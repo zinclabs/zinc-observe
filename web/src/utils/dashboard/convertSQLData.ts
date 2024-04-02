@@ -28,6 +28,8 @@ import {
   getUnitValue,
 } from "./convertDataIntoUnitValue";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
+import { getColor, getSQLMinMaxValue } from "./colorPalette";
+
 export const convertSQLData = (
   panelSchema: any,
   searchQueryData: any,
@@ -416,6 +418,17 @@ export const convertSQLData = (
     series: [],
   };
   const defaultSeriesProps = getPropsByChartTypeForSeries(panelSchema.type);
+
+  // if color type is shades, continuous then required to calculate min and max for chart.
+  let chartMin: any = Infinity;
+  let chartMax: any = -Infinity;
+  if (
+    ["shades", "green-yellow-red", "red-yellow-green"].includes(
+      panelSchema?.config?.color?.mode
+    )
+  ) {
+    [chartMin, chartMax] = getSQLMinMaxValue(yAxisKeys, searchQueryData);
+  }
 
   // Now set the series values as per the chart data
   // Override any configs if required as per the chart type

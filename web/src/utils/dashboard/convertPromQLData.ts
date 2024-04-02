@@ -20,6 +20,7 @@ import {
 } from "./convertDataIntoUnitValue";
 import { utcToZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
+import { getColor, getMetricMinMaxValue } from "./colorPalette";
 
 let moment: any;
 let momentInitialized = false;
@@ -143,6 +144,7 @@ export const convertPromQLData = async (
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
+    // color: colorArrayByValue,
     grid: {
       containLabel: panelSchema.config?.axis_width == null ? true : false,
       //based on config width set grid
@@ -347,6 +349,17 @@ export const convertPromQLData = async (
     panelSchema.type
   );
 
+  // if color type is shades, continuous then required to calculate min and max for chart.
+  let chartMin: any = Infinity;
+  let chartMax: any = -Infinity;
+  if (
+    ["shades", "green-yellow-red", "red-yellow-green"].includes(
+      panelSchema?.config?.color?.mode
+    )
+  ) {
+    [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
+  }
+
   options.series = searchQueryData.map((it: any, index: number) => {
     switch (panelSchema.type) {
       case "bar":
@@ -373,6 +386,19 @@ export const convertPromQLData = async (
                   metric.metric,
                   panelSchema.queries[index].config.promql_legend
                 ),
+                itemStyle: {
+                  color: getColor(
+                    panelSchema,
+                    getPromqlLegendName(
+                      metric.metric,
+                      panelSchema.queries[index].config.promql_legend
+                    ),
+                    metric.metric,
+                    chartMin,
+                    chartMax
+                  ),
+                },
+                // colorBy: "data",
                 // if utc then simply return the values by removing z from string
                 // else convert time from utc to zoned
                 // used slice to remove Z from isostring to pass as a utc
@@ -444,6 +470,18 @@ export const convertPromQLData = async (
                   ) / 6
                 }`,
               },
+            },
+            itemStyle: {
+              color: getColor(
+                panelSchema,
+                getPromqlLegendName(
+                  metric.metric,
+                  panelSchema.queries[index].config.promql_legend
+                ),
+                values,
+                chartMin,
+                chartMax
+              ),
             },
             title: {
               fontSize: 10,
@@ -787,7 +825,9 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "line",
         emphasis: { focus: "series" },
         smooth: true,
-        areaStyle: {},
+        areaStyle: {
+          opacity: 0.4,
+        },
         showSymbol: false,
         lineStyle: { width: 1.5 },
       };
@@ -802,7 +842,9 @@ const getPropsByChartTypeForSeries = (type: string) => {
         type: "line",
         smooth: true,
         stack: "Total",
-        areaStyle: {},
+        areaStyle: {
+          opacity: 0.4,
+        },
         showSymbol: false,
         emphasis: {
           focus: "series",

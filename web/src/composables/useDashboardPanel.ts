@@ -71,6 +71,9 @@ const getDefaultDashboardPanelData: any = () => ({
       drilldown: [],
       connect_nulls: false,
       wrap_table_cells: false,
+      color: {
+        mode: "palette-classic",
+      },
     },
     htmlContent: "",
     markdownContent: "",
