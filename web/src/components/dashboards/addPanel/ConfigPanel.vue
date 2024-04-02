@@ -732,6 +732,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           )
         "
       />
+
+      <div class="space"></div>
+      <ColorPaletteDropDown v-if="dashboardPanelData.data.type != 'metric'" />
+      <div class="space"></div>
     </div>
   </div>
 </template>
@@ -742,9 +746,10 @@ import { computed, defineComponent, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
+import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 
 export default defineComponent({
-  components: { Drilldown, CommonAutoComplete },
+  components: { Drilldown, CommonAutoComplete, ColorPaletteDropDown },
   props: ["dashboardPanelData"],
   setup(props) {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
