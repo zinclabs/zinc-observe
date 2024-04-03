@@ -22,9 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         label="Color palette"
         class="showLabelOnTop"
         stack-label
-        :display-value="`${
-          dashboardPanelData.data.config.color.mode ?? 'palette-classic'
-        }`"
+        :display-value="selectedOptionLabel"
         @update:model-value="onColorModeChange"
         style="width: 100%"
       >
@@ -33,13 +31,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <q-item-section style="padding: 2px">
               <q-item-label>{{ props.opt.label }}</q-item-label>
               <q-item-label caption>
+                <div v-if="props.opt.subLabel">
+                  <div style="font-weight: 200">
+                    {{ props.opt.subLabel }}
+                  </div>
+                </div>
                 <div
-                  v-if="Array.isArray(props.opt.subLabel)"
+                  v-if="Array.isArray(props.opt.colorPalette)"
                   class="color-container"
                 >
                   <div
                     :style="{
-                      background: `linear-gradient(to right, ${props.opt.subLabel.join(
+                      background: `linear-gradient(to right, ${props.opt.colorPalette.join(
                         ', '
                       )})`,
                       width: '100%',
@@ -47,11 +50,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       borderRadius: '3px',
                     }"
                   ></div>
-                </div>
-                <div v-else>
-                  <div style="font-weight: 200">
-                    {{ props.opt.subLabel }}
-                  </div>
                 </div>
               </q-item-label>
             </q-item-section>
@@ -77,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="q-pt-md"
       v-if="
-        ['green-yellow-red', 'red-yellow-green'].includes(
+        ['continuous'].includes(
           dashboardPanelData.data.config.color.mode
         )
       "
@@ -101,7 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { colorArrayBySeries } from "@/utils/dashboard/colorPalette";
+import { classicColorPalette } from "@/utils/dashboard/colorPalette";
+import { computed } from "vue";
 import { onBeforeMount } from "vue";
 import { defineComponent } from "vue";
 export default defineComponent({
@@ -118,6 +117,7 @@ export default defineComponent({
         };
       }
     });
+
     const colorOptions = [
       {
         label: "Fixed",
@@ -131,20 +131,51 @@ export default defineComponent({
       },
       {
         label: "Palette-Classic",
-        subLabel: colorArrayBySeries,
+        subLabel: "Random color for each series",
+        colorPalette: [
+          "#5470c6",
+          "#91cc75",
+          "#fac858",
+          "#ee6666",
+          "#73c0de",
+          "#3ba272",
+          "#fc8452",
+          "#9a60b4",
+          "#ea7ccc",
+          "#59c4e6",
+          "#edafda",
+          "#93b7e3",
+          "#a5e7f0",
+        ],
         value: "palette-classic",
       },
       {
+        label: "Palette-Classic (By Series)",
+        subLabel: "Same color for same series name",
+        colorPalette: classicColorPalette,
+        value: "palette-classic-by-series",
+      },
+      {
         label: "Green-Yellow-Red",
-        subLabel: ["#00FF00", "#FFFF00", "#FF0000"],
-        value: "green-yellow-red",
+        colorPalette: ["#00FF00", "#FFFF00", "#FF0000"],
+        value: "continuous",
       },
       {
         label: "Red-Yellow-Green",
-        subLabel: ["#FF0000", "#FFFF00", "#00FF00"],
-        value: "red-yellow-green",
+        colorPalette: ["#FF0000", "#FFFF00", "#00FF00"],
+        value: "continuous",
       },
     ];
+
+    const selectedOptionLabel = computed(() => {
+      const selectedOption = colorOptions.find(
+        (option) =>
+          option.value === dashboardPanelData?.data?.config?.color?.mode ??
+          "palette-classic"
+      );
+      return selectedOption ? selectedOption.label : "palette-classic";
+    });
+
     const onColorModeChange = (value: any) => {
       // if value.value is fixed or shades, assign ["#53ca53"] to fixedcolor
       if (["fixed", "shades"].includes(value.value)) {
@@ -152,7 +183,7 @@ export default defineComponent({
         dashboardPanelData.data.config.color.seriesBy = "last";
       } else {
         // else assign sublabel to fixedcolor
-        dashboardPanelData.data.config.color.fixedColor = value.subLabel;
+        dashboardPanelData.data.config.color.fixedColor = value.colorPalette;
       }
       dashboardPanelData.data.config.color.mode = value.value;
     };
@@ -161,6 +192,7 @@ export default defineComponent({
       promqlMode,
       colorOptions,
       onColorModeChange,
+      selectedOptionLabel,
     };
   },
 });

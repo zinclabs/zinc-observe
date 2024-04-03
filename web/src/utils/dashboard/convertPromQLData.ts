@@ -352,11 +352,7 @@ export const convertPromQLData = async (
   // if color type is shades, continuous then required to calculate min and max for chart.
   let chartMin: any = Infinity;
   let chartMax: any = -Infinity;
-  if (
-    ["shades", "green-yellow-red", "red-yellow-green"].includes(
-      panelSchema?.config?.color?.mode
-    )
-  ) {
+  if (["shades", "continuous"].includes(panelSchema?.config?.color?.mode)) {
     [chartMin, chartMax] = getMetricMinMaxValue(searchQueryData);
   }
 
@@ -393,7 +389,7 @@ export const convertPromQLData = async (
                       metric.metric,
                       panelSchema.queries[index].config.promql_legend
                     ),
-                    metric.metric,
+                    metric.values,
                     chartMin,
                     chartMax
                   ),
@@ -826,7 +822,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         emphasis: { focus: "series" },
         smooth: true,
         areaStyle: {
-          opacity: 0.4,
+          // opacity: 0.4,
         },
         showSymbol: false,
         lineStyle: { width: 1.5 },
@@ -843,7 +839,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
         smooth: true,
         stack: "Total",
         areaStyle: {
-          opacity: 0.4,
+          // opacity: 0.4,
         },
         showSymbol: false,
         emphasis: {
