@@ -423,11 +423,18 @@ export const convertSQLData = (
   let chartMin: any = Infinity;
   let chartMax: any = -Infinity;
   if (
-    ["shades", "green-yellow-red", "red-yellow-green"].includes(
-      panelSchema?.config?.color?.mode
-    )
+    [
+      "shades",
+      "continuous-green-yellow-red",
+      "continuous-red-yellow-green",
+    ].includes(panelSchema?.config?.color?.mode)
   ) {
-    [chartMin, chartMax] = getSQLMinMaxValue(yAxisKeys, searchQueryData);
+    // if heatmap then get min and max from z axis sql data
+    if (panelSchema.type == "heatmap") {
+      [chartMin, chartMax] = getSQLMinMaxValue(zAxisKeys, searchQueryData);
+    } else {
+      [chartMin, chartMax] = getSQLMinMaxValue(yAxisKeys, searchQueryData);
+    }
   }
 
   // Now set the series values as per the chart data
@@ -507,6 +514,19 @@ export const convertSQLData = (
                     data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[yAxis] ??
                     null
                 ),
+                color:
+                  getColor(
+                    panelSchema,
+                    yAxisKeys.length == 1 ? key : key + " (" + yAxisName + ")",
+                    xAxisUniqueValue.map(
+                      (it: any) =>
+                        data.find((it2: any) => it2[xAxisKeys[0]] == it)?.[
+                          yAxis
+                        ] ?? null
+                    ),
+                    chartMin,
+                    chartMax
+                  ) ?? "#5960b2",
               };
               return seriesObj;
             });
@@ -520,9 +540,15 @@ export const convertSQLData = (
               (it: any) => it.alias == key
             )?.label,
             color:
-              panelSchema.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key
-              )?.color || "#5960b2",
+              getColor(
+                panelSchema,
+                panelSchema?.queries[0]?.fields?.y.find(
+                  (it: any) => it.alias == key
+                )?.label,
+                getAxisDataFromKey(key),
+                chartMin,
+                chartMax
+              ) ?? "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
             // config to connect null values
@@ -596,9 +622,15 @@ export const convertSQLData = (
               (it: any) => it.alias == key
             )?.label,
             color:
-              panelSchema.queries[0]?.fields?.y.find(
-                (it: any) => it.alias == key
-              )?.color || "#5960b2",
+              getColor(
+                panelSchema,
+                panelSchema?.queries[0]?.fields?.y.find(
+                  (it: any) => it.alias == key
+                )?.label,
+                getAxisDataFromKey(key),
+                chartMin,
+                chartMax
+              ) ?? "#5960b2",
             opacity: 0.8,
             ...defaultSeriesProps,
             // config to connect null values
@@ -617,8 +649,15 @@ export const convertSQLData = (
             (it: any) => it.alias == key
           )?.label,
           color:
-            panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
-              ?.color || "#5960b2",
+            getColor(
+              panelSchema,
+              panelSchema?.queries[0]?.fields?.y.find(
+                (it: any) => it.alias == key
+              )?.label,
+              getAxisDataFromKey(key),
+              chartMin,
+              chartMax
+            ) ?? "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
           data: getAxisDataFromKey(key),
@@ -635,8 +674,15 @@ export const convertSQLData = (
             (it: any) => it.alias == key
           )?.label,
           color:
-            panelSchema.queries[0]?.fields?.y.find((it: any) => it.alias == key)
-              ?.color || "#5960b2",
+            getColor(
+              panelSchema,
+              panelSchema?.queries[0]?.fields?.y.find(
+                (it: any) => it.alias == key
+              )?.label,
+              getAxisDataFromKey(key),
+              chartMin,
+              chartMax
+            ) ?? "#5960b2",
           opacity: 0.8,
           ...defaultSeriesProps,
           data: getAxisDataFromKey(key),
@@ -699,6 +745,16 @@ export const convertSQLData = (
           data: getAxisDataFromKey(key).map((it: any, i: number) => {
             return { value: it, name: options?.xAxis[0]?.data[i] };
           }),
+          // color:
+          //   getColor(
+          //     panelSchema,
+          //     panelSchema?.queries[0]?.fields?.y.find(
+          //       (it: any) => it.alias == key
+          //     )?.label,
+          //     getAxisDataFromKey(key),
+          //     chartMin,
+          //     chartMax
+          //   ) ?? "#5960b2",
           label: {
             show: true,
             formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
@@ -750,6 +806,16 @@ export const convertSQLData = (
           data: getAxisDataFromKey(key).map((it: any, i: number) => {
             return { value: it, name: options?.xAxis[0]?.data[i] };
           }),
+          // color:
+          //   getColor(
+          //     panelSchema,
+          //     panelSchema?.queries[0]?.fields?.y.find(
+          //       (it: any) => it.alias == key
+          //     )?.label,
+          //     getAxisDataFromKey(key),
+          //     chartMin,
+          //     chartMax
+          //   ) ?? "#5960b2",
           label: {
             show: true,
             formatter: "{d}%", // {b} represents name, {c} represents value {d} represents percent
@@ -815,6 +881,8 @@ export const convertSQLData = (
                 yAxisKeys[0]
               ] ?? null
           ),
+          color:
+            getColor(panelSchema, key, data, chartMin, chartMax) ?? "#5960b2",
         };
         return seriesObj;
       });
@@ -872,6 +940,14 @@ export const convertSQLData = (
                 );
               })
               .flat(),
+            color:
+              getColor(
+                panelSchema,
+                panelSchema?.queries[0]?.fields?.y[0]?.label,
+                zValues,
+                chartMin,
+                chartMax
+              ) ?? "#5960b2",
             label: {
               show: true,
               fontSize: 12,
@@ -1011,6 +1087,8 @@ export const convertSQLData = (
         const data = searchQueryData[0].filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
+          color:
+            getColor(panelSchema, key, data, chartMin, chartMax) ?? "#5960b2",
           ...defaultSeriesProps,
           data: options.xAxis[0].data.map(
             (it: any) =>
@@ -1134,6 +1212,15 @@ export const convertSQLData = (
           ...defaultSeriesProps,
           min: panelSchema?.queries[0]?.config?.min || 0,
           max: panelSchema?.queries[0]?.config?.max || 100,
+
+          color:
+            getColor(
+              panelSchema,
+              xAxisValue[index] ?? "",
+              it,
+              chartMin,
+              chartMax
+            ) ?? "#5960b2",
 
           //which grid will be used
           gridIndex: index,

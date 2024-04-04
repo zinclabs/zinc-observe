@@ -81,9 +81,11 @@ const getSeriesValueFrom2DArray = (panelSchema: any, values: any) => {
       : 50;
 
   if (
-    ["shades", "continuous", "green-yellow-red", "red-yellow-green"].includes(
-      panelSchema?.config?.color?.mode
-    )
+    [
+      "shades",
+      "continuous-green-yellow-red",
+      "continuous-red-yellow-green",
+    ].includes(panelSchema?.config?.color?.mode)
   ) {
     if (panelSchema?.config?.color?.seriesBy == "min") {
       values.forEach((value: any) => {
@@ -113,7 +115,13 @@ const getSeriesValueFromArray = (panelSchema: any, values: any) => {
         ? values[values.length - 1]
         : 50
       : 50;
-  if (["shades", "continuous"].includes(panelSchema?.config?.color?.mode)) {
+  if (
+    [
+      "shades",
+      "continuous-green-yellow-red",
+      "continuous-red-yellow-green",
+    ].includes(panelSchema?.config?.color?.mode)
+  ) {
     if (panelSchema?.config?.color?.seriesBy == "min") {
       values.forEach((value: any) => {
         // value[1] should not NaN
@@ -230,7 +238,12 @@ export const classicColorPalette = [
   "#98C0FF",
 ];
 
-function getColorBasedOnValue(currentValue, minValue, maxValue, colorArray) {
+function getColorBasedOnValue(
+  currentValue: any,
+  minValue: any,
+  maxValue: any,
+  colorArray: any
+) {
   // Calculate the size of each partition
   var partitionSize = (maxValue - minValue) / colorArray.length;
 
@@ -244,18 +257,22 @@ function getColorBasedOnValue(currentValue, minValue, maxValue, colorArray) {
   return colorArray[index];
 }
 
-function djb2Hash(str) {
-  let hash = 5381;
+function getHashFromSeriesName(str: string) {
+  // remove unwanted space
+  str = str.trim();
+
+  let hash = 0;
   for (let i = 0; i < str.length; i++) {
-    // 5 times left shift means multiply by 32
-    hash = (hash << 5) + hash + str.charCodeAt(i); /* hash * 33 + c */
+    hash += str.charCodeAt(i);
   }
   return hash;
 }
 
 const getColorForSeries = (seriesName: string, colorArray: string[]) => {
-  // let hash = djb2Hash(seriesName);
-  let hash = djb2Hash(seriesName);
+  // Calculate the hash of the series name
+  let hash = getHashFromSeriesName(seriesName);
+
+  // Use the hash to select a color from the color array
   let index = Math.abs(hash) % colorArray.length;
   return colorArray[index];
 };
@@ -267,7 +284,6 @@ export const getColor = (
   chartMin?: any,
   chartMax?: any
 ) => {
-  console.log(panelSchema?.config?.color);
   // switch case based on panelSchema.color type
   switch (panelSchema?.config?.color?.mode) {
     case "fixed": {
@@ -297,7 +313,8 @@ export const getColor = (
       return null;
     }
 
-    case "continuous": {
+    case "continuous-green-yellow-red":
+    case "continuous-red-yellow-green": {
       const value =
         panelSchema?.queryType == "promql"
           ? getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50

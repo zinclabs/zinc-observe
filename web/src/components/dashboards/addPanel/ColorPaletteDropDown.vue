@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="q-pt-md"
       v-if="
-        ['continuous'].includes(
+        ['continuous-green-yellow-red', 'continuous-red-yellow-green'].includes(
           dashboardPanelData.data.config.color.mode
         )
       "
@@ -158,12 +158,12 @@ export default defineComponent({
       {
         label: "Green-Yellow-Red",
         colorPalette: ["#00FF00", "#FFFF00", "#FF0000"],
-        value: "continuous",
+        value: "continuous-green-yellow-red",
       },
       {
         label: "Red-Yellow-Green",
         colorPalette: ["#FF0000", "#FFFF00", "#00FF00"],
-        value: "continuous",
+        value: "continuous-red-yellow-green",
       },
     ];
 
