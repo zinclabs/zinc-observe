@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :display-value="selectedOptionLabel"
         @update:model-value="onColorModeChange"
         style="width: 100%"
+        :popup-content-style="{ height: '300px' }"
       >
         <template v-slot:option="props">
           <q-item v-bind="props.itemProps">
@@ -74,11 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       class="q-pt-md"
-      v-if="
-        ['continuous-green-yellow-red', 'continuous-red-yellow-green'].includes(
-          dashboardPanelData.data.config.color.mode
-        )
-      "
+      v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')"
     >
       Color series by:
       <div>
@@ -107,11 +104,11 @@ export default defineComponent({
   name: "ColorPaletteDropdown",
   setup() {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
-    // on before mount need to check whether color object is there or not else use palette-classic as a default
+    // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
     onBeforeMount(() => {
       if (!dashboardPanelData?.data?.config?.color) {
         dashboardPanelData.data.config.color = {
-          mode: "palette-classic",
+          mode: "palette-classic-by-series",
           fixedColor: ["#53ca53"],
           seriesBy: "last",
         };
@@ -128,6 +125,12 @@ export default defineComponent({
         label: "Shades",
         subLabel: "Different shades of specific color",
         value: "shades",
+      },
+      {
+        label: "Palette-Classic (By Series)",
+        subLabel: "Same color for same series name",
+        colorPalette: classicColorPalette,
+        value: "palette-classic-by-series",
       },
       {
         label: "Palette-Classic",
@@ -150,20 +153,62 @@ export default defineComponent({
         value: "palette-classic",
       },
       {
-        label: "Palette-Classic (By Series)",
-        subLabel: "Same color for same series name",
-        colorPalette: classicColorPalette,
-        value: "palette-classic-by-series",
-      },
-      {
-        label: "Green-Yellow-Red",
-        colorPalette: ["#00FF00", "#FFFF00", "#FF0000"],
+        label: "Green-Yellow-Red (By Value)",
+        colorPalette: [
+          "#69B34C",
+          "#ACB334",
+          "#FAB733",
+          "#FF8E15",
+          "#FF4E11",
+          "#FF0D0D",
+        ],
         value: "continuous-green-yellow-red",
       },
       {
-        label: "Red-Yellow-Green",
-        colorPalette: ["#FF0000", "#FFFF00", "#00FF00"],
+        label: "Red-Yellow-Green (By Value)",
+        colorPalette: [
+          "#FF0D0D",
+          "#FF4E11",
+          "#FF8E15",
+          "#FAB733",
+          "#ACB334",
+          "#69B34C",
+        ],
         value: "continuous-red-yellow-green",
+      },
+      {
+        label: "Temperature (By Value)",
+        colorPalette: ["#85CBD9", "#F6EADB", "#FBDBA2", "#FFC86D", "#FC8585"],
+        value: "continuous-temperature",
+      },
+      {
+        label: "Positive (By Value)",
+        colorPalette: ["#D3E8D3", "#A7D1A7", "#7AB97A", "#4EA24E", "#228B22"],
+        value: "continuous-positive",
+      },
+      {
+        label: "Negative (By Value)",
+        colorPalette: [
+          "#FEEAEA",
+          "#FFD4D4",
+          "#FFADAD",
+          "#F77272",
+          "#F03030",
+          "#B12E21",
+        ],
+        value: "continuous-negative",
+      },
+      {
+        label: "Light To Dark Blue (By Value)",
+        colorPalette: [
+          "#DBE9F3",
+          "#B8CCE0",
+          "#96AFCD",
+          "#7392BA",
+          "#5175A7",
+          "#2E5894",
+        ],
+        value: "continuous-light-to-dark-blue",
       },
     ];
 
@@ -171,13 +216,15 @@ export default defineComponent({
       const selectedOption = colorOptions.find(
         (option) =>
           option.value === dashboardPanelData?.data?.config?.color?.mode ??
-          "palette-classic"
+          "palette-classic-by-series"
       );
-      return selectedOption ? selectedOption.label : "palette-classic";
+      return selectedOption
+        ? selectedOption.label
+        : "Palette-Classic (By Series)";
     });
 
     const onColorModeChange = (value: any) => {
-      // if value.value is fixed or shades, assign ["#53ca53"] to fixedcolor
+      // if value.value is fixed or shades, assign ["#53ca53"] to fixedcolor as a default
       if (["fixed", "shades"].includes(value.value)) {
         dashboardPanelData.data.config.color.fixedColor = ["#53ca53"];
         dashboardPanelData.data.config.color.seriesBy = "last";

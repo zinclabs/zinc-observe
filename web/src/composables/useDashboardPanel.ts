@@ -72,7 +72,9 @@ const getDefaultDashboardPanelData: any = () => ({
       connect_nulls: false,
       wrap_table_cells: false,
       color: {
-        mode: "palette-classic",
+        mode: "palette-classic-by-series",
+        fixedColor: ["#53ca53"],
+        seriesBy: "last",
       },
     },
     htmlContent: "",

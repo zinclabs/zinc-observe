@@ -81,11 +81,8 @@ const getSeriesValueFrom2DArray = (panelSchema: any, values: any) => {
       : 50;
 
   if (
-    [
-      "shades",
-      "continuous-green-yellow-red",
-      "continuous-red-yellow-green",
-    ].includes(panelSchema?.config?.color?.mode)
+    ["shades"].includes(panelSchema?.config?.color?.mode) ||
+    panelSchema?.config?.color?.mode.startsWith("continuous")
   ) {
     if (panelSchema?.config?.color?.seriesBy == "min") {
       values.forEach((value: any) => {
@@ -116,11 +113,8 @@ const getSeriesValueFromArray = (panelSchema: any, values: any) => {
         : 50
       : 50;
   if (
-    [
-      "shades",
-      "continuous-green-yellow-red",
-      "continuous-red-yellow-green",
-    ].includes(panelSchema?.config?.color?.mode)
+    ["shades"].includes(panelSchema?.config?.color?.mode) ||
+    panelSchema?.config?.color?.mode.startsWith("continuous")
   ) {
     if (panelSchema?.config?.color?.seriesBy == "min") {
       values.forEach((value: any) => {
@@ -313,25 +307,24 @@ export const getColor = (
       return null;
     }
 
-    case "continuous-green-yellow-red":
-    case "continuous-red-yellow-green": {
-      const value =
-        panelSchema?.queryType == "promql"
-          ? getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50
-          : getSeriesValueFromArray(panelSchema, valuesArr) ?? 50;
-
-      return getColorBasedOnValue(
-        value,
-        chartMin ?? 0,
-        chartMax ?? 100,
-        panelSchema?.config?.color?.fixedColor ?? ["5470c6"]
-      );
-    }
-
     default: {
-      // return color using colorArrayBySeries
+      // if mode starts with "continuous", execute this code
+      if (panelSchema?.config?.color?.mode?.startsWith("continuous")) {
+        const value =
+          panelSchema?.queryType == "promql"
+            ? getSeriesValueFrom2DArray(panelSchema, valuesArr) ?? 50
+            : getSeriesValueFromArray(panelSchema, valuesArr) ?? 50;
+
+        return getColorBasedOnValue(
+          value,
+          chartMin ?? 0,
+          chartMax ?? 100,
+          panelSchema?.config?.color?.fixedColor ?? ["5470c6"]
+        );
+      }
+
+      // for all other cases, default will be palette-classic-by-series
       return getColorForSeries(seriesName, classicColorPalette);
-      // return null
     }
   }
 };
