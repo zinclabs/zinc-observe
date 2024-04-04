@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :display-value="selectedOptionLabel"
         @update:model-value="onColorModeChange"
         style="width: 100%"
-        :popup-content-style="{ height: '300px' }"
+        :popup-content-style="{ height: '300px', width: '200px' }"
       >
         <template v-slot:option="props">
           <q-item v-bind="props.itemProps">
@@ -128,13 +128,14 @@ export default defineComponent({
       },
       {
         label: "Palette-Classic (By Series)",
-        subLabel: "Same color for same series name",
+        subLabel: "Series with the same name will use the same color",
         colorPalette: classicColorPalette,
         value: "palette-classic-by-series",
       },
       {
         label: "Palette-Classic",
-        subLabel: "Random color for each series",
+        subLabel:
+          "A random color will be used for each series, regardless of its name",
         colorPalette: [
           "#5470c6",
           "#91cc75",
