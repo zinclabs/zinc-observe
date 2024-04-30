@@ -510,6 +510,12 @@ export default defineComponent({
         name: "rum",
       },
       {
+        title: t("menu.synthetics"),
+        icon: "public",
+        link: "/synthetics",
+        name: "synthetics",
+      },
+      {
         title: t("menu.dashboard"),
         icon: outlinedDashboard,
         link: "/dashboards",

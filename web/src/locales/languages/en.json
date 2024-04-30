@@ -57,7 +57,9 @@
     "cancelChanges": "Cancel Changes",
     "logs": "Logs",
     "addGroup":"Add Group",
-    "addCondition":"Add Condition"
+    "addCondition":"Add Condition",
+    "url": "URL",
+    "send": "Send"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -154,7 +156,8 @@
     "settings": "Management",
     "iam": "IAM",
     "report": "Reports",
-    "pipeline": "Pipelines"
+    "pipeline": "Pipelines",
+    "synthetics": "Synthetics"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -926,6 +929,11 @@
   },
   "traces": {
     "viewLogs": "View Logs",
-    "backToLogs": "Back to Logs"
+    "backToLogs": "Back to Logs",
+    "refreshQuery": "Refresh Query"
+  },
+  "synthetics": {
+    "header": "Synthetics",
+    "requestType": "Request Type"
   }
 }
