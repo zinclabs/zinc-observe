@@ -191,7 +191,8 @@
     "sizekb": "Size (kb)",
     "viewURL": "View URL",
     "events": "Events",
-    "location": "Location"
+    "location": "Location",
+    "syntheticMonitoring": "Synthetic Monitoring"
   },
   "about": {
     "name": "OpenObserve",
