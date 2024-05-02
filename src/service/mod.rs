@@ -40,6 +40,7 @@ pub mod schema;
 pub mod search;
 pub mod session;
 pub mod stream;
+pub mod synthetics;
 pub mod syslogs_route;
 pub mod traces;
 pub mod usage;

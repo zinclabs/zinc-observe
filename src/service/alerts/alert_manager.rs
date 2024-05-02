@@ -60,6 +60,7 @@ pub async fn handle_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyh
     match trigger.module {
         db::scheduler::TriggerModule::Report => handle_report_triggers(trigger).await,
         db::scheduler::TriggerModule::Alert => handle_alert_triggers(trigger).await,
+        db::scheduler::TriggerModule::Synthetics => handle_synthetics_triggers(trigger).await,
     }
 }
 
@@ -367,5 +368,33 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
     }
     publish_triggers_usage(trigger_data_stream).await;
 
+    Ok(())
+}
+
+pub async fn handle_synthetics_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    log::info!(
+        "Handle synthetics trigger called for key: {}",
+        &trigger.module_key
+    );
+
+    let org_id = &trigger.org;
+    // For synthetics, trigger.module_key is the synthetics name
+    let synthetics_name = &trigger.module_key;
+
+    let mut synthetics = db::synthetics::get(org_id, synthetics_name).await?;
+    let now = Utc::now().timestamp_micros();
+    if let Err(e) = synthetics.test_target().await {
+        log::error!("Failed while testing synthetics target {synthetics_name}: {e}");
+    }
+    synthetics.last_triggered_at = Some(now);
+
+    if let Err(e) = db::synthetics::set_without_updating_trigger(org_id, &synthetics).await {
+        log::error!(
+            "Failed to update synthetics: {synthetics_name} after trigger: {}",
+            e
+        );
+    }
     Ok(())
 }

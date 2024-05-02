@@ -29,6 +29,7 @@ pub mod rum;
 pub mod search;
 pub mod status;
 pub mod stream;
+pub mod synthetics;
 pub mod syslog;
 pub mod traces;
 pub mod users;
