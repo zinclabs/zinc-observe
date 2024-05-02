@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(variable, index) in variables as any"
         :key="variable.uuid"
-        class="q-col-gutter-sm q-pb-sm flex items-center"
+        class="q-col-gutter-sm q-pb-sm flex items-center o2-input"
         :data-test="`alert-variables-${index + 1}`"
       >
         <div class="q-ml-none">
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="min-width: 250px"
           />
         </div>
-        <div class="q-ml-none">
+        <div class="q-ml-none variables-value-input">
           <q-input
             data-test="alert-variables-value-input"
             v-model="variable.value"

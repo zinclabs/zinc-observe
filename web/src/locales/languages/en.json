@@ -59,7 +59,8 @@
     "addGroup":"Add Group",
     "addCondition":"Add Condition",
     "url": "URL",
-    "send": "Send"
+    "send": "Send",
+    "token": "Token"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -934,6 +935,12 @@
   },
   "synthetics": {
     "header": "Synthetics",
-    "requestType": "Request Type"
+    "requestType": "Request Type",
+    "requestOptions": "Request Options",
+    "params": "Params",
+    "headers": "Headers",
+    "body": "Body",
+    "authorization": "Authorization",
+    "bodyType": "Body Type"
   }
 }

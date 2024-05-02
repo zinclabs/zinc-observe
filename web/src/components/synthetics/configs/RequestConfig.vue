@@ -1,6 +1,6 @@
 <template>
-  <div>
-    <div class="flex items-center o2-input">
+  <div class="request-config o2-input">
+    <div class="flex items-center">
       <div class="request-type-selector">
         <q-select
           v-model="request.type"
@@ -43,15 +43,161 @@
       </div>
     </div>
     <div>
-      <app-tabs />
+      <app-tabs
+        :active-tab="activeConfigTab"
+        :tabs="requestConfigTabs"
+        @update:active-tab="updateActiveTab"
+      />
+      <q-separator />
+      <div class="relative-position q-mt-sm">
+        <transition name="slide" mode="out-in">
+          <div class="config-content" v-if="activeConfigTab === 'params'">
+            <div class="q-mb-sm text-subtitle2 text-bold text-grey-8">
+              Query Params
+            </div>
+
+            <div class="flex">
+              <div
+                class="params-key-title q-ml-xs q-mr-xs text-subtitle2 text-grey-9"
+              >
+                Key
+              </div>
+              <div
+                class="params-value-title q-ml-xs text-subtitle2 text-grey-9"
+              >
+                Value
+              </div>
+            </div>
+            <variables-input
+              :variables="request.params"
+              @add:variable="addQueryParam(request.params)"
+              @remove:variable="(tab) => removeQueryParam(tab, request.params)"
+            />
+          </div>
+          <div
+            class="config-content flex"
+            v-else-if="activeConfigTab === 'authorization'"
+          >
+            <div class="request-type-selector q-mr-lg">
+              <q-select
+                v-model="request.auth.type"
+                :options="authTypes"
+                :label="t('common.type') + ' *'"
+                color="input-border"
+                bg-color="input-bg"
+                class="q-py-sm showLabelOnTop no-case"
+                emit-value
+                map-options
+                stack-label
+                outlined
+                filled
+                dense
+                :rules="[(val: any) => !!val || 'Field is required!']"
+              />
+            </div>
+            <div v-if="request.auth.type === 'basic'">
+              <div class="request-url">
+                <q-input
+                  v-model="request.auth.basic.username"
+                  color="input-border"
+                  bg-color="input-bg"
+                  :label="t('user.name') + ' *'"
+                  class="showLabelOnTop q-mb-md"
+                  placeholder="https://example.com"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  tabindex="0"
+                />
+              </div>
+              <div class="request-url">
+                <q-input
+                  v-model="request.auth.basic.password"
+                  color="input-border"
+                  bg-color="input-bg"
+                  :label="t('user.password') + ' *'"
+                  class="showLabelOnTop q-mb-sm"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  tabindex="0"
+                />
+              </div>
+            </div>
+
+            <div v-if="request.auth.type === 'bearer'">
+              <div class="request-url">
+                <q-input
+                  v-model="request.auth.bearer.token"
+                  color="input-border"
+                  bg-color="input-bg"
+                  :label="t('common.token') + ' *'"
+                  class="showLabelOnTop q-mb-md"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  tabindex="0"
+                />
+              </div>
+            </div>
+          </div>
+          <div class="config-content" v-else-if="activeConfigTab === 'headers'">
+            <div class="q-mb-sm text-bold text-grey-8">Headers</div>
+
+            <variables-input
+              :variables="request.headers"
+              @add:variable="addQueryParam(request.headers)"
+              @remove:variable="(tab) => removeQueryParam(tab, request.headers)"
+            />
+          </div>
+          <div class="config-content" v-else-if="activeConfigTab === 'body'">
+            <div class="request-body-type-selector q-mr-lg">
+              <q-select
+                v-model="request.body.type"
+                :options="bodyTypes"
+                :label="t('synthetics.bodyType') + ' *'"
+                color="input-border"
+                bg-color="input-bg"
+                input-class="no-case"
+                options-selected-class="no-case"
+                class="q-py-sm showLabelOnTop no-case"
+                stack-label
+                map-options
+                emit-value
+                outlined
+                filled
+                dense
+                :rules="[(val: any) => !!val || 'Field is required!']"
+              />
+            </div>
+
+            <div class="query-editor">
+              <QueryEditor
+                :key="request.body.type"
+                style="height: 400px; width: 100%"
+                editorId="synthetics-request-body-editor"
+                v-model:query="request.body.content"
+                :language="editorLanguage"
+                @update:query="onQueryUpdate"
+              />
+            </div>
+          </div>
+        </transition>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import VariablesInput from "@/components/alerts/VariablesInput.vue";
+import AppTabs from "@/components/common/AppTabs.vue";
+import { getUUID } from "@/utils/zincutils";
+import { ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import AppTabs from "src/components/common/AppTabs.vue";
+import QueryEditor from "../QueryEditor.vue";
 
 const { t } = useI18n();
 
@@ -66,20 +212,251 @@ const requestTypeOptions = [
   "OPTIONS",
 ];
 
+const bodyTypes = [
+  {
+    label: "none",
+    value: "none",
+  },
+  {
+    label: "Raw",
+    value: "raw",
+  },
+  {
+    label: "Form Data",
+    value: "form_data",
+  },
+  {
+    label: "x-www-form-urlencoded",
+    value: "x-www-form-urlencoded",
+  },
+  {
+    label: "GraphQL",
+    value: "graphql",
+  },
+  {
+    label: "Text-Plain",
+    value: "text_plain",
+  },
+  {
+    label: "Text-JSON",
+    value: "text_json",
+  },
+  {
+    label: "Text-HTML",
+    value: "text_html",
+  },
+  {
+    label: "Text-XML",
+    value: "text_xml",
+  },
+  {
+    label: "Text-JavaScript",
+    value: "text_javaScript",
+  },
+];
+
 const request = ref({
   type: "GET",
   url: "",
+  params: [
+    {
+      id: getUUID(),
+      key: "",
+      value: "",
+    },
+  ],
+  headers: [
+    {
+      id: getUUID(),
+      key: "",
+      value: "",
+    },
+  ],
+  auth: {
+    type: "basic",
+    basic: {
+      username: "",
+      password: "",
+    },
+    bearer: {
+      token: "",
+    },
+  },
+  body: {
+    type: "raw",
+    content: "",
+  },
 });
 
-const selectedRequestType = ref<string>("GET");
+const authTypes = [
+  {
+    label: "Basic",
+    value: "basic",
+  },
+  {
+    label: "Bearer",
+    value: "bearer",
+  },
+  {
+    label: "OAuth 2.0",
+    value: "oauth_2.0",
+  },
+];
+
+const requestConfigTabs = [
+  {
+    value: "params",
+    label: t("synthetics.params"),
+    style: {
+      width: "100px",
+      margin: "0 10px",
+    },
+  },
+  {
+    value: "authorization",
+    label: t("synthetics.authorization"),
+    style: {
+      width: "120px",
+      margin: "0 10px",
+    },
+  },
+  {
+    value: "headers",
+    label: t("synthetics.headers"),
+    style: {
+      width: "110px",
+      margin: "0 10px",
+    },
+  },
+  {
+    value: "body",
+    label: t("synthetics.body"),
+    style: {
+      width: "100px",
+      margin: "0 10px",
+    },
+  },
+];
+
+const activeConfigTab = ref<string>("params");
+
+const updateActiveTab = (tab: string) => {
+  activeConfigTab.value = tab;
+};
+
+const editorLanguage = ref<string>("json");
+
+watch(
+  () => request.value.body.type,
+  (newVal) => {
+    console.log("request body type", newVal);
+    if (newVal === "graphql") {
+      editorLanguage.value = "graphql";
+    }
+
+    if (newVal === "text_plain") {
+      editorLanguage.value = "markdown";
+    }
+
+    if (newVal === "text_json") {
+      editorLanguage.value = "json";
+    }
+
+    if (newVal === "text_html") {
+      editorLanguage.value = "html";
+    }
+
+    if (newVal === "text_xml") {
+      editorLanguage.value = "xml";
+    }
+
+    if (newVal === "text_javaScript") {
+      editorLanguage.value = "javascript";
+    }
+  }
+);
+
+const addQueryParam = (data: any) => {
+  data.push({
+    id: getUUID(),
+    key: "",
+    value: "",
+  });
+};
+
+const removeQueryParam = (tab: { id: string }, data: any) => {
+  data = data.filter((param: { id: string }) => param.id !== tab.id);
+};
+
+const onQueryUpdate = (query: string) => {
+  console.log(query);
+};
 </script>
 
 <style scoped lang="scss">
+.config-content {
+  height: 200px;
+  width: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+  position: absolute; /* Position absolutely within the parent */
+  top: 0;
+  left: 0;
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.1s ease-in-out;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  opacity: 0;
+  transform: translateY(-5px); /* Start from or move to the right */
+}
+
+.slide-enter-to,
+.slide-leave-from {
+  opacity: 1;
+  transform: translateY(0); /* Move to or start from the center */
+}
+
 .request-type-selector {
   width: 120px;
 }
 
+.request-body-type-selector {
+  width: 250px;
+}
+
 .request-url {
   width: 400px;
+}
+
+.params-key-title,
+.params-value-title {
+  width: 250px;
+}
+
+.query-editor {
+  height: 200px;
+  width: 100%;
+}
+</style>
+
+<style lang="scss">
+.request-config {
+  .variables-value-input {
+    width: 400px;
+  }
+
+  .request-body-type-selector {
+    .q-field--labeled.showLabelOnTop.q-select
+      .q-field__control-container
+      .q-field__native
+      > :first-child {
+      text-transform: none;
+    }
+  }
 }
 </style>
