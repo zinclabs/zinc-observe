@@ -1,9 +1,9 @@
 <template>
   <div>
-    <request-config />
+    <api-test-config />
   </div>
 </template>
 <script lang="ts" setup>
-import RequestConfig from "@/components/synthetics/configs/RequestConfig.vue";
+import ApiTestConfig from "@/components/synthetics/ApiTestConfig.vue";
 </script>
 <style lang="scss" scoped></style>

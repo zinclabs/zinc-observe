@@ -30,7 +30,7 @@
           tabindex="0"
         />
       </div>
-      <div class="q-mt-md">
+      <div class="request-submit-btn">
         <q-btn
           data-test="add-alert-submit-btn"
           :label="t('common.send')"
@@ -49,7 +49,7 @@
         @update:active-tab="updateActiveTab"
       />
       <q-separator />
-      <div class="relative-position q-mt-sm">
+      <div class="relative-position q-mt-sm config-content-container">
         <transition name="slide" mode="out-in">
           <div class="config-content" v-if="activeConfigTab === 'params'">
             <div class="q-mb-sm text-subtitle2 text-bold text-grey-8">
@@ -177,7 +177,7 @@
             <div class="query-editor">
               <QueryEditor
                 :key="request.body.type"
-                style="height: 400px; width: 100%"
+                style="height: 300px; width: 100%"
                 editorId="synthetics-request-body-editor"
                 v-model:query="request.body.content"
                 :language="editorLanguage"
@@ -394,6 +394,10 @@ const onQueryUpdate = (query: string) => {
 </script>
 
 <style scoped lang="scss">
+.config-content-container {
+  height: 380px;
+  overflow-y: auto;
+}
 .config-content {
   height: 200px;
   width: 100%;
@@ -439,7 +443,7 @@ const onQueryUpdate = (query: string) => {
 }
 
 .query-editor {
-  height: 200px;
+  height: 100px;
   width: 100%;
 }
 </style>
@@ -456,6 +460,15 @@ const onQueryUpdate = (query: string) => {
       .q-field__native
       > :first-child {
       text-transform: none;
+    }
+  }
+
+  .request-submit-btn {
+    margin-top: 18px;
+    button {
+      padding: 6px 32px !important;
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
     }
   }
 }
