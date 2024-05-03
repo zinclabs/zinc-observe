@@ -35,10 +35,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-const retry = ref({
-  count: 0,
-  delay: 0,
+import { computed, ref } from "vue";
+
+const props = defineProps({
+  modelValue: {
+    type: Object,
+    required: true,
+    default: () => ({}),
+  },
+});
+
+const emit = defineEmits(["update:modelValue"]);
+
+const retry = computed({
+  get: () => {
+    return props.modelValue;
+  },
+  set: (value) => {
+    emit("update:modelValue", value);
+  },
 });
 </script>
 

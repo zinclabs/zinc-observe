@@ -157,7 +157,7 @@
         >
           <q-input
             filled
-            v-model="scheduling.date"
+            v-model="schedule.start.date"
             label="Start Date *"
             color="input-border"
             bg-color="input-bg"
@@ -179,7 +179,7 @@
                   transition-show="scale"
                   transition-hide="scale"
                 >
-                  <q-date v-model="scheduling.date" mask="DD-MM-YYYY">
+                  <q-date v-model="schedule.start.date" mask="DD-MM-YYYY">
                     <div class="row items-center justify-end">
                       <q-btn
                         v-close-popup="true"
@@ -200,7 +200,7 @@
         >
           <q-input
             filled
-            v-model="scheduling.time"
+            v-model="schedule.start.time"
             label="Start Time *"
             color="input-border"
             bg-color="input-bg"
@@ -219,7 +219,7 @@
                   transition-show="scale"
                   transition-hide="scale"
                 >
-                  <q-time v-model="scheduling.time">
+                  <q-time v-model="schedule.start.time">
                     <div class="row items-center justify-end">
                       <q-btn
                         v-close-popup="true"
@@ -237,7 +237,7 @@
         <div class="o2-input">
           <q-select
             data-test="add-report-schedule-start-timezone-select"
-            v-model="scheduling.timezone"
+            v-model="schedule.start.timezone"
             :options="filteredTimezone"
             @blur="
               timezone =
@@ -268,11 +268,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import { useLocalTimezone } from "@/utils/zincutils";
+
+const props = defineProps({
+  modelValue: {
+    type: Object,
+    required: true,
+    default: () => ({}),
+  },
+});
+
+const emit = defineEmits(["update:modelValue"]);
 
 const { t } = useI18n();
 
@@ -281,12 +291,6 @@ const store = useStore();
 const cronError = ref("");
 
 const selectedTimeTab = ref("sendLater");
-
-const scheduling = ref({
-  date: "",
-  time: "",
-  timezone: "",
-});
 
 const filteredTimezone: any = ref([]);
 
@@ -355,14 +359,12 @@ const timeTabs = [
   },
 ];
 
-const schedule = ref({
-  interval: 1,
-  type: "once",
-  cron: "",
-  custom: {
-    interval: 1,
-    frequency: "hours",
-    period: "hours",
+const schedule = computed({
+  get: () => {
+    return props.modelValue;
+  },
+  set: (value) => {
+    emit("update:modelValue", value);
   },
 });
 

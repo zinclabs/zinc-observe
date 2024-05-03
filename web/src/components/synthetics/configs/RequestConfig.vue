@@ -3,7 +3,7 @@
     <div class="flex items-center">
       <div class="request-type-selector">
         <q-select
-          v-model="request.type"
+          v-model="requestTypeValue"
           :options="requestTypeOptions"
           :label="t('common.url') + ' *'"
           color="input-border"
@@ -18,7 +18,7 @@
       </div>
       <div class="request-url">
         <q-input
-          v-model="request.url"
+          v-model="requestUrlValue"
           color="input-border"
           bg-color="input-bg"
           class="showLabelOnTop q-mb-sm"
@@ -69,9 +69,9 @@
               </div>
             </div>
             <variables-input
-              :variables="request.params"
-              @add:variable="addQueryParam(request.params)"
-              @remove:variable="(tab) => removeQueryParam(tab, request.params)"
+              :variables="queryParams"
+              @add:variable="addQueryParam"
+              @remove:variable="(tab) => removeQueryParam(tab)"
             />
           </div>
           <div
@@ -80,7 +80,7 @@
           >
             <div class="request-type-selector q-mr-lg">
               <q-select
-                v-model="request.auth.type"
+                v-model="authMeta.type"
                 :options="authTypes"
                 :label="t('common.type') + ' *'"
                 color="input-border"
@@ -95,10 +95,10 @@
                 :rules="[(val: any) => !!val || 'Field is required!']"
               />
             </div>
-            <div v-if="request.auth.type === 'basic'">
+            <div v-if="authMeta.type === 'basic'">
               <div class="request-url">
                 <q-input
-                  v-model="request.auth.basic.username"
+                  v-model="authMeta.basic.username"
                   color="input-border"
                   bg-color="input-bg"
                   :label="t('user.name') + ' *'"
@@ -113,11 +113,12 @@
               </div>
               <div class="request-url">
                 <q-input
-                  v-model="request.auth.basic.password"
+                  v-model="authMeta.basic.password"
                   color="input-border"
                   bg-color="input-bg"
                   :label="t('user.password') + ' *'"
                   class="showLabelOnTop q-mb-sm"
+                  type="password"
                   stack-label
                   outlined
                   filled
@@ -127,10 +128,10 @@
               </div>
             </div>
 
-            <div v-if="request.auth.type === 'bearer'">
+            <div v-if="authMeta.type === 'bearer'">
               <div class="request-url">
                 <q-input
-                  v-model="request.auth.bearer.token"
+                  v-model="authMeta.bearer.token"
                   color="input-border"
                   bg-color="input-bg"
                   :label="t('common.token') + ' *'"
@@ -148,15 +149,15 @@
             <div class="q-mb-sm text-bold text-grey-8">Headers</div>
 
             <variables-input
-              :variables="request.headers"
-              @add:variable="addQueryParam(request.headers)"
-              @remove:variable="(tab) => removeQueryParam(tab, request.headers)"
+              :variables="requestHeaders"
+              @add:variable="addHeader"
+              @remove:variable="(tab) => removeHeader(tab)"
             />
           </div>
           <div class="config-content" v-else-if="activeConfigTab === 'body'">
             <div class="request-body-type-selector q-mr-lg">
               <q-select
-                v-model="request.body.type"
+                v-model="bodyMeta.type"
                 :options="bodyTypes"
                 :label="t('synthetics.bodyType') + ' *'"
                 color="input-border"
@@ -176,10 +177,10 @@
 
             <div class="query-editor">
               <QueryEditor
-                :key="request.body.type"
+                :key="bodyMeta.type"
                 style="height: 300px; width: 100%"
                 editorId="synthetics-request-body-editor"
-                v-model:query="request.body.content"
+                v-model:query="bodyMeta.content"
                 :language="editorLanguage"
                 @update:query="onQueryUpdate"
               />
@@ -195,11 +196,21 @@
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { getUUID } from "@/utils/zincutils";
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import QueryEditor from "../QueryEditor.vue";
 
+const props = defineProps({
+  modelValue: {
+    type: Object,
+    required: true,
+    default: () => ({}),
+  },
+});
+
 const { t } = useI18n();
+
+const emit = defineEmits(["update:modelValue"]);
 
 // create array of strings
 const requestTypeOptions = [
@@ -349,7 +360,6 @@ const editorLanguage = ref<string>("json");
 watch(
   () => request.value.body.type,
   (newVal) => {
-    console.log("request body type", newVal);
     if (newVal === "graphql") {
       editorLanguage.value = "graphql";
     }
@@ -376,16 +386,81 @@ watch(
   }
 );
 
-const addQueryParam = (data: any) => {
-  data.push({
+const requestTypeValue = computed({
+  get: () => props.modelValue.type,
+  set: (val) => {
+    emit("update:modelValue", { ...props.modelValue, type: val });
+  },
+});
+
+const requestUrlValue = computed({
+  get: () => props.modelValue.url,
+  set: (val) => {
+    emit("update:modelValue", { ...props.modelValue, url: val });
+  },
+});
+
+const queryParams = computed({
+  get: () => props.modelValue.params,
+  set: (val) => {
+    emit("update:modelValue", { ...props.modelValue, params: val });
+  },
+});
+
+const requestHeaders = computed({
+  get: () => props.modelValue.headers,
+  set: (val) => {
+    console.log(val);
+    emit("update:modelValue", { ...props.modelValue, headers: val });
+  },
+});
+
+const authMeta = computed({
+  get: () => props.modelValue.auth,
+  set: (val) => {
+    emit("update:modelValue", {
+      ...props.modelValue,
+      auth: val,
+    });
+  },
+});
+
+const bodyMeta = computed({
+  get: () => props.modelValue.body,
+  set: (val) => {
+    emit("update:modelValue", {
+      ...props.modelValue,
+      body: val,
+    });
+  },
+});
+
+const addQueryParam = () => {
+  queryParams.value.push({
     id: getUUID(),
     key: "",
     value: "",
   });
 };
 
-const removeQueryParam = (tab: { id: string }, data: any) => {
-  data = data.filter((param: { id: string }) => param.id !== tab.id);
+const removeQueryParam = (tab: { id: string }) => {
+  queryParams.value = queryParams.value.filter(
+    (param: { id: string }) => param.id !== tab.id
+  );
+};
+
+const addHeader = () => {
+  requestHeaders.value.push({
+    id: getUUID(),
+    key: "",
+    value: "",
+  });
+};
+
+const removeHeader = (tab: { id: string }) => {
+  requestHeaders.value = requestHeaders.value.filter(
+    (param: { id: string }) => param.id !== tab.id
+  );
 };
 
 const onQueryUpdate = (query: string) => {

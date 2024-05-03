@@ -52,16 +52,28 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+
+const props = defineProps({
+  modelValue: {
+    type: Object,
+    required: true,
+    default: () => ({}),
+  },
+});
+
+const emit = defineEmits(["update:modelValue"]);
 
 const { t } = useI18n();
 
-const alert = ref({
-  type: "email",
-  emails: "",
-  message: "",
-  title: "",
+const alert = computed({
+  get: () => {
+    return props.modelValue;
+  },
+  set: (value) => {
+    emit("update:modelValue", value);
+  },
 });
 </script>
 

@@ -220,11 +220,29 @@
 
 <script setup lang="ts">
 import { getUUID } from "@/utils/zincutils";
-import { ref } from "vue";
+import { computed, ref, type Ref, type WritableComputedRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-import { remove } from "lodash-es";
+
+interface Assertion {
+  operator: string;
+  type: string;
+  value: string;
+  key?: string;
+  timingScope?: string;
+  id: string;
+}
+
+const props = defineProps({
+  modelValue: {
+    type: Array,
+    required: true,
+    default: () => [],
+  },
+});
+
+const emit = defineEmits(["update:modelValue"]);
 
 const assertionTypes = [
   {
@@ -253,16 +271,12 @@ const { t } = useI18n();
 
 const store = useStore();
 
-const assertions = ref([
-  {
-    operator: "",
-    type: "body",
-    value: "",
-    key: "",
-    timingScope: "",
-    id: getUUID(),
+const assertions: WritableComputedRef<Assertion[]> = computed({
+  get: () => props.modelValue as Assertion[],
+  set: (value) => {
+    emit("update:modelValue", value);
   },
-]);
+});
 
 const timeScopeOptions = [
   {

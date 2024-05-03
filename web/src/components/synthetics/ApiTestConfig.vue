@@ -1,128 +1,191 @@
 <template>
-  <div>Add Api Test</div>
-  <q-stepper
-    v-model="step"
-    vertical
-    color="primary"
-    animated
-    class="q-mt-md"
-    header-nav
+  <div style="height: calc(100vh - 114px); overflow-y: auto">
+    <div>Add Api Test</div>
+    <div class="q-ma-md">
+      <q-stepper
+        v-model="step"
+        vertical
+        color="primary"
+        animated
+        class="q-mt-md"
+        header-nav
+      >
+        <q-step
+          data-test="api-test-define-request"
+          :name="1"
+          prefix="1"
+          title="Define Request"
+          :done="step > 1"
+        >
+          <request-config
+            class="q-mt-md"
+            v-model="apiConfig.request"
+            @update:model-value="onRequestConfigUpdate"
+          />
+
+          <q-stepper-navigation>
+            <q-btn
+              data-test="add-report-step2-continue-btn"
+              @click="step = 2"
+              color="secondary"
+              label="Continue"
+              no-caps
+            />
+          </q-stepper-navigation>
+        </q-step>
+
+        <q-step
+          data-test="api-test-define-assertions"
+          :name="2"
+          prefix="2"
+          title="Define Assertion"
+          :done="step > 2"
+        >
+          <assertion-config
+            class="q-mt-md"
+            v-model="apiConfig.assertions"
+            @update:model-value="onRequestConfigUpdate"
+          />
+          <q-btn
+            data-test="add-report-step2-continue-btn"
+            @click="step = 3"
+            color="secondary"
+            label="Continue"
+            no-caps
+          />
+          <q-btn
+            data-test="add-report-step2-back-btn"
+            flat
+            @click="step = 1"
+            color="primary"
+            label="Back"
+            class="q-ml-sm"
+            no-caps
+          />
+        </q-step>
+
+        <q-step
+          data-test="api-test-define-retry-condition"
+          :name="3"
+          prefix="3"
+          title="Define Retry Condition"
+          :done="step > 3"
+        >
+          <retry-config
+            class="q-mt-md"
+            v-model="apiConfig.retry"
+            @update:model-value="onRequestConfigUpdate"
+          />
+          <q-btn
+            data-test="add-report-step2-continue-btn"
+            @click="step = 4"
+            color="secondary"
+            label="Continue"
+            no-caps
+          />
+          <q-btn
+            data-test="add-report-step2-back-btn"
+            flat
+            @click="step = 2"
+            color="primary"
+            label="Back"
+            class="q-ml-sm"
+            no-caps
+          />
+        </q-step>
+
+        <q-step
+          data-test="add-report-select-schedule-step"
+          :name="4"
+          prefix="4"
+          title="Schedule"
+          :done="step > 4"
+          class="q-mt-md"
+        >
+          <schedule-config
+            class="q-mt-md"
+            v-model="apiConfig.schedule"
+            @update:model-value="onRequestConfigUpdate"
+          />
+          <q-btn
+            data-test="add-report-step2-continue-btn"
+            @click="step = 5"
+            color="secondary"
+            label="Continue"
+            no-caps
+          />
+          <q-btn
+            data-test="add-report-step2-back-btn"
+            flat
+            @click="step = 3"
+            color="primary"
+            label="Back"
+            class="q-ml-sm"
+            no-caps
+          />
+        </q-step>
+        <q-step
+          data-test="add-report-select-schedule-step"
+          :name="5"
+          title="Alert"
+          prefix="5"
+          :done="step > 5"
+          class="q-mt-md"
+        >
+          <alert-config
+            v-model="apiConfig.alert"
+            @update:model-value="onRequestConfigUpdate"
+          />
+          <q-btn
+            data-test="add-report-step2-back-btn"
+            flat
+            @click="step = 4"
+            color="primary"
+            label="Back"
+            class="q-ml-sm"
+            no-caps
+          />
+        </q-step>
+      </q-stepper>
+    </div>
+  </div>
+  <div
+    class="flex justify-end q-px-md q-py-sm full-width"
+    style="position: sticky; bottom: 0px; z-index: 2"
+    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+    :style="{
+      'box-shadow':
+        store.state.theme === 'dark'
+          ? 'rgb(45 45 45) 0px -4px 7px 0px'
+          : 'rgb(240 240 240) 0px -4px 7px 0px',
+    }"
   >
-    <q-step
-      data-test="api-test-define-request"
-      :name="1"
-      title="Define Request"
-      :done="step > 1"
-    >
-      <request-config class="q-mt-md" />
-
-      <q-stepper-navigation>
-        <q-btn
-          data-test="add-report-step2-continue-btn"
-          @click="step = 2"
-          color="secondary"
-          label="Continue"
-          no-caps
-        />
-      </q-stepper-navigation>
-    </q-step>
-
-    <q-step
-      data-test="api-test-define-assertions"
-      :name="2"
-      title="Define Assertion"
-      :done="step > 2"
-    >
-      <assertion-config class="q-mt-md" />
-      <q-btn
-        data-test="add-report-step2-continue-btn"
-        @click="step = 3"
-        color="secondary"
-        label="Continue"
-        no-caps
-      />
-      <q-btn
-        data-test="add-report-step2-back-btn"
-        flat
-        @click="step = 1"
-        color="primary"
-        label="Back"
-        class="q-ml-sm"
-        no-caps
-      />
-    </q-step>
-
-    <q-step
-      data-test="api-test-define-retry-condition"
-      :name="3"
-      title="Define Retry Condition"
-      :done="step > 3"
-    >
-      <retry-config class="q-mt-md" />
-      <q-btn
-        data-test="add-report-step2-continue-btn"
-        @click="step = 4"
-        color="secondary"
-        label="Continue"
-        no-caps
-      />
-      <q-btn
-        data-test="add-report-step2-back-btn"
-        flat
-        @click="step = 2"
-        color="primary"
-        label="Back"
-        class="q-ml-sm"
-        no-caps
-      />
-    </q-step>
-
-    <q-step
-      data-test="add-report-select-schedule-step"
-      :name="4"
-      title="Schedule"
-      icon="schedule"
-      :done="step > 4"
-      class="q-mt-md"
-    >
-      <schedule-config class="q-mt-md" />
-      <q-btn
-        data-test="add-report-step2-continue-btn"
-        @click="step = 5"
-        color="secondary"
-        label="Continue"
-        no-caps
-      />
-      <q-btn
-        data-test="add-report-step2-back-btn"
-        flat
-        @click="step = 3"
-        color="primary"
-        label="Back"
-        class="q-ml-sm"
-        no-caps
-      />
-    </q-step>
-    <q-step
-      data-test="add-report-select-schedule-step"
-      :name="5"
-      title="Alert"
-      icon="alert"
-      :done="step > 5"
-      class="q-mt-md"
-    >
-      <alert-config />
-      <q-btn
-        data-test="add-report-step2-back-btn"
-        flat
-        @click="step = 4"
-        color="primary"
-        label="Back"
-        class="q-ml-sm"
-        no-caps
-      />
-    </q-step>
-  </q-stepper>
+    <q-btn
+      data-test="add-report-cancel-btn"
+      class="text-bold"
+      :label="t('alerts.cancel')"
+      text-color="light-text"
+      padding="sm md"
+      no-caps
+      @click="openCancelDialog"
+    />
+    <q-btn
+      data-test="add-report-save-btn"
+      :label="t('alerts.save')"
+      class="text-bold no-border q-ml-md"
+      color="secondary"
+      padding="sm xl"
+      no-caps
+      @click="saveReport"
+    />
+  </div>
+  <ConfirmDialog
+    v-model="dialog.show"
+    :title="dialog.title"
+    :message="dialog.message"
+    @update:ok="dialog.okCallback"
+    @update:cancel="dialog.show = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -131,10 +194,137 @@ import AssertionConfig from "@/components/synthetics/configs/AssertionConfig.vue
 import RetryConfig from "@/components/synthetics/configs/RetryConfig.vue";
 import ScheduleConfig from "@/components/synthetics/configs/ScheduleConfig.vue";
 import AlertConfig from "@/components/synthetics/configs/AlertConfig.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
-import { ref } from "vue";
+import { ref, watch } from "vue";
+import { getUUID } from "@/utils/zincutils";
+import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 
 const step = ref<number>(1);
+
+const store = useStore();
+
+const { t } = useI18n();
+
+const router = useRouter();
+
+const dialog = ref({
+  show: false,
+  title: "",
+  message: "",
+  okCallback: () => {},
+});
+
+const apiConfig = ref({
+  request: {
+    type: "GET",
+    url: "",
+    params: [
+      {
+        id: getUUID(),
+        key: "",
+        value: "",
+      },
+    ],
+    headers: [
+      {
+        id: getUUID(),
+        key: "",
+        value: "",
+      },
+    ],
+    auth: {
+      type: "basic",
+      basic: {
+        username: "",
+        password: "",
+      },
+      bearer: {
+        token: "",
+      },
+    },
+    body: {
+      type: "raw",
+      content: "",
+    },
+  },
+  assertions: [
+    {
+      operator: "",
+      type: "body",
+      value: "",
+      key: "",
+      timingScope: "",
+      id: getUUID(),
+    },
+  ],
+  retry: {
+    count: 0,
+    delay: 0,
+  },
+  schedule: {
+    interval: 1,
+    type: "once",
+    cron: "",
+    custom: {
+      interval: 1,
+      frequency: "hours",
+      period: "hours",
+    },
+    start: {
+      date: "",
+      time: "",
+      timezone: "",
+    },
+  },
+  alert: {
+    type: "email",
+    emails: "",
+    message: "",
+    title: "",
+  },
+});
+
+const originalApiConfig = ref(JSON.stringify(apiConfig.value));
+
+watch(
+  () => apiConfig.value.request,
+  (newVal) => {
+    console.log(newVal);
+  },
+  {
+    deep: true,
+  }
+);
+const onRequestConfigUpdate = (config: any) => {
+  console.log("updated config", apiConfig.value);
+};
+
+const saveReport = () => {
+  console.log("save report", apiConfig.value);
+};
+
+const goToTests = () => {
+  router.replace({
+    name: "reports",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+};
+
+const openCancelDialog = () => {
+  if (originalApiConfig.value === JSON.stringify(apiConfig.value)) {
+    goToTests();
+    return;
+  }
+  dialog.value.show = true;
+  dialog.value.title = "Discard Changes";
+  dialog.value.message = "Are you sure you want to cancel changes?";
+  dialog.value.okCallback = goToTests;
+};
 </script>
 
 <style scoped></style>
