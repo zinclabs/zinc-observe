@@ -934,13 +934,18 @@
     "refreshQuery": "Refresh Query"
   },
   "synthetics": {
-    "header": "Synthetics",
+    "header": "Synthetics Monitoring & Testing",
     "requestType": "Request Type",
     "requestOptions": "Request Options",
     "params": "Params",
     "headers": "Headers",
     "body": "Body",
     "authorization": "Authorization",
-    "bodyType": "Body Type"
+    "bodyType": "Body Type",
+    "addApiTest": "Add API Test",
+    "domain": "Domain",
+    "tests": "Tests",
+    "addTest": "Add Test",
+    "testType": "Test Type"
   }
 }

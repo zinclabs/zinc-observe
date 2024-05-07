@@ -1,9 +1,11 @@
 <template>
   <div>
-    <api-test-config />
+    <test-list />
+
+    <router-view />
   </div>
 </template>
 <script lang="ts" setup>
-import ApiTestConfig from "@/components/synthetics/ApiTestConfig.vue";
+import TestList from "@/components/synthetics/TestList.vue";
 </script>
 <style lang="scss" scoped></style>

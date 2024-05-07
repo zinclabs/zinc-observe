@@ -1,6 +1,30 @@
 <template>
   <div style="height: calc(100vh - 114px); overflow-y: auto">
-    <div>Add Api Test</div>
+    <div class="row items-center no-wrap q-mx-md q-my-sm">
+      <div class="flex items-center">
+        <div
+          data-test="add-report-back-btn"
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="router.back()"
+        >
+          <q-icon name="arrow_back_ios_new" size="14px" />
+        </div>
+        <div v-if="isEditingTest" class="text-h6" data-test="add-report-title">
+          {{ apiConfig.name }}
+        </div>
+        <div v-else class="text-h6" data-test="add-report-title">
+          {{ t("synthetics.addApiTest") }}
+        </div>
+      </div>
+    </div>
+    <q-separator />
     <div class="q-ma-md">
       <q-stepper
         v-model="step"
@@ -210,6 +234,8 @@ const { t } = useI18n();
 
 const router = useRouter();
 
+const isEditingTest = ref(false);
+
 const dialog = ref({
   show: false,
   title: "",
@@ -218,6 +244,8 @@ const dialog = ref({
 });
 
 const apiConfig = ref({
+  name: "Test1",
+  type: "",
   request: {
     type: "GET",
     url: "",
@@ -278,6 +306,7 @@ const apiConfig = ref({
       time: "",
       timezone: "",
     },
+    timezoneOffset: "",
   },
   alert: {
     type: "email",
@@ -285,6 +314,11 @@ const apiConfig = ref({
     message: "",
     title: "",
   },
+  lastTriggeredAt: 0,
+  createdAt: "",
+  updatedAt: "",
+  owner: "",
+  lastEditedBy: "",
 });
 
 const originalApiConfig = ref(JSON.stringify(apiConfig.value));
