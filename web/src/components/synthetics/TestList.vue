@@ -183,11 +183,13 @@ import {
   outlinedPause,
   outlinedPlayArrow,
 } from "@quasar/extras/material-icons-outlined";
+import syntheticsService from "@/services/synthetics";
 
 interface Test {
   name: string;
   type: string;
   domain: string;
+  state: boolean;
 }
 
 const { t } = useI18n();
@@ -300,14 +302,12 @@ const createPipeline = () => {
 };
 
 const gettests = () => {
-  // tests.value = [];
-  return;
-  syntheticService
+  syntheticsService
     .list(store.state.selectedOrganization.identifier)
     .then((response) => {
-      tests.value = response.data.list.map((pipeline: any, index: number) => {
+      tests.value = response.data.list.map((test: any, index: number) => {
         return {
-          ...pipeline,
+          ...test,
           "#": index + 1,
         };
       });
@@ -318,7 +318,6 @@ const gettests = () => {
 };
 
 const editPipeline = (test: Test) => {
-  console.log("editPipeline", test);
   router.push({
     name: "editSyntheticsTest",
     query: {
@@ -328,7 +327,47 @@ const editPipeline = (test: Test) => {
   });
 };
 
-const openDeleteDialog = (pipeline: Pipeline) => {
+const deleteTest = (test: Test) => {
+  syntheticsService
+    .delete(store.state.selectedOrganization.identifier, test.name)
+    .then(() => {
+      gettests();
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+};
+
+const exploreTest = (test: Test) => {
+  router.push({
+    name: "exploreSyntheticsTest",
+    query: {
+      name: test.name,
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+};
+
+const toggleTestStatus = (test: Test) => {
+  testStatusLoadingMap.value[test.name] = true;
+  syntheticsService
+    .toggleTestState(
+      store.state.selectedOrganization.identifier,
+      test.name,
+      !test.state
+    )
+    .then(() => {
+      test.state = !test.state;
+    })
+    .catch((error) => {
+      console.error(error);
+    })
+    .finally(() => {
+      testStatusLoadingMap.value[test.name] = false;
+    });
+};
+
+const openDeleteDialog = (pipeline: Test) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
   confirmDialogMeta.value.message =
@@ -422,10 +461,6 @@ const filterData = (rows: any, terms: any) => {
     }
   }
   return filtered;
-};
-
-const toggleTestStatus = (test: any) => {
-  return;
 };
 </script>
 <style lang=""></style>
