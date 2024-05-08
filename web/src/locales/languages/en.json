@@ -946,6 +946,7 @@
     "domain": "Domain",
     "tests": "Tests",
     "addTest": "Add Test",
-    "testType": "Test Type"
+    "testType": "Test Type",
+    "openUrl": "Open URL"
   }
 }

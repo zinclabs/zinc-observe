@@ -42,9 +42,15 @@
             title="Define Request"
             :done="step > 1"
           >
+            <recorder-request-config
+              v-if="isBrowserTest"
+              v-model="apiConfig.request"
+            />
             <request-config
+              v-else
               class="q-mt-md"
               v-model="apiConfig.request"
+              :advanced="true"
               @update:model-value="onRequestConfigUpdate"
             />
 
@@ -63,10 +69,12 @@
             data-test="api-test-define-assertions"
             :name="2"
             prefix="2"
-            title="Define Assertion"
+            :title="isBrowserTest ? 'Test Editor' : 'Define Assertion'"
             :done="step > 2"
           >
+            <recorder-config v-if="isBrowserTest" class="q-mb-md" />
             <assertion-config
+              v-else
               class="q-mt-md"
               v-model="apiConfig.assertions"
               @update:model-value="onRequestConfigUpdate"
@@ -222,12 +230,16 @@ import ScheduleConfig from "@/components/synthetics/configs/ScheduleConfig.vue";
 import AlertConfig from "@/components/synthetics/configs/AlertConfig.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import syntheticsService from "@/services/synthetics";
+import RecorderConfig from "@/components/synthetics/configs/RecorderConfig.vue";
+import RecorderRequestConfig from "@/components/synthetics/configs/RecorderRequestConfig.vue";
 
-import { onBeforeMount, ref, watch } from "vue";
+import { computed, onBeforeMount, ref, watch } from "vue";
 import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
+
+const testType = ref("http");
 
 const step = ref<number>(1);
 
@@ -326,7 +338,10 @@ const apiConfig = ref({
 
 const originalApiConfig = ref(JSON.stringify(apiConfig.value));
 
+const isBrowserTest = computed(() => testType.value === "browser");
+
 onBeforeMount(() => {
+  testType.value = (router.currentRoute.value.params.type || "http") as string;
   syntheticsService
     .getTest(
       store.state.selectedOrganization.identifier,

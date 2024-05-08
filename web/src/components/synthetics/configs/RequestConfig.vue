@@ -42,7 +42,7 @@
         />
       </div>
     </div>
-    <div>
+    <div v-if="advanced">
       <app-tabs
         :active-tab="activeConfigTab"
         :tabs="requestConfigTabs"
@@ -205,6 +205,11 @@ const props = defineProps({
     type: Object,
     required: true,
     default: () => ({}),
+  },
+  advanced: {
+    type: Boolean,
+    required: false,
+    default: false,
   },
 });
 
