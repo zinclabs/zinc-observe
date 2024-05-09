@@ -123,8 +123,8 @@ const formData = ref({
 const { t } = useI18n();
 
 const streamTypes = ref([
-  { label: "Api Test", value: "api_test" },
-  { label: "Browser Test", value: "browser_test" },
+  { label: "Api Test", value: "http" },
+  { label: "Browser Test", value: "browser" },
 ]);
 
 const isValidName = computed(() => {
