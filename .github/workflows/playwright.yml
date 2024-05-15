@@ -23,8 +23,7 @@ env:
   ZO_QUICK_MODE_STRATEGY : first
   ZO_ALLOW_USER_DEFINED_SCHEMAS: true
   ZO_INGEST_ALLOWED_UPTO: 5
-
-
+  AWS_EC2_METADATA_DISABLED: true   
 
 jobs:
   ui_integration_tests:
@@ -82,6 +81,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
             node-version: lts/*
+
+      - name: Download image snapshot from S3
+        run: |
+          aws --version
+          aws s3 cp s3://o2-public-ci-data  tests/ui-testing/playwright-tests/dashboard-snaps/ --recursive --no-sign-request
+        
       - name: Install dependencies and run ui-tests
         run: |
           touch .env
