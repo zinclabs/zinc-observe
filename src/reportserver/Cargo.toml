@@ -1,0 +1,20 @@
+[package]
+name = "reportserver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tempfile.workspace = true
+log.workspace = true    
+anyhow.workspace = true
+actix-web.workspace = true
+env_logger.workspace = true
+config.workspace = true
+serde.workspace = true
+tokio.workspace = true
+chromiumoxide.workspace=true
+once_cell.workspace=true
+lettre.workspace=true
+chrono.workspace=true
+futures.workspace=true

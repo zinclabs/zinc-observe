@@ -242,6 +242,7 @@ pub static BLOCKED_STREAMS: Lazy<Vec<&str>> =
 #[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
+    pub report_server: ReportServer,
     pub http: Http,
     pub grpc: Grpc,
     pub route: Route,
@@ -264,6 +265,22 @@ pub struct Config {
 }
 
 #[derive(EnvConfig)]
+pub struct ReportServer {
+    #[env_config(name = "ZO_ENABLE_EMBEDDED_REPORT_SERVER", default = false)]
+    pub enable_report_server: bool,
+    #[env_config(name = "ZO_REPORT_USER_EMAIL", default = "")]
+    pub user_email: String,
+    #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
+    pub user_password: String,
+    #[env_config(name = "ZO_HTTP_PORT", default = 5082)]
+    pub port: u16,
+    #[env_config(name = "ZO_HTTP_ADDR", default = "127.0.0.1")]
+    pub addr: String,
+    #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
+    pub ipv6_enabled: bool,
+}
+
+#[derive(EnvConfig)]
 pub struct TokioConsole {
     #[env_config(name = "ZO_TOKIO_CONSOLE_SERVER_ADDR", default = "0.0.0.0")]
     pub tokio_console_server_addr: String,
@@ -273,12 +290,34 @@ pub struct TokioConsole {
     pub tokio_console_retention: u64,
 }
 
+// #[derive(EnvConfig)]
+// pub struct Chrome {
+//     #[env_config(name = "ZO_CHROME_ENABLED", default = false)]
+//     pub chrome_enabled: bool,
+//     #[env_config(name = "ZO_CHROME_PATH", default = "")]
+//     pub chrome_path: String,
+//     #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
+//     pub chrome_no_sandbox: bool,
+//     #[env_config(name = "ZO_CHROME_WITH_HEAD", default = false)]
+//     pub chrome_with_head: bool,
+//     #[env_config(name = "ZO_CHROME_SLEEP_SECS", default = 20)]
+//     pub chrome_sleep_secs: u16,
+//     #[env_config(name = "ZO_CHROME_WINDOW_WIDTH", default = 1370)]
+//     pub chrome_window_width: u32,
+//     #[env_config(name = "ZO_CHROME_WINDOW_HEIGHT", default = 730)]
+//     pub chrome_window_height: u32,
+// }
+
 #[derive(EnvConfig)]
 pub struct Chrome {
     #[env_config(name = "ZO_CHROME_ENABLED", default = false)]
     pub chrome_enabled: bool,
     #[env_config(name = "ZO_CHROME_PATH", default = "")]
     pub chrome_path: String,
+    #[env_config(name = "ZO_CHROME_CHECK_DEFAULT_PATH", default = true)]
+    pub chrome_check_default: bool,
+    #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./download")]
+    pub chrome_download_path: String,
     #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]
     pub chrome_no_sandbox: bool,
     #[env_config(name = "ZO_CHROME_WITH_HEAD", default = false)]
@@ -589,7 +628,7 @@ pub struct Common {
     pub report_user_name: String,
     #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
     pub report_user_password: String,
-    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "")]
+    #[env_config(name = "ZO_REPORT_SERVER_URL", default = "localhost:5083")]
     pub report_server_url: String,
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub all_fields_name: String,

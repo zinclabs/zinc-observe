@@ -5328,6 +5328,7 @@ dependencies = [
  "rayon",
  "regex",
  "regex-syntax 0.8.3",
+ "reportserver",
  "reqwest 0.12.4",
  "rust-embed-for-web",
  "segment",
@@ -6352,6 +6353,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71fe3824f5629716b1589be05dacd749f6aa084c87e00e016714a8cdfccc997c"
 dependencies = [
  "bytecheck",
+]
+
+[[package]]
+name = "reportserver"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "anyhow",
+ "chromiumoxide",
+ "chrono",
+ "config",
+ "env_logger",
+ "futures",
+ "lettre",
+ "log",
+ "once_cell",
+ "serde",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]

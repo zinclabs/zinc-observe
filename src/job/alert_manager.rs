@@ -25,6 +25,18 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
+    log::info!(
+        "Spawning embedded report server {}",
+        CONFIG.report_server.enable_report_server
+    );
+    if CONFIG.report_server.enable_report_server {
+        tokio::task::spawn(async move {
+            if let Err(e) = reportserver::spawn_server().await {
+                log::error!("report server failed to spawn {}", e);
+            }
+        });
+    }
+
     // check super cluster
     #[cfg(feature = "enterprise")]
     if O2_CONFIG.super_cluster.enabled {
