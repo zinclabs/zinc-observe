@@ -272,9 +272,9 @@ pub struct ReportServer {
     pub user_email: String,
     #[env_config(name = "ZO_REPORT_USER_PASSWORD", default = "")]
     pub user_password: String,
-    #[env_config(name = "ZO_HTTP_PORT", default = 5082)]
+    #[env_config(name = "ZO_REPORT_SERVER_HTTP_PORT", default = 5082)]
     pub port: u16,
-    #[env_config(name = "ZO_HTTP_ADDR", default = "127.0.0.1")]
+    #[env_config(name = "ZO_REPORT_SERVER_HTTP_ADDR", default = "127.0.0.1")]
     pub addr: String,
     #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
