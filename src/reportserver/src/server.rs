@@ -18,15 +18,15 @@ pub async fn spawn_server() -> Result<(), anyhow::Error> {
         ));
     }
 
-    let haddr: SocketAddr = if CONFIG.http.ipv6_enabled {
-        format!("[::]:{}", CONFIG.http.port).parse()?
+    let haddr: SocketAddr = if CONFIG.report_server.ipv6_enabled {
+        format!("[::]:{}", CONFIG.report_server.port).parse()?
     } else {
-        let ip = if !CONFIG.http.addr.is_empty() {
-            CONFIG.http.addr.clone()
+        let ip = if !CONFIG.report_server.addr.is_empty() {
+            CONFIG.report_server.addr.clone()
         } else {
             "0.0.0.0".to_string()
         };
-        format!("{}:{}", ip, CONFIG.http.port).parse()?
+        format!("{}:{}", ip, CONFIG.report_server.port).parse()?
     };
     log::info!("starting Report server at: {}", haddr);
     let server = HttpServer::new(move || {
