@@ -265,12 +265,12 @@ impl Report {
             ))
             .unwrap();
             match Client::builder()
+                .danger_accept_invalid_certs(CONFIG.common.report_server_skip_tls_verify)
                 .build()
                 .unwrap()
                 .put(url)
                 .query(&[("timezone", &self.timezone)])
                 .header("Content-Type", "application/json")
-                // .header(reqwest::header::AUTHORIZATION, creds)
                 .json(&report_data)
                 .send()
                 .await

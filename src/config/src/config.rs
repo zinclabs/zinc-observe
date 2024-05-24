@@ -630,6 +630,8 @@ pub struct Common {
     pub report_user_password: String,
     #[env_config(name = "ZO_REPORT_SERVER_URL", default = "localhost:5083")]
     pub report_server_url: String,
+    #[env_config(name = "ZO_REPORT_SERVER_SKIP_TLS_VERIFY", default = false)]
+    pub report_server_skip_tls_verify: bool,
     #[env_config(name = "ZO_CONCATENATED_SCHEMA_FIELD_NAME", default = "_all")]
     pub all_fields_name: String,
     #[env_config(name = "ZO_SCHEMA_CACHE_COMPRESS_ENABLED", default = false)]
