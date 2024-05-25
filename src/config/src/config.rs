@@ -316,6 +316,8 @@ pub struct Chrome {
     pub chrome_path: String,
     #[env_config(name = "ZO_CHROME_CHECK_DEFAULT_PATH", default = true)]
     pub chrome_check_default: bool,
+    #[env_config(name = "ZO_CHROME_AUTO_DOWNLOAD", default = false)]
+    pub chrome_auto_download: bool,
     #[env_config(name = "ZO_CHROME_DOWNLOAD_PATH", default = "./download")]
     pub chrome_download_path: String,
     #[env_config(name = "ZO_CHROME_NO_SANDBOX", default = false)]

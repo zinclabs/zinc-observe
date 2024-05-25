@@ -70,6 +70,11 @@ async fn init_chrome_launch_options() -> BrowserConfig {
                 should_download = true;
             }
         }
+        if should_download && !CONFIG.chrome.chrome_auto_download {
+            should_download = false;
+            log::error!("Chrome binary could not be detected");
+        }
+
         if should_download {
             // Download known good chrome version
             let download_path = &CONFIG.chrome.chrome_download_path;
@@ -88,15 +93,18 @@ async fn init_chrome_launch_options() -> BrowserConfig {
             // if the installation fails, it might leave the cache in a bad state
             // and it is advised to wipe it.
             // Note: Does not work on LinuxArm platforms.
-            let info = fetcher
-                .fetch()
-                .await
-                .expect("chrome could not be downloaded");
-            log::info!(
-                "chrome fetched at path {:#?}",
-                info.executable_path.as_path()
-            );
-            browser_config = browser_config.chrome_executable(info.executable_path);
+            match fetcher.fetch().await {
+                Ok(info) => {
+                    log::info!(
+                        "chrome fetched at path {:#?}",
+                        info.executable_path.as_path()
+                    );
+                    browser_config = browser_config.chrome_executable(info.executable_path);
+                }
+                Err(e) => {
+                    log::error!("chrome binary could not be fetched: {e}");
+                }
+            }
         }
     }
     browser_config.build().unwrap()
