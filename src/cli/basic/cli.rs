@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use clap::value_parser;
 use config::utils::file::set_permission;
 use infra::file_list as infra_file_list;
 
@@ -52,6 +53,15 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .long("component")
                         .help("view data of the component: version, user"),
                 ),
+            clap::Command::new("print-env-info")
+                .arg(clap::Arg::new("check")
+                .long("check")
+                .value_name("BOOL")
+                .value_parser(value_parser!(bool))
+                .num_args(0..=1)
+                .default_missing_value("true")
+                .help("Checks if the help associated with env variable is missing"))
+                .about("print all the supported environment variables supported by O2"),
             clap::Command::new("init-dir")
                 .about("init openobserve data dir")
                 .arg(
@@ -130,6 +140,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                 return Err(anyhow::anyhow!("please set data path"));
             }
         }
+        return Ok(true);
+    }
+
+    // Execute this before executing other commands
+    if name == "print-env-info" {
+        let check = command.get_one::<bool>("check").unwrap_or(&false);
+        crate::cli::basic::functions::render_help(*check);
         return Ok(true);
     }
 
