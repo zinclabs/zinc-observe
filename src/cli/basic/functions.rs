@@ -24,7 +24,7 @@ pub(crate) fn render_help(enable_check: bool) {
 
     let max_len = fields.keys().map(|key| key.len()).max().unwrap_or_default();
 
-    let mut empty_env_variables = vec!["Following environment variables are not set:"];
+    let mut empty_env_variables = vec!["Following environment variables are not set: \n"];
     for (k, v) in fields.iter() {
         if k.is_empty() {
             continue;
@@ -46,7 +46,8 @@ pub(crate) fn render_help(enable_check: bool) {
 
     // gt 1 because the first element is the message
     if empty_env_variables.len() > 1 && enable_check {
-        println!("{}", empty_env_variables.join("\n"));
+        println!("{}", empty_env_variables.swap_remove(0));
+        println!("{}", empty_env_variables.join(";"));
         exit(1);
     }
 }
