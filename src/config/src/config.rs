@@ -376,9 +376,9 @@ pub struct Pyroscope {
 
 #[derive(EnvConfig)]
 pub struct Auth {
-    #[env_config(name = "ZO_ROOT_USER_EMAIL")]
+    #[env_config(name = "ZO_ROOT_USER_EMAIL", help = "Email of first/root user")]
     pub root_user_email: String,
-    #[env_config(name = "ZO_ROOT_USER_PASSWORD")]
+    #[env_config(name = "ZO_ROOT_USER_PASSWORD", help = "Password of first/root user")]
     pub root_user_password: String,
     #[env_config(name = "ZO_COOKIE_MAX_AGE", default = 2592000)] // seconds, 30 days
     pub cookie_max_age: i64,
@@ -390,23 +390,51 @@ pub struct Auth {
 
 #[derive(EnvConfig)]
 pub struct Http {
-    #[env_config(name = "ZO_HTTP_PORT", default = 5080)]
+    #[env_config(
+        name = "ZO_HTTP_PORT",
+        default = 5080,
+        help = "openobserve server listen HTTP port"
+    )]
     pub port: u16,
-    #[env_config(name = "ZO_HTTP_ADDR", default = "")]
+    #[env_config(
+        name = "ZO_HTTP_ADDR",
+        default = "",
+        help = "openobserve server listen HTTP ip address"
+    )]
     pub addr: String,
-    #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
+    #[env_config(
+        name = "ZO_HTTP_IPV6_ENABLED",
+        default = false,
+        help = "enable ipv6 support for HTTP"
+    )]
     pub ipv6_enabled: bool,
 }
 
 #[derive(EnvConfig)]
 pub struct Grpc {
-    #[env_config(name = "ZO_GRPC_PORT", default = 5081)]
+    #[env_config(
+        name = "ZO_GRPC_PORT",
+        default = 5081,
+        help = "openobserve server listen gRPC port"
+    )]
     pub port: u16,
-    #[env_config(name = "ZO_GRPC_ADDR", default = "")]
+    #[env_config(
+        name = "ZO_GRPC_ADDR",
+        default = "",
+        help = "openobserve server listen gRPC ip address"
+    )]
     pub addr: String,
-    #[env_config(name = "ZO_GRPC_ORG_HEADER_KEY", default = "organization")]
+    #[env_config(
+        name = "ZO_GRPC_ORG_HEADER_KEY",
+        default = "organization",
+        help = "header key for sending organization information for traces using OTLP over grpc"
+    )]
     pub org_header_key: String,
-    #[env_config(name = "ZO_GRPC_STREAM_HEADER_KEY", default = "stream-name")]
+    #[env_config(
+        name = "ZO_GRPC_STREAM_HEADER_KEY",
+        default = "stream-name",
+        help = "header key for sending stream-name information for traces using OTLP over grpc"
+    )]
     pub stream_header_key: String,
     #[env_config(name = "ZO_INTERNAL_GRPC_TOKEN", default = "")]
     pub internal_grpc_token: String,
@@ -416,7 +444,11 @@ pub struct Grpc {
         help = "Max grpc message size in MB, default is 16 MB"
     )]
     pub max_message_size: usize,
-    #[env_config(name = "ZO_GRPC_CONNECT_TIMEOUT", default = 5)] // in seconds
+    #[env_config(
+        name = "ZO_GRPC_CONNECT_TIMEOUT",
+        default = 5,
+        help = "Default grpc connect timeout in seconds"
+    )] // in seconds
     pub connect_timeout: u64,
 }
 
@@ -452,10 +484,17 @@ pub struct Common {
     pub cluster_coordinator: String,
     #[env_config(name = "ZO_QUEUE_STORE", default = "")]
     pub queue_store: String,
-    #[env_config(name = "ZO_META_STORE", default = "")]
+    #[env_config(
+        name = "ZO_META_STORE",
+        default = "",
+        help = "Default is sqlite for local mode, etcd for cluster mode. 
+    Supported values are: sqlite, etcd, postgres, mysql. 
+    Sqlite is supported only for local mode. 
+    Etcd is deprecated."
+    )]
     pub meta_store: String,
     pub meta_store_external: bool, // external storage no need sync file_list to s3
-    #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
+    #[env_config(name = "ZO_META_POSTGRES_DSN", default = "", help = "If you enable postgres as meta store, you need configure the database source address, like this: postgres://postgres:12345678@localhost:5432/openobserve")]
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve

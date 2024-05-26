@@ -22,9 +22,7 @@ use config::Config;
 pub(crate) fn render_help(enable_check: bool) {
     let fields = Config::get_help();
 
-    let max_len = fields
-        .iter()
-        .map(|(key, _)| key.len())
+    let max_len = fields.keys().map(|key| key.len())
         .max()
         .unwrap_or_default();
 
