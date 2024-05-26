@@ -148,6 +148,11 @@ jobs:
             mkdir -p bin
             mv target/aarch64-unknown-linux-gnu/release/openobserve bin/openobserve
      
+        - name: Ensure all env-vars have help text
+          run: |
+            chmod +x bin/openobserve
+            ./bin/openobserve print-env-info --check 
+    
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4
           with:

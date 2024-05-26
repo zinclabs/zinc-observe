@@ -22,9 +22,7 @@ use config::Config;
 pub(crate) fn render_help(enable_check: bool) {
     let fields = Config::get_help();
 
-    let max_len = fields.keys().map(|key| key.len())
-        .max()
-        .unwrap_or_default();
+    let max_len = fields.keys().map(|key| key.len()).max().unwrap_or_default();
 
     let mut empty_env_variables = vec!["Following environment variables are not set:"];
     for (k, v) in fields.iter() {

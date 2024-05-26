@@ -494,7 +494,11 @@ pub struct Common {
     )]
     pub meta_store: String,
     pub meta_store_external: bool, // external storage no need sync file_list to s3
-    #[env_config(name = "ZO_META_POSTGRES_DSN", default = "", help = "If you enable postgres as meta store, you need configure the database source address, like this: postgres://postgres:12345678@localhost:5432/openobserve")]
+    #[env_config(
+        name = "ZO_META_POSTGRES_DSN",
+        default = "",
+        help = "If you enable postgres as meta store, you need configure the database source address, like this: postgres://postgres:12345678@localhost:5432/openobserve"
+    )]
     pub meta_postgres_dsn: String, // postgres://postgres:12345678@localhost:5432/openobserve
     #[env_config(name = "ZO_META_MYSQL_DSN", default = "")]
     pub meta_mysql_dsn: String, // mysql://root:12345678@localhost:3306/openobserve
