@@ -47,7 +47,7 @@ use {std::sync::Arc, tokio::sync::Mutex};
 use super::usage::report_request_usage_stats;
 use crate::{
     common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
-    handler::grpc::request::search::Searcher,
+    handler::grpc::request::search::intra_cluster::Searcher,
     service::format_partition_key,
 };
 
@@ -643,6 +643,47 @@ fn filter_source_by_partition_key(source: &str, filters: &[(&str, Vec<String>)])
 
 pub fn server_internal_error(error: impl ToString) -> Error {
     Error::ErrorCode(ErrorCodes::ServerInternalError(error.to_string()))
+}
+
+#[tracing::instrument(name = "service:search_partition_multi:enter", skip(req))]
+pub async fn search_partition_multi(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    req: &search::MultiSearchPartitionRequest,
+) -> Result<search::SearchPartitionResponse, Error> {
+    let mut res = search::SearchPartitionResponse::default();
+    let mut total_rec = 0;
+    for query in &req.sql {
+        match search_partition(
+            trace_id,
+            org_id,
+            stream_type,
+            &search::SearchPartitionRequest {
+                start_time: req.start_time,
+                end_time: req.end_time,
+                sql: query.to_string(),
+                sql_mode: req.sql_mode.to_string(),
+                regions: req.regions.clone(),
+                clusters: req.clusters.clone(),
+                encoding: req.encoding,
+            },
+        )
+        .await
+        {
+            Ok(resp) => {
+                if resp.partitions.len() > res.partitions.len() {
+                    total_rec += resp.records;
+                    res = resp;
+                }
+            }
+            Err(err) => {
+                log::error!("search_partition_multi error: {:?}", err);
+            }
+        };
+    }
+    res.records = total_rec;
+    Ok(res)
 }
 
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);

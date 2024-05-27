@@ -118,7 +118,7 @@ impl Search for Searcher {
     ) -> Result<Response<SearchResponse>, Status> {
         let start = std::time::Instant::now();
         let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
-            prop.extract(&super::MetadataMap(req.metadata()))
+            prop.extract(&crate::handler::grpc::request::MetadataMap(req.metadata()))
         });
         tracing::Span::current().set_parent(parent_cx);
 
@@ -183,7 +183,7 @@ impl Search for Searcher {
     ) -> Result<Response<SearchResponse>, Status> {
         let start = std::time::Instant::now();
         let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
-            prop.extract(&super::MetadataMap(req.metadata()))
+            prop.extract(&crate::handler::grpc::request::MetadataMap(req.metadata()))
         });
         tracing::Span::current().set_parent(parent_cx);
 
