@@ -21,8 +21,8 @@ use actix_web::{
     post, put, web, HttpRequest, HttpResponse,
 };
 use config::{
-    get_config,
     utils::{base64, json},
+    CONFIG,
 };
 use strum::IntoEnumIterator;
 
@@ -275,7 +275,6 @@ pub async fn authentication(
         }
     };
     if resp.status {
-        let cfg = get_config();
         let access_token = format!(
             "Basic {}",
             base64::encode(&format!("{}:{}", auth.name, auth.password))
@@ -288,12 +287,12 @@ pub async fn authentication(
         let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
         auth_cookie.set_expires(
             cookie::time::OffsetDateTime::now_utc()
-                + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
+                + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
         );
         auth_cookie.set_http_only(true);
-        auth_cookie.set_secure(cfg.auth.cookie_secure_only);
+        auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
         auth_cookie.set_path("/");
-        if cfg.auth.cookie_same_site_lax {
+        if CONFIG.auth.cookie_same_site_lax {
             auth_cookie.set_same_site(cookie::SameSite::Lax);
         } else {
             auth_cookie.set_same_site(cookie::SameSite::None);
@@ -312,75 +311,92 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 
         use crate::handler::http::auth::validator::ID_TOKEN_HEADER;
 
-        let cfg = get_config();
         let mut resp = SignInResponse::default();
-        if let Some(auth_header) = _req.headers().get("Authorization") {
-            if let Ok(auth_header) = auth_header.to_str() {
-                if let Some((name, password)) =
-                    o2_enterprise::enterprise::dex::service::auth::get_user_from_token(auth_header)
-                {
-                    match crate::handler::http::auth::validator::validate_user(&name, &password)
-                        .await
-                    {
-                        Ok(v) => {
-                            if v.is_valid {
-                                resp.status = true;
-                            } else {
-                                return unauthorized_error(resp);
-                            }
-                        }
-                        Err(_) => {
-                            return unauthorized_error(resp);
-                        }
-                    };
 
-                    if resp.status {
-                        let access_token = format!(
-                            "Basic {}",
-                            base64::encode(&format!("{}:{}", &name, &password))
-                        );
+        let query = web::Query::<std::collections::HashMap<String, String>>::from_query(
+            _req.query_string(),
+        )
+        .unwrap();
 
-                        let id_token = config::utils::json::json!({
-                            "email": name,
-                            "name": name,
-                        });
-                        let tokens = json::to_string(&AuthTokens {
-                            access_token,
-                            refresh_token: "".to_string(),
-                        })
-                        .unwrap();
+        let mut req_time = None;
+        let mut exp_in = None;
 
-                        let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
-                        auth_cookie.set_expires(
-                            cookie::time::OffsetDateTime::now_utc()
-                                + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
-                        );
-                        auth_cookie.set_http_only(true);
-                        auth_cookie.set_secure(cfg.auth.cookie_secure_only);
-                        auth_cookie.set_path("/");
-
-                        if cfg.auth.cookie_same_site_lax {
-                            auth_cookie.set_same_site(cookie::SameSite::Lax);
-                        } else {
-                            auth_cookie.set_same_site(cookie::SameSite::None);
-                        }
-                        let url = format!(
-                            "{}{}/web/cb#id_token={}.{}",
-                            cfg.common.web_url,
-                            cfg.common.base_uri,
-                            ID_TOKEN_HEADER,
-                            base64::encode(&id_token.to_string())
-                        );
-                        return Ok(HttpResponse::Found()
-                            .append_header((header::LOCATION, url))
-                            .cookie(auth_cookie)
-                            .json(resp));
-                    } else {
-                        unauthorized_error(resp)
-                    }
-                } else {
-                    unauthorized_error(resp)
+        let auth_header = if let Some(s) = query.get("auth") {
+            req_time = query.get("request_time");
+            exp_in = query.get("exp_in").unwrap_or(&"").parse::<i64>().ok();
+            format!("q_auth {}", s)
+        } else if let Some(auth_header) = _req.headers().get("Authorization") {
+            match auth_header.to_str() {
+                Ok(auth_header_str) => auth_header_str.to_string(),
+                Err(_) => {
+                    return unauthorized_error(resp);
                 }
+            }
+        } else {
+            return unauthorized_error(resp);
+        };
+
+        if let Some((name, password)) =
+            o2_enterprise::enterprise::dex::service::auth::get_user_from_token(&auth_header)
+        {
+            match crate::handler::http::auth::validator::validate_user_for_query_params(
+                &name, &password, req_time, exp_in,
+            )
+            .await
+            {
+                Ok(v) => {
+                    if v.is_valid {
+                        resp.status = true;
+                    } else {
+                        return unauthorized_error(resp);
+                    }
+                }
+                Err(_) => {
+                    return unauthorized_error(resp);
+                }
+            };
+
+            if resp.status {
+                let access_token = format!(
+                    "Basic {}",
+                    base64::encode(&format!("{}:{}", &name, &password))
+                );
+
+                let id_token = config::utils::json::json!({
+                    "email": name,
+                    "name": name,
+                });
+                let tokens = json::to_string(&AuthTokens {
+                    access_token,
+                    refresh_token: "".to_string(),
+                })
+                .unwrap();
+
+                let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
+                auth_cookie.set_expires(
+                    cookie::time::OffsetDateTime::now_utc()
+                        + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+                );
+                auth_cookie.set_http_only(true);
+                auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
+                auth_cookie.set_path("/");
+
+                if CONFIG.auth.cookie_same_site_lax {
+                    auth_cookie.set_same_site(cookie::SameSite::Lax);
+                } else {
+                    auth_cookie.set_same_site(cookie::SameSite::None);
+                }
+                let url = format!(
+                    "{}{}/web/cb#id_token={}.{}",
+                    CONFIG.common.web_url,
+                    CONFIG.common.base_uri,
+                    ID_TOKEN_HEADER,
+                    base64::encode(&id_token.to_string())
+                );
+                return Ok(HttpResponse::Found()
+                    .append_header((header::LOCATION, url))
+                    .cookie(auth_cookie)
+                    .json(resp));
             } else {
                 unauthorized_error(resp)
             }

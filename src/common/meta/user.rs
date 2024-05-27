@@ -35,6 +35,7 @@ pub struct UserRequest {
 }
 
 impl UserRequest {
+    #[allow(clippy::too_many_arguments)]
     pub fn to_new_dbuser(
         &self,
         password: String,
@@ -43,6 +44,7 @@ impl UserRequest {
         token: String,
         rum_token: String,
         is_external: bool,
+        password_ext: String,
     ) -> DBUser {
         DBUser {
             email: self.email.clone(),
@@ -57,6 +59,7 @@ impl UserRequest {
                 role: self.role.clone(),
             }],
             is_external,
+            password_ext: Some(password_ext),
         }
     }
 }
@@ -74,6 +77,7 @@ pub struct DBUser {
     pub organizations: Vec<UserOrg>,
     #[serde(default)]
     pub is_external: bool,
+    pub password_ext: Option<String>,
 }
 
 impl DBUser {
@@ -100,6 +104,7 @@ impl DBUser {
             rum_token: org.rum_token.clone(),
             salt: local.salt,
             is_external: self.is_external,
+            password_ext: self.password_ext.clone(),
         })
     }
 
@@ -120,6 +125,7 @@ impl DBUser {
                     rum_token: org.rum_token,
                     salt: self.salt.clone(),
                     is_external: self.is_external,
+                    password_ext: self.password_ext.clone(),
                 })
             }
             ret_val
@@ -144,6 +150,7 @@ pub struct User {
     pub org: String,
     /// Is the user authenticated and created via LDAP
     pub is_external: bool,
+    pub password_ext: Option<String>,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema)]

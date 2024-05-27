@@ -176,7 +176,7 @@ async fn update_passcode_inner(
     };
 
     db_user.organizations = new_orgs;
-    let _ = db::user::set(db_user.clone()).await;
+    let _ = db::user::set(&db_user).await;
 
     let ret = if is_rum_update {
         IngestionTokensContainer::RumToken(RumIngestionToken {
