@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, path::Path, sync::Arc, time::UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::UNIX_EPOCH,
+};
 
 use arrow::{
     array::{ArrayRef, BooleanArray, Int64Array, StringArray},
@@ -29,7 +34,7 @@ use config::{
     utils::{
         arrow::record_batches_to_json_rows,
         asynchronism::file::{get_file_contents, get_file_meta},
-        file::scan_files,
+        file::scan_files_for_move,
         json,
         parquet::{
             read_metadata_from_file, read_recordbatch_from_bytes, read_schema_from_file,
@@ -68,6 +73,14 @@ use crate::{
 };
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+static LAST_SCANNED_DIR: Lazy<Arc<RwLock<PathBuf>>> = Lazy::new(|| {
+    Arc::new(RwLock::new({
+        let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
+            .canonicalize()
+            .unwrap();
+        wal_dir.join("files/")
+    }))
+});
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let (tx, rx) =
@@ -85,6 +98,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((prefix, files)) => {
+                        println!("prefix: {}, files: {:?}", prefix, files);
                         if let Err(e) = move_files(thread_id, &prefix, files).await {
                             log::error!(
                                 "[INGESTER:JOB] Error moving parquet files to remote: {}",
@@ -109,10 +123,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
             Err(e) => {
                 log::error!("[INGESTER:JOB] Error prepare parquet files: {}", e);
             }
-            Ok(files) => {
+            Ok((files, last_scanned_dir)) => {
                 for (prefix, files) in files.into_iter() {
                     if let Err(e) = tx.send((prefix, files)).await {
                         log::error!("[INGESTER:JOB] Error sending parquet files to move: {}", e);
+                    } else {
+                        let mut w = LAST_SCANNED_DIR.write().await;
+                        w.push(PathBuf::from(last_scanned_dir.clone()));
+                        drop(w)
                     }
                 }
             }
@@ -122,17 +140,31 @@ pub async fn run() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Error> {
+async fn prepare_files() -> Result<(FxIndexMap<String, Vec<FileKey>>, String), anyhow::Error> {
     let start = std::time::Instant::now();
     let wal_dir = Path::new(&CONFIG.common.data_wal_dir)
         .canonicalize()
         .unwrap();
 
-    let pattern = wal_dir.join("files/");
-    let files =
-        scan_files(&pattern, "parquet", Some(CONFIG.limit.file_push_limit)).unwrap_or_default();
+    let pattern = wal_dir.join("files/").to_string_lossy().to_string();
+    let r = LAST_SCANNED_DIR.read().await;
+    let start_dir = LAST_SCANNED_DIR.read().await.clone();
+    drop(r);
+
+    let (files, last_scanned_dir) = scan_files_for_move(
+        pattern,
+        "parquet",
+        Some(CONFIG.limit.file_push_limit),
+        start_dir.to_str().unwrap(),
+    )
+    .unwrap_or_default();
     if files.is_empty() {
-        return Ok(FxIndexMap::default());
+        let pattern = wal_dir.join("files/").to_string_lossy().to_string();
+        let mut w = LAST_SCANNED_DIR.write().await;
+        w.push(PathBuf::from(pattern.clone()));
+        drop(w);
+
+        return Ok((FxIndexMap::default(), pattern));
     }
     log::debug!(
         "[INGESTER:JOB] move files get: {}, took: {} ms",
@@ -198,7 +230,7 @@ async fn prepare_files() -> Result<FxIndexMap<String, Vec<FileKey>>, anyhow::Err
         partition_files_with_size.len()
     );
 
-    Ok(partition_files_with_size)
+    Ok((partition_files_with_size, last_scanned_dir))
 }
 
 async fn move_files(

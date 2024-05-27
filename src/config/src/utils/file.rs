@@ -76,6 +76,60 @@ pub fn scan_files<P: AsRef<Path>>(
     Ok(files)
 }
 
+#[inline(always)]
+pub fn scan_files_for_move<P: AsRef<Path>>(
+    root: P,
+    ext: &str,
+    limit: Option<usize>,
+    start_from: &str,
+) -> Result<(Vec<String>, String), std::io::Error> {
+    let mut last_scanned_dir = String::new();
+    let mut dirs = get_dirs(root.as_ref())?;
+    dirs.sort();
+
+    if !start_from.is_empty() {
+        let idx = dirs.iter().position(|x| x == start_from);
+        if let Some(idx) = idx {
+            dirs = dirs.split_at(idx).1.to_vec();
+        }
+    }
+    let limit = limit.unwrap_or_default();
+    let mut files = Vec::with_capacity(std::cmp::max(16, limit));
+
+    for dir in dirs {
+        last_scanned_dir = dir.to_string();
+        let dir_files = scan_files(dir, ext, Some(limit))?;
+        files.extend(dir_files);
+        if limit > 0 && files.len() >= limit {
+            break;
+        }
+    }
+    Ok((files, last_scanned_dir.to_string()))
+}
+
+#[inline(always)]
+pub fn get_dirs<P: AsRef<Path>>(root: P) -> Result<Vec<String>, std::io::Error> {
+    let mut leaf_dirs = Vec::new();
+    let mut dirs = Vec::new();
+    dirs.push(root.as_ref().to_path_buf());
+
+    while let Some(dir_path) = dirs.pop() {
+        let mut has_sub_dir = false;
+        let dir = std::fs::read_dir(&dir_path)?;
+        for entry in dir {
+            let path = entry?.path();
+            if path.is_dir() {
+                has_sub_dir = true;
+                dirs.push(path);
+            }
+        }
+        if !has_sub_dir {
+            leaf_dirs.push(dir_path.to_str().unwrap().to_string());
+        }
+    }
+    Ok(leaf_dirs)
+}
+
 #[cfg(unix)]
 pub fn set_permission<P: AsRef<std::path::Path>>(path: P, mode: u32) -> Result<(), std::io::Error> {
     use std::os::unix::fs::PermissionsExt;
