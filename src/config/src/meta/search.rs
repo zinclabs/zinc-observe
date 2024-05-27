@@ -577,6 +577,10 @@ pub struct MultiStreamRequest {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
+    #[serde(default)]
+    pub regions: Vec<String>, // default query all regions, local: only query local region clusters
+    #[serde(default)]
+    pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
 }
 
 impl MultiStreamRequest {
@@ -601,8 +605,8 @@ impl MultiStreamRequest {
                     skip_wal: self.skip_wal,
                 },
                 aggs: self.aggs.clone(),
-                regions: vec![],
-                clusters: vec![],
+                regions: self.regions.clone(),
+                clusters: self.clusters.clone(),
                 encoding: self.encoding,
                 timeout: self.timeout,
             });

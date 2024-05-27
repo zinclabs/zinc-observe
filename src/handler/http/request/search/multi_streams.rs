@@ -157,8 +157,15 @@ pub async fn search_multi(
     }
 
     let user_id = in_req.headers().get("user_id").unwrap().to_str().unwrap();
-    let queries = multi_req.to_query_req();
+    let mut queries = multi_req.to_query_req();
     let mut multi_res = search::Response::new(multi_req.from, multi_req.size);
+
+    // Before making any rpc requests, first check the sql expressions can be decoded correctly
+    for req in queries.iter_mut() {
+        if let Err(e) = req.decode() {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    }
 
     for mut req in queries {
         let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
