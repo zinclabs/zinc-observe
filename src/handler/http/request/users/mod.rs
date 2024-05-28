@@ -24,6 +24,7 @@ use config::{
     utils::{base64, json},
     CONFIG,
 };
+use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -363,11 +364,12 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
         if let Some((name, password)) =
             o2_enterprise::enterprise::dex::service::auth::get_user_from_token(&auth_header)
         {
-            match crate::handler::http::auth::validator::validate_user_for_query_params(
-                &name, &password, req_time, exp_in,
-            )
-            .await
-            {
+            let (ret, pass_ext) =
+                crate::handler::http::auth::validator::validate_user_for_query_params(
+                    &name, &password, req_time, exp_in,
+                )
+                .await;
+            match ret {
                 Ok(v) => {
                     if v.is_valid {
                         resp.status = true;
@@ -382,8 +384,8 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 
             if resp.status {
                 let access_token = format!(
-                    "Basic {}",
-                    base64::encode(&format!("{}:{}", &name, &password))
+                    "auth_ext {}",
+                    base64::encode(&format!("{}:{}", &name, &pass_ext))
                 );
 
                 let id_token = config::utils::json::json!({
@@ -399,7 +401,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
                 auth_cookie.set_expires(
                     cookie::time::OffsetDateTime::now_utc()
-                        + cookie::time::Duration::seconds(CONFIG.auth.cookie_max_age),
+                        + cookie::time::Duration::seconds(O2_CONFIG.common.ext_cookie_max_age),
                 );
                 auth_cookie.set_http_only(true);
                 auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);
