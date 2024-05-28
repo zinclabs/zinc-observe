@@ -212,14 +212,15 @@ async fn validate_user_from_db(
     user_password: &str,
     req_time: Option<&String>,
     exp_in: i64,
+    password_ext_salt: &str,
 ) -> Result<TokenValidationResponse, Error> {
     // let db_user = db::user::get_db_user(user_id).await;
     match db_user {
         Ok(mut user) => {
             let in_pass = get_hash(user_password, &user.salt);
-            if user.password.eq(&in_pass) {
+            if req_time.is_none() && user.password.eq(&in_pass) {
                 if user.password_ext.is_none() {
-                    let password_ext = get_hash(user_password, "");
+                    let password_ext = get_hash(user_password, password_ext_salt);
                     user.password_ext = Some(password_ext);
                     let _ = db::user::set(&user).await;
                 }
@@ -238,11 +239,11 @@ async fn validate_user_from_db(
                         "{}{}",
                         get_hash(
                             &format!("{}{}", user.password_ext.unwrap(), req_time.unwrap()),
-                            ""
+                            password_ext_salt
                         ),
                         exp_in
                     ),
-                    "",
+                    password_ext_salt,
                 );
                 if hashed_pass.eq(&in_pass) {
                     return Ok(TokenValidationResponse {
@@ -270,7 +271,7 @@ pub async fn validate_user(
     user_password: &str,
 ) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
-    validate_user_from_db(db_user, user_password, None, 0).await
+    validate_user_from_db(db_user, user_password, None, 0, &get_salt()).await
 }
 
 pub async fn validate_user_for_query_params(
@@ -280,7 +281,7 @@ pub async fn validate_user_for_query_params(
     exp_in: i64,
 ) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
-    validate_user_from_db(db_user, user_password, req_time, exp_in).await
+    validate_user_from_db(db_user, user_password, req_time, exp_in, &get_salt()).await
 }
 
 pub async fn validator_aws(
@@ -569,6 +570,17 @@ pub(crate) async fn list_objects_for_user(
     }
 }
 
+fn get_salt() -> String {
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::common::infra::config::O2_CONFIG
+            .common
+            .query_auth_salt
+            .clone()
+    }
+    #[cfg(not(feature = "enterprise"))]
+    "openobserve".to_string()
+}
 #[cfg(test)]
 mod tests {
     use infra::db as infra_db;
