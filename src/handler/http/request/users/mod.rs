@@ -20,7 +20,6 @@ use actix_web::{
     http::{self},
     post, put, web, HttpRequest, HttpResponse,
 };
-use chrono::Utc;
 use config::{
     utils::{base64, json},
     CONFIG,
@@ -309,6 +308,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         use actix_web::http::header;
+        use chrono::Utc;
 
         use crate::handler::http::auth::validator::ID_TOKEN_HEADER;
 
