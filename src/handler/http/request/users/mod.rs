@@ -20,6 +20,7 @@ use actix_web::{
     http::{self},
     post, put, web, HttpRequest, HttpResponse,
 };
+use chrono::Utc;
 use config::{
     utils::{base64, json},
     CONFIG,
@@ -319,11 +320,34 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
         .unwrap();
 
         let mut req_time = None;
-        let mut exp_in = None;
+        let mut exp_in = 300;
+        let mut req_ts = 0;
 
         let auth_header = if let Some(s) = query.get("auth") {
-            req_time = query.get("request_time");
-            exp_in = query.get("exp_in").unwrap_or(&"").parse::<i64>().ok();
+            match query.get("request_time") {
+                Some(req_time_str) => {
+                    if let Ok(ts) = config::utils::time::parse_str_to_time(req_time_str) {
+                        req_ts = ts.timestamp();
+                    } else {
+                        return unauthorized_error(resp);
+                    }
+                    req_time = Some(req_time_str);
+                }
+                None => {
+                    return unauthorized_error(resp);
+                }
+            };
+            match query.get("exp_in") {
+                Some(exp_in_str) => {
+                    exp_in = exp_in_str.parse::<i64>().unwrap();
+                }
+                None => {
+                    return unauthorized_error(resp);
+                }
+            };
+            if Utc::now().timestamp() - req_ts > exp_in {
+                return unauthorized_error(resp);
+            }
             format!("q_auth {}", s)
         } else if let Some(auth_header) = _req.headers().get("Authorization") {
             match auth_header.to_str() {
