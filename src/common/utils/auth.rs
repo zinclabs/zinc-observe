@@ -354,7 +354,10 @@ impl FromRequest for AuthExtractor {
         let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
             let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
             let access_token = auth_tokens.access_token;
-            if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
+            if access_token.starts_with("Basic")
+                || access_token.starts_with("Bearer")
+                || access_token.starts_with("auth_ext")
+            {
                 access_token
             } else if access_token.starts_with("session") {
                 let session_key = access_token.strip_prefix("session ").unwrap().to_string();
@@ -549,5 +552,15 @@ mod tests {
         let hash =
             "$argon2d$v=16$m=2048,t=4,p=2$VGVzdFNhbHQ$CZzrFPtqjY4mIPYwoDztCJ3OGD5M0P37GH4QddwrbZk";
         assert_eq!(get_hash("Pass#123", "TestSalt"), hash);
+    }
+
+    #[tokio::test]
+    async fn test_get_hash_for_pass() {
+        let pass1 = get_hash("a", "openobserve");
+        let time = chrono::Utc::now().timestamp();
+        let pass2 = get_hash(&format!("{}{}", &pass1, time), "openobserve");
+        let pass3 = get_hash(&format!("{}{}", &pass2, 600), "openobserve");
+        println!("time: {}", time);
+        println!("pass3: {}", pass3);
     }
 }
