@@ -321,7 +321,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 
         let mut req_time = None;
         let mut exp_in = 300;
-        let mut req_ts = 0;
+        let req_ts;
 
         let auth_header = if let Some(s) = query.get("auth") {
             match query.get("request_time") {

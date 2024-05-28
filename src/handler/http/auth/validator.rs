@@ -210,8 +210,8 @@ pub async fn validate_credentials(
 async fn validate_user_from_db(
     db_user: Result<DBUser, anyhow::Error>,
     user_password: &str,
-    req_time: Option<&str>,
-    exp_in: Option<&str>,
+    req_time: Option<&String>,
+    exp_in: i64,
 ) -> Result<TokenValidationResponse, Error> {
     // let db_user = db::user::get_db_user(user_id).await;
     match db_user {
@@ -223,8 +223,7 @@ async fn validate_user_from_db(
                     user.password_ext = Some(password_ext);
                     let _ = db::user::set(&user).await;
                 }
-
-                return Ok(TokenValidationResponse {
+                Ok(TokenValidationResponse {
                     is_valid: true,
                     user_email: user.email,
                     is_internal_user: !user.is_external,
@@ -232,8 +231,8 @@ async fn validate_user_from_db(
                     user_name: user.first_name.to_owned(),
                     family_name: user.last_name,
                     given_name: user.first_name,
-                });
-            } else if user.password_ext.is_some() && req_time.is_some() && exp_in.is_some() {
+                })
+            } else if user.password_ext.is_some() && req_time.is_some() {
                 let hashed_pass = get_hash(
                     &format!(
                         "{}{}",
@@ -241,7 +240,7 @@ async fn validate_user_from_db(
                             &format!("{}{}", user.password_ext.unwrap(), req_time.unwrap()),
                             ""
                         ),
-                        exp_in.unwrap()
+                        exp_in
                     ),
                     "",
                 );
@@ -271,14 +270,14 @@ pub async fn validate_user(
     user_password: &str,
 ) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
-    validate_user_from_db(db_user, user_password, None, None).await
+    validate_user_from_db(db_user, user_password, None, 0).await
 }
 
 pub async fn validate_user_for_query_params(
     user_id: &str,
     user_password: &str,
-    req_time: Option<&str>,
-    exp_in: Option<&str>,
+    req_time: Option<&String>,
+    exp_in: i64,
 ) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
     validate_user_from_db(db_user, user_password, req_time, exp_in).await
