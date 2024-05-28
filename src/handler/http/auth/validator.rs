@@ -238,11 +238,7 @@ async fn validate_user_from_db(
                     &format!(
                         "{}{}",
                         get_hash(
-                            &format!(
-                                "{}{}",
-                                get_hash(&user.password_ext.unwrap(), ""),
-                                req_time.unwrap()
-                            ),
+                            &format!("{}{}", user.password_ext.unwrap(), req_time.unwrap()),
                             ""
                         ),
                         exp_in.unwrap()
