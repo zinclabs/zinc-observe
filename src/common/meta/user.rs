@@ -355,3 +355,11 @@ pub struct AuthTokens {
     pub access_token: String,
     pub refresh_token: String,
 }
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct AuthTokensExt {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub request_time: String,
+    pub expires_in: i64,
+}

@@ -26,7 +26,7 @@ use crate::{
     common::{
         meta::{
             ingestion::INGESTION_EP,
-            user::{DBUser, TokenValidationResponse, UserRole},
+            user::{AuthTokensExt, DBUser, TokenValidationResponse, UserRole},
         },
         utils::auth::{get_hash, is_root_user, AuthExtractor},
     },
@@ -284,21 +284,10 @@ pub async fn validate_user_for_query_params(
     user_password: &str,
     req_time: Option<&String>,
     exp_in: i64,
-) -> (Result<TokenValidationResponse, Error>, String) {
+) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
-    let user = db_user.unwrap();
 
-    (
-        validate_user_from_db(
-            Ok(user.clone()),
-            user_password,
-            req_time,
-            exp_in,
-            &get_salt(),
-        )
-        .await,
-        user.password_ext.unwrap_or("".to_string()),
-    )
+    validate_user_from_db(db_user, user_password, req_time, exp_in, &get_salt()).await
 }
 
 pub async fn validator_aws(
@@ -433,14 +422,10 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    if auth_info.auth.starts_with("Basic") || auth_info.auth.starts_with("auth_ext") {
-        let decoded = if auth_info.auth.starts_with("Basic") {
-            base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim())
-                .expect("Failed to decode base64 string")
-        } else {
-            base64::decode(auth_info.auth.strip_prefix("auth_ext").unwrap().trim())
-                .expect("Failed to decode base64 string")
-        };
+    if auth_info.auth.starts_with("Basic") {
+        let decoded = base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim())
+            .expect("Failed to decode base64 string");
+
         let credentials = String::from_utf8(decoded.into())
             .map_err(|_| ())
             .expect("Failed to decode base64 string");
@@ -454,6 +439,14 @@ async fn oo_validator_internal(
         validator(req, &username, &password, auth_info, path_prefix).await
     } else if auth_info.auth.starts_with("Bearer") {
         super::token::token_validator(req, auth_info).await
+    } else if auth_info.auth.starts_with("auth_ext") {
+        let auth_tokens: AuthTokensExt =
+            config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
+        if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
+            Err((ErrorUnauthorized("Unauthorized Access"), req))
+        } else {
+            Err((ErrorUnauthorized("Unauthorized Access"), req))
+        }
     } else {
         Err((ErrorUnauthorized("Unauthorized Access"), req))
     }
