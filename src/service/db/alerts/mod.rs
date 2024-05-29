@@ -93,6 +93,27 @@ pub async fn set(
     }
 }
 
+pub async fn set_without_updating_trigger(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    alert: &Alert,
+) -> Result<String, anyhow::Error> {
+    let schedule_key = format!("{stream_type}/{stream_name}/{}", alert.name);
+    let key = format!("/alerts/{org_id}/{}", &schedule_key);
+    match db::put(
+        &key,
+        json::to_vec(alert).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await
+    {
+        Ok(_) => Ok(schedule_key),
+        Err(e) => Err(anyhow::anyhow!("{e}")),
+    }
+}
+
 pub async fn delete(
     org_id: &str,
     stream_type: StreamType,

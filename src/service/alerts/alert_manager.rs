@@ -75,6 +75,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     let alert_name = columns[2];
     let is_realtime = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
+    let now = Utc::now().timestamp_micros();
 
     if is_realtime && is_silenced {
         log::debug!(
@@ -149,7 +150,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     }
 
     let mut trigger_data_stream = TriggerData {
-        org: trigger.org,
+        org: trigger.org.clone(),
         module: TriggerDataType::Alert,
         key: trigger.module_key.clone(),
         next_run_at: new_trigger.next_run_at,
@@ -208,6 +209,24 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         db::scheduler::update_trigger(new_trigger).await?;
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
     }
+
+    // Get the most recent version of this alert
+    match super::get(org_id, stream_type, stream_name, alert_name).await? {
+        Some(mut alert) => {
+            alert.last_triggered_at = Some(now);
+            alert.last_triggered_status = Some(trigger_data_stream.status.clone());
+
+            if let Err(e) =
+                db::alerts::set_without_updating_trigger(org_id, stream_type, stream_name, &alert)
+                    .await
+            {
+                log::error!("Failed to update alert: {alert_name} after trigger: {e}");
+            }
+        }
+        None => {
+            log::debug!("Alert {alert_name} already deleted");
+        }
+    };
 
     // publish the triggers as stream
     trigger_data_stream.end_time = Utc::now().timestamp_micros();

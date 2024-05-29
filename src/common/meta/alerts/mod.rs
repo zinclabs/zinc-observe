@@ -13,10 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::stream::StreamType, utils::json::Value};
+use chrono::{DateTime, FixedOffset};
+use config::{
+    meta::{stream::StreamType, usage::TriggerDataStatus},
+    utils::json::Value,
+};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use super::dashboards::datetime_now;
 
 pub mod destinations;
 pub mod templates;
@@ -50,6 +56,20 @@ pub struct Alert {
     /// Timezone offset in minutes.
     /// The negative secs means the Western Hemisphere
     pub tz_offset: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_triggered_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_triggered_status: Option<TriggerDataStatus>,
+    #[serde(default = "datetime_now")]
+    #[schema(value_type = String, format = DateTime)]
+    pub created_at: DateTime<FixedOffset>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = String, format = DateTime)]
+    pub updated_at: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
+    pub owner: String,
+    #[serde(default)]
+    pub last_edited_by: String,
 }
 
 impl PartialEq for Alert {
@@ -76,6 +96,12 @@ impl Default for Alert {
             description: "".to_string(),
             enabled: false,
             tz_offset: 0, // UTC
+            last_triggered_at: None,
+            last_triggered_status: None,
+            created_at: datetime_now(),
+            updated_at: None,
+            owner: "".to_string(),
+            last_edited_by: "".to_string(),
         }
     }
 }
