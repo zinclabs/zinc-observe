@@ -31,8 +31,8 @@ use crate::{
         meta::{
             self,
             user::{
-                AuthTokens, AuthTokensExt, RolesResponse, SignInResponse, SignInUser, UpdateUser,
-                UserOrgRole, UserRequest, UserRole,
+                AuthTokens, RolesResponse, SignInResponse, SignInUser, UpdateUser, UserOrgRole,
+                UserRequest, UserRole,
             },
         },
         utils::auth::UserEmail,
@@ -311,7 +311,9 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
         use chrono::Utc;
         use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
-        use crate::handler::http::auth::validator::ID_TOKEN_HEADER;
+        use crate::{
+            common::meta::user::AuthTokensExt, handler::http::auth::validator::ID_TOKEN_HEADER,
+        };
 
         let mut resp = SignInResponse::default();
 
@@ -322,7 +324,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 
         let mut request_time = None;
         let mut expires_in = 300;
-        let req_ts;
+        let mut req_ts = 0;
 
         let auth_header = if let Some(s) = query.get("auth") {
             match query.get("request_time") {
@@ -397,7 +399,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let tokens = json::to_string(&AuthTokensExt {
                     access_token,
                     refresh_token: "".to_string(),
-                    request_time: request_time.unwrap().to_string(),
+                    request_time: req_ts,
                     expires_in,
                 })
                 .unwrap();
