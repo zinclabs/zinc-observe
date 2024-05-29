@@ -54,7 +54,7 @@ pub async fn validator(
         Some(path) => path,
         None => req.request().path(),
     };
-    match if auth_info.auth.starts_with("auth_ext") {
+    match if auth_info.auth.starts_with("{\"auth_ext\":") {
         let auth_token: AuthTokensExt =
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
         validate_credentials_ext(user_id, password, req.request().path(), auth_token).await
@@ -560,14 +560,20 @@ async fn oo_validator_internal(
         validator(req, &username, &password, auth_info, path_prefix).await
     } else if auth_info.auth.starts_with("Bearer") {
         super::token::token_validator(req, auth_info).await
-    } else if auth_info.auth.starts_with("auth_ext") {
+    } else if auth_info.auth.starts_with("{\"auth_ext\":") {
         let auth_tokens: AuthTokensExt =
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
         if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
             Err((ErrorUnauthorized("Unauthorized Access"), req))
         } else {
-            let decoded = base64::decode(auth_info.auth.strip_prefix("auth_ext").unwrap().trim())
-                .expect("Failed to decode base64 string");
+            let decoded = base64::decode(
+                auth_tokens
+                    .auth_ext
+                    .strip_prefix("auth_ext")
+                    .unwrap()
+                    .trim(),
+            )
+            .expect("Failed to decode base64 string");
             let (username, password) = match get_user_details(decoded) {
                 Some(value) => value,
                 None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),

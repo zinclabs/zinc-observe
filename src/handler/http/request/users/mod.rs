@@ -387,7 +387,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             };
 
             if resp.status {
-                let access_token = format!(
+                let auth_ext = format!(
                     "auth_ext {}",
                     base64::encode(&format!("{}:{}", &name, &password))
                 );
@@ -397,7 +397,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     "name": name,
                 });
                 let tokens = json::to_string(&AuthTokensExt {
-                    access_token,
+                    auth_ext,
                     refresh_token: "".to_string(),
                     request_time: req_ts,
                     expires_in,
