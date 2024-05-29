@@ -354,10 +354,7 @@ impl FromRequest for AuthExtractor {
         let auth_str = if let Some(cookie) = req.cookie("auth_tokens") {
             let auth_tokens: AuthTokens = json::from_str(cookie.value()).unwrap_or_default();
             let access_token = auth_tokens.access_token;
-            if access_token.starts_with("Basic")
-                || access_token.starts_with("Bearer")
-                || access_token.starts_with("auth_ext")
-            {
+            if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
                 access_token
             } else if access_token.starts_with("session") {
                 let session_key = access_token.strip_prefix("session ").unwrap().to_string();
@@ -370,6 +367,8 @@ impl FromRequest for AuthExtractor {
             } else {
                 format!("Bearer {}", access_token)
             }
+        } else if let Some(cookie) = req.cookie("auth_ext") {
+            cookie.value().to_string()
         } else if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
                 auth_str.to_owned()

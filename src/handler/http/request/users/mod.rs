@@ -31,8 +31,8 @@ use crate::{
         meta::{
             self,
             user::{
-                AuthTokens, RolesResponse, SignInResponse, SignInUser, UpdateUser, UserOrgRole,
-                UserRequest, UserRole,
+                AuthTokens, AuthTokensExt, RolesResponse, SignInResponse, SignInUser, UpdateUser,
+                UserOrgRole, UserRequest, UserRole,
             },
         },
         utils::auth::UserEmail,
@@ -320,8 +320,8 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
         )
         .unwrap();
 
-        let mut req_time = None;
-        let mut exp_in = 300;
+        let mut request_time = None;
+        let mut expires_in = 300;
         let req_ts;
 
         let auth_header = if let Some(s) = query.get("auth") {
@@ -332,7 +332,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     } else {
                         return unauthorized_error(resp);
                     }
-                    req_time = Some(req_time_str);
+                    request_time = Some(req_time_str);
                 }
                 None => {
                     return unauthorized_error(resp);
@@ -340,13 +340,13 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             };
             match query.get("exp_in") {
                 Some(exp_in_str) => {
-                    exp_in = exp_in_str.parse::<i64>().unwrap();
+                    expires_in = exp_in_str.parse::<i64>().unwrap();
                 }
                 None => {
                     return unauthorized_error(resp);
                 }
             };
-            if Utc::now().timestamp() - req_ts > exp_in {
+            if Utc::now().timestamp() - req_ts > expires_in {
                 return unauthorized_error(resp);
             }
             format!("q_auth {}", s)
@@ -364,12 +364,14 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
         if let Some((name, password)) =
             o2_enterprise::enterprise::dex::service::auth::get_user_from_token(&auth_header)
         {
-            let (ret, pass_ext) =
-                crate::handler::http::auth::validator::validate_user_for_query_params(
-                    &name, &password, req_time, exp_in,
-                )
-                .await;
-            match ret {
+            match crate::handler::http::auth::validator::validate_user_for_query_params(
+                &name,
+                &password,
+                request_time,
+                expires_in,
+            )
+            .await
+            {
                 Ok(v) => {
                     if v.is_valid {
                         resp.status = true;
@@ -385,20 +387,22 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             if resp.status {
                 let access_token = format!(
                     "auth_ext {}",
-                    base64::encode(&format!("{}:{}", &name, &pass_ext))
+                    base64::encode(&format!("{}:{}", &name, &password))
                 );
 
                 let id_token = config::utils::json::json!({
                     "email": name,
                     "name": name,
                 });
-                let tokens = json::to_string(&AuthTokens {
+                let tokens = json::to_string(&AuthTokensExt {
                     access_token,
                     refresh_token: "".to_string(),
+                    request_time: request_time.unwrap().to_string(),
+                    expires_in,
                 })
                 .unwrap();
 
-                let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
+                let mut auth_cookie = cookie::Cookie::new("auth_ext", tokens);
                 auth_cookie.set_expires(
                     cookie::time::OffsetDateTime::now_utc()
                         + cookie::time::Duration::seconds(O2_CONFIG.common.ext_cookie_max_age),
