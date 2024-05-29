@@ -218,63 +218,28 @@ pub async fn validate_credentials(
     }
 }
 
+#[cfg(feature = "enterprise")]
 pub async fn validate_credentials_ext(
     user_id: &str,
     in_password: &str,
     path: &str,
     auth_token: AuthTokensExt,
 ) -> Result<TokenValidationResponse, Error> {
-    #[cfg(feature = "enterprise")]
-    {
-        let user;
-        let password_ext_salt = o2_enterprise::enterprise::common::infra::config::O2_CONFIG
-            .common
-            .ext_auth_salt
-            .as_str();
-        let mut path_columns = path.split('/').collect::<Vec<&str>>();
-        if let Some(v) = path_columns.last() {
-            if v.is_empty() {
-                path_columns.pop();
-            }
+    let user;
+    let password_ext_salt = o2_enterprise::enterprise::common::infra::config::O2_CONFIG
+        .common
+        .ext_auth_salt
+        .as_str();
+    let mut path_columns = path.split('/').collect::<Vec<&str>>();
+    if let Some(v) = path_columns.last() {
+        if v.is_empty() {
+            path_columns.pop();
         }
+    }
 
-        // this is only applicable for super admin user
-        if is_root_user(user_id) {
-            user = users::get_user(None, user_id).await;
-            if user.is_none() {
-                return Ok(TokenValidationResponse {
-                    is_valid: false,
-                    user_email: "".to_string(),
-                    is_internal_user: false,
-                    user_role: None,
-                    user_name: "".to_string(),
-                    family_name: "".to_string(),
-                    given_name: "".to_string(),
-                });
-            }
-        } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
-            let db_user = db::user::get_db_user(user_id).await;
-            user = match db_user {
-                Ok(user) => {
-                    let all_users = user.get_all_users();
-                    if all_users.is_empty() {
-                        None
-                    } else {
-                        all_users.first().cloned()
-                    }
-                }
-                Err(_) => None,
-            }
-        } else {
-            user = match path.find('/') {
-                Some(index) => {
-                    let org_id = &path[0..index];
-                    users::get_user(Some(org_id), user_id).await
-                }
-                None => users::get_user(None, user_id).await,
-            }
-        };
-
+    // this is only applicable for super admin user
+    if is_root_user(user_id) {
+        user = users::get_user(None, user_id).await;
         if user.is_none() {
             return Ok(TokenValidationResponse {
                 is_valid: false,
@@ -286,50 +251,91 @@ pub async fn validate_credentials_ext(
                 given_name: "".to_string(),
             });
         }
-        let user = user.unwrap();
+    } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+        let db_user = db::user::get_db_user(user_id).await;
+        user = match db_user {
+            Ok(user) => {
+                let all_users = user.get_all_users();
+                if all_users.is_empty() {
+                    None
+                } else {
+                    all_users.first().cloned()
+                }
+            }
+            Err(_) => None,
+        }
+    } else {
+        user = match path.find('/') {
+            Some(index) => {
+                let org_id = &path[0..index];
+                users::get_user(Some(org_id), user_id).await
+            }
+            None => users::get_user(None, user_id).await,
+        }
+    };
 
-        let hashed_pass = get_hash(
-            &format!(
-                "{}{}",
-                get_hash(
-                    &format!("{}{}", user.password_ext.unwrap(), auth_token.request_time),
-                    password_ext_salt
-                ),
-                auth_token.expires_in
-            ),
-            password_ext_salt,
-        );
-        if !hashed_pass.eq(&in_password) {
-            return Ok(TokenValidationResponse {
-                is_valid: false,
-                user_email: "".to_string(),
-                is_internal_user: false,
-                user_role: None,
-                user_name: "".to_string(),
-                family_name: "".to_string(),
-                given_name: "".to_string(),
-            });
-        }
-        if !path.contains("/user")
-            || (path.contains("/user")
-                && (user.role.eq(&UserRole::Admin)
-                    || user.role.eq(&UserRole::Root)
-                    || user.email.eq(user_id)))
-        {
-            Ok(TokenValidationResponse {
-                is_valid: true,
-                user_email: user.email,
-                is_internal_user: !user.is_external,
-                user_role: Some(user.role),
-                user_name: user.first_name.to_owned(),
-                family_name: user.last_name,
-                given_name: user.first_name,
-            })
-        } else {
-            Err(ErrorForbidden("Not allowed"))
-        }
+    if user.is_none() {
+        return Ok(TokenValidationResponse {
+            is_valid: false,
+            user_email: "".to_string(),
+            is_internal_user: false,
+            user_role: None,
+            user_name: "".to_string(),
+            family_name: "".to_string(),
+            given_name: "".to_string(),
+        });
     }
-    #[cfg(not(feature = "enterprise"))]
+    let user = user.unwrap();
+
+    let hashed_pass = get_hash(
+        &format!(
+            "{}{}",
+            get_hash(
+                &format!("{}{}", user.password_ext.unwrap(), auth_token.request_time),
+                password_ext_salt
+            ),
+            auth_token.expires_in
+        ),
+        password_ext_salt,
+    );
+    if !hashed_pass.eq(&in_password) {
+        return Ok(TokenValidationResponse {
+            is_valid: false,
+            user_email: "".to_string(),
+            is_internal_user: false,
+            user_role: None,
+            user_name: "".to_string(),
+            family_name: "".to_string(),
+            given_name: "".to_string(),
+        });
+    }
+    if !path.contains("/user")
+        || (path.contains("/user")
+            && (user.role.eq(&UserRole::Admin)
+                || user.role.eq(&UserRole::Root)
+                || user.email.eq(user_id)))
+    {
+        Ok(TokenValidationResponse {
+            is_valid: true,
+            user_email: user.email,
+            is_internal_user: !user.is_external,
+            user_role: Some(user.role),
+            user_name: user.first_name.to_owned(),
+            family_name: user.last_name,
+            given_name: user.first_name,
+        })
+    } else {
+        Err(ErrorForbidden("Not allowed"))
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn validate_credentials_ext(
+    _user_id: &str,
+    _in_password: &str,
+    _path: &str,
+    _auth_token: AuthTokensExt,
+) -> Result<TokenValidationResponse, Error> {
     Err(ErrorForbidden("Not allowed"))
 }
 
