@@ -309,7 +309,6 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     {
         use actix_web::http::header;
         use chrono::Utc;
-        use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
         use crate::{
             common::meta::user::AuthTokensExt, handler::http::auth::validator::ID_TOKEN_HEADER,
@@ -407,7 +406,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let mut auth_cookie = cookie::Cookie::new("auth_ext", tokens);
                 auth_cookie.set_expires(
                     cookie::time::OffsetDateTime::now_utc()
-                        + cookie::time::Duration::seconds(O2_CONFIG.common.ext_cookie_max_age),
+                        + cookie::time::Duration::seconds(req_ts),
                 );
                 auth_cookie.set_http_only(true);
                 auth_cookie.set_secure(CONFIG.auth.cookie_secure_only);

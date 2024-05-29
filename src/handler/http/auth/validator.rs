@@ -226,10 +226,7 @@ pub async fn validate_credentials_ext(
     auth_token: AuthTokensExt,
 ) -> Result<TokenValidationResponse, Error> {
     let user;
-    let password_ext_salt = o2_enterprise::enterprise::common::infra::config::O2_CONFIG
-        .common
-        .ext_auth_salt
-        .as_str();
+    let password_ext_salt = config::CONFIG.auth.ext_auth_salt.as_str();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last() {
         if v.is_empty() {
@@ -733,15 +730,7 @@ pub(crate) async fn list_objects_for_user(
 }
 
 fn get_salt() -> String {
-    #[cfg(feature = "enterprise")]
-    {
-        o2_enterprise::enterprise::common::infra::config::O2_CONFIG
-            .common
-            .ext_auth_salt
-            .clone()
-    }
-    #[cfg(not(feature = "enterprise"))]
-    "openobserve".to_string()
+    CONFIG.auth.ext_auth_salt.clone()
 }
 #[cfg(test)]
 mod tests {

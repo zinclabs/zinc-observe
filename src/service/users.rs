@@ -54,7 +54,7 @@ pub async fn post_user(
         if existing_user.is_err() {
             let salt = ider::uuid();
             let password = get_hash(&usr_req.password, &salt);
-            let password_ext = get_hash(&usr_req.password, "");
+            let password_ext = get_hash(&usr_req.password, &config::CONFIG.auth.ext_auth_salt);
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
             let user = usr_req.to_new_dbuser(
@@ -658,7 +658,7 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
     let salt = ider::uuid();
     let password = get_hash(&usr_req.password, &salt);
-    let password_ext = get_hash(&usr_req.password, "");
+    let password_ext = get_hash(&usr_req.password, &config::CONFIG.auth.ext_auth_salt);
     let token = generate_random_string(16);
     let rum_token = format!("rum{}", generate_random_string(16));
     let user = usr_req.to_new_dbuser(
