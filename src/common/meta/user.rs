@@ -360,6 +360,6 @@ pub struct AuthTokens {
 pub struct AuthTokensExt {
     pub access_token: String,
     pub refresh_token: String,
-    pub request_time: String,
+    pub request_time: i64,
     pub expires_in: i64,
 }

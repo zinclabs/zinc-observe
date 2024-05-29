@@ -54,7 +54,13 @@ pub async fn validator(
         Some(path) => path,
         None => req.request().path(),
     };
-    match validate_credentials(user_id, password.trim(), path).await {
+    match if auth_info.auth.starts_with("auth_ext") {
+        let auth_token: AuthTokensExt =
+            config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
+        validate_credentials_ext(user_id, password, req.request().path(), auth_token).await
+    } else {
+        validate_credentials(user_id, password.trim(), path).await
+    } {
         Ok(res) => {
             if res.is_valid {
                 // / Hack for prometheus, need support POST and check the header
@@ -210,6 +216,121 @@ pub async fn validate_credentials(
     } else {
         Err(ErrorForbidden("Not allowed"))
     }
+}
+
+pub async fn validate_credentials_ext(
+    user_id: &str,
+    in_password: &str,
+    path: &str,
+    auth_token: AuthTokensExt,
+) -> Result<TokenValidationResponse, Error> {
+    #[cfg(feature = "enterprise")]
+    {
+        let user;
+        let password_ext_salt = o2_enterprise::enterprise::common::infra::config::O2_CONFIG
+            .common
+            .ext_auth_salt
+            .as_str();
+        let mut path_columns = path.split('/').collect::<Vec<&str>>();
+        if let Some(v) = path_columns.last() {
+            if v.is_empty() {
+                path_columns.pop();
+            }
+        }
+
+        // this is only applicable for super admin user
+        if is_root_user(user_id) {
+            user = users::get_user(None, user_id).await;
+            if user.is_none() {
+                return Ok(TokenValidationResponse {
+                    is_valid: false,
+                    user_email: "".to_string(),
+                    is_internal_user: false,
+                    user_role: None,
+                    user_name: "".to_string(),
+                    family_name: "".to_string(),
+                    given_name: "".to_string(),
+                });
+            }
+        } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
+            let db_user = db::user::get_db_user(user_id).await;
+            user = match db_user {
+                Ok(user) => {
+                    let all_users = user.get_all_users();
+                    if all_users.is_empty() {
+                        None
+                    } else {
+                        all_users.first().cloned()
+                    }
+                }
+                Err(_) => None,
+            }
+        } else {
+            user = match path.find('/') {
+                Some(index) => {
+                    let org_id = &path[0..index];
+                    users::get_user(Some(org_id), user_id).await
+                }
+                None => users::get_user(None, user_id).await,
+            }
+        };
+
+        if user.is_none() {
+            return Ok(TokenValidationResponse {
+                is_valid: false,
+                user_email: "".to_string(),
+                is_internal_user: false,
+                user_role: None,
+                user_name: "".to_string(),
+                family_name: "".to_string(),
+                given_name: "".to_string(),
+            });
+        }
+        let user = user.unwrap();
+
+        let hashed_pass = get_hash(
+            &format!(
+                "{}{}",
+                get_hash(
+                    &format!("{}{}", user.password_ext.unwrap(), auth_token.request_time),
+                    password_ext_salt
+                ),
+                auth_token.expires_in
+            ),
+            password_ext_salt,
+        );
+        if !hashed_pass.eq(&in_password) {
+            return Ok(TokenValidationResponse {
+                is_valid: false,
+                user_email: "".to_string(),
+                is_internal_user: false,
+                user_role: None,
+                user_name: "".to_string(),
+                family_name: "".to_string(),
+                given_name: "".to_string(),
+            });
+        }
+        if !path.contains("/user")
+            || (path.contains("/user")
+                && (user.role.eq(&UserRole::Admin)
+                    || user.role.eq(&UserRole::Root)
+                    || user.email.eq(user_id)))
+        {
+            Ok(TokenValidationResponse {
+                is_valid: true,
+                user_email: user.email,
+                is_internal_user: !user.is_external,
+                user_role: Some(user.role),
+                user_name: user.first_name.to_owned(),
+                family_name: user.last_name,
+                given_name: user.first_name,
+            })
+        } else {
+            Err(ErrorForbidden("Not allowed"))
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    Err(ErrorForbidden("Not allowed"))
 }
 
 async fn validate_user_from_db(
@@ -426,16 +547,10 @@ async fn oo_validator_internal(
         let decoded = base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim())
             .expect("Failed to decode base64 string");
 
-        let credentials = String::from_utf8(decoded.into())
-            .map_err(|_| ())
-            .expect("Failed to decode base64 string");
-        let parts: Vec<&str> = credentials.splitn(2, ':').collect();
-        if parts.len() != 2 {
-            return Err((ErrorUnauthorized("Unauthorized Access"), req));
-        }
-        let (username, password) = (parts[0], parts[1]);
-        let username = username.to_owned();
-        let password = password.to_owned();
+        let (username, password) = match get_user_details(decoded) {
+            Some(value) => value,
+            None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
+        };
         validator(req, &username, &password, auth_info, path_prefix).await
     } else if auth_info.auth.starts_with("Bearer") {
         super::token::token_validator(req, auth_info).await
@@ -445,11 +560,31 @@ async fn oo_validator_internal(
         if chrono::Utc::now().timestamp() - auth_tokens.request_time > auth_tokens.expires_in {
             Err((ErrorUnauthorized("Unauthorized Access"), req))
         } else {
-            Err((ErrorUnauthorized("Unauthorized Access"), req))
+            let decoded = base64::decode(auth_info.auth.strip_prefix("auth_ext").unwrap().trim())
+                .expect("Failed to decode base64 string");
+            let (username, password) = match get_user_details(decoded) {
+                Some(value) => value,
+                None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
+            };
+            validator(req, &username, &password, auth_info, path_prefix).await
         }
     } else {
         Err((ErrorUnauthorized("Unauthorized Access"), req))
     }
+}
+
+fn get_user_details(decoded: String) -> Option<(String, String)> {
+    let credentials = String::from_utf8(decoded.into())
+        .map_err(|_| ())
+        .expect("Failed to decode base64 string");
+    let parts: Vec<&str> = credentials.splitn(2, ':').collect();
+    if parts.len() != 2 {
+        return None;
+    }
+    let (username, password) = (parts[0], parts[1]);
+    let username = username.to_owned();
+    let password = password.to_owned();
+    Some((username, password))
 }
 
 /// Validates the authentication information in the incoming request and returns the request if
