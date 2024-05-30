@@ -226,7 +226,8 @@ pub async fn validate_credentials_ext(
     auth_token: AuthTokensExt,
 ) -> Result<TokenValidationResponse, Error> {
     let user;
-    let password_ext_salt = config::CONFIG.auth.ext_auth_salt.as_str();
+    let config = get_config();
+    let password_ext_salt = config.auth.ext_auth_salt.as_str();
     let mut path_columns = path.split('/').collect::<Vec<&str>>();
     if let Some(v) = path_columns.last() {
         if v.is_empty() {
@@ -400,7 +401,8 @@ pub async fn validate_user(
     user_password: &str,
 ) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
-    validate_user_from_db(db_user, user_password, None, 0, &get_salt()).await
+    let config = get_config();
+    validate_user_from_db(db_user, user_password, None, 0, &config.auth.ext_auth_salt).await
 }
 
 pub async fn validate_user_for_query_params(
@@ -410,8 +412,15 @@ pub async fn validate_user_for_query_params(
     exp_in: i64,
 ) -> Result<TokenValidationResponse, Error> {
     let db_user = db::user::get_db_user(user_id).await;
-
-    validate_user_from_db(db_user, user_password, req_time, exp_in, &get_salt()).await
+    let config = get_config();
+    validate_user_from_db(
+        db_user,
+        user_password,
+        req_time,
+        exp_in,
+        &config.auth.ext_auth_salt,
+    )
+    .await
 }
 
 pub async fn validator_aws(
@@ -729,9 +738,6 @@ pub(crate) async fn list_objects_for_user(
     }
 }
 
-fn get_salt() -> String {
-    CONFIG.auth.ext_auth_salt.clone()
-}
 #[cfg(test)]
 mod tests {
     use infra::db as infra_db;

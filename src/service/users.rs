@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{http, HttpResponse};
-use config::{ider, utils::rand::generate_random_string};
+use config::{get_config, ider, utils::rand::generate_random_string};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
@@ -41,6 +41,7 @@ pub async fn post_user(
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
     let initiator_user = db::user::get(Some(org_id), initiator_id).await;
+    let cfg = get_config();
     if is_root_user(initiator_id)
         || (initiator_user.is_ok()
             && initiator_user.as_ref().unwrap().is_some()
@@ -54,7 +55,7 @@ pub async fn post_user(
         if existing_user.is_err() {
             let salt = ider::uuid();
             let password = get_hash(&usr_req.password, &salt);
-            let password_ext = get_hash(&usr_req.password, &config::CONFIG.auth.ext_auth_salt);
+            let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
             let user = usr_req.to_new_dbuser(
@@ -656,9 +657,10 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 }
 
 pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
+    let cfg = get_config();
     let salt = ider::uuid();
     let password = get_hash(&usr_req.password, &salt);
-    let password_ext = get_hash(&usr_req.password, &config::CONFIG.auth.ext_auth_salt);
+    let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
     let token = generate_random_string(16);
     let rum_token = format!("rum{}", generate_random_string(16));
     let user = usr_req.to_new_dbuser(
