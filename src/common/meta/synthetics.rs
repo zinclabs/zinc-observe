@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, FixedOffset};
+use config::meta::usage::TriggerDataStatus;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -58,7 +59,7 @@ pub struct SyntheticsFrequency {
     pub timezone: String,
     #[serde(default)]
     #[serde(rename = "timezoneOffset")]
-    pub timezone_offset: i64,
+    pub timezone_offset: i32,
 }
 
 impl Default for SyntheticsFrequency {
@@ -159,6 +160,8 @@ pub struct Synthetics {
     pub enabled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_triggered_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_trigger_status: Option<TriggerDataStatus>,
     #[serde(default = "datetime_now")]
     #[schema(value_type = String, format = DateTime)]
     pub created_at: DateTime<FixedOffset>,
@@ -183,6 +186,7 @@ impl Default for Synthetics {
             alert: SyntheticsAlert::default(),
             enabled: false,
             last_triggered_at: None,
+            last_trigger_status: None,
             created_at: datetime_now(),
             updated_at: None,
             owner: "".to_string(),

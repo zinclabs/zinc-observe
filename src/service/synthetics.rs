@@ -16,7 +16,7 @@
 use std::str::FromStr;
 
 use actix_web::http;
-use config::{CONFIG, SMTP_CLIENT};
+use config::{get_config, SMTP_CLIENT};
 use cron::Schedule;
 use lettre::{message::SinglePart, AsyncTransport, Message};
 
@@ -37,8 +37,9 @@ pub async fn save(
     mut synthetics: Synthetics,
     create: bool,
 ) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
     // Check if SMTP is enabled, otherwise don't save the synthetic
-    if !CONFIG.smtp.smtp_enabled {
+    if !cfg.smtp.smtp_enabled {
         return Err(anyhow::anyhow!("SMTP configuration not enabled"));
     }
 
@@ -181,7 +182,8 @@ impl Synthetics {
 
     /// Sends emails to the [`Synthetics`] recepients. Currently only one pdf data is supported.
     async fn send_email(&self) -> Result<(), anyhow::Error> {
-        if !CONFIG.smtp.smtp_enabled {
+        let cfg = get_config();
+        if !cfg.smtp.smtp_enabled {
             return Err(anyhow::anyhow!("SMTP configuration not enabled"));
         }
 
@@ -191,15 +193,15 @@ impl Synthetics {
         }
 
         let mut email = Message::builder()
-            .from(CONFIG.smtp.smtp_from_email.parse()?)
+            .from(cfg.smtp.smtp_from_email.parse()?)
             .subject(format!("Openobserve Synthetics - {}", &self.name));
 
         for recepient in recepients {
             email = email.to(recepient.parse()?);
         }
 
-        if !CONFIG.smtp.smtp_reply_to.is_empty() {
-            email = email.reply_to(CONFIG.smtp.smtp_reply_to.parse()?);
+        if !cfg.smtp.smtp_reply_to.is_empty() {
+            email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
         }
 
         let email = email

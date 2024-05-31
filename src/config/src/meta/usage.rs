@@ -40,6 +40,8 @@ pub enum TriggerDataType {
     Report,
     #[serde(rename = "alert")]
     Alert,
+    #[serde(rename = "synthetics")]
+    Synthetics,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

@@ -37,32 +37,45 @@ pub async fn get(org_id: &str, name: &str) -> Result<Synthetics, anyhow::Error> 
 
 pub async fn set(org_id: &str, synthetics: &Synthetics, create: bool) -> Result<(), anyhow::Error> {
     match set_without_updating_trigger(org_id, synthetics).await {
-        Ok(_schedule_key) => {
-            // let trigger = db::scheduler::Trigger {
-            //     org: org_id.to_string(),
-            //     module: db::scheduler::TriggerModule::Synthetics,
-            //     module_key: schedule_key,
-            //     next_run_at: synthetics.schedule.start,
-            //     ..Default::default()
-            // };
-            // if create {
-            //     match db::scheduler::push(trigger).await {
-            //         Ok(_) => Ok(()),
-            //         Err(e) => {
-            //             log::error!("Failed to save trigger: {}", e);
-            //             Ok(())
-            //         }
-            //     }
-            // } else {
-            //     match db::scheduler::update_trigger(trigger).await {
-            //         Ok(_) => Ok(()),
-            //         Err(e) => {
-            //             log::error!("Failed to update trigger: {}", e);
-            //             Ok(())
-            //         }
-            //     }
-            // }
-            Ok(())
+        Ok(schedule_key) => {
+            let trigger = db::scheduler::Trigger {
+                org: org_id.to_string(),
+                module: db::scheduler::TriggerModule::Synthetics,
+                module_key: schedule_key.clone(),
+                next_run_at: synthetics.schedule.start,
+                ..Default::default()
+            };
+            if create {
+                match db::scheduler::push(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to save trigger: {}", e);
+                        Ok(())
+                    }
+                }
+            } else if db::scheduler::exists(
+                org_id,
+                db::scheduler::TriggerModule::Synthetics,
+                &schedule_key,
+            )
+            .await
+            {
+                match db::scheduler::update_trigger(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to update trigger: {}", e);
+                        Ok(())
+                    }
+                }
+            } else {
+                match db::scheduler::push(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to save trigger: {}", e);
+                        Ok(())
+                    }
+                }
+            }
         }
         Err(e) => Err(anyhow::anyhow!("Error saving synthetic: {}", e)),
     }
@@ -91,16 +104,15 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
     let key = format!("/synthetics/{org_id}/{name}");
     match db::delete(&key, false, db::NEED_WATCH, None).await {
         Ok(_) => {
-            // match db::scheduler::delete(org_id, db::scheduler::TriggerModule::Synthetics, name)
-            //     .await
-            // {
-            //     Ok(_) => Ok(()),
-            //     Err(e) => {
-            //         log::error!("Failed to delete trigger: {}", e);
-            //         Ok(())
-            //     }
-            // }
-            Ok(())
+            match db::scheduler::delete(org_id, db::scheduler::TriggerModule::Synthetics, name)
+                .await
+            {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    log::error!("Failed to delete trigger: {}", e);
+                    Ok(())
+                }
+            }
         }
         Err(e) => Err(anyhow::anyhow!("Error deleting synthetic: {}", e)),
     }
@@ -135,7 +147,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Synthetics = if config::CONFIG.common.meta_store_external {
+                let item_value: Synthetics = if config::get_config().common.meta_store_external {
                     match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
                             Ok(val) => val,

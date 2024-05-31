@@ -26,7 +26,10 @@ use config::{
 use cron::Schedule;
 
 use crate::{
-    common::meta::{alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType},
+    common::meta::{
+        alerts::AlertFrequencyType, dashboards::reports::ReportFrequencyType,
+        synthetics::SyntheticsFrequencyType,
+    },
     service::{db, usage::publish_triggers_usage},
 };
 
@@ -384,11 +387,111 @@ pub async fn handle_synthetics_triggers(
     let synthetics_name = &trigger.module_key;
 
     let mut synthetics = db::synthetics::get(org_id, synthetics_name).await?;
+
+    let mut new_trigger = db::scheduler::Trigger {
+        next_run_at: Utc::now().timestamp_micros(),
+        is_realtime: false,
+        is_silenced: false,
+        status: db::scheduler::TriggerStatus::Waiting,
+        retries: 0,
+        ..trigger.clone()
+    };
+
+    if !synthetics.enabled {
+        log::debug!(
+            "Report not enabled: org: {}, report: {}",
+            org_id,
+            synthetics_name
+        );
+        // update trigger, check on next week
+        new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
+        db::scheduler::update_trigger(new_trigger).await?;
+        return Ok(());
+    }
+    let mut run_once = false;
+
+    // Update trigger, set `next_run_at` to the
+    // frequency interval of this synthetics
+    match synthetics.schedule.frequency_type {
+        SyntheticsFrequencyType::Seconds => {
+            new_trigger.next_run_at += Duration::try_seconds(synthetics.schedule.interval)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        }
+        SyntheticsFrequencyType::Minutes => {
+            new_trigger.next_run_at += Duration::try_minutes(synthetics.schedule.interval)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        }
+        SyntheticsFrequencyType::Hours => {
+            new_trigger.next_run_at += Duration::try_hours(synthetics.schedule.interval)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        }
+        SyntheticsFrequencyType::Days => {
+            new_trigger.next_run_at += Duration::try_days(synthetics.schedule.interval)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        }
+        SyntheticsFrequencyType::Once => {
+            // Check on next week
+            new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
+            // Disable the report
+            synthetics.enabled = false;
+            run_once = true;
+        }
+        SyntheticsFrequencyType::Cron => {
+            let schedule = Schedule::from_str(&synthetics.schedule.cron)?;
+            // tz_offset is in minutes
+            let tz_offset =
+                FixedOffset::east_opt(synthetics.schedule.timezone_offset * 60).unwrap();
+            new_trigger.next_run_at = schedule
+                .upcoming(tz_offset)
+                .next()
+                .unwrap()
+                .timestamp_micros();
+        }
+    }
+
+    let mut trigger_data_stream = TriggerData {
+        org: trigger.org.clone(),
+        module: TriggerDataType::Synthetics,
+        key: trigger.module_key.clone(),
+        next_run_at: new_trigger.next_run_at,
+        is_realtime: trigger.is_realtime,
+        is_silenced: trigger.is_silenced,
+        status: TriggerDataStatus::Completed,
+        start_time: trigger.start_time.unwrap_or_default(),
+        end_time: trigger.end_time.unwrap_or_default(),
+        retries: trigger.retries,
+        error: None,
+    };
+
     let now = Utc::now().timestamp_micros();
-    if let Err(e) = synthetics.test_target().await {
-        log::error!("Failed while testing synthetics target {synthetics_name}: {e}");
+    match synthetics.test_target().await {
+        Ok(_) => {
+            log::debug!("Synthetics test done for synthetics: {}", synthetics_name);
+            // Synthetics test successful, update the trigger
+            if run_once {
+                new_trigger.status = db::scheduler::TriggerStatus::Completed;
+            }
+            db::scheduler::update_trigger(new_trigger).await?;
+            log::debug!("Update trigger for synthetics: {}", synthetics_name);
+            trigger_data_stream.end_time = Utc::now().timestamp_micros();
+        }
+        Err(e) => {
+            log::error!("Failed while testing synthetics target {synthetics_name}: {e}");
+            trigger_data_stream.end_time = Utc::now().timestamp_micros();
+            trigger_data_stream.status = TriggerDataStatus::Failed;
+            trigger_data_stream.error = Some(format!("error processing synthetics: {e}"));
+        }
     }
     synthetics.last_triggered_at = Some(now);
+    synthetics.last_trigger_status = Some(trigger_data_stream.status.clone());
 
     if let Err(e) = db::synthetics::set_without_updating_trigger(org_id, &synthetics).await {
         log::error!(
@@ -396,5 +499,7 @@ pub async fn handle_synthetics_triggers(
             e
         );
     }
+
+    publish_triggers_usage(trigger_data_stream).await;
     Ok(())
 }
