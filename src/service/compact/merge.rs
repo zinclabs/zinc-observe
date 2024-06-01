@@ -558,12 +558,23 @@ pub async fn merge_files_logs(
         };
         tmp_dir.insert(&file.key, data);
     }
+    log::info!(
+        "[COMPACT:{thread_id}] merging total {} small files",
+        tmp_dir.len()
+    );
     if !deleted_files.is_empty() {
         new_file_list.retain(|f| !deleted_files.contains(&f.key));
     }
     if new_file_list.len() <= 1 {
         return Ok((String::from(""), FileMeta::default(), retain_file_list));
     }
+
+    log::info!(
+        "[COMPACT:{thread_id}] merging  small files files in hashmap:{} , files in new_file_list:{} , files in retain_file_list:{}",
+        tmp_dir.len(),
+        &new_file_list.len(),
+        &retain_file_list.len()
+    );
 
     // get time range for these files
     let min_ts = new_file_list.iter().map(|f| f.meta.min_ts).min().unwrap();
@@ -632,7 +643,7 @@ pub async fn merge_files_logs(
 
             // do the convert
             let mut buf = Vec::new();
-            let file_tmp_dir = cache::tmpfs::Directory::default();
+            // let file_tmp_dir = cache::tmpfs::Directory::default();
             let file_data = tmp_dir.get(&file.key).unwrap();
             if file_data.is_empty() {
                 // delete file from file list
@@ -646,16 +657,27 @@ pub async fn merge_files_logs(
                 }
                 return Err(anyhow::anyhow!("merge_files error: file data is empty"));
             }
-            file_tmp_dir.set(&file.key, file_data.clone())?;
 
+            let (_, batches) = read_recordbatch_from_bytes(file_data).await.map_err(|e| {
+                log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
+                log::error!(
+                    "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
+                    file.key,
+                    e
+                );
+                DataFusionError::Execution(e.to_string())
+            })?;
+
+            log::info!("[COMPACT:{thread_id}] convert_parquet_file : {}", &file.key);
             datafusion::exec::convert_parquet_file(
-                file_tmp_dir.name(),
+                "",
                 &mut buf,
                 Arc::new(schema),
                 &bloom_filter_fields,
                 &full_text_search_fields,
                 diff_fields,
                 FileType::PARQUET,
+                Some(batches),
             )
             .await
             .map_err(|e| {
@@ -947,7 +969,9 @@ pub async fn merge_files(
                 }
                 return Err(anyhow::anyhow!("merge_files error: file data is empty"));
             }
+
             file_tmp_dir.set(&file.key, file_data)?;
+
             datafusion::exec::convert_parquet_file(
                 file_tmp_dir.name(),
                 &mut buf,
@@ -956,6 +980,7 @@ pub async fn merge_files(
                 &full_text_search_fields,
                 diff_fields,
                 FileType::PARQUET,
+                None,
             )
             .await
             .map_err(|e| {

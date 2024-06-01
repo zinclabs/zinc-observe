@@ -924,6 +924,7 @@ fn merge_rewrite_sql(sql: &str, schema: Arc<Schema>, is_final_phase: bool) -> Re
     Ok(sql)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn convert_parquet_file(
     trace_id: &str,
     buf: &mut Vec<u8>,
@@ -932,6 +933,7 @@ pub async fn convert_parquet_file(
     full_text_search_fields: &[String],
     rules: HashMap<String, DataType>,
     file_type: FileType,
+    in_records_batches: Option<Vec<RecordBatch>>,
 ) -> Result<()> {
     let cfg = get_config();
     let start = std::time::Instant::now();
@@ -947,42 +949,51 @@ pub async fn convert_parquet_file(
     // query data
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer)?;
 
-    // Configure listing options
-    let listing_options = match file_type {
-        FileType::PARQUET => {
-            let file_format = ParquetFormat::default();
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
+    match in_records_batches {
+        Some(record_batches) => {
+            let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![record_batches])?);
+            ctx.register_table("tbl", mem_table.clone())?;
         }
-        FileType::JSON => {
-            let file_format = JsonFormat::default();
-            ListingOptions::new(Arc::new(file_format))
-                .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
-        }
-        _ => {
-            return Err(DataFusionError::Execution(format!(
-                "Unsupported file type scheme {file_type:?}",
-            )));
+        None => {
+            let listing_options = match file_type {
+                FileType::PARQUET => {
+                    let file_format = ParquetFormat::default();
+                    ListingOptions::new(Arc::new(file_format))
+                        .with_file_extension(FileType::PARQUET.get_ext())
+                        .with_target_partitions(cfg.limit.cpu_num)
+                }
+                FileType::JSON => {
+                    let file_format = JsonFormat::default();
+                    ListingOptions::new(Arc::new(file_format))
+                        .with_file_extension(FileType::JSON.get_ext())
+                        .with_target_partitions(cfg.limit.cpu_num)
+                }
+                _ => {
+                    return Err(DataFusionError::Execution(format!(
+                        "Unsupported file type scheme {file_type:?}",
+                    )));
+                }
+            };
+
+            let prefix = match ListingTableUrl::parse(format!("tmpfs:///{trace_id}/")) {
+                Ok(url) => url,
+                Err(e) => {
+                    return Err(datafusion::error::DataFusionError::Execution(format!(
+                        "ListingTableUrl error: {e}"
+                    )));
+                }
+            };
+
+            let config = ListingTableConfig::new(prefix)
+                .with_listing_options(listing_options)
+                .with_schema(schema.clone());
+
+            let table = ListingTable::try_new(config)?;
+            // Configure listing options
+
+            ctx.register_table("tbl", Arc::new(table))?;
         }
     };
-
-    let prefix = match ListingTableUrl::parse(format!("tmpfs:///{trace_id}/")) {
-        Ok(url) => url,
-        Err(e) => {
-            return Err(datafusion::error::DataFusionError::Execution(format!(
-                "ListingTableUrl error: {e}"
-            )));
-        }
-    };
-
-    let config = ListingTableConfig::new(prefix)
-        .with_listing_options(listing_options)
-        .with_schema(schema.clone());
-
-    let table = ListingTable::try_new(config)?;
-    ctx.register_table("tbl", Arc::new(table))?;
 
     // get all sorted data
     let mut df = match ctx.sql(&query_sql).await {
