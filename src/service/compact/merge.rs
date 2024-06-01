@@ -489,6 +489,301 @@ pub async fn merge_by_stream(
 
 /// merge some small files into one big file, upload to storage, returns the big
 /// file key and merged files
+pub async fn merge_files_logs(
+    thread_id: usize,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    prefix: &str,
+    files_with_size: &[FileKey],
+) -> Result<(String, FileMeta, Vec<FileKey>), anyhow::Error> {
+    if files_with_size.len() <= 1 {
+        return Ok((String::from(""), FileMeta::default(), Vec::new()));
+    }
+
+    let mut new_file_size = 0;
+    let mut total_records = 0;
+    let mut new_file_list = Vec::new();
+    let mut deleted_files = Vec::new();
+    let cfg = get_config();
+    for file in files_with_size.iter() {
+        if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64 {
+            break;
+        }
+        new_file_size += file.meta.original_size;
+        total_records += file.meta.records;
+        new_file_list.push(file.clone());
+        // metrics
+        metrics::COMPACT_MERGED_FILES
+            .with_label_values(&[org_id, stream_type.to_string().as_str()])
+            .inc();
+        metrics::COMPACT_MERGED_BYTES
+            .with_label_values(&[org_id, stream_type.to_string().as_str()])
+            .inc_by(file.meta.original_size as u64);
+    }
+    // no files need to merge
+    if new_file_list.len() <= 1 {
+        return Ok((String::from(""), FileMeta::default(), Vec::new()));
+    }
+
+    let retain_file_list = new_file_list.clone();
+
+    let len = new_file_list.len();
+
+    // write parquet files into tmpfs
+    let mut tmp_dir = HashMap::with_capacity(len);
+    for file in &retain_file_list {
+        log::info!("[COMPACT:{thread_id}] merge small file: {}", &file.key);
+        let data = match storage::get(&file.key).await {
+            Ok(body) => body,
+            Err(err) => {
+                log::error!(
+                    "[COMPACT:{thread_id}] merge small file: {}, err: {}",
+                    &file.key,
+                    err
+                );
+                if err.to_string().to_lowercase().contains("not found") {
+                    // delete file from file list
+                    if let Err(err) = file_list::delete_parquet_file(&file.key, true).await {
+                        log::error!(
+                            "[COMPACT:{thread_id}] delete file: {}, from file_list err: {}",
+                            &file.key,
+                            err
+                        );
+                    }
+                }
+                deleted_files.push(file.key.clone());
+                continue;
+            }
+        };
+        tmp_dir.insert(&file.key, data);
+    }
+    if !deleted_files.is_empty() {
+        new_file_list.retain(|f| !deleted_files.contains(&f.key));
+    }
+    if new_file_list.len() <= 1 {
+        return Ok((String::from(""), FileMeta::default(), retain_file_list));
+    }
+
+    // get time range for these files
+    let min_ts = new_file_list.iter().map(|f| f.meta.min_ts).min().unwrap();
+    let max_ts = new_file_list.iter().map(|f| f.meta.max_ts).max().unwrap();
+
+    // convert the file to the latest version of schema
+    let schema_latest = infra::schema::get(org_id, stream_name, stream_type).await?;
+    let stream_setting = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let defined_schema_fields = stream_setting
+        .and_then(|s| s.defined_schema_fields)
+        .unwrap_or_default();
+    let schema_latest = if !defined_schema_fields.is_empty() {
+        let schema_latest = SchemaCache::new(schema_latest);
+        let schema_latest =
+            generate_schema_for_defined_schema_fields(&schema_latest, &defined_schema_fields);
+        Arc::new(schema_latest.schema().clone())
+    } else {
+        Arc::new(schema_latest)
+    };
+
+    let schema_versions =
+        infra::schema::get_versions(org_id, stream_name, stream_type, Some((min_ts, max_ts)))
+            .await?;
+    let schema_latest_id = schema_versions.len() - 1;
+    let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&schema_latest).unwrap();
+    let full_text_search_fields = get_stream_setting_fts_fields(&schema_latest).unwrap();
+    if cfg.common.widening_schema_evolution && schema_versions.len() > 1 {
+        for file in &new_file_list {
+            // get the schema version of the file
+            let schema_ver_id = match db::schema::filter_schema_version_id(
+                &schema_versions,
+                file.meta.min_ts,
+                file.meta.max_ts,
+            ) {
+                Some(id) => id,
+                None => {
+                    log::error!(
+                        "[COMPACT:{thread_id}] merge small file: {}, schema version not found, min_ts: {}, max_ts: {}",
+                        &file.key,
+                        file.meta.min_ts,
+                        file.meta.max_ts
+                    );
+                    // HACK: use the latest version if not found in schema versions
+                    schema_latest_id
+                }
+            };
+            if schema_ver_id == schema_latest_id {
+                continue;
+            }
+            // cacluate the diff between latest schema and current schema
+            let schema = schema_versions[schema_ver_id]
+                .clone()
+                .with_metadata(HashMap::new());
+            let mut diff_fields = hashbrown::HashMap::new();
+            let cur_fields = schema.fields();
+            for field in cur_fields {
+                if let Ok(v) = schema_latest.field_with_name(field.name()) {
+                    if v.data_type() != field.data_type() {
+                        diff_fields.insert(v.name().clone(), v.data_type().clone());
+                    }
+                }
+            }
+            if diff_fields.is_empty() {
+                continue;
+            }
+
+            // do the convert
+            let mut buf = Vec::new();
+            let file_tmp_dir = cache::tmpfs::Directory::default();
+            let file_data = tmp_dir.get(&file.key).unwrap();
+            if file_data.is_empty() {
+                // delete file from file list
+                log::warn!("found invalid file: {}", file.key);
+                if let Err(err) = file_list::delete_parquet_file(&file.key, true).await {
+                    log::error!(
+                        "[COMPACT:{thread_id}] delete file: {}, from file_list err: {}",
+                        &file.key,
+                        err
+                    );
+                }
+                return Err(anyhow::anyhow!("merge_files error: file data is empty"));
+            }
+            file_tmp_dir.set(&file.key, file_data.clone())?;
+
+            datafusion::exec::convert_parquet_file(
+                file_tmp_dir.name(),
+                &mut buf,
+                Arc::new(schema),
+                &bloom_filter_fields,
+                &full_text_search_fields,
+                diff_fields,
+                FileType::PARQUET,
+            )
+            .await
+            .map_err(|e| {
+                DataFusionError::Plan(format!("convert_parquet_file {}, err: {}", &file.key, e))
+            })?;
+
+            // replace the file in tmpfs
+            tmp_dir.insert(&file.key, buf.into());
+        }
+    }
+
+    let mut new_file_meta = FileMeta {
+        min_ts,
+        max_ts,
+        records: total_records,
+        original_size: new_file_size,
+        compressed_size: 0,
+        flattened: false,
+    };
+    if new_file_meta.records == 0 {
+        return Err(anyhow::anyhow!("merge_parquet_files error: records is 0"));
+    }
+
+    let start = std::time::Instant::now();
+    let merge_result =
+        merge_parquet_files(thread_id, "", schema_latest.clone(), Some(&tmp_dir)).await;
+
+    let (new_schema, new_batches) = merge_result.map_err(|e| {
+        let files = tmp_dir.keys().map(|f| f.to_string()).collect::<Vec<_>>();
+        log::error!(
+            "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
+            e,
+            files,
+            schema_latest
+        );
+
+        DataFusionError::Plan(format!("merge_parquet_files err: {:?}", e))
+    })?;
+
+    let buf = write_recordbatch_to_parquet(
+        new_schema.clone(),
+        &new_batches,
+        &bloom_filter_fields,
+        &full_text_search_fields,
+        &new_file_meta,
+    )
+    .await?;
+    new_file_meta.compressed_size = buf.len() as i64;
+    if new_file_meta.compressed_size == 0 {
+        return Err(anyhow::anyhow!(
+            "merge_parquet_files error: compressed_size is 0"
+        ));
+    }
+
+    // generate inverted index RecordBatch
+    let inverted_idx_batches = generate_inverted_idx_recordbatch(
+        schema_latest.clone(),
+        &new_batches,
+        stream_type,
+        &full_text_search_fields,
+    );
+
+    let id = ider::generate();
+    let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
+    log::info!(
+        "[COMPACT:{thread_id}] merge file succeeded, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
+        retain_file_list.len(),
+        new_file_key,
+        new_file_meta.original_size,
+        new_file_meta.compressed_size,
+        start.elapsed().as_millis(),
+    );
+
+    let buf = Bytes::from(buf);
+    // upload file
+    match storage::put(&new_file_key, buf.clone()).await {
+        Ok(_) => {
+            if cfg.common.inverted_index_enabled && stream_type == StreamType::Logs {
+                let (index_file_name, filemeta) = generate_index_on_compactor(
+                    &retain_file_list,
+                    inverted_idx_batches,
+                    new_file_key.clone(),
+                    org_id,
+                    stream_name,
+                )
+                .await
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "generate_index_on_compactor error: {}, need delete files: {:?}",
+                        e,
+                        retain_file_list
+                    )
+                })?;
+                if !index_file_name.is_empty() {
+                    log::info!("Created index file during compaction {}", index_file_name);
+                    // Notify that we wrote the index file to the db.
+                    if let Err(e) = write_file_list(
+                        org_id,
+                        &[FileKey {
+                            key: index_file_name.clone(),
+                            meta: filemeta,
+                            deleted: false,
+                        }],
+                    )
+                    .await
+                    {
+                        log::error!(
+                            "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
+                            index_file_name,
+                            e.to_string(),
+                            retain_file_list
+                        );
+                    }
+                } else {
+                    log::warn!(
+                        "generate_index_on_compactor returned an empty index file name and need delete files: {:?}",
+                        retain_file_list
+                    );
+                }
+            }
+            Ok((new_file_key, new_file_meta, retain_file_list))
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// merge some small files into one big file, upload to storage, returns the big
+/// file key and merged files
 pub async fn merge_files(
     thread_id: usize,
     org_id: &str,
@@ -687,7 +982,7 @@ pub async fn merge_files(
 
     let start = std::time::Instant::now();
     let merge_result = if stream_type == StreamType::Logs {
-        merge_parquet_files(thread_id, tmp_dir.name(), schema_latest.clone()).await
+        merge_parquet_files(thread_id, tmp_dir.name(), schema_latest.clone(), None).await
     } else {
         datafusion::exec::merge_parquet_files(
             tmp_dir.name(),
@@ -1036,11 +1331,27 @@ pub async fn merge_parquet_files(
     thread_id: usize,
     trace_id: &str,
     schema: Arc<Schema>,
+    in_data_map: Option<&HashMap<&String, Bytes>>,
 ) -> ::datafusion::error::Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
+    let mut record_batches = Vec::new();
 
-    // 1. get record batches from tmpfs
-    let temp_files = infra::cache::tmpfs::list(trace_id, "parquet").map_err(|e| {
+    if let Some(data_map) = in_data_map {
+        for (file, data) in data_map {
+            let (_, batches) = read_recordbatch_from_bytes(data).await.map_err(|e| {
+                log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
+                log::error!(
+                    "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
+                    file,
+                    e
+                );
+                DataFusionError::Execution(e.to_string())
+            })?;
+            record_batches.extend(batches);
+        }
+    } else {
+        // 1. get record batches from tmpfs
+        let temp_files = infra::cache::tmpfs::list(trace_id, "parquet").map_err(|e| {
         log::error!(
             "[INGESTER:JOB:{thread_id}] merge small files failed at getting temp files. Error {}",
             e
@@ -1048,9 +1359,8 @@ pub async fn merge_parquet_files(
         DataFusionError::Execution(e.to_string())
     })?;
 
-    let mut record_batches = Vec::new();
-    for file in temp_files {
-        let bytes = infra::cache::tmpfs::get(&file.location).map_err(|e| {
+        for file in temp_files {
+            let bytes = infra::cache::tmpfs::get(&file.location).map_err(|e| {
             log::error!(
                 "[INGESTER:JOB:{thread_id}] merge small files failed at reading temp files to bytes. Error {}",
                 e
@@ -1058,7 +1368,7 @@ pub async fn merge_parquet_files(
             DataFusionError::Execution(e.to_string())
         })?;
 
-        let (_, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
+            let (_, batches) = read_recordbatch_from_bytes(&bytes).await.map_err(|e| {
             log::error!("[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error",);
             log::error!(
                 "[INGESTER:JOB:{thread_id}] read_recordbatch_from_bytes error for file: {}, err: {}",
@@ -1067,7 +1377,8 @@ pub async fn merge_parquet_files(
             );
             DataFusionError::Execution(e.to_string())
         })?;
-        record_batches.extend(batches);
+            record_batches.extend(batches);
+        }
     }
 
     // format recordbatch

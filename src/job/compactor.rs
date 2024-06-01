@@ -54,16 +54,27 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((tx, msg)) => {
-                        let ret = compact::merge::merge_files(
-                            thread_id,
-                            &msg.org_id,
-                            msg.stream_type,
-                            &msg.stream_name,
-                            &msg.prefix,
-                            &msg.files,
-                        )
-                        .await;
-                        time::sleep(time::Duration::from_millis(10)).await;
+                        let ret = if msg.stream_type == config::meta::stream::StreamType::Logs {
+                            compact::merge::merge_files_logs(
+                                thread_id,
+                                &msg.org_id,
+                                msg.stream_type,
+                                &msg.stream_name,
+                                &msg.prefix,
+                                &msg.files,
+                            )
+                            .await
+                        } else {
+                            compact::merge::merge_files(
+                                thread_id,
+                                &msg.org_id,
+                                msg.stream_type,
+                                &msg.stream_name,
+                                &msg.prefix,
+                                &msg.files,
+                            )
+                            .await
+                        };
                         match ret {
                             Ok((file, meta, _)) => {
                                 if let Err(e) = tx
