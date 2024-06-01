@@ -669,6 +669,7 @@ pub async fn merge_files(
 
             // replace the file in tmpfs
             tmp_dir.set(&file.key, buf.into())?;
+            drop(file_tmp_dir);
         }
     }
 
@@ -708,6 +709,7 @@ pub async fn merge_files(
 
         DataFusionError::Plan(format!("merge_parquet_files err: {:?}", e))
     })?;
+    drop(tmp_dir);
 
     let buf = write_recordbatch_to_parquet(
         new_schema.clone(),

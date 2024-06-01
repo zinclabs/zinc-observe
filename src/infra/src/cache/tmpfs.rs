@@ -57,6 +57,9 @@ impl Directory {
     pub fn list(&self, extension: &str) -> Result<Vec<File>> {
         list(&self.location, extension)
     }
+    pub fn clear(&self) -> Result<()> {
+        delete(&format!("/{}/", self.location), true)
+    }
 }
 
 impl Default for Directory {
@@ -69,7 +72,7 @@ impl Default for Directory {
 
 impl Drop for Directory {
     fn drop(&mut self) {
-        delete(&format!("/{}/", self.location), true).unwrap();
+        self.clear().unwrap();
     }
 }
 
