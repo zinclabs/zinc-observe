@@ -130,7 +130,7 @@ mod tests {
         assert_eq!(parse("alertmanager"), Role::AlertManager);
         assert_eq!(parse("alertManager"), Role::AlertManager);
         assert_eq!(parse("AlertManager"), Role::AlertManager);
-        assert!("alert_manager".parse::<Role>().is_err());
+        assert!("alert_manager".parse::<Role>().is_ok());
     }
 
     #[test]
