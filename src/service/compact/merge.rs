@@ -536,8 +536,10 @@ pub async fn merge_files(
 
     // write parquet files into tmpfs
     let tmp_dir = cache::tmpfs::Directory::default();
-    for file in &new_file_list {
-        log::info!("[COMPACT:{thread_id}] merge small file: {}", &file.key);
+    let mut fi = 0;
+    for file in new_file_list.iter() {
+        fi += 1;
+        log::info!("[COMPACT:{thread_id}:{fi}] merge small file: {}", &file.key);
         let data = match storage::get(&file.key).await {
             Ok(body) => body,
             Err(err) => {
@@ -595,7 +597,7 @@ pub async fn merge_files(
     let bloom_filter_fields = get_stream_setting_bloom_filter_fields(&schema_latest).unwrap();
     let full_text_search_fields = get_stream_setting_fts_fields(&schema_latest).unwrap();
     if cfg.common.widening_schema_evolution && schema_versions.len() > 1 {
-        for file in &new_file_list {
+        for file in new_file_list.iter() {
             // get the schema version of the file
             let schema_ver_id = match db::schema::filter_schema_version_id(
                 &schema_versions,
@@ -761,7 +763,10 @@ pub async fn merge_files(
                         retain_file_list
                     )
                 })?;
-                if !index_file_name.is_empty() {
+                if index_file_name.is_empty() {
+                    // there is no index file generated,
+                    // it means there is no inverted index terms can be generated
+                } else {
                     log::info!("Created index file during compaction {}", index_file_name);
                     // Notify that we wrote the index file to the db.
                     if let Err(e) = write_file_list(
@@ -781,11 +786,6 @@ pub async fn merge_files(
                             retain_file_list
                         );
                     }
-                } else {
-                    log::warn!(
-                        "generate_index_on_compactor returned an empty index file name and need delete files: {:?}",
-                        retain_file_list
-                    );
                 }
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
