@@ -673,6 +673,8 @@ pub async fn merge_files_logs(
                 DataFusionError::Execution(e.to_string())
             })?;
 
+            tmp_dir.remove(&file.key);
+
             log::info!("[COMPACT:{thread_id}] convert_parquet_file : {}", &file.key);
             datafusion::exec::convert_parquet_file(
                 "",
