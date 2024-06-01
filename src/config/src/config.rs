@@ -633,7 +633,7 @@ pub struct Common {
     pub show_stream_dates_doc_num: bool,
     #[env_config(name = "ZO_INGEST_BLOCKED_STREAMS", default = "")] // use comma to split
     pub blocked_streams: String,
-    #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = false)]
+    #[env_config(name = "ZO_INGEST_INFER_SCHEMA_PER_REQUEST", default = true)]
     pub infer_schema_per_request: bool,
     #[env_config(name = "ZO_REPORT_USER_NAME", default = "")]
     pub report_user_name: String,
