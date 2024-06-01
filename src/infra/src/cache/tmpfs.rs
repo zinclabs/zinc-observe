@@ -21,8 +21,12 @@ use parking_lot::RwLock;
 
 use crate::errors::*;
 
-static FILES: Lazy<RwLock<HashMap<String, File>>> = Lazy::new(Default::default);
-static DATA: Lazy<RwLock<HashMap<String, Bytes>>> = Lazy::new(Default::default);
+const CAP_LEN: usize = 10240;
+
+static FILES: Lazy<RwLock<HashMap<String, File>>> =
+    Lazy::new(|| RwLock::new(HashMap::with_capacity(CAP_LEN)));
+static DATA: Lazy<RwLock<HashMap<String, Bytes>>> =
+    Lazy::new(|| RwLock::new(HashMap::with_capacity(CAP_LEN)));
 
 const STRING_SIZE: usize = std::mem::size_of::<String>();
 const BYTES_SIZE: usize = std::mem::size_of::<bytes::Bytes>();
@@ -145,8 +149,8 @@ pub fn delete(path: &str, prefix: bool) -> Result<()> {
             DATA.write().remove(&f.location);
         }
     }
-    FILES.write().shrink_to_fit();
-    DATA.write().shrink_to_fit();
+    FILES.write().shrink_to(CAP_LEN);
+    DATA.write().shrink_to(CAP_LEN);
     Ok(())
 }
 
