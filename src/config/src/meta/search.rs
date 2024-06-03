@@ -554,9 +554,9 @@ pub struct MultiStreamRequest {
     #[serde(default)]
     pub timeout: i64,
     #[serde(default)]
-    pub from: usize,
+    pub from: i64,
     #[serde(default = "default_size")]
-    pub size: usize,
+    pub size: i64,
     pub start_time: i64,
     pub end_time: i64,
     #[serde(default)]
