@@ -2283,6 +2283,7 @@ const useLogs = () => {
       endCount +
       " out of " +
       totalCount.toLocaleString() +
+      eventTotalPlus +
       " events in " +
       searchObj.data.queryResults.took +
       " ms. (Scan Size: " +
