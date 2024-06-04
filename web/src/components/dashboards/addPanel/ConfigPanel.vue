@@ -731,6 +731,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type
           )
         "
+        :variablesData="variablesData"
       />
     </div>
   </div>
@@ -745,7 +746,7 @@ import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoCompl
 
 export default defineComponent({
   components: { Drilldown, CommonAutoComplete },
-  props: ["dashboardPanelData"],
+  props: ["dashboardPanelData", "variablesData"],
   setup(props) {
     const { dashboardPanelData, promqlMode } = useDashboardPanelData();
     const { t } = useI18n();
@@ -928,10 +929,20 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].config.promql_legend;
 
+      // Find the index of the last opening brace '{'
       const openingBraceIndex = inputValue.lastIndexOf("{");
-      const newValue =
-        inputValue.slice(0, openingBraceIndex + 1) + option + "}";
-      return newValue;
+
+      //if { is not present add it at the start and than return
+
+      if (openingBraceIndex === -1) {
+        const newValue =
+          "{" + inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+        return newValue;
+      } else {
+        const newValue =
+          inputValue.slice(0, openingBraceIndex + 1) + option + "}";
+        return newValue;
+      }
     };
 
     const dashboardSelectfieldPromQlList = computed(() =>

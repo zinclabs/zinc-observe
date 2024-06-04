@@ -255,7 +255,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.configLabel')"
                   v-model="dashboardPanelData.layout.isConfigPanelOpen"
                 >
-                  <ConfigPanel :dashboardPanelData="dashboardPanelData" />
+                  <ConfigPanel
+                    :dashboardPanelData="dashboardPanelData"
+                    :variablesData="variablesData"
+                  />
                 </PanelSidebar>
               </div>
             </div>
@@ -507,7 +510,8 @@ export default defineComponent({
       if ((data?.defaultDatetimeDuration?.type ?? "relative") === "relative") {
         selectedDate.value = {
           valueType: "relative",
-          relativeTimePeriod: data?.defaultDatetimeDuration?.relativeTimePeriod ?? "15m",
+          relativeTimePeriod:
+            data?.defaultDatetimeDuration?.relativeTimePeriod ?? "15m",
         };
       } else {
         // else, dashboard will have absolute time settings

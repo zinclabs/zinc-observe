@@ -8,7 +8,7 @@ export default {
           query: {
             sql: "select * from default",
             from: 0,
-            size: 0,
+            size: -1,
             start_time: 0,
             end_time: 0,
             sql_mode: "full",

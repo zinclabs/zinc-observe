@@ -158,6 +158,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-input>
               </div>
               <div>
+                <q-toggle
+                  v-model="variableData.multiSelect"
+                  :label="t('dashboard.multiSelect')"
+                  data-test="dashboard-query_values-show_multiple_values"
+                />
+              </div>
+              <div>
                 <div class="flex flex-row">
                   <div
                     data-test="dashboard-query-values-filter"
@@ -222,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="operator"
                       data-test="dashboard-query-values-filter-operator-selector"
                       :rules="[(val: any) => !!(val.trim()) || 'Field is required!']"
-                      :options="['=', '!=']"
+                      :options="['=', '!=', 'IN']"
                     />
                     <CommonAutoComplete
                       v-model="filter.value"
@@ -293,6 +300,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <!-- show the auto add variables for the custom fields -->
           <div v-if="variableData.type == 'custom'">
+            <div>
+              <q-toggle
+                v-model="variableData.multiSelect"
+                :label="t('dashboard.multiSelect')"
+                data-test="dashboard-custom-show_multiple_values"
+              />
+            </div>
             <div
               v-for="(option, index) in variableData.options"
               :key="index"
@@ -457,6 +471,7 @@ export default defineComponent({
       },
       value: "",
       options: [],
+      multiSelect: false,
     });
 
     const filterCycleError: any = ref("");
@@ -471,6 +486,10 @@ export default defineComponent({
         value: "",
       });
     };
+    // by default, use multiSelect as false
+    if (!variableData.multiSelect) {
+      variableData.multiSelect = false;
+    }
 
     const filterUpdated = (index: number, filter: any) => {
       variableData.query_data.filter[index].name = filter.name;
@@ -481,6 +500,15 @@ export default defineComponent({
     };
 
     const editMode = ref(false);
+
+    watch(
+      () => variableData.query_data.max_record_size,
+      (newVal, oldVal) => {
+        if (newVal === "") {
+          variableData.query_data.max_record_size = null;
+        }
+      }
+    );
 
     onMounted(async () => {
       if (props.variableName) {

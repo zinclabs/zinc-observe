@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :read-only="searchObj.meta.filterType === 'basic'"
           @update:query="updateQueryValue"
           @run-query="searchData"
-        ></query-editor>
+        />
       </div>
     </div>
     <template>
@@ -185,7 +185,7 @@ export default defineComponent({
   components: {
     DateTime,
     QueryEditor: defineAsyncComponent(
-      () => import("@/plugins/traces/QueryEditor.vue")
+      () => import("@/components/QueryEditor.vue")
     ),
     SyntaxGuide,
     AppTabs,

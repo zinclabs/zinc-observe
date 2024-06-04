@@ -84,6 +84,7 @@
       <drilldown-pop-up
         :drilldown-data-index="selectedDrilldownIndexToEdit"
         :is-edit-mode="isDrilldownEditMode"
+        :variables-data="variablesData"
         @close="saveDrilldownData"
         :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
       />
@@ -101,6 +102,7 @@ import { onBeforeMount } from "vue";
 export default defineComponent({
   name: "Drilldown",
   components: { DrilldownPopUp },
+  props: ["variablesData"],
   setup() {
     const store = useStore();
     const showDrilldownPopUp = ref(false);

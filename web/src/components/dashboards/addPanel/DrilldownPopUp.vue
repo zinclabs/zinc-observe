@@ -215,7 +215,7 @@
           >
             <div
               style="display: flex; gap: 10px; margin-bottom: 10px"
-              :key="variableNamesFn?.toString()"
+              :key="JSON.stringify(variableNamesFn ?? {})"
             >
               <CommonAutoComplete
                 placeholder="Name"
@@ -229,10 +229,7 @@
                 searchRegex="(.*)"
                 v-model="variable.value"
                 :items="options.selectedValue"
-                style="
-                  width: auto !important;
-                  padding-top: 3px !important;
-                "
+                style="width: auto !important; padding-top: 3px !important"
               ></CommonAutoComplete>
 
               <q-icon
@@ -328,6 +325,10 @@ export default defineComponent({
       type: Number,
       default: -1,
     },
+    variablesData: {
+      type: Object,
+      default: false,
+    },
   },
   emits: ["close"],
   setup(props, { emit }) {
@@ -381,6 +382,9 @@ export default defineComponent({
       // get tab list
       await getDashboardList();
       await getTabList();
+
+      // get variables list
+      await getvariableNames();
     });
 
     // on folder change, reset dashboard and tab values
@@ -556,6 +560,13 @@ export default defineComponent({
     //want label for dropdown in input and value for its input value
     const selectedValue = computed(() => {
       let selectedValues: any = [];
+      const variableListName = props.variablesData.values
+        .filter((variable: any) => variable.type !== "dynamic_filters")
+        .map((variable: any) => ({
+          label: variable.name,
+          value: "${" + variable.name + "}",
+        }));
+
       if (dashboardPanelData.data.type === "sankey") {
         selectedValues = [
           { label: "Edge Source", value: "${edge.__source}" },
@@ -563,6 +574,7 @@ export default defineComponent({
           { label: "Edge Value", value: "${edge.__value}" },
           { label: "Node Name", value: "${node.__name}" },
           { label: "Node Value", value: "${node.__value}" },
+          ...variableListName,
         ];
       } else if (dashboardPanelData.data.type === "table") {
         dashboardPanelData.data.queries.forEach((query: any) => {
@@ -570,6 +582,7 @@ export default defineComponent({
             ...query.fields.x,
             ...query.fields.y,
             ...query.fields.z,
+            ...variableListName,
           ];
           panelFields.forEach((field) => {
             selectedValues.push({
@@ -582,6 +595,7 @@ export default defineComponent({
         selectedValues = [
           { label: "Series Name", value: "${series.__name}" },
           { label: "Series Value", value: "${series.__value}" },
+          ...variableListName,
         ];
       }
       return selectedValues;
@@ -592,10 +606,13 @@ export default defineComponent({
 
     const variableNamesFn = ref([]);
 
-    watch(drilldownData.value, async (newData) => {
-      if (newData.data.folder && newData.data.dashboard) {
+    const getvariableNames = async () => {
+      if (
+        drilldownData.value.data.folder &&
+        drilldownData.value.data.dashboard
+      ) {
         const folder = store.state.organizationData.folders.find(
-          (folder: any) => folder.name === newData.data.folder
+          (folder: any) => folder.name === drilldownData.value.data.folder
         );
 
         const allDashboardData = await getAllDashboardsByFolderId(
@@ -603,7 +620,8 @@ export default defineComponent({
           folder.folderId
         );
         const dashboardData = allDashboardData.find(
-          (dashboard: any) => dashboard.title === newData.data.dashboard
+          (dashboard: any) =>
+            dashboard.title === drilldownData.value.data.dashboard
         );
 
         if (dashboardData) {
@@ -617,6 +635,12 @@ export default defineComponent({
         } else {
           variableNamesFn.value = [];
         }
+      }
+    };
+
+    watch(drilldownData.value, async (newData) => {
+      if (newData.data.folder && newData.data.dashboard) {
+        await getvariableNames();
       } else {
         variableNamesFn.value = [];
       }

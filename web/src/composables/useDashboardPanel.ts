@@ -793,86 +793,67 @@ const useDashboardPanelData = () => {
     ].fields.value = null;
   };
 
-  const addFilteredItem = (name: string) => {
-    if (
-      !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter
-    ) {
+  const addFilteredItem = async (name: string) => {
+    const currentQuery =
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter = [];
+      ];
+
+    // Ensure the filter array is initialized
+    if (!currentQuery.fields.filter) {
+      currentQuery.fields.filter = [];
     }
 
-    if (
-      !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter.find((it: any) => it.column == name)
-    ) {
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter.push({
-        type: "list",
-        values: [],
-        column: name,
-        operator: null,
-        value: null,
-      });
-    }
+    // Add the new filter item
+    currentQuery.fields.filter.push({
+      type: "list",
+      values: [],
+      column: name,
+      operator: null,
+      value: null,
+    });
 
+    // Ensure the filterValue array is initialized
     if (!dashboardPanelData.meta.filterValue) {
       dashboardPanelData.meta.filterValue = [];
     }
 
-    // remove any existing data
-    const find = dashboardPanelData.meta.filterValue.findIndex(
-      (it: any) => it.column == name
-    );
-    if (find >= 0) {
-      dashboardPanelData.meta.filterValue.splice(find, 1);
-    }
-
-    StreamService.fieldValues({
-      org_identifier: store.state.selectedOrganization.identifier,
-      stream_name:
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream,
-      start_time: new Date(
-        dashboardPanelData.meta.dateTime["start_time"].toISOString()
-      ).getTime(),
-      end_time: new Date(
-        dashboardPanelData.meta.dateTime["end_time"].toISOString()
-      ).getTime(),
-      fields: [name],
-      size: 10,
-      type: dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.stream_type,
-    })
-      .then((res: any) => {
-        dashboardPanelData.meta.filterValue.push({
-          column: name,
-          value: res?.data?.hits?.[0]?.values
-            .map((it: any) => it.zo_sql_key)
-            .filter((it: any) => it),
-        });
-      })
-      .catch((error: any) => {
-        const errorDetailValue =
-          error.response?.data.error_detail ||
-          error.response?.data.message ||
-          "Something went wrong!";
-        const trimmedErrorMessage =
-          errorDetailValue.length > 300
-            ? errorDetailValue.slice(0, 300) + " ..."
-            : errorDetailValue;
-        $q.notify({
-          type: "negative",
-          message: trimmedErrorMessage,
-          timeout: 5000,
-        });
+    try {
+      const res = await StreamService.fieldValues({
+        org_identifier: store.state.selectedOrganization.identifier,
+        stream_name: currentQuery.fields.stream,
+        start_time: new Date(
+          dashboardPanelData.meta.dateTime["start_time"].toISOString()
+        ).getTime(),
+        end_time: new Date(
+          dashboardPanelData.meta.dateTime["end_time"].toISOString()
+        ).getTime(),
+        fields: [name],
+        size: 100,
+        type: currentQuery.fields.stream_type,
       });
+
+      dashboardPanelData.meta.filterValue.push({
+        column: name,
+        value: res?.data?.hits?.[0]?.values
+          .map((it: any) => it.zo_sql_key)
+          .filter((it: any) => it),
+      });
+    } catch (error: any) {
+      const errorDetailValue =
+        error.response?.data.error_detail ||
+        error.response?.data.message ||
+        "Something went wrong!";
+      const trimmedErrorMessage =
+        errorDetailValue.length > 300
+          ? errorDetailValue.slice(0, 300) + " ..."
+          : errorDetailValue;
+      $q.notify({
+        type: "negative",
+        message: trimmedErrorMessage,
+        timeout: 5000,
+      });
+    }
   };
 
   const loadFilterItem = (name: any) => {
@@ -889,7 +870,7 @@ const useDashboardPanelData = () => {
         dashboardPanelData.meta.dateTime["end_time"].toISOString()
       ).getTime(),
       fields: [name],
-      size: 10,
+      size: 100,
       type: dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.stream_type,

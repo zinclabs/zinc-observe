@@ -352,12 +352,26 @@ export default defineComponent({
 
       if (query) {
         if (weight) {
-          const weightField = weight.aggregationFunction
-            ? weight.aggregationFunction == "count-distinct"
-              ? `count(distinct(${weight.column}))`
-              : `${weight.aggregationFunction}(${weight.column})`
-            : `${weight.column}`;
-          query += `, ${weightField} as ${weight.alias}`;
+          switch (weight.aggregationFunction) {
+            case "p50":
+              query += `, approx_percentile_cont(${weight.column}, 0.5) as ${weight.alias}`;
+              break;
+            case "p90":
+              query += `, approx_percentile_cont(${weight.column}, 0.9) as ${weight.alias}`;
+              break;
+            case "p95":
+              query += `, approx_percentile_cont(${weight.column}, 0.95) as ${weight.alias}`;
+              break;
+            case "p99":
+              query += `, approx_percentile_cont(${weight.column}, 0.99) as ${weight.alias}`;
+              break;
+            case "count-distinct":
+              query += `, count(distinct(${weight.column})) as ${weight.alias}`;
+              break;
+            default:
+              query += `, ${weight.aggregationFunction}(${weight.column}) as ${weight.alias}`;
+              break;
+          }
         }
         query += ` FROM "${
           dashboardPanelData.data.queries[
@@ -479,9 +493,33 @@ export default defineComponent({
       }
 
       if (value) {
-        selectFields.push(
-          `${value.aggregationFunction}(${value.column}) as ${value.alias}`
-        );
+        switch (value?.aggregationFunction) {
+          case "p50":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.5) as ${value.alias}`
+            );
+            break;
+          case "p90":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.9) as ${value.alias}`
+            );
+            break;
+          case "p95":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.95) as ${value.alias}`
+            );
+            break;
+          case "p99":
+            selectFields.push(
+              `approx_percentile_cont(${value?.column}, 0.99) as ${value.alias}`
+            );
+            break;
+          default:
+            selectFields.push(
+              `${value.aggregationFunction}(${value.column}) as ${value.alias}`
+            );
+            break;
+        }
       }
 
       // Adding the selected fields to the query
@@ -610,6 +648,18 @@ export default defineComponent({
           switch (field?.aggregationFunction) {
             case "count-distinct":
               selector += `count(distinct(${field?.column}))`;
+              break;
+            case "p50":
+              selector += `approx_percentile_cont(${field?.column}, 0.5)`;
+              break;
+            case "p90":
+              selector += `approx_percentile_cont(${field?.column}, 0.9)`;
+              break;
+            case "p95":
+              selector += `approx_percentile_cont(${field?.column}, 0.95)`;
+              break;
+            case "p99":
+              selector += `approx_percentile_cont(${field?.column}, 0.99)`;
               break;
             case "histogram": {
               // if inteval is not null, then use it
@@ -788,11 +838,28 @@ export default defineComponent({
 
         // Get the parsed query
         try {
-          dashboardPanelData.meta.parsedQuery = parser.astify(
-            dashboardPanelData.data.queries[
+          let currentQuery = dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].query
-          );
+          
+           // replace variables with dummy values to verify query is correct or not
+          if(/\${[a-zA-Z0-9_-]+:csv}/.test(currentQuery)){
+            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:csv}/g, "1,2")
+          }
+          if(/\${[a-zA-Z0-9_-]+:singlequote}/.test(currentQuery)){
+            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:singlequote}/g, "'1','2'")
+          }
+          if(/\${[a-zA-Z0-9_-]+:doublequote}/.test(currentQuery)){
+            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:doublequote}/g, '"1","2"')
+          }
+          if(/\${[a-zA-Z0-9_-]+:pipe}/.test(currentQuery)){
+            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:pipe}/g, "1|2")
+          }
+          if(/\$(\w+|\{\w+\})/.test(currentQuery)){
+            currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, "10")
+          }
+
+          dashboardPanelData.meta.parsedQuery = parser.astify(currentQuery);
         } catch (e) {
           // exit as there is an invalid query
           dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax");
@@ -869,10 +936,18 @@ export default defineComponent({
     const updatePromQLQuery = async (event, value) => {
       autoCompleteData.value.query = value;
       autoCompleteData.value.text = event.changes[0].text;
-      autoCompleteData.value.dateTime = {
-        startTime: dashboardPanelData.meta.dateTime.start_time?.getTime(),
-        endTime: dashboardPanelData.meta.dateTime.end_time?.getTime(),
-      };
+
+      // set the start and end time
+      if (
+        dashboardPanelData.meta.dateTime.start_time &&
+        dashboardPanelData.meta.dateTime.end_time
+      ) {
+        autoCompleteData.value.dateTime = {
+          startTime: dashboardPanelData.meta.dateTime.start_time?.getTime(),
+          endTime: dashboardPanelData.meta.dateTime.end_time?.getTime(),
+        };
+      }
+
       autoCompleteData.value.position.cursorIndex =
         queryEditorRef.value.getCursorIndex();
       autoCompleteData.value.popup.open =

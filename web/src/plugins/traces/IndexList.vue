@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, onBeforeUnmount } from "vue";
+import { defineComponent, ref, type Ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar } from "quasar";
@@ -231,7 +231,7 @@ export default defineComponent({
       parser = await sqlParser();
     };
 
-    onBeforeUnmount(async () => {
+    onBeforeMount(async () => {
       await importSqlParser();
     });
 

@@ -499,8 +499,6 @@ export default defineComponent({
         cloneDeep(serviceTree),
         maxDepth
       );
-
-      console.log("service tree", traceServiceMap.value);
     };
 
     // Convert span object to required format

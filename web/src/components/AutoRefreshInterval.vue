@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       border
       no-caps
       class="q-pa-xs refresh-interval-dropdown"
+      content-style="z-index: 10001"
     >
       <template v-slot:label>
         <div class="row items-center no-wrap">

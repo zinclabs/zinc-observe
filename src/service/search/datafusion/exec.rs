@@ -502,7 +502,7 @@ async fn get_fast_mode_ctx(
     let mut new_files = Vec::new();
     let needs = sql.meta.limit + sql.meta.offset;
     for i in (0..files.len()).rev() {
-        loaded_records += files.get(i).unwrap().meta.records as usize;
+        loaded_records += files.get(i).unwrap().meta.records;
         new_files.push(files[i].clone());
         if loaded_records >= needs && (desc || new_files.len() > 1) {
             break;
@@ -550,8 +550,8 @@ fn replace_in_query(replace_pat: &str, where_query: &mut String, is_alias: bool)
 
 pub async fn merge(
     org_id: &str,
-    offset: usize,
-    limit: usize,
+    offset: i64,
+    limit: i64,
     sql: &str,
     batches: &[RecordBatch],
     select_fields: &[Arc<Field>],

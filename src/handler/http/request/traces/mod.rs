@@ -200,10 +200,10 @@ pub async fn get_latest_traces(
     };
     let from = query
         .get("from")
-        .map_or(0, |v| v.parse::<usize>().unwrap_or(0));
+        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     let size = query
         .get("size")
-        .map_or(10, |v| v.parse::<usize>().unwrap_or(10));
+        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
     let mut start_time = query
         .get("start_time")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -419,7 +419,7 @@ pub async fn get_latest_traces(
             }
         };
 
-        let resp_size = resp_search.hits.len();
+        let resp_size = resp_search.hits.len() as i64;
         for item in resp_search.hits {
             let trace_id = item.get("trace_id").unwrap().as_str().unwrap().to_string();
             let trace_start_time = item.get("start_time").unwrap().as_i64().unwrap();

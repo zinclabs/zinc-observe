@@ -834,83 +834,68 @@ const useLogs = () => {
   };
 
   const getQueryPartitions = async (queryReq: any) => {
-    // const queryReq = buildSearch();
-    searchObj.data.queryResults.hits = [];
-    searchObj.data.histogram = {
-      xData: [],
-      yData: [],
-      chartParams: {
-        title: "",
-        unparsed_x_data: [],
-        timezone: "",
-      },
-      errorCode: 0,
-      errorMsg: "",
-      errorDetail: "",
-    };
-
-    const parsedSQL: any = fnParsedSQL();
-
-    if (
-      !searchObj.meta.sqlMode ||
-      (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL))
-    ) {
-      const partitionQueryReq: any = {
-        sql: queryReq.query.sql,
-        start_time: queryReq.query.start_time,
-        end_time: queryReq.query.end_time,
-        sql_mode: searchObj.meta.sqlMode ? "full" : "context",
+    try{
+      // const queryReq = buildSearch();
+      searchObj.data.queryResults.hits = [];
+      searchObj.data.histogram = {
+        xData: [],
+        yData: [],
+        chartParams: {
+          title: "",
+          unparsed_x_data: [],
+          timezone: "",
+        },
+        errorCode: 0,
+        errorMsg: "",
+        errorDetail: "",
       };
-      if (store.state.zoConfig.sql_base64_enabled) {
-        partitionQueryReq["encoding"] = "base64";
+
+      const parsedSQL: any = fnParsedSQL();
+
+      if (searchObj.meta.sqlMode && parsedSQL == undefined) {
+        searchObj.data.queryResults.error = "Invalid SQL Syntax";
+        throw new Error("Invalid SQL Syntax");
+        return;
       }
 
       if (
-        config.isEnterprise == "true" &&
-        store.state.zoConfig.super_cluster_enabled
+        !searchObj.meta.sqlMode ||
+        (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL))
       ) {
-        if (queryReq.query.hasOwnProperty("regions")) {
-          partitionQueryReq["regions"] = queryReq.query.regions;
+        const partitionQueryReq: any = {
+          sql: queryReq.query.sql,
+          start_time: queryReq.query.start_time,
+          end_time: queryReq.query.end_time,
+          sql_mode: searchObj.meta.sqlMode ? "full" : "context",
+        };
+        if (store.state.zoConfig.sql_base64_enabled) {
+          partitionQueryReq["encoding"] = "base64";
         }
 
-        if (queryReq.query.hasOwnProperty("clusters")) {
-          partitionQueryReq["clusters"] = queryReq.query.clusters;
-        }
-      }
+        if (
+          config.isEnterprise == "true" &&
+          store.state.zoConfig.super_cluster_enabled
+        ) {
+          if (queryReq.query.hasOwnProperty("regions")) {
+            partitionQueryReq["regions"] = queryReq.query.regions;
+          }
 
-      await searchService
-        .partition({
-          org_identifier: searchObj.organizationIdetifier,
-          query: partitionQueryReq,
-          page_type: searchObj.data.stream.streamType,
-        })
-        .then(async (res) => {
+          if (queryReq.query.hasOwnProperty("clusters")) {
+            partitionQueryReq["clusters"] = queryReq.query.clusters;
+          }
+        }
+
+        if (parsedSQL != undefined && hasAggregation(parsedSQL?.columns)) {
           searchObj.data.queryResults.partitionDetail = {
             partitions: [],
             partitionTotal: [],
             paginations: [],
           };
-
-          // searchObj.data.queryResults.total = res.data.records;
-          const partitions = res.data.partitions;
-
-          searchObj.data.queryResults.partitionDetail.partitions = partitions;
-
           let pageObject: any = [];
-          // partitions.forEach((item: any, index: number) => {
-          //   pageObject = [
-          //     {
-          //       startTime: item[0],
-          //       endTime: item[1],
-          //       from: 0,
-          //       size: searchObj.meta.resultGrid.rowsPerPage,
-          //     },
-          //   ];
-          //   searchObj.data.queryResults.partitionDetail.paginations.push(
-          //     pageObject
-          //   );
-          //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-          // });
+          const partitions: any = [
+            [partitionQueryReq.start_time, partitionQueryReq.end_time],
+          ];
+          searchObj.data.queryResults.partitionDetail.partitions = partitions;
           for (const [index, item] of partitions.entries()) {
             pageObject = [
               {
@@ -925,52 +910,108 @@ const useLogs = () => {
             );
             searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
           }
-        });
-    } else {
-      searchObj.data.queryResults.partitionDetail = {
-        partitions: [],
-        partitionTotal: [],
-        paginations: [],
-      };
+        } else {
+          await searchService
+            .partition({
+              org_identifier: searchObj.organizationIdetifier,
+              query: partitionQueryReq,
+              page_type: searchObj.data.stream.streamType,
+            })
+            .then(async (res) => {
+              searchObj.data.queryResults.partitionDetail = {
+                partitions: [],
+                partitionTotal: [],
+                paginations: [],
+              };
 
-      searchObj.data.queryResults.partitionDetail.partitions = [
-        [queryReq.query.start_time, queryReq.query.end_time],
-      ];
+              // searchObj.data.queryResults.total = res.data.records;
+              const partitions = res.data.partitions;
 
-      let pageObject: any = [];
-      // searchObj.data.queryResults.partitionDetail.partitions.forEach(
-      //   (item: any, index: number) => {
-      //     pageObject = [
-      //       {
-      //         startTime: item[0],
-      //         endTime: item[1],
-      //         from: 0,
-      //         size: searchObj.meta.resultGrid.rowsPerPage,
-      //       },
-      //     ];
-      //     searchObj.data.queryResults.partitionDetail.paginations.push(
-      //       pageObject
-      //     );
-      //     searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
-      //   }
-      // );
-      for (const [
-        index,
-        item,
-      ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
-        pageObject = [
-          {
-            startTime: item[0],
-            endTime: item[1],
-            from: 0,
-            size: searchObj.meta.resultGrid.rowsPerPage,
-          },
+              searchObj.data.queryResults.partitionDetail.partitions = partitions;
+
+              let pageObject: any = [];
+              // partitions.forEach((item: any, index: number) => {
+              //   pageObject = [
+              //     {
+              //       startTime: item[0],
+              //       endTime: item[1],
+              //       from: 0,
+              //       size: searchObj.meta.resultGrid.rowsPerPage,
+              //     },
+              //   ];
+              //   searchObj.data.queryResults.partitionDetail.paginations.push(
+              //     pageObject
+              //   );
+              //   searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+              // });
+              for (const [index, item] of partitions.entries()) {
+                pageObject = [
+                  {
+                    startTime: item[0],
+                    endTime: item[1],
+                    from: 0,
+                    size: searchObj.meta.resultGrid.rowsPerPage,
+                  },
+                ];
+                searchObj.data.queryResults.partitionDetail.paginations.push(
+                  pageObject
+                );
+                searchObj.data.queryResults.partitionDetail.partitionTotal.push(
+                  -1
+                );
+              }
+            });
+        }
+      } else {
+        searchObj.data.queryResults.partitionDetail = {
+          partitions: [],
+          partitionTotal: [],
+          paginations: [],
+        };
+
+        searchObj.data.queryResults.partitionDetail.partitions = [
+          [queryReq.query.start_time, queryReq.query.end_time],
         ];
-        searchObj.data.queryResults.partitionDetail.paginations.push(
-          pageObject
-        );
-        searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+
+        let pageObject: any = [];
+        // searchObj.data.queryResults.partitionDetail.partitions.forEach(
+        //   (item: any, index: number) => {
+        //     pageObject = [
+        //       {
+        //         startTime: item[0],
+        //         endTime: item[1],
+        //         from: 0,
+        //         size: searchObj.meta.resultGrid.rowsPerPage,
+        //       },
+        //     ];
+        //     searchObj.data.queryResults.partitionDetail.paginations.push(
+        //       pageObject
+        //     );
+        //     searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+        //   }
+        // );
+        for (const [
+          index,
+          item,
+        ] of searchObj.data.queryResults.partitionDetail.partitions.entries()) {
+          pageObject = [
+            {
+              startTime: item[0],
+              endTime: item[1],
+              from: 0,
+              size: searchObj.meta.resultGrid.rowsPerPage,
+            },
+          ];
+          searchObj.data.queryResults.partitionDetail.paginations.push(
+            pageObject
+          );
+          searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
+        }
       }
+    } catch (e: any) {
+      console.log("error", e);
+      searchObj.data.queryResults.error = e.message;
+      throw e;
     }
   };
 
@@ -1763,16 +1804,16 @@ const useLogs = () => {
         searchObj.data.histogram.errorCode = 0;
         searchObj.data.histogram.errorDetail = "";
         searchObj.loadingHistogram = true;
-        queryReq.query.size = 0;
+        queryReq.query.size = -1;
         const parsedSQL: any = fnParsedSQL();
 
-        let hasAggregationFlag = false;
-        if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
-          hasAggregationFlag = hasAggregation(parsedSQL?.columns);
-          if (hasAggregationFlag) {
-            queryReq.query.track_total_hits = true;
-          }
-        }
+        // let hasAggregationFlag = false;
+        // if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
+        //   hasAggregationFlag = hasAggregation(parsedSQL?.columns);
+        //   if (hasAggregationFlag) {
+        //     queryReq.query.track_total_hits = true;
+        //   }
+        // }
 
         searchService
           .search({
@@ -1786,9 +1827,9 @@ const useLogs = () => {
             searchObj.data.queryResults.aggs = res.data.hits;
             searchObj.data.queryResults.scan_size = res.data.scan_size;
             searchObj.data.queryResults.took += res.data.took;
-            if (hasAggregationFlag) {
-              searchObj.data.queryResults.total = res.data.total;
-            }
+            // if (hasAggregationFlag) {
+            //   searchObj.data.queryResults.total = res.data.total;
+            // }
             await generateHistogramData();
 
             let regeratePaginationFlag = false;
@@ -2247,8 +2288,7 @@ const useLogs = () => {
 
       if (
         searchObj.data.queryResults.hasOwnProperty("aggs") &&
-        searchObj.data.queryResults.aggs &&
-        !hasAggregationFlag
+        searchObj.data.queryResults.aggs
       ) {
         searchObj.data.queryResults.aggs.map(
           (bucket: {

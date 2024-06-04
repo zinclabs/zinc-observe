@@ -27,8 +27,8 @@ use sqlparser::{
 
 use crate::get_config;
 
-const MAX_LIMIT: usize = 100000;
-const MAX_OFFSET: usize = 100000;
+const MAX_LIMIT: i64 = 100000;
+const MAX_OFFSET: i64 = 100000;
 
 /// parsed sql
 #[derive(Clone, Debug, Serialize)]
@@ -39,8 +39,8 @@ pub struct Sql {
     pub order_by: Vec<(String, bool)>, // desc: true / false
     pub group_by: Vec<String>,         // field
     pub having: bool,
-    pub offset: usize,
-    pub limit: usize,
+    pub offset: i64,
+    pub limit: i64,
     pub time_range: Option<(i64, i64)>,
     pub quick_text: Vec<(String, String, SqlOperator)>, // use text line quick filter
     pub field_alias: Vec<(String, String)>,             // alias for select field
@@ -185,14 +185,14 @@ impl std::fmt::Display for SqlValue {
     }
 }
 
-impl<'a> From<Offset<'a>> for usize {
+impl<'a> From<Offset<'a>> for i64 {
     fn from(offset: Offset) -> Self {
         match offset.0 {
             SqlOffset {
                 value: SqlExpr::Value(Value::Number(v, _b)),
                 ..
             } => {
-                let mut v: usize = v.parse().unwrap_or(0);
+                let mut v: i64 = v.parse().unwrap_or(0);
                 if v > MAX_OFFSET {
                     v = MAX_OFFSET;
                 }
@@ -203,11 +203,11 @@ impl<'a> From<Offset<'a>> for usize {
     }
 }
 
-impl<'a> From<Limit<'a>> for usize {
+impl<'a> From<Limit<'a>> for i64 {
     fn from(l: Limit<'a>) -> Self {
         match l.0 {
             SqlExpr::Value(Value::Number(v, _b)) => {
-                let mut v: usize = v.parse().unwrap_or(0);
+                let mut v: i64 = v.parse().unwrap_or(0);
                 if v > MAX_LIMIT {
                     v = MAX_LIMIT;
                 }

@@ -271,7 +271,7 @@ export default defineComponent({
       // if value is false, then immediately set the value
       if (isDashboardVariablesAndPanelsDataLoaded.value === false) {
         setImmediateValue(newValue);
-      } else {
+      } else if (store.state.printMode) {
         // if value is true, then debounce the value
         setDebounceValue(newValue);
       }

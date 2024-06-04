@@ -143,6 +143,10 @@ pub enum AggregationFunc {
     Min,
     Max,
     Avg,
+    P50,
+    P90,
+    P95,
+    P99,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -270,6 +274,8 @@ pub struct VariableList {
     pub query_data: Option<QueryData>,
     pub value: Option<String>,
     pub options: Option<Vec<CustomFieldsOption>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub multi_select: Option<bool>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

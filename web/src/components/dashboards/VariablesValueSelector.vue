@@ -65,38 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ></q-input>
       </div>
       <div v-else-if="item.type == 'custom'">
-        <q-select
-          style="min-width: 150px"
-          outlined
-          dense
+        <VariableCustomValueSelector
           v-model="item.value"
-          :display-value="
-            item.value
-              ? item.value
-              : !item.isLoading
-              ? '(No Options Available)'
-              : ''
-          "
-          :options="item.options"
-          map-options
-          stack-label
-          filled
-          borderless
-          :label="item.label || item.name"
-          option-value="value"
-          option-label="label"
-          emit-value
-          data-test="dashboard-variable-custom-selector"
+          :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
-        >
-          <template v-slot:no-option>
-            <q-item>
-              <q-item-section class="text-italic text-grey">
-                No Options Available
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        />
       </div>
       <div v-else-if="item.type == 'dynamic_filters'">
         <VariableAdHocValueSelector v-model="item.value" :variableItem="item" />
@@ -111,6 +84,7 @@ import { defineComponent, reactive } from "vue";
 import streamService from "../../services/stream";
 import { useStore } from "vuex";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
+import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
@@ -129,6 +103,7 @@ export default defineComponent({
   components: {
     VariableQueryValueSelector,
     VariableAdHocValueSelector,
+    VariableCustomValueSelector,
   },
   setup(props: any, { emit }) {
     const instance = getCurrentInstance();
@@ -138,7 +113,6 @@ export default defineComponent({
       isVariablesLoading: false,
       values: [],
     });
-
     // variables dependency graph
     let variablesDependencyGraph: any = {};
 
@@ -167,7 +141,7 @@ export default defineComponent({
       // make list of variables using variables config list
       // set initial variables values from props
       props?.variablesConfig?.list?.forEach((item: any) => {
-        const initialValue =
+        let initialValue =
           item.type == "dynamic_filters"
             ? JSON.parse(
                 decodeURIComponent(
@@ -177,6 +151,11 @@ export default defineComponent({
               ) ?? []
             : props.initialVariableValues?.value[item.name] ?? null;
 
+        if (item.multiSelect) {
+          initialValue = Array.isArray(initialValue)
+            ? initialValue
+            : [initialValue];
+        }
         const variableData = {
           ...item,
           // isLoading is used to check that currently, if the variable is loading(it is used to show the loading icon)
@@ -185,7 +164,6 @@ export default defineComponent({
           // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
           isVariableLoadingPending: true,
         };
-
         // need to use initial value
         // also, constant type variable should not be updated
         if (item.type != "constant") {
@@ -399,10 +377,23 @@ export default defineComponent({
                   variable.isVariableLoadingPending === false
                 ) {
                   // replace it's value in the query if it is dependent on query context
-                  queryContext = queryContext.replace(
-                    `$${variable.name}`,
-                    variable.value
-                  );
+
+                  if (Array.isArray(variable.value)) {
+                    const arrayValues = variable.value
+                      .map((value: any) => {
+                        return `'${value}'`;
+                      })
+                      .join(", ");
+                    queryContext = queryContext.replace(
+                      `'$${variable.name}'`,
+                      `(${arrayValues})`
+                    );
+                  } else {
+                    queryContext = queryContext.replace(
+                      `$${variable.name}`,
+                      variable.value
+                    );
+                  }
                 }
                 // above condition not matched, means variable is not loaded
                 // so, check if it is dependent on query context
@@ -451,19 +442,41 @@ export default defineComponent({
                     value: value.zo_sql_key.toString(),
                   }));
 
-                // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
+                // Define oldVariableSelectedValues array
+                let oldVariableSelectedValues: any = [];
+                if (oldVariablesData[currentVariable.name]) {
+                  oldVariableSelectedValues = Array.isArray(
+                    oldVariablesData[currentVariable.name]
+                  )
+                    ? oldVariablesData[currentVariable.name]
+                    : [oldVariablesData[currentVariable.name]];
+                }
+
+                // if the old value exists in the dropdown, set the old value; otherwise, set the first value of the dropdown; otherwise, set a blank string value
                 if (
                   oldVariablesData[currentVariable.name] !== undefined ||
                   oldVariablesData[currentVariable.name] !== null
                 ) {
-                  currentVariable.value = currentVariable.options.some(
-                    (option: any) =>
-                      option.value === oldVariablesData[currentVariable.name]
-                  )
-                    ? oldVariablesData[currentVariable.name]
-                    : currentVariable.options.length
-                    ? currentVariable.options[0].value
-                    : null;
+                  if (currentVariable.multiSelect) {
+                    const selectedValues = currentVariable.options
+                      .filter((option: any) =>
+                        oldVariableSelectedValues.includes(option.value)
+                      )
+                      .map((option: any) => option.value);
+                    currentVariable.value =
+                      selectedValues.length > 0
+                        ? selectedValues
+                        : [currentVariable.options[0].value]; // If no option is available, set as the first value
+                  } else {
+                    currentVariable.value = currentVariable.options.some(
+                      (option: any) =>
+                        option.value === oldVariablesData[currentVariable.name]
+                    )
+                      ? oldVariablesData[currentVariable.name]
+                      : currentVariable.options.length
+                      ? currentVariable.options[0].value
+                      : null;
+                  }
                 } else {
                   currentVariable.value = currentVariable.options.length
                     ? currentVariable.options[0].value
@@ -475,7 +488,7 @@ export default defineComponent({
               } else {
                 // no response hits found
                 // set value as empty string
-                currentVariable.value = null;
+                currentVariable.value = currentVariable.multiSelect ? [] : null;
                 // set options as empty array
                 currentVariable.options = [];
 
@@ -502,21 +515,40 @@ export default defineComponent({
             break;
           }
           case "custom": {
-            // assign options
-            currentVariable["options"] = currentVariable?.options;
+            currentVariable.options = currentVariable?.options;
 
-            // if the old value exist in dropdown set the old value
-            // otherwise set first value of drop down
-            // otherwise set null value
-            let oldVariableObjectSelectedValue = currentVariable.options.find(
-              (option: any) =>
-                option.value === oldVariablesData[currentVariable.name]
-            );
-            // if the old value exist in dropdown set the old value otherwise set first value of drop down otherwise set blank string value
-            if (oldVariableObjectSelectedValue) {
-              currentVariable.value = oldVariableObjectSelectedValue.value;
+            // Check if the old value exists and set it
+            let oldVariableSelectedValues: any = [];
+            if (oldVariablesData[currentVariable.name]) {
+              oldVariableSelectedValues = Array.isArray(
+                oldVariablesData[currentVariable.name]
+              )
+                ? oldVariablesData[currentVariable.name]
+                : [oldVariablesData[currentVariable.name]];
+            }
+
+            // If multiSelect is true, set the value as an array containing old value and selected value
+            if (currentVariable.multiSelect) {
+              const selectedValues = currentVariable.options
+                .filter((option: any) =>
+                  oldVariableSelectedValues.includes(option.value)
+                )
+                .map((option: any) => option.value);
+              currentVariable.value =
+                // If no option is available, set as the first value or if old value exists, set the old value
+                selectedValues.length > 0
+                  ? selectedValues
+                  : [currentVariable.options[0].value] ||
+                    oldVariableSelectedValues;
             } else {
-              currentVariable.value = currentVariable.options[0]?.value ?? null;
+              // If multiSelect is false, set the value as a single value from options which is selected
+              currentVariable.value =
+                currentVariable.options.find(
+                  (option: any) => option.value === oldVariableSelectedValues[0]
+                )?.value ??
+                (currentVariable.options.length > 0
+                  ? currentVariable.options[0].value
+                  : null);
             }
 
             resolve(true);

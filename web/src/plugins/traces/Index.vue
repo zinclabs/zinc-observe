@@ -321,10 +321,10 @@ export default defineComponent({
       }
     }
 
-    function getStreamList() {
+    async function getStreamList() {
       try {
         getStreams("traces", false)
-          .then((res) => {
+          .then(async (res) => {
             searchObj.data.streamResults = res;
 
             if (res.list.length > 0) {
@@ -349,7 +349,7 @@ export default defineComponent({
               };
             }
 
-            extractFields();
+            await extractFields();
 
             if (
               searchObj.data.editorValue &&
@@ -1100,7 +1100,7 @@ export default defineComponent({
       }
     }
 
-    function loadPageData() {
+    async function loadPageData() {
       searchObj.loading = true;
 
       searchObj.data.resultGrid.currentPage = 0;
@@ -1110,7 +1110,7 @@ export default defineComponent({
         store.state.selectedOrganization.identifier;
 
       //get stream list
-      getStreamList();
+      await getStreamList();
     }
 
     function refreshStreamData() {
@@ -1127,7 +1127,7 @@ export default defineComponent({
       await importSqlParser();
       if (searchObj.loading == false) {
         // eslint-disable-next-line no-prototype-builtins
-        loadPageData();
+        await loadPageData();
         restoreUrlQueryParams();
       }
     });

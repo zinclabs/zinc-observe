@@ -141,7 +141,7 @@ async fn scan_wal_files(
                 break;
             }
             Some(files) => {
-                log::info!(
+                log::debug!(
                     "[INGESTER:JOB] scan files get batch: {}, took: {} ms",
                     files.len(),
                     start.elapsed().as_millis() - last_time

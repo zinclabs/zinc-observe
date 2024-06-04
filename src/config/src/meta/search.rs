@@ -94,9 +94,9 @@ impl std::fmt::Display for RequestEncoding {
 pub struct Query {
     pub sql: String,
     #[serde(default)]
-    pub from: usize,
+    pub from: i64,
     #[serde(default = "default_size")]
-    pub size: usize,
+    pub size: i64,
     #[serde(default)]
     pub start_time: i64,
     #[serde(default)]
@@ -121,8 +121,8 @@ pub struct Query {
     pub skip_wal: bool,
 }
 
-fn default_size() -> usize {
-    10
+fn default_size() -> i64 {
+    crate::get_config().limit.query_default_limit
 }
 
 impl Default for Query {
@@ -189,8 +189,8 @@ pub struct Response {
     #[schema(value_type = Object)]
     pub aggs: HashMap<String, Vec<json::Value>>,
     pub total: usize,
-    pub from: usize,
-    pub size: usize,
+    pub from: i64,
+    pub size: i64,
     #[serde(default)]
     #[serde(skip_serializing)]
     pub file_count: usize,
@@ -230,7 +230,7 @@ pub struct ResponseNodeTook {
 }
 
 impl Response {
-    pub fn new(from: usize, size: usize) -> Self {
+    pub fn new(from: i64, size: i64) -> Self {
         Response {
             took: 0,
             took_detail: None,

@@ -17,13 +17,14 @@ use std::sync::Arc;
 
 use arrow::{
     array::{
-        make_builder, new_null_array, ArrayBuilder, ArrayRef, BooleanBuilder, Float64Builder,
-        Int64Builder, NullBuilder, StringBuilder, UInt64Builder,
+        make_builder, new_null_array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
+        Float64Array, Float64Builder, Int64Array, Int64Builder, NullBuilder, StringArray,
+        StringBuilder, UInt64Array, UInt64Builder,
     },
     record_batch::RecordBatch,
 };
 use arrow_schema::{ArrowError, DataType, Schema};
-use hashbrown::HashSet;
+use hashbrown::{HashMap, HashSet};
 
 use super::{json::get_string_value, schema_ext::SchemaExt};
 use crate::FxIndexMap;
@@ -215,7 +216,7 @@ pub fn convert_json_to_record_batch(
 }
 
 pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> RecordBatch {
-    if schema.fields() == batch.schema().fields() {
+    if schema.fields().is_empty() || schema.fields() == batch.schema().fields() {
         return batch;
     }
     let records_len = batch.num_rows();
@@ -227,16 +228,408 @@ pub fn format_recordbatch_by_schema(schema: Arc<Schema>, batch: RecordBatch) -> 
     let batch_fields = batch_schema
         .fields()
         .iter()
-        .map(|f| f.name())
-        .collect::<HashSet<_>>();
+        .map(|f| (f.name(), f.data_type()))
+        .collect::<HashMap<_, _>>();
 
     let mut cols: Vec<ArrayRef> = Vec::with_capacity(schema.fields().len());
     for field in schema.fields() {
-        if batch_fields.contains(field.name()) {
-            cols.push(batch.column_by_name(field.name()).unwrap().clone());
-        } else {
-            cols.push(new_null_array(field.data_type(), records_len))
+        match batch_fields.get(field.name()) {
+            Some(data_type) if *data_type == field.data_type() => {
+                cols.push(batch.column_by_name(field.name()).unwrap().clone());
+            }
+            Some(data_type) => {
+                let col = batch.column_by_name(field.name()).unwrap();
+                let mut builder = make_builder(field.data_type(), records_len);
+                match field.data_type() {
+                    DataType::Utf8 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<StringBuilder>()
+                            .unwrap();
+                        match data_type {
+                            DataType::Utf8 => {
+                                let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::Int64 => {
+                                let col = col.as_any().downcast_ref::<Int64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::UInt64 => {
+                                let col = col.as_any().downcast_ref::<UInt64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::Float64 => {
+                                let col = col.as_any().downcast_ref::<Float64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::Boolean => {
+                                let col = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).to_string());
+                                }
+                            }
+                            DataType::Null => {
+                                for _ in 0..records_len {
+                                    b.append_null();
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    DataType::Int64 => {
+                        let b = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                        match data_type {
+                            DataType::Utf8 => {
+                                let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
+                            DataType::Int64 => {
+                                let col = col.as_any().downcast_ref::<Int64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::UInt64 => {
+                                let col = col.as_any().downcast_ref::<UInt64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) as i64);
+                                }
+                            }
+                            DataType::Float64 => {
+                                let col = col.as_any().downcast_ref::<Float64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) as i64);
+                                }
+                            }
+                            DataType::Boolean => {
+                                let col = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) as i64);
+                                }
+                            }
+                            DataType::Null => {
+                                for _ in 0..records_len {
+                                    b.append_null();
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    DataType::UInt64 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<UInt64Builder>()
+                            .unwrap();
+                        match data_type {
+                            DataType::Utf8 => {
+                                let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
+                            DataType::Int64 => {
+                                let col = col.as_any().downcast_ref::<Int64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) as u64);
+                                }
+                            }
+                            DataType::UInt64 => {
+                                let col = col.as_any().downcast_ref::<UInt64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::Float64 => {
+                                let col = col.as_any().downcast_ref::<Float64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) as u64);
+                                }
+                            }
+                            DataType::Boolean => {
+                                let col = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) as u64);
+                                }
+                            }
+                            DataType::Null => {
+                                for _ in 0..records_len {
+                                    b.append_null();
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    DataType::Float64 => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<Float64Builder>()
+                            .unwrap();
+                        match data_type {
+                            DataType::Utf8 => {
+                                let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
+                            DataType::Int64 => {
+                                let col = col.as_any().downcast_ref::<Int64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) as f64);
+                                }
+                            }
+                            DataType::UInt64 => {
+                                let col = col.as_any().downcast_ref::<UInt64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) as f64);
+                                }
+                            }
+                            DataType::Float64 => {
+                                let col = col.as_any().downcast_ref::<Float64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::Boolean => {
+                                let col = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) as i64 as f64);
+                                }
+                            }
+                            DataType::Null => {
+                                for _ in 0..records_len {
+                                    b.append_null();
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    DataType::Boolean => {
+                        let b = builder
+                            .as_any_mut()
+                            .downcast_mut::<BooleanBuilder>()
+                            .unwrap();
+                        match data_type {
+                            DataType::Utf8 => {
+                                let col = col.as_any().downcast_ref::<StringArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i).parse().unwrap_or_default());
+                                }
+                            }
+                            DataType::Int64 => {
+                                let col = col.as_any().downcast_ref::<Int64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) > 0);
+                                }
+                            }
+                            DataType::UInt64 => {
+                                let col = col.as_any().downcast_ref::<UInt64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) > 0);
+                                }
+                            }
+                            DataType::Float64 => {
+                                let col = col.as_any().downcast_ref::<Float64Array>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i) > 0.0);
+                                }
+                            }
+                            DataType::Boolean => {
+                                let col = col.as_any().downcast_ref::<BooleanArray>().unwrap();
+                                for i in 0..records_len {
+                                    b.append_value(col.value(i));
+                                }
+                            }
+                            DataType::Null => {
+                                for _ in 0..records_len {
+                                    b.append_null();
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    DataType::Null => {
+                        builder
+                            .as_any_mut()
+                            .downcast_mut::<NullBuilder>()
+                            .unwrap()
+                            .append_null();
+                    }
+                    _ => {}
+                }
+                cols.push(builder.finish());
+            }
+            _ => cols.push(new_null_array(field.data_type(), records_len)),
         }
     }
     RecordBatch::try_new(schema, cols).unwrap()
+}
+
+#[cfg(test)]
+mod test {
+    use arrow::util::pretty::pretty_format_batches;
+    use arrow_schema::Field;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_format_recordbatch_by_schema() {
+        // Create a sample schema
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Float64, false),
+            Field::new("city", DataType::Utf8, true),
+        ]));
+
+        // Create a sample record batch
+        let name = StringArray::from(vec!["Alice", "Bob", "Charlie"]);
+        let age = Float64Array::from(vec![25.0, 30.0, 35.0]);
+        let city = StringArray::from(vec!["New York", "London", "Paris"]);
+        let record_batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(name.clone()) as ArrayRef,
+                Arc::new(age.clone()) as ArrayRef,
+                Arc::new(city.clone()) as ArrayRef,
+            ],
+        )
+        .unwrap();
+
+        // Format the record batch by the schema
+        let formatted_batch = format_recordbatch_by_schema(schema.clone(), record_batch);
+
+        // Assert that the formatted batch has the same schema as the input schema
+        assert_eq!(formatted_batch.schema(), schema);
+
+        // Assert that the formatted batch has the same number of rows as the input batch
+        assert_eq!(formatted_batch.num_rows(), 3);
+
+        // Assert that the formatted batch has the same data as the input batch
+        assert_eq!(
+            pretty_format_batches(&[formatted_batch])
+                .unwrap()
+                .to_string(),
+            "+---------+------+----------+
+| name    | age  | city     |
++---------+------+----------+
+| Alice   | 25.0 | New York |
+| Bob     | 30.0 | London   |
+| Charlie | 35.0 | Paris    |
++---------+------+----------+"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_format_recordbatch_by_schema_with_mismatch_schema() {
+        // Create a sample schema
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Float64, false),
+            Field::new("city", DataType::Utf8, true),
+        ]));
+
+        // Create a sample schema
+        let record_schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Utf8, false),
+            Field::new("city", DataType::Utf8, true),
+        ]));
+
+        // Create a sample record batch
+        let name = StringArray::from(vec!["Alice", "Bob", "Charlie"]);
+        let age = StringArray::from(vec!["25", "30", "35"]);
+        let city = StringArray::from(vec!["New York", "London", "Paris"]);
+        let record_batch = RecordBatch::try_new(
+            record_schema,
+            vec![
+                Arc::new(name.clone()) as ArrayRef,
+                Arc::new(age.clone()) as ArrayRef,
+                Arc::new(city.clone()) as ArrayRef,
+            ],
+        )
+        .unwrap();
+
+        // Format the record batch by the schema
+        let formatted_batch = format_recordbatch_by_schema(schema.clone(), record_batch);
+
+        // Assert that the formatted batch has the same schema as the input schema
+        assert_eq!(formatted_batch.schema(), schema);
+
+        // Assert that the formatted batch has the same number of rows as the input batch
+        assert_eq!(formatted_batch.num_rows(), 3);
+
+        // Assert that the formatted batch has the same data as the input batch
+        assert_eq!(
+            pretty_format_batches(&[formatted_batch])
+                .unwrap()
+                .to_string(),
+            "+---------+------+----------+
+| name    | age  | city     |
++---------+------+----------+
+| Alice   | 25.0 | New York |
+| Bob     | 30.0 | London   |
+| Charlie | 35.0 | Paris    |
++---------+------+----------+"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_format_recordbatch_by_schema_with_empty_schema() {
+        // Create a sample schema
+        let schema = Arc::new(Schema::empty());
+
+        // Create a sample schema
+        let record_schema = Arc::new(Schema::new(vec![
+            Field::new("name", DataType::Utf8, false),
+            Field::new("age", DataType::Utf8, false),
+            Field::new("city", DataType::Utf8, true),
+        ]));
+
+        // Create a sample record batch
+        let name = StringArray::from(vec!["Alice", "Bob", "Charlie"]);
+        let age = StringArray::from(vec!["25", "30", "35"]);
+        let city = StringArray::from(vec!["New York", "London", "Paris"]);
+        let record_batch = RecordBatch::try_new(
+            record_schema.clone(),
+            vec![
+                Arc::new(name.clone()) as ArrayRef,
+                Arc::new(age.clone()) as ArrayRef,
+                Arc::new(city.clone()) as ArrayRef,
+            ],
+        )
+        .unwrap();
+
+        // Format the record batch by the schema
+        let formatted_batch = format_recordbatch_by_schema(schema.clone(), record_batch);
+
+        // Assert that the formatted batch has the same schema as the input schema
+        assert_eq!(formatted_batch.schema(), record_schema);
+
+        // Assert that the formatted batch has the same number of rows as the input batch
+        assert_eq!(formatted_batch.num_rows(), 3);
+
+        // Assert that the formatted batch has the same data as the input batch
+        assert_eq!(
+            pretty_format_batches(&[formatted_batch])
+                .unwrap()
+                .to_string(),
+            "+---------+-----+----------+
+| name    | age | city     |
++---------+-----+----------+
+| Alice   | 25  | New York |
+| Bob     | 30  | London   |
+| Charlie | 35  | Paris    |
++---------+-----+----------+"
+        );
+    }
 }

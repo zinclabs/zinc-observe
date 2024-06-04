@@ -58,7 +58,7 @@ async fn get_bucket_by_key<'a>(
     let mut bucket = jetstream::kv::Config {
         bucket: format!("{}{}", prefix, bucket_name),
         num_replicas: cfg.nats.replicas,
-        history: 3,
+        history: cfg.nats.history,
         ..Default::default()
     };
     if bucket_name == "nodes" || bucket_name == "clusters" {

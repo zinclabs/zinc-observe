@@ -57,14 +57,13 @@ static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwr
 static RE_ONLY_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) from[ ]+query").unwrap());
 
 static RE_HISTOGRAM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
-static RE_MATCH_ALL: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all_raw\('([^']*)'\)").unwrap());
+static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
-static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
-static RE_MATCH_ALL_INDEXED_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_ignore_case\('([^']*)'\)").unwrap());
+static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)match_all_indexed\('([^']*)'\)").unwrap());
+static RE_MATCH_ALL_INDEXED_IGNORE_CASE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)match_all_indexed_ignore_case\('([^']*)'\)").unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -337,13 +336,13 @@ impl Sql {
 
         // Hack offset limit and sort by for sql
         if meta.limit == 0 {
-            meta.offset = req_query.from as usize;
-            meta.limit = req_query.size as usize;
-            if meta.limit == 0 && sql_mode.eq(&SqlMode::Full) {
-                // sql mode context, allow limit 0, used to no hits, but return aggs
-                // sql mode full, disallow without limit, default limit 1000
-                meta.limit = cfg.limit.query_full_mode_limit;
-            }
+            meta.offset = req_query.from as i64;
+            // If `size` is negative, use the backend's default limit setting
+            meta.limit = if req_query.size >= 0 {
+                req_query.size as i64
+            } else {
+                cfg.limit.query_default_limit
+            };
             origin_sql = if meta.order_by.is_empty()
                 && (!sql_mode.eq(&SqlMode::Full)
                     || (meta.group_by.is_empty()

@@ -68,13 +68,13 @@ export const convertPanelData = async (
         // chartpanelref will be used to get width and height of the chart element from DOM
         return {
           chartType: panelSchema.type,
-          ...convertSQLData(
+          ...(await convertSQLData(
             panelSchema,
             data,
             store,
             chartPanelRef,
             hoveredSeriesState
-          ),
+          )),
         };
       }
     }

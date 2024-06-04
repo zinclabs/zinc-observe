@@ -90,7 +90,7 @@ import { defineComponent, ref, toRef, watch, computed } from "vue";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 
 export default defineComponent({
-  name: "VariableQueryValueSelector",
+  name: "VariableCustomValueSelector",
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
@@ -143,18 +143,14 @@ export default defineComponent({
             const firstTwoValues = selectedValue.value.slice(0, 2).join(", ");
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
-          } else if (props.variableItem.options.length == 0) {
-            return "(No Data Found)";
           } else {
             return selectedValue.value.join(", ");
           }
-        } else if (selectedValue.value == "") {
-          return "<blank>";
         } else {
           return selectedValue.value;
         }
       } else if (!props.variableItem.isLoading) {
-        return "(No Data Found)";
+        return "(No Options Available)";
       } else {
         return "";
       }

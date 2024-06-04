@@ -1614,6 +1614,8 @@ export default defineComponent({
               extractedObj.data.stream.streamType = "logs";
             }
 
+            delete searchObj.data.queryResults.aggs;
+
             if (
               searchObj.data.stream.streamType ==
               extractedObj.data.stream.streamType

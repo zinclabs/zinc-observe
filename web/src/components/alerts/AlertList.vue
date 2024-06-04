@@ -387,6 +387,8 @@ export default defineComponent({
                 .join(" AND ");
             } else if (data.query_condition.sql) {
               conditions = data.query_condition.sql;
+            } else if (data.query_condition.promql) {
+              conditions = data.query_condition.promql;
             }
             if (conditions.length > 50) {
               conditions = conditions.substring(0, 32) + "...";

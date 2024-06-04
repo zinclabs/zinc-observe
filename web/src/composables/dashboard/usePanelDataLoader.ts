@@ -65,11 +65,15 @@ export const usePanelDataLoader = (
         JSON.stringify(
           variablesData.value?.values
             ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
-            ?.filter((it: any) =>
-              panelSchema.value.queries
-                ?.map((q: any) => q?.query?.includes(`$${it.name}`))
-                ?.includes(true)
-            )
+            ?.filter((it: any) => {
+              const regexForVariable = new RegExp(
+                `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`
+              );
+
+              return panelSchema.value.queries
+                ?.map((q: any) => regexForVariable.test(q?.query))
+                ?.includes(true);
+            })
         )
       )
     : [];
@@ -304,7 +308,7 @@ export const usePanelDataLoader = (
                     sql_mode: "full",
                     start_time: startISOTimestamp,
                     end_time: endISOTimestamp,
-                    size: 0,
+                    size: -1,
                   },
                 },
                 page_type: pageType,
@@ -438,15 +442,63 @@ export const usePanelDataLoader = (
     if (currentDependentVariablesData?.length) {
       currentDependentVariablesData?.forEach((variable: any) => {
         const variableName = `$${variable.name}`;
-        const variableValue = variable.value === null ? "" : variable.value;
-        if (query.includes(variableName)) {
-          metadata.push({
-            type: "variable",
-            name: variable.name,
-            value: variable.value,
+
+        let variableValue = "";
+        if (Array.isArray(variable.value)) {
+          const value = variable.value
+            .map((value: any) => `'${value}'`)
+            .join(",");
+          const possibleVariablesPlaceHolderTypes = [
+            {
+              placeHolder: `\${${variable.name}:csv}`,
+              value: variable.value.join(","),
+            },
+            {
+              placeHolder: `\${${variable.name}:pipe}`,
+              value: variable.value.join("|"),
+            },
+            {
+              placeHolder: `\${${variable.name}:doublequote}`,
+              value: variable.value.map((value: any) => `"${value}"`).join(","),
+            },
+            {
+              placeHolder: `\${${variable.name}:singlequote}`,
+              value: value,
+            },
+            {
+              placeHolder: `\${${variable.name}}`,
+              value: queryType === "sql" ? value : variable.value.join("|"),
+            },
+            {
+              placeHolder: `\$${variable.name}`,
+              value: queryType === "sql" ? value : variable.value.join("|"),
+            },
+          ];
+
+          possibleVariablesPlaceHolderTypes.forEach((placeHolderObj) => {
+            if (query.includes(placeHolderObj.placeHolder)) {
+              metadata.push({
+                type: "variable",
+                name: variable.name,
+                value: placeHolderObj.value,
+              });
+            }
+            query = query.replaceAll(
+              placeHolderObj.placeHolder,
+              placeHolderObj.value
+            );
           });
+        } else {
+          variableValue = variable.value === null ? "" : variable.value;
+          if (query.includes(variableName)) {
+            metadata.push({
+              type: "variable",
+              name: variable.name,
+              value: variable.value,
+            });
+          }
+          query = query.replaceAll(variableName, variableValue);
         }
-        query = query.replaceAll(variableName, variableValue);
       });
 
       return { query, metadata };
@@ -609,11 +661,15 @@ export const usePanelDataLoader = (
   const getDependentVariablesData = () =>
     variablesData.value?.values
       ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
-      ?.filter((it: any) =>
-        panelSchema.value.queries
-          ?.map((q: any) => q?.query?.includes(`$${it.name}`))
-          ?.includes(true)
-      );
+      ?.filter((it: any) => {
+        const regexForVariable = new RegExp(
+          `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`
+        );
+
+        return panelSchema.value.queries
+          ?.map((q: any) => regexForVariable.test(q?.query))
+          ?.includes(true);
+      });
 
   const getDynamicVariablesData = () => {
     const sqlQueryStreams =
@@ -648,6 +704,27 @@ export const usePanelDataLoader = (
     );
   };
 
+  const areArraysEqual = (array1: any, array2: any) => {
+    // Check if both arrays have the same length
+    if (array1?.length !== array2?.length) {
+      return false;
+    }
+
+    // Sort both arrays
+    const sortedArray1 = array1?.slice().sort();
+    const sortedArray2 = array2?.slice().sort();
+
+    // Compare sorted arrays element by element
+    for (let i = 0; i < sortedArray1?.length; i++) {
+      if (sortedArray1[i] !== sortedArray2[i]) {
+        return false;
+      }
+    }
+
+    // If all elements are equal, return true
+    return true;
+  };
+
   const isAllRegularVariablesValuesSameWith = (
     newDependentVariablesData: any
   ) =>
@@ -655,7 +732,10 @@ export const usePanelDataLoader = (
       const oldValue = currentDependentVariablesData.find(
         (it2: any) => it2.name == it.name
       );
-      return it.value == oldValue?.value && oldValue?.value != "";
+      // return it.value == oldValue?.value && oldValue?.value != "";
+      return it.multiSelect
+        ? areArraysEqual(it.value, oldValue?.value)
+        : it.value == oldValue?.value && oldValue?.value != "";
     });
 
   const isAllDynamicVariablesValuesSameWith = (newDynamicVariablesData: any) =>
@@ -720,14 +800,14 @@ export const usePanelDataLoader = (
     // so we need to fire the query
     log("Step3: checking if no of variables have changed, starting...");
 
-    // log(
-    //   "Step3: newDependentVariablesData,",
-    //   JSON.stringify(newDependentVariablesData, null, 2)
-    // );
-    // log(
-    //   "Step3: newDynamicVariablesData...",
-    //   JSON.stringify(newDynamicVariablesData, null, 2)
-    // );
+    log(
+      "Step3: newDependentVariablesData,",
+      JSON.stringify(newDependentVariablesData, null, 2)
+    );
+    log(
+      "Step3: newDynamicVariablesData...",
+      JSON.stringify(newDynamicVariablesData, null, 2)
+    );
 
     // if the length of the any of the regular and old dynamic data has changed,
     // we need to fire the query

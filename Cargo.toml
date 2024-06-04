@@ -172,7 +172,14 @@ base64 = "0.21"
 float-cmp = "0.9"
 
 [workspace]
-members = ["src/config", "src/infra", "src/ingester", "src/wal", "src/proto", "src/report_server"]
+members = [
+  "src/config",
+  "src/infra",
+  "src/ingester",
+  "src/wal",
+  "src/proto",
+  "src/report_server",
+]
 resolver = "2"
 
 [workspace.package]
@@ -210,7 +217,7 @@ cityhasher = { version = "0.1", default-features = false }
 dashmap = { version = "5.5", features = ["serde"] }
 datafusion = "38"
 datafusion-expr = "38"
-arrow = { version = "51.0.0", features = ["ipc_compression"] }
+arrow = { version = "51.0.0", features = ["ipc_compression", "prettyprint"] }
 arrow-json = "51.0.0"
 arrow-schema = { version = "51.0.0", features = ["serde"] }
 parquet = { version = "51.0.0", features = ["arrow", "async", "object_store"] }

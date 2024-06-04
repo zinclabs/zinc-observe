@@ -422,6 +422,14 @@ export default defineComponent({
 
     // drilldown
     const replacePlaceholders = (str: any, obj: any) => {
+      // if the str is same as the key, return it's value(it can be an string or array).
+      for (const key in obj) {
+        // ${varName} == str
+        if (`\$\{${key}\}` == str) {
+          return obj[key];
+        }
+      }
+
       return str.replace(/\$\{([^}]+)\}/g, function (_: any, key: any) {
         // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
         let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
