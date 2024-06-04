@@ -24,7 +24,7 @@ use crate::{
         infra::config::SYSLOG_ENABLED,
         meta::{organization::DEFAULT_ORG, user::UserRequest},
     },
-    service::{compact::stats::update_stats_from_file_list, db, users},
+    service::{compact::stats::update_stats_from_file_list, db, usage, users},
 };
 
 mod alert_manager;
@@ -94,6 +94,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if cfg.common.telemetry_enabled && cluster::is_querier(&cluster::LOCAL_NODE_ROLE) {
         tokio::task::spawn(async move { telemetry::run().await });
     }
+
+    tokio::task::spawn(async move { usage::run().await });
 
     // initialize metadata watcher
     tokio::task::spawn(async move { db::schema::watch().await });

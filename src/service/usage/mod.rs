@@ -35,7 +35,7 @@ use o2_enterprise::enterprise::common::auditor;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc;
 use reqwest::Client;
-use tokio::sync::RwLock;
+use tokio::{sync::RwLock, time};
 
 pub mod ingestion_service;
 pub mod stats;
@@ -44,12 +44,6 @@ pub static USAGE_DATA: Lazy<Arc<RwLock<Vec<UsageData>>>> =
     Lazy::new(|| Arc::new(RwLock::new(vec![])));
 pub static TRIGGERS_USAGE_DATA: Lazy<Arc<RwLock<Vec<TriggerData>>>> =
     Lazy::new(|| Arc::new(RwLock::new(vec![])));
-
-pub static LAST_PUBLISHED_USAGE: Lazy<Arc<RwLock<i64>>> =
-    Lazy::new(|| Arc::new(RwLock::new(Utc::now().timestamp())));
-
-pub static LAST_PUBLISHED_TRIGGERS: Lazy<Arc<RwLock<i64>>> =
-    Lazy::new(|| Arc::new(RwLock::new(Utc::now().timestamp())));
 
 pub async fn report_request_usage_stats(
     stats: RequestStats,
@@ -145,15 +139,9 @@ pub async fn publish_usage(mut usage: Vec<UsageData>) {
     let mut usages = USAGE_DATA.write().await;
     usages.append(&mut usage);
 
-    let current_ts = Utc::now().timestamp();
-    let r = LAST_PUBLISHED_USAGE.read().await;
-    let last_published = *r;
-    if usages.len() < get_config().common.usage_batch_size
-        && current_ts - last_published < get_config().common.usage_publish_interval
-    {
+    if usages.len() < get_config().common.usage_batch_size {
         return;
     }
-    drop(r);
 
     let curr_usages = std::mem::take(&mut *usages);
     // release the write lock
@@ -171,16 +159,9 @@ pub async fn publish_triggers_usage(trigger: TriggerData) {
     let mut usages = TRIGGERS_USAGE_DATA.write().await;
     usages.push(trigger);
 
-    let current_ts = Utc::now().timestamp();
-    let r = LAST_PUBLISHED_TRIGGERS.read().await;
-    let last_published = *r;
-
-    if usages.len() < cfg.common.usage_batch_size
-        && current_ts - last_published < cfg.common.usage_publish_interval
-    {
+    if usages.len() < cfg.common.usage_batch_size {
         return;
     }
-    drop(r);
 
     let curr_usages = std::mem::take(&mut *usages);
     // release the write lock
@@ -334,9 +315,6 @@ async fn ingest_usages(curr_usages: Vec<UsageData>) {
             drop(usages);
         }
     }
-    let mut w = LAST_PUBLISHED_USAGE.write().await;
-    *w = Utc::now().timestamp();
-    drop(w);
 }
 
 async fn ingest_trigger_usages(curr_usages: Vec<TriggerData>) {
@@ -363,9 +341,52 @@ async fn ingest_trigger_usages(curr_usages: Vec<TriggerData>) {
         usages.append(&mut curr_usages);
         drop(usages);
     }
-    let mut w = LAST_PUBLISHED_TRIGGERS.write().await;
-    *w = Utc::now().timestamp();
-    drop(w);
+}
+
+async fn publish_existing_usage() {
+    let mut usages = USAGE_DATA.write().await;
+    log::debug!("publishing usage reports,len: {}", usages.len());
+    if usages.is_empty() {
+        return;
+    }
+
+    let curr_usages = std::mem::take(&mut *usages);
+    // release the write lock
+    drop(usages);
+
+    ingest_usages(curr_usages).await
+}
+
+async fn publish_existing_triggers_usage() {
+    let mut usages = TRIGGERS_USAGE_DATA.write().await;
+    log::debug!("publishing triggers usage reports,len: {}", usages.len());
+
+    if usages.is_empty() {
+        return;
+    }
+
+    let curr_usages = std::mem::take(&mut *usages);
+    // release the write lock
+    drop(usages);
+
+    ingest_trigger_usages(curr_usages).await
+}
+
+pub async fn run() {
+    let cfg = get_config();
+    if !cfg.common.usage_enabled {
+        return;
+    }
+    let mut usage_interval = time::interval(time::Duration::from_secs(
+        cfg.common.usage_publish_interval.try_into().unwrap(),
+    ));
+    usage_interval.tick().await; // trigger the first run
+    loop {
+        log::debug!("Usage ingestion loop running");
+        usage_interval.tick().await;
+        publish_existing_usage().await;
+        publish_existing_triggers_usage().await;
+    }
 }
 
 #[cfg(feature = "enterprise")]
