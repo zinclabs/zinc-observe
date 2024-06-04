@@ -2241,6 +2241,11 @@ const useLogs = () => {
     const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
     const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
     let endCount;
+    let eventTotalPlus = "";
+
+    if (searchObj.data.queryResults.partitionDetail.paginations.length > 1) {
+      eventTotalPlus = "+";
+    }
 
     let totalCount = searchObj.data.queryResults.total || 0;
     if (searchObj.meta.resultGrid.showPagination == false) {

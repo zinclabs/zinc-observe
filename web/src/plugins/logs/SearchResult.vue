@@ -101,7 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <h6 class="text-center" v-if="searchObj.data.histogram.errorCode != 0">
-          <q-icon name="warning" color="warning" size="30px"></q-icon> Error
+          <q-icon name="warning"
+color="warning" size="30px"></q-icon> Error
           while fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
@@ -138,10 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :style="{
           wordBreak: 'break-word',
-          height:
-            !searchObj.meta.showHistogram
-              ? 'calc(100% - 40px)'
-              : 'calc(100% - 140px)',
+          height: !searchObj.meta.showHistogram
+            ? 'calc(100% - 40px)'
+            : 'calc(100% - 140px)',
         }"
       >
         <template v-slot:before>
@@ -215,13 +215,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </th>
             </tr>
-            <tr v-if="searchObj.loading == true">
+            <tr
+              v-if="searchObj.loading == true"
+              class="logs-search-result-loading"
+            >
               <td
                 :colspan="searchObj.data.resultGrid.columns.length"
-                class="text-bold"
-                style="opacity: 0.7"
+                class="text-bold rounded-borders bg-primary text-white"
               >
-                <div class="text-subtitle2 text-weight-bold">
+                <div>
                   <q-spinner-hourglass size="20px" />
                   {{ t("confirmDialog.loading") }}
                 </div>
@@ -978,6 +980,11 @@ export default defineComponent({
     top: 7px;
     position: relative;
     height: 30px;
+  }
+
+  .logs-search-result-loading {
+    position: absolute;
+    width: 100%;
   }
 }
 </style>
