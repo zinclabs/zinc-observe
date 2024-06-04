@@ -1191,7 +1191,7 @@ export default defineComponent({
           if (searchObj.data.parsedQuery?.from?.length > 0) {
             if (
               searchObj.data.parsedQuery.from[0].table !==
-                searchObj.data.stream.selectedStream.value &&
+                searchObj.data.stream.selectedStream.length > 0 &&
               searchObj.data.parsedQuery.from[0].table !== streamName
             ) {
               let streamFound = false;
@@ -1261,7 +1261,7 @@ export default defineComponent({
           value: value,
           //user_org: this.store.state.selectedOrganization.identifier,
           //user_id: this.store.state.userInfo.email,
-          stream_name: searchObj.data.stream.selectedStream.value,
+          stream_name: searchObj.data.stream.selectedStream.join(","),
           page: "Search Logs",
         });
       }
