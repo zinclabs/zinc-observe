@@ -85,6 +85,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('common.attributes')"
       style="text-transform: capitalize"
     />
+    <q-tab
+      name="logs"
+      :label="t('common.logs')"
+      style="text-transform: capitalize"
+    />
   </q-tabs>
   <q-separator style="width: 100%" />
   <q-tab-panels v-model="activeTab" class="span_details_tab-panels">

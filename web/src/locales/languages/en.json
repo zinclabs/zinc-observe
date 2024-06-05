@@ -54,7 +54,8 @@
     "expand": "Expand",
     "date": "Date",
     "description": "Description",
-    "cancelChanges": "Cancel Changes"
+    "cancelChanges": "Cancel Changes",
+    "logs": "Logs"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -879,5 +880,8 @@
     "cancelQuery": "Cancel Query",
     "queryRange": "Query Range",
     "refreshQuery": "Refresh Query"
+  },
+  "traces": {
+    "viewLogs": "View Logs"
   }
 }

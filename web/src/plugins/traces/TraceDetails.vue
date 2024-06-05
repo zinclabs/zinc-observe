@@ -26,10 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="row q-px-sm"
       v-if="traceTree.length && !searchObj.data.traceDetails.loading"
     >
-      <div
-        class="q-py-sm q-px-sm flex items-end justify-between col-12 toolbar"
-      >
-        <div class="flex items-end justify-start">
+      <div class="full-width flex items-center toolbar flex justify-between">
+        <div class="flex items-center">
           <div class="text-h6 q-mr-lg">
             {{ traceTree[0]["operationName"] }}
           </div>
@@ -44,12 +42,92 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div class="q-pb-xs">Spans: {{ spanList.length }}</div>
+          <div class="q-pb-xs q-mr-lg">Spans: {{ spanList.length }}</div>
+
+          <div class="q-pb-xs q-mr-lg cursor-pointer flex items-center">
+            <q-icon :name="outlinedInfo" class="q-mr-xs" size="16px" />
+            Trace Details
+          </div>
+
+          <div class="o2-input flex items-center trace-logs-selector">
+            <q-select
+              data-test="log-search-index-list-select-stream"
+              v-model="selectedLogStreams"
+              :label="selectedLogStreams.length ? '' : t('search.selectIndex')"
+              :options="filteredStreamOptions"
+              data-cy="stream-selection"
+              input-debounce="0"
+              behavior="menu"
+              filled
+              multiple
+              borderless
+              dense
+              fill-input
+              :title="selectedStreamsString"
+              @update:model-value="onStreamChange('')"
+            >
+              <template #no-option>
+                <div class="o2-input log-stream-search-input">
+                  <q-input
+                    data-test="alert-list-search-input"
+                    v-model="streamSearchValue"
+                    borderless
+                    filled
+                    debounce="500"
+                    autofocus
+                    dense
+                    size="xs"
+                    @update:model-value="filterStreamFn"
+                    class="q-ml-auto q-mb-xs no-border q-pa-xs"
+                    :placeholder="t('search.searchStream')"
+                  >
+                    <template #prepend>
+                      <q-icon name="search" class="cursor-pointer" />
+                    </template>
+                  </q-input>
+                </div>
+                <q-item>
+                  <q-item-section> {{ t("search.noResult") }}</q-item-section>
+                </q-item>
+              </template>
+              <template #before-options>
+                <div class="o2-input log-stream-search-input">
+                  <q-input
+                    data-test="alert-list-search-input"
+                    v-model="streamSearchValue"
+                    borderless
+                    debounce="500"
+                    filled
+                    dense
+                    autofocus
+                    @update:model-value="filterStreamFn"
+                    class="q-ml-auto q-mb-xs no-border q-pa-xs"
+                    :placeholder="t('search.searchStream')"
+                  >
+                    <template #prepend>
+                      <q-icon name="search" class="cursor-pointer" />
+                    </template>
+                  </q-input>
+                </div>
+              </template>
+            </q-select>
+            <q-btn
+              data-test="trace-view-logs-btn"
+              v-close-popup="true"
+              class="text-bold traces-view-logs-btn"
+              :label="t('traces.viewLogs')"
+              text-color="light-text"
+              padding="sm md"
+              size="sm"
+              no-caps
+              @click="redirectToLogs"
+            />
+          </div>
         </div>
         <div class="flex items-center">
           <q-btn
             data-test="logs-search-bar-share-link-btn"
-            class="q-mr-sm download-logs-btn q-px-sm"
+            class="q-mr-sm download-logs-btn"
             size="sm"
             icon="share"
             round
@@ -61,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn v-close-popup="true" round flat icon="cancel" size="md" />
         </div>
       </div>
+
       <q-separator style="width: 100%" />
       <div class="col-12 flex justify-between items-end q-pr-sm q-pt-sm">
         <div
@@ -195,6 +274,7 @@ import {
   onMounted,
   watch,
   defineAsyncComponent,
+  onBeforeMount,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
@@ -214,6 +294,10 @@ import {
 import { throttle } from "lodash-es";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import useStreams from "@/composables/useStreams";
+import { b64EncodeUnicode } from "@/utils/zincutils";
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -247,6 +331,7 @@ export default defineComponent({
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
     const traceServiceMap: any = ref({});
+    const { getStreams } = useStreams();
     const spanDimensions = {
       height: 30,
       barHeight: 8,
@@ -262,9 +347,19 @@ export default defineComponent({
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
 
+    const logStreams = ref([]);
+
+    const filteredStreamOptions = ref([]);
+
+    const selectedLogStreams = ref([]);
+
+    const streamSearchValue = ref("");
+
     const { t } = useI18n();
 
     const $q = useQuasar();
+
+    const router = useRouter();
 
     const traceVisuals = [
       { label: "Timeline", value: "timeline", icon: TraceTimelineIcon },
@@ -290,6 +385,23 @@ export default defineComponent({
     });
 
     const isTimelineExpanded = ref(false);
+
+    const selectedStreamsString = computed(() =>
+      selectedLogStreams.value.join(", ")
+    );
+
+    onBeforeMount(() => {
+      getStreams("logs", false)
+        .then((res: any) => {
+          logStreams.value = res.list.map((option: any) => option.name);
+          filteredStreamOptions.value = JSON.parse(
+            JSON.stringify(logStreams.value)
+          );
+          selectedLogStreams.value.push(logStreams.value[0]);
+        })
+        .catch(() => Promise.reject())
+        .finally(() => {});
+    });
 
     onMounted(() => {
       buildTracesTree();
@@ -722,6 +834,41 @@ export default defineComponent({
       emit("shareLink");
     };
 
+    const redirectToLogs = () => {
+      const stream: string = selectedLogStreams.value.join(",");
+      const from =
+        searchObj.data.traceDetails.selectedTrace.trace_start_time - 30000000;
+      const to =
+        searchObj.data.traceDetails.selectedTrace.trace_end_time + 30000000;
+      const refresh = 0;
+      const query = b64EncodeUnicode(
+        `trace_id='${spanList.value[0]["trace_id"]}'`
+      );
+
+      router.push({
+        path: "/logs",
+        query: {
+          stream_type: "logs",
+          stream,
+          from,
+          to,
+          refresh,
+          sql_mode: "false",
+          query,
+          org_identifier: store.state.selectedOrganization.identifier,
+          show_histogram: "true",
+          type: "trace_explorer",
+          quick_mode: "false",
+        },
+      });
+    };
+
+    const filterStreamFn = (val: string) => {
+      filteredStreamOptions.value = logStreams.value.filter((stream: any) => {
+        return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
+      });
+    };
+
     return {
       t,
       traceTree,
@@ -754,6 +901,13 @@ export default defineComponent({
       copyToClipboard,
       copyTraceId,
       shareLink,
+      outlinedInfo,
+      redirectToLogs,
+      filteredStreamOptions,
+      selectedLogStreams,
+      filterStreamFn,
+      streamSearchValue,
+      selectedStreamsString,
     };
   },
 });
@@ -824,6 +978,14 @@ $traceChartCollapseHeight: 42px;
     }
   }
 }
+
+.log-stream-search-input {
+  width: 226px;
+
+  .q-field .q-field__control {
+    padding: 0px 8px;
+  }
+}
 </style>
 <style lang="scss">
 .trace-details {
@@ -868,5 +1030,31 @@ $traceChartCollapseHeight: 42px;
       text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
     }
   }
+}
+
+.trace-logs-selector {
+  .q-field {
+    span {
+      display: inline-block;
+      width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: left;
+    }
+  }
+}
+
+.log-stream-search-input {
+  .q-field .q-field__control {
+    padding: 0px 4px;
+  }
+}
+
+.traces-view-logs-btn {
+  height: 36px;
+  margin-left: -1px;
+  border-top-left-radius: 0px;
+  border-bottom-left-radius: 0px;
 }
 </style>
