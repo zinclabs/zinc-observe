@@ -89,7 +89,7 @@ pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
     Ok(json::from_slice::<DBUser>(&val).unwrap())
 }
 
-pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
+pub async fn set(user: &DBUser) -> Result<(), anyhow::Error> {
     let key = format!("/user/{}", user.email);
     db::put(
         &key,
@@ -100,25 +100,26 @@ pub async fn set(user: DBUser) -> Result<(), anyhow::Error> {
     .await?;
 
     // cache user
-    for org in user.organizations {
+    for org in &user.organizations {
         let user = User {
             email: user.email.clone(),
             first_name: user.first_name.clone(),
             last_name: user.last_name.clone(),
             password: user.password.clone(),
-            role: org.role,
+            role: org.role.clone(),
             org: org.name.clone(),
-            token: org.token,
+            token: org.token.clone(),
             rum_token: org.rum_token.clone(),
             salt: user.salt.clone(),
             is_external: user.is_external,
+            password_ext: user.password_ext.clone(),
         };
         USERS.insert(
             format!("{}/{}", org.name.clone(), user.email.clone()),
             user.clone(),
         );
 
-        if let Some(rum_token) = org.rum_token {
+        if let Some(rum_token) = &org.rum_token {
             USERS_RUM_TOKEN
                 .clone()
                 .insert(format!("{}/{}", org.name.clone(), rum_token), user);
@@ -299,7 +300,7 @@ mod tests {
     async fn test_user() {
         let org_id = "dummy".to_string();
         let email = "user3@example.com";
-        let resp = set(DBUser {
+        let resp = set(&DBUser {
             email: email.to_string(),
             password: "pass".to_string(),
             salt: String::from("sdfjshdkfshdfkshdfkshdfkjh"),
@@ -312,6 +313,7 @@ mod tests {
                 token: "Abcd".to_string(),
                 rum_token: Some("rumAbcd".to_string()),
             }],
+            password_ext: Some("pass".to_string()),
         })
         .await;
         assert!(resp.is_ok());

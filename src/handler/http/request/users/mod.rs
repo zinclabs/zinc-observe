@@ -20,6 +20,7 @@ use actix_web::{
     http::{self},
     post, put, web, HttpRequest, HttpResponse,
 };
+use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{
     get_config,
     utils::{base64, json},
@@ -35,7 +36,7 @@ use crate::{
                 UserRequest, UserRole,
             },
         },
-        utils::auth::UserEmail,
+        utils::auth::{generate_presigned_url, UserEmail},
     },
     service::users,
 };
@@ -304,87 +305,180 @@ pub async fn authentication(
     }
 }
 
+#[derive(serde::Deserialize)]
+struct PresignedURLGenerator {
+    #[serde(default = "default_exp_in")]
+    exp_in: u32,
+}
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct PresignedURLGeneratorResponse {
+    url: String,
+}
+
+const fn default_exp_in() -> u32 {
+    600
+}
+
+#[get("/presigned-url")]
+pub async fn get_presigned_url(
+    _req: HttpRequest,
+    basic_auth: BasicAuth,
+    query: web::Query<PresignedURLGenerator>,
+) -> Result<HttpResponse, Error> {
+    let cfg = get_config();
+    let time = chrono::Utc::now().timestamp();
+    let password_ext_salt = cfg.auth.ext_auth_salt.as_str();
+    let url = generate_presigned_url(
+        basic_auth.user_id(),
+        basic_auth.password().unwrap(),
+        password_ext_salt,
+        &cfg.common.base_uri,
+        query.exp_in as i64,
+        time,
+    );
+
+    let payload = PresignedURLGeneratorResponse { url };
+    Ok(HttpResponse::Ok().json(&payload))
+}
+
 #[get("/login")]
 pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
     #[cfg(feature = "enterprise")]
     {
         use actix_web::http::header;
+        use chrono::Utc;
 
-        use crate::handler::http::auth::validator::ID_TOKEN_HEADER;
+        use crate::{
+            common::meta::user::AuthTokensExt, handler::http::auth::validator::ID_TOKEN_HEADER,
+        };
 
-        let cfg = get_config();
         let mut resp = SignInResponse::default();
-        if let Some(auth_header) = _req.headers().get("Authorization") {
-            if let Ok(auth_header) = auth_header.to_str() {
-                if let Some((name, password)) =
-                    o2_enterprise::enterprise::dex::service::auth::get_user_from_token(auth_header)
-                {
-                    match crate::handler::http::auth::validator::validate_user(&name, &password)
-                        .await
-                    {
-                        Ok(v) => {
-                            if v.is_valid {
-                                resp.status = true;
-                            } else {
-                                return unauthorized_error(resp);
-                            }
-                        }
-                        Err(_) => {
-                            return unauthorized_error(resp);
-                        }
-                    };
 
-                    if resp.status {
-                        let access_token = format!(
-                            "Basic {}",
-                            base64::encode(&format!("{}:{}", &name, &password))
-                        );
+        let query = web::Query::<std::collections::HashMap<String, String>>::from_query(
+            _req.query_string(),
+        )
+        .unwrap();
 
-                        let id_token = config::utils::json::json!({
-                            "email": name,
-                            "name": name,
-                        });
-                        let tokens = json::to_string(&AuthTokens {
-                            access_token,
-                            refresh_token: "".to_string(),
-                        })
-                        .unwrap();
+        let mut request_time = None;
+        let mut expires_in = 300;
+        let mut req_ts = 0;
 
-                        let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
-                        auth_cookie.set_expires(
-                            cookie::time::OffsetDateTime::now_utc()
-                                + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
-                        );
-                        auth_cookie.set_http_only(true);
-                        auth_cookie.set_secure(cfg.auth.cookie_secure_only);
-                        auth_cookie.set_path("/");
-
-                        if cfg.auth.cookie_same_site_lax {
-                            auth_cookie.set_same_site(cookie::SameSite::Lax);
-                        } else {
-                            auth_cookie.set_same_site(cookie::SameSite::None);
-                        }
-                        let url = format!(
-                            "{}{}/web/cb#id_token={}.{}",
-                            cfg.common.web_url,
-                            cfg.common.base_uri,
-                            ID_TOKEN_HEADER,
-                            base64::encode(&id_token.to_string())
-                        );
-                        return Ok(HttpResponse::Found()
-                            .append_header((header::LOCATION, url))
-                            .cookie(auth_cookie)
-                            .json(resp));
+        let auth_header = if let Some(s) = query.get("auth") {
+            match query.get("request_time") {
+                Some(req_time_str) => {
+                    if let Ok(ts) = config::utils::time::parse_str_to_time(req_time_str) {
+                        req_ts = ts.timestamp();
                     } else {
-                        unauthorized_error(resp)
+                        return unauthorized_error(resp);
                     }
-                } else {
-                    unauthorized_error(resp)
+                    request_time = Some(req_time_str);
                 }
+                None => {
+                    return unauthorized_error(resp);
+                }
+            };
+
+            match query.get("exp_in") {
+                Some(exp_in_str) => {
+                    expires_in = exp_in_str.parse::<i64>().unwrap();
+                }
+                None => {
+                    return unauthorized_error(resp);
+                }
+            };
+            if Utc::now().timestamp() - req_ts > expires_in {
+                return unauthorized_error(resp);
+            }
+            println!("Is the token set {}", s);
+            format!("q_auth {}", s)
+        } else if let Some(auth_header) = _req.headers().get("Authorization") {
+            match auth_header.to_str() {
+                Ok(auth_header_str) => auth_header_str.to_string(),
+                Err(_) => {
+                    return unauthorized_error(resp);
+                }
+            }
+        } else {
+            return unauthorized_error(resp);
+        };
+
+        log::info!(
+            "Auth header before fetching user from token: {}",
+            auth_header
+        );
+        if let Some((name, password)) =
+            o2_enterprise::enterprise::dex::service::auth::get_user_from_token(&auth_header)
+        {
+            match crate::handler::http::auth::validator::validate_user_for_query_params(
+                &name,
+                &password,
+                request_time,
+                expires_in,
+            )
+            .await
+            {
+                Ok(v) => {
+                    if v.is_valid {
+                        resp.status = true;
+                    } else {
+                        return unauthorized_error(resp);
+                    }
+                }
+                Err(_) => {
+                    return unauthorized_error(resp);
+                }
+            };
+
+            if resp.status {
+                let cfg = get_config();
+                let auth_ext = format!(
+                    "auth_ext {}",
+                    base64::encode(&format!("{}:{}", &name, &password))
+                );
+
+                let id_token = config::utils::json::json!({
+                    "email": name,
+                    "name": name,
+                });
+                let tokens = json::to_string(&AuthTokensExt {
+                    auth_ext,
+                    refresh_token: "".to_string(),
+                    request_time: req_ts,
+                    expires_in,
+                })
+                .unwrap();
+
+                let mut auth_cookie = cookie::Cookie::new("auth_ext", tokens);
+                auth_cookie.set_expires(
+                    cookie::time::OffsetDateTime::now_utc()
+                        + cookie::time::Duration::seconds(req_ts),
+                );
+                auth_cookie.set_http_only(true);
+                auth_cookie.set_secure(cfg.auth.cookie_secure_only);
+                auth_cookie.set_path("/");
+
+                if cfg.auth.cookie_same_site_lax {
+                    auth_cookie.set_same_site(cookie::SameSite::Lax);
+                } else {
+                    auth_cookie.set_same_site(cookie::SameSite::None);
+                }
+                let url = format!(
+                    "{}{}/web/cb#id_token={}.{}",
+                    cfg.common.web_url,
+                    cfg.common.base_uri,
+                    ID_TOKEN_HEADER,
+                    base64::encode(&id_token.to_string())
+                );
+                return Ok(HttpResponse::Found()
+                    .append_header((header::LOCATION, url))
+                    .cookie(auth_cookie)
+                    .json(resp));
             } else {
                 unauthorized_error(resp)
             }
         } else {
+            log::error!("User can not be found from auth-header");
             unauthorized_error(resp)
         }
     }
@@ -432,4 +526,31 @@ fn unauthorized_error(mut resp: SignInResponse) -> Result<HttpResponse, Error> {
     resp.status = false;
     resp.message = "Invalid credentials".to_string();
     Ok(HttpResponse::Unauthorized().json(resp))
+}
+
+#[cfg(test)]
+mod tests {
+    use actix_web::{test, App};
+    use actix_web_httpauth::headers::authorization::Basic;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_presigned_url() {
+        let mut app = test::init_service(App::new().service(get_presigned_url)).await;
+
+        let auth = Basic::new("username", Some("password"));
+        let req = test::TestRequest::get()
+            .uri("/presigned-url")
+            .append_header((actix_web::http::header::AUTHORIZATION, auth))
+            .to_request();
+        let resp = test::call_service(&mut app, req).await;
+
+        assert_eq!(resp.status(), http::StatusCode::OK);
+
+        let body = test::read_body(resp).await;
+        let response_body: PresignedURLGeneratorResponse = serde_json::from_slice(&body).unwrap();
+
+        assert!(!response_body.url.is_empty());
+    }
 }

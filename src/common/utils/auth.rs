@@ -15,6 +15,7 @@
 
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
+use base64::Engine;
 use config::utils::json;
 use futures::future::{ready, Ready};
 
@@ -367,6 +368,8 @@ impl FromRequest for AuthExtractor {
             } else {
                 format!("Bearer {}", access_token)
             }
+        } else if let Some(cookie) = req.cookie("auth_ext") {
+            cookie.value().to_string()
         } else if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
                 auth_str.to_owned()
@@ -513,12 +516,69 @@ impl FromRequest for AuthExtractor {
     }
 }
 
+/// Constructs the login URL with the provided parameters.
+///
+/// # Arguments
+///
+/// * `base_url` - The base URL of the authentication service.
+/// * `time` - The request time.
+/// * `exp_in` - The expiration time.
+/// * `auth` - The authentication token.
+///
+/// # Returns
+///
+/// The constructed login URL.
+pub fn generate_presigned_url(
+    username: &str,
+    password: &str,
+    salt: &str,
+    base_url: &str,
+    exp_in: i64,
+    time: i64,
+) -> String {
+    // let time = chrono::Utc::now().timestamp();
+    let stage1 = get_hash(password, salt);
+    let stage2 = get_hash(&format!("{}{}", &stage1, time), salt);
+    let stage3 = get_hash(&format!("{}{}", &stage2, exp_in), salt);
+
+    let user_pass = format!("{}:{}", username, stage3);
+    let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
+
+    format!(
+        "{}/auth/login?request_time={}&exp_in={}&auth={}",
+        base_url, time, exp_in, auth
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use infra::db as infra_db;
 
     use super::*;
     use crate::{common::meta::user::UserRequest, service::users};
+
+    #[test]
+    fn test_generate_presigned_url() {
+        let password = "password";
+        let salt = "saltsalt";
+        let username = "user";
+        let base_url = "https://example.com";
+        let exp_in = 3600;
+        let time = 1634567890;
+
+        let expected_url = format!(
+            "{}/auth/login?request_time={}&exp_in={}&auth={}",
+            base_url,
+            time,
+            exp_in,
+            "dXNlcjokYXJnb24yZCR2PTE2JG09MjA0OCx0PTQscD0yJGMyRnNkSE5oYkhRJGNwTElHZzdEaFl1Vi9nSWxMaCtRZksrS29Vd2ZFaGVpdHkwc3Z0c243Y1E="
+        );
+
+        let generated_url =
+            generate_presigned_url(username, password, salt, base_url, exp_in, time);
+
+        assert_eq!(generated_url, expected_url);
+    }
 
     #[tokio::test]
     async fn test_is_root_user() {
@@ -549,5 +609,23 @@ mod tests {
         let hash =
             "$argon2d$v=16$m=2048,t=4,p=2$VGVzdFNhbHQ$CZzrFPtqjY4mIPYwoDztCJ3OGD5M0P37GH4QddwrbZk";
         assert_eq!(get_hash("Pass#123", "TestSalt"), hash);
+    }
+
+    #[tokio::test]
+    async fn test_get_hash_for_pass() {
+        let pass1 = get_hash("Pass#123", "openobserve");
+        let time = chrono::Utc::now().timestamp();
+        let pass2 = get_hash(&format!("{}{}", &pass1, time), "openobserve");
+        let exp_in = 600;
+        let pass3 = get_hash(&format!("{}{}", &pass2, exp_in), "openobserve");
+        println!("time: {}", time);
+        println!("pass3: {}", pass3);
+
+        let user_pass = format!("{}:{}", "b@b.com", pass3);
+        let auth = base64::engine::general_purpose::STANDARD.encode(user_pass);
+        println!(
+            "http://localhost:5080/auth/login?request_time={}&exp_in={}&auth={}",
+            time, exp_in, auth
+        );
     }
 }

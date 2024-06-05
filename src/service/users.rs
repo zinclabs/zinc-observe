@@ -16,7 +16,7 @@
 use std::io::Error;
 
 use actix_web::{http, HttpResponse};
-use config::{ider, utils::rand::generate_random_string};
+use config::{get_config, ider, utils::rand::generate_random_string};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 
@@ -41,6 +41,7 @@ pub async fn post_user(
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
     let initiator_user = db::user::get(Some(org_id), initiator_id).await;
+    let cfg = get_config();
     if is_root_user(initiator_id)
         || (initiator_user.is_ok()
             && initiator_user.as_ref().unwrap().is_some()
@@ -54,6 +55,7 @@ pub async fn post_user(
         if existing_user.is_err() {
             let salt = ider::uuid();
             let password = get_hash(&usr_req.password, &salt);
+            let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
             let user = usr_req.to_new_dbuser(
@@ -63,8 +65,9 @@ pub async fn post_user(
                 token,
                 rum_token,
                 usr_req.is_external,
+                password_ext,
             );
-            db::user::set(user).await.unwrap();
+            db::user::set(&user).await.unwrap();
             // Update OFGA
             #[cfg(feature = "enterprise")]
             {
@@ -138,7 +141,7 @@ pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
             org.rum_token = Some(rum_token);
         };
     }
-    db::user::set(db_user).await
+    db::user::set(&db_user).await
 }
 
 pub async fn update_user(
@@ -268,7 +271,7 @@ pub async fn update_user(
                                 db_user.organizations = new_orgs;
                             }
 
-                            db::user::set(db_user).await.unwrap();
+                            db::user::set(&db_user).await.unwrap();
 
                             #[cfg(feature = "enterprise")]
                             {
@@ -393,7 +396,7 @@ pub async fn add_user_to_org(
                 orgs
             };
             db_user.organizations = new_orgs;
-            db::user::set(db_user).await.unwrap();
+            db::user::set(&db_user).await.unwrap();
 
             // Update OFGA
             #[cfg(feature = "enterprise")]
@@ -570,7 +573,7 @@ pub async fn remove_user_from_org(
                         }
                         orgs.retain(|x| !x.name.eq(&org_id.to_string()));
                         user.organizations = orgs;
-                        let resp = db::user::set(user).await;
+                        let resp = db::user::set(&user).await;
                         // special case as we cache flattened user struct
                         if resp.is_ok() {
                             USERS.remove(&format!("{org_id}/{email_id}"));
@@ -654,8 +657,10 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 }
 
 pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
+    let cfg = get_config();
     let salt = ider::uuid();
     let password = get_hash(&usr_req.password, &salt);
+    let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
     let token = generate_random_string(16);
     let rum_token = format!("rum{}", generate_random_string(16));
     let user = usr_req.to_new_dbuser(
@@ -665,8 +670,9 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
         token,
         rum_token,
         usr_req.is_external,
+        password_ext,
     );
-    db::user::set(user).await.unwrap();
+    db::user::set(&user).await.unwrap();
     Ok(())
 }
 
@@ -690,6 +696,7 @@ mod tests {
                 last_name: "".to_owned(),
                 org: "dummy".to_string(),
                 is_external: false,
+                password_ext: Some("pass#123".to_string()),
             },
         );
     }

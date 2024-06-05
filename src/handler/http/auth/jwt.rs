@@ -153,6 +153,7 @@ pub async fn process_token(
             salt: "".to_owned(),
             organizations: source_orgs,
             is_external: true,
+            password_ext: Some("".to_owned()),
         };
 
         match users::update_db_user(updated_db_user).await {
@@ -408,6 +409,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
                 ..UserOrg::default()
             }],
             is_external: true,
+            password_ext: Some("".to_owned()),
         };
 
         match users::update_db_user(updated_db_user).await {

@@ -35,6 +35,7 @@ pub struct UserRequest {
 }
 
 impl UserRequest {
+    #[allow(clippy::too_many_arguments)]
     pub fn to_new_dbuser(
         &self,
         password: String,
@@ -43,6 +44,7 @@ impl UserRequest {
         token: String,
         rum_token: String,
         is_external: bool,
+        password_ext: String,
     ) -> DBUser {
         DBUser {
             email: self.email.clone(),
@@ -57,6 +59,7 @@ impl UserRequest {
                 role: self.role.clone(),
             }],
             is_external,
+            password_ext: Some(password_ext),
         }
     }
 }
@@ -74,6 +77,7 @@ pub struct DBUser {
     pub organizations: Vec<UserOrg>,
     #[serde(default)]
     pub is_external: bool,
+    pub password_ext: Option<String>,
 }
 
 impl DBUser {
@@ -100,6 +104,7 @@ impl DBUser {
             rum_token: org.rum_token.clone(),
             salt: local.salt,
             is_external: self.is_external,
+            password_ext: self.password_ext.clone(),
         })
     }
 
@@ -120,6 +125,7 @@ impl DBUser {
                     rum_token: org.rum_token,
                     salt: self.salt.clone(),
                     is_external: self.is_external,
+                    password_ext: self.password_ext.clone(),
                 })
             }
             ret_val
@@ -144,6 +150,7 @@ pub struct User {
     pub org: String,
     /// Is the user authenticated and created via LDAP
     pub is_external: bool,
+    pub password_ext: Option<String>,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema)]
@@ -299,7 +306,7 @@ pub struct SignInResponse {
     pub message: String,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct TokenValidationResponse {
     pub is_valid: bool,
     pub user_email: String,
@@ -308,6 +315,107 @@ pub struct TokenValidationResponse {
     pub given_name: String,
     pub is_internal_user: bool,
     pub user_role: Option<UserRole>,
+}
+pub struct TokenValidationResponseBuilder {
+    pub response: TokenValidationResponse,
+}
+
+/// Builder for creating a `TokenValidationResponse` from a `DBUser`.
+impl TokenValidationResponseBuilder {
+    /// Creates a new `TokenValidationResponseBuilder` from a `DBUser`.
+    ///
+    /// # Arguments
+    ///
+    /// * `user` - The `DBUser` object used to build the `TokenValidationResponse`.
+    ///
+    /// # Returns
+    ///
+    /// A `TokenValidationResponseBuilder` object.
+    pub fn from_db_user(user: &DBUser) -> TokenValidationResponseBuilder {
+        Self {
+            response: TokenValidationResponse {
+                is_valid: true,
+                user_email: user.email.clone(),
+                is_internal_user: !user.is_external,
+                user_role: None,
+                user_name: user.first_name.clone(),
+                given_name: user.first_name.clone(),
+                family_name: user.last_name.clone(),
+            },
+        }
+    }
+
+    /// Creates a new `TokenValidationResponseBuilder` from a `User`.
+    ///
+    /// Arguments
+    ///
+    /// * `user` - The `User` object used to build the `TokenValidationResponse`.
+    pub fn from_user(user: &User) -> TokenValidationResponseBuilder {
+        Self {
+            response: TokenValidationResponse {
+                is_valid: true,
+                user_email: user.email.clone(),
+                is_internal_user: !user.is_external,
+                user_role: Some(user.role.clone()),
+                user_name: user.first_name.clone(),
+                given_name: user.first_name.clone(),
+                family_name: user.last_name.clone(),
+            },
+        }
+    }
+
+    pub fn new() -> TokenValidationResponseBuilder {
+        Self {
+            response: TokenValidationResponse::default(),
+        }
+    }
+
+    pub fn is_valid(mut self, is_valid: bool) -> Self {
+        self.response.is_valid = is_valid;
+        self
+    }
+
+    pub fn user_email(mut self, user_email: String) -> Self {
+        self.response.user_email = user_email;
+        self
+    }
+
+    pub fn user_name(mut self, user_name: String) -> Self {
+        self.response.user_name = user_name;
+        self
+    }
+
+    pub fn family_name(mut self, family_name: String) -> Self {
+        self.response.family_name = family_name;
+        self
+    }
+
+    pub fn given_name(mut self, given_name: String) -> Self {
+        self.response.given_name = given_name;
+        self
+    }
+
+    pub fn is_internal_user(mut self, is_internal_user: bool) -> Self {
+        self.response.is_internal_user = is_internal_user;
+        self
+    }
+
+    pub fn user_role(mut self, user_role: Option<UserRole>) -> Self {
+        self.response.user_role = user_role;
+        self
+    }
+
+    pub fn build(self) -> TokenValidationResponse {
+        TokenValidationResponse {
+            is_valid: self.response.is_valid,
+            user_email: self.response.user_email,
+            user_name: self.response.user_name,
+            family_name: self.response.family_name,
+            given_name: self.response.given_name,
+            is_internal_user: self.response.is_internal_user,
+            user_role: self.response.user_role,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -347,4 +455,12 @@ pub struct RolesResponse {
 pub struct AuthTokens {
     pub access_token: String,
     pub refresh_token: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct AuthTokensExt {
+    pub auth_ext: String,
+    pub refresh_token: String,
+    pub request_time: i64,
+    pub expires_in: i64,
 }
