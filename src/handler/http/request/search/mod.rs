@@ -345,20 +345,23 @@ pub async fn search(
             )
             .await;
 
+            let is_Aggregate = crate::service::search::result_utils::is_aggregate_query(&req_sql)
+                .unwrap_or_default();
+            println!("is_Aggregate: {}", is_Aggregate);
+
             let res_cache = serde_json::to_string(&res).unwrap();
             let mut hasher = DefaultHasher::new();
             req_sql.hash(&mut hasher);
             let query_hash = hasher.finish();
+            let file_path = format!("{}/{}/{}", org_id, stream_type.to_string(), stream_name);
             let file_name = format!(
-                "{}/{}/{}/{}_{}_{}.json",
-                org_id,
-                stream_type.to_string(),
-                stream_name,
-                req.query.start_time,
-                req.query.end_time,
-                query_hash
+                "{}_{}_{}.json",
+                req.query.start_time, req.query.end_time, query_hash
             );
-            let _ = result_writer::cache_results_to_disk(&file_name, &res_cache).await;
+            tokio::spawn(async move {
+                let _ =
+                    result_writer::cache_results_to_disk(&file_path, &file_name, &res_cache).await;
+            });
 
             Ok(HttpResponse::Ok().json(res))
         }
