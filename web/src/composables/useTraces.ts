@@ -128,6 +128,7 @@ const defaultObject = {
       selectedSpanId: "" as String | null,
       expandedSpans: [] as String[],
       showSpanDetails: false,
+      selectedLogStreams: [] as String[],
     },
   },
 };

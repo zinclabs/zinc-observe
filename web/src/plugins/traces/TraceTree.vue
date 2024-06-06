@@ -171,7 +171,7 @@ export default defineComponent({
       default: 0,
     },
   },
-  emits: ["toggleCollapse"],
+  emits: ["toggleCollapse", "selectSpan"],
   setup(props, { emit }) {
     const { searchObj } = useTraces();
     const store = useStore();
@@ -180,8 +180,7 @@ export default defineComponent({
       emit("toggleCollapse", spanId);
     }
     const selectSpan = (spanId: string) => {
-      searchObj.data.traceDetails.showSpanDetails = true;
-      searchObj.data.traceDetails.selectedSpanId = spanId;
+      emit("selectSpan", spanId);
     };
 
     return {

@@ -44,7 +44,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div class="q-pb-xs q-mr-lg">Spans: {{ spanList.length }}</div>
 
-          <div class="q-pb-xs q-mr-lg cursor-pointer flex items-center">
+          <div
+            class="q-pb-xs q-mr-lg cursor-pointer flex items-center"
+            @click="openTraceDetails"
+          >
             <q-icon :name="outlinedInfo" class="q-mr-xs" size="16px" />
             Trace Details
           </div>
@@ -52,8 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="o2-input flex items-center trace-logs-selector">
             <q-select
               data-test="log-search-index-list-select-stream"
-              v-model="selectedLogStreams"
-              :label="selectedLogStreams.length ? '' : t('search.selectIndex')"
+              v-model="searchObj.data.traceDetails.selectedLogStreams"
+              :label="
+                searchObj.data.traceDetails.selectedLogStreams.length
+                  ? ''
+                  : t('search.selectIndex')
+              "
               :options="filteredStreamOptions"
               data-cy="stream-selection"
               input-debounce="0"
@@ -117,9 +124,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-bold traces-view-logs-btn"
               :label="t('traces.viewLogs')"
               text-color="light-text"
-              padding="sm md"
+              padding="sm sm"
               size="sm"
               no-caps
+              dense
+              icon="search"
               @click="redirectToLogs"
             />
           </div>
@@ -238,6 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :leftWidth="leftWidth"
                 class="trace-tree"
                 @toggle-collapse="toggleSpanCollapse"
+                @select-span="updateSelectedSpan"
               />
             </div>
           </div>
@@ -245,12 +255,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-separator vertical />
       <div
-        v-if="isSidebarOpen && selectedSpanId"
+        v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
         class="histogram-sidebar"
         :class="isTimelineExpanded ? '' : 'full'"
       >
         <trace-details-sidebar
-          :span="spanMap[selectedSpanId as string]"
+          :span="showTraceDetails ? traceDetails : spanMap[selectedSpanId as string]"
           @close="closeSidebar"
         />
       </div>
@@ -351,8 +361,6 @@ export default defineComponent({
 
     const filteredStreamOptions = ref([]);
 
-    const selectedLogStreams = ref([]);
-
     const streamSearchValue = ref("");
 
     const { t } = useI18n();
@@ -360,6 +368,8 @@ export default defineComponent({
     const $q = useQuasar();
 
     const router = useRouter();
+
+    const traceDetails = ref({});
 
     const traceVisuals = [
       { label: "Timeline", value: "timeline", icon: TraceTimelineIcon },
@@ -387,8 +397,10 @@ export default defineComponent({
     const isTimelineExpanded = ref(false);
 
     const selectedStreamsString = computed(() =>
-      selectedLogStreams.value.join(", ")
+      searchObj.data.traceDetails.selectedLogStreams.join(", ")
     );
+
+    const showTraceDetails = ref(false);
 
     onBeforeMount(() => {
       getStreams("logs", false)
@@ -397,13 +409,18 @@ export default defineComponent({
           filteredStreamOptions.value = JSON.parse(
             JSON.stringify(logStreams.value)
           );
-          selectedLogStreams.value.push(logStreams.value[0]);
+
+          if (!searchObj.data.traceDetails.selectedLogStreams.length)
+            searchObj.data.traceDetails.selectedLogStreams.push(
+              logStreams.value[0]
+            );
         })
         .catch(() => Promise.reject())
         .finally(() => {});
     });
 
     onMounted(() => {
+      traceDetails.value = searchObj.data.traceDetails.selectedTrace;
       buildTracesTree();
     });
 
@@ -835,7 +852,8 @@ export default defineComponent({
     };
 
     const redirectToLogs = () => {
-      const stream: string = selectedLogStreams.value.join(",");
+      const stream: string =
+        searchObj.data.traceDetails.selectedLogStreams.join(",");
       const from =
         searchObj.data.traceDetails.selectedTrace.trace_start_time - 30000000;
       const to =
@@ -867,6 +885,17 @@ export default defineComponent({
       filteredStreamOptions.value = logStreams.value.filter((stream: any) => {
         return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
       });
+    };
+
+    const openTraceDetails = () => {
+      searchObj.data.traceDetails.showSpanDetails = true;
+      showTraceDetails.value = true;
+    };
+
+    const updateSelectedSpan = (spanId: string) => {
+      showTraceDetails.value = false;
+      searchObj.data.traceDetails.showSpanDetails = true;
+      searchObj.data.traceDetails.selectedSpanId = spanId;
     };
 
     return {
@@ -904,10 +933,13 @@ export default defineComponent({
       outlinedInfo,
       redirectToLogs,
       filteredStreamOptions,
-      selectedLogStreams,
       filterStreamFn,
       streamSearchValue,
       selectedStreamsString,
+      openTraceDetails,
+      showTraceDetails,
+      traceDetails,
+      updateSelectedSpan,
     };
   },
 });
@@ -1056,5 +1088,12 @@ $traceChartCollapseHeight: 42px;
   margin-left: -1px;
   border-top-left-radius: 0px;
   border-bottom-left-radius: 0px;
+
+  .q-btn__content {
+    span {
+      font-size: 12px;
+      color: #343434;
+    }
+  }
 }
 </style>

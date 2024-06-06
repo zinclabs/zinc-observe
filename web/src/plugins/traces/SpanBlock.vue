@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
   >
     <div
-      class="flex justify-between items-end cursor-pointer span-block relative-position"
+      class="flex justify-between items-end cursor-pointer span-block relative-position span-block-overlay"
       :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
       :style="{
         height: spanDimensions.height + 'px',
@@ -85,9 +85,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             transition: 'all 0.5s ease',
             zIndex: 1,
           }"
-          class="text-caption"
+          class="text-caption flex items-center"
         >
-          {{ formatTimeWithSuffix(span.durationUs) }}
+          <div>
+            {{ formatTimeWithSuffix(span.durationUs) }}
+          </div>
+          <q-btn
+            class="q-mx-xs view-span-logs"
+            size="8px"
+            icon="search"
+            dense
+            :title="t('traces.viewLogs')"
+            @click.stop="viewSpanLogs"
+          />
         </div>
         <q-resize-observer debounce="300" @resize="onResize" />
       </div>
@@ -111,6 +121,9 @@ import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import SpanDetails from "./SpanDetails.vue";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
+import { b64EncodeStandard } from "@/utils/zincutils";
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -160,6 +173,8 @@ export default defineComponent({
       if (!searchObj.data.traceDetails.selectedSpanId) return false;
       return searchObj.data.traceDetails.selectedSpanId !== props.span.spanId;
     });
+    const router = useRouter();
+    const { t } = useI18n();
     const selectSpan = () => {
       emit("selectSpan", props.span.spanId);
     };
@@ -212,7 +227,7 @@ export default defineComponent({
         spanBlockWidth.value
       ) {
         style.right = 0;
-        style.top = "0";
+        style.top = "-5px";
       } else if (getLeftPosition.value > 50) {
         style.left =
           getLeftPosition.value * onePercent - labelWidth + 10 + "px";
@@ -248,7 +263,36 @@ export default defineComponent({
       }
     };
 
+    const viewSpanLogs = () => {
+      const stream: string =
+        searchObj.data.traceDetails.selectedLogStreams.join(",");
+      const from = props.span.startTimeMs * 1000 - 10000000;
+      const to = props.span.endTimeMs * 1000 + 10000000;
+      const refresh = 0;
+      const query = b64EncodeStandard(
+        `span_id='${props.span.spanId}' AND trace_id='${searchObj.data.traceDetails.selectedTrace.trace_id}'`
+      );
+
+      router.push({
+        path: "/logs",
+        query: {
+          stream_type: "logs",
+          stream,
+          from,
+          to,
+          refresh,
+          sql_mode: "false",
+          query,
+          org_identifier: store.state.selectedOrganization.identifier,
+          show_histogram: "true",
+          type: "trace_explorer",
+          quick_mode: "false",
+        },
+      });
+    };
+
     return {
+      t,
       formatTimeWithSuffix,
       selectSpan,
       toggleSpanCollapse,
@@ -265,6 +309,7 @@ export default defineComponent({
       defocusSpan,
       isSpanSelected,
       store,
+      viewSpanLogs,
     };
   },
 });
@@ -285,5 +330,17 @@ export default defineComponent({
 
 .light-grey {
   background-color: #ececec;
+}
+
+.view-span-logs {
+  visibility: hidden;
+}
+
+.span-block-overlay {
+  &:hover {
+    .view-span-logs {
+      visibility: visible;
+    }
+  }
 }
 </style>
