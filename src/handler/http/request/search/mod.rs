@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+    io::Error,
+};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use chrono::Duration;
@@ -41,6 +45,7 @@ use crate::{
             http::{
                 get_search_type_from_request, get_stream_type_from_request, RequestHeaderExtractor,
             },
+            result_writer,
         },
     },
     service::{
@@ -277,6 +282,10 @@ pub async fn search(
         search_fut.await
     };
 
+    // let req_start_time = req.query.start_time;
+    // let req_end_time = req.query.end_time;
+    let req_sql = req.query.sql.clone();
+
     // do search
     match search_res {
         Ok(mut res) => {
@@ -335,6 +344,22 @@ pub async fn search(
                 num_fn,
             )
             .await;
+
+            let res_cache = serde_json::to_string(&res).unwrap();
+            let mut hasher = DefaultHasher::new();
+            req_sql.hash(&mut hasher);
+            let query_hash = hasher.finish();
+            let file_name = format!(
+                "{}/{}/{}/{}_{}_{}.json",
+                org_id,
+                stream_type.to_string(),
+                stream_name,
+                req.query.start_time,
+                req.query.end_time,
+                query_hash
+            );
+            let _ = result_writer::cache_results_to_disk(&file_name, &res_cache).await;
+
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
