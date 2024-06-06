@@ -443,6 +443,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @remove:searchterm="removeSearchTerm"
           @search:timeboxed="onTimeBoxed"
           @add:table="addFieldToTable"
+          @view-trace="
+            redirectToTraces(
+              searchObj.data.queryResults.hits[
+                searchObj.meta.resultGrid.navigation.currentRowIndex
+              ]
+            )
+          "
         />
       </q-dialog>
     </div>

@@ -8,6 +8,20 @@
         {{ span.operationName }}
       </div>
       <div class="flex items-center">
+        <div style="border-right: 1px solid #cccccc; font-size: 14px">
+          <q-btn
+            class="q-mx-sm view-span-logs-btn"
+            size="10px"
+            icon="search"
+            dense
+            padding="xs sm"
+            no-caps
+            :title="t('traces.viewLogs')"
+            @click.stop="viewSpanLogs"
+          >
+            View Logs</q-btn
+          >
+        </div>
         <div
           class="q-px-sm"
           style="border-right: 1px solid #cccccc; font-size: 14px"
@@ -381,6 +395,7 @@ import { useStore } from "vuex";
 import { formatTimeWithSuffix } from "@/utils/zincutils";
 import { date, useQuasar } from "quasar";
 import { copyToClipboard } from "quasar";
+import { useI18n } from "vue-i18n";
 
 const props = defineProps({
   span: {
@@ -397,7 +412,11 @@ const props = defineProps({
   },
 });
 
+const emit = defineEmits(["view-logs"]);
+
 const store = useStore();
+
+const { t } = useI18n();
 
 const getDuration = computed(() => formatTimeWithSuffix(props.span.durationUs));
 
@@ -542,6 +561,10 @@ const expandEvent = (index: number) => {
   if (expandedEvents.value[index.toString()])
     delete expandedEvents.value[index.toString()];
   else expandedEvents.value[index.toString()] = true;
+};
+
+const viewSpanLogs = () => {
+  emit("view-logs", props.span.spanId);
 };
 
 const copySpanId = () => {

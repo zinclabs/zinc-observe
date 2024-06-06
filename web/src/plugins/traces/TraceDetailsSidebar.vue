@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="closeSidebar"
     ></q-btn>
   </div>
-  <div class="q-pb-sm q-pt-xs flex flex-wrap">
+  <div class="q-pb-sm q-pt-xs flex flex-wrap trace-details-toolbar-container">
     <div
       :title="span.operation_name"
       class="q-px-sm q-pb-none ellipsis non-selectable"
@@ -53,6 +53,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-grey-7">Duration: </span>
       <span>{{ getDuration }}</span>
     </div>
+
+    <q-btn
+      class="q-mx-xs view-span-logs-btn"
+      size="10px"
+      icon="search"
+      dense
+      padding="xs sm"
+      no-caps
+      :title="t('traces.viewLogs')"
+      @click.stop="viewSpanLogs"
+    >
+      View Logs</q-btn
+    >
   </div>
   <q-tabs
     v-model="activeTab"
@@ -83,11 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-tab
       name="attributes"
       :label="t('common.attributes')"
-      style="text-transform: capitalize"
-    />
-    <q-tab
-      name="logs"
-      :label="t('common.logs')"
       style="text-transform: capitalize"
     />
   </q-tabs>
@@ -333,7 +341,7 @@ export default defineComponent({
       default: () => null,
     },
   },
-  emits: ["close"],
+  emits: ["close", "view-logs"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const activeTab = ref("tags");
@@ -527,6 +535,10 @@ export default defineComponent({
       return formattedLines.join("\n");
     }
 
+    const viewSpanLogs = () => {
+      emit("view-logs");
+    };
+
     return {
       t,
       activeTab,
@@ -543,6 +555,7 @@ export default defineComponent({
       getExceptionEvents,
       exceptionEventColumns,
       getDuration,
+      viewSpanLogs,
     };
   },
 });
@@ -744,6 +757,20 @@ export default defineComponent({
 .span_details_tab-panels {
   .q-tab-panel {
     padding: 8px 0 8px 8px;
+  }
+}
+
+.view-span-logs-btn {
+  .q-btn__content {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+
+    .q-icon {
+      margin-right: 2px !important;
+      font-size: 14px;
+      margin-bottom: 1px;
+    }
   }
 }
 </style>
