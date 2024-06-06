@@ -37,6 +37,7 @@
                                     ? item.isSchemaField
                                     : ''
                               )
+                              && multiStreamFields.includes(key)
                             "
           >
             <q-item-section>
@@ -67,6 +68,7 @@
                                     ? item.isSchemaField
                                     : ''
                               )
+                              && multiStreamFields.includes(key)
                             "
           >
             <q-item-section>
@@ -126,6 +128,7 @@
 </template>
 
 <script lang="ts">
+import { defineComponent, ref, onBeforeMount } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
@@ -161,6 +164,18 @@ export default {
       emit("addFieldToTable", value);
     };
     const { searchObj } = useLogs();
+    let multiStreamFields: any = ref([]);
+
+    onBeforeMount(() => {
+      searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
+        if (
+          item.streams.length == searchObj.data.stream.selectedStream.length
+        ) {
+          multiStreamFields.value.push(item.name);
+        }
+      });
+    });
+
     return {
       t,
       copyLogToClipboard,
@@ -169,6 +184,7 @@ export default {
       addFieldToTable,
       store,
       searchObj,
+      multiStreamFields,
     };
   },
 };

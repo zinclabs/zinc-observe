@@ -28,7 +28,16 @@ const search = {
     },
     search_type: string = "UI"
   ) => {
-    const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
+    // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
+    let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
+    if (typeof query.query.sql != "string") {
+      url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}`;
+      if (query.hasOwnProperty("aggs")) {
+        return http().post(url, { ...query.query, aggs: query.aggs });
+      } else {
+        return http().post(url, query.query);
+      }
+    }
     return http().post(url, query);
   },
   search_around: ({
@@ -41,6 +50,7 @@ const search = {
     stream_type,
     regions,
     clusters,
+    is_multistream,
   }: {
     org_identifier: string;
     index: string;
@@ -51,8 +61,15 @@ const search = {
     stream_type: string;
     regions: string;
     clusters: string;
+    is_multistream: boolean;
   }) => {
-    let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
+    // let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
+    let url: string = "";
+    if(is_multistream) {
+      url = `/api/${org_identifier}/${index}/_around_multi?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
+    } else {
+      url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
+    }
     if (query_fn.trim() != "") {
       url = url + `&query_fn=${query_fn}`;
     }
@@ -140,7 +157,11 @@ const search = {
     query: any;
     page_type: string;
   }) => {
-    const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
+    // const url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
+    let url = `/api/${org_identifier}/_search_partition?type=${page_type}`;
+    if (typeof query.sql != "string") {
+      url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}`;
+    }
     return http().post(url, query);
   },
   get_running_queries: (org_identifier: string) => {

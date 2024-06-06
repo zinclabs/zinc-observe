@@ -672,3 +672,11 @@ export const maskText = (text: string) => {
 
   return text;
 };
+
+export const convertToCamelCase = (str: string) => {
+  if (!str) {
+    return ''; // or handle the case as needed
+  }
+
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};

@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     :key="
-                      searchObj.data.stream.selectedStream.value || 'default'
+                      searchObj.data.stream.selectedStream.join(',') || 'default'
                     "
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
@@ -90,6 +90,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #after>
                 <div
                   v-if="
+                    searchObj.data.filterErrMsg !== '' &&
+                    searchObj.loading == false
+                  "
+                >
+                  <h5 class="text-center">
+                    <q-icon name="warning" color="warning"
+size="10rem" /><br />
+                    <div
+                      data-test="logs-search-filter-error-message"
+                      v-html="searchObj.data.filterErrMsg"
+                    ></div>
+                  </h5>
+                </div>
+                <div
+                  v-else-if="
                     searchObj.data.errorMsg !== '' && searchObj.loading == false
                   "
                 >
@@ -130,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else-if="
-                    searchObj.data.stream.selectedStream.label == '' &&
+                    searchObj.data.stream.selectedStream.length == 0 &&
                     searchObj.loading == false
                   "
                   class="row"
@@ -182,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-else
                   data-test="logs-search-search-result"
-                  class="full-height"
+                  class="full-height search-result-container"
                 >
                   <search-result
                     ref="searchResultRef"
@@ -256,7 +271,7 @@ export default defineComponent({
           button: "Search Data",
           user_org: this.store.state.selectedOrganization.identifier,
           user_id: this.store.state.userInfo.email,
-          stream_name: this.searchObj.data.stream.selectedStream.value,
+          stream_name: this.searchObj.data.stream.selectedStream.join(","),
           show_query: this.searchObj.meta.showQuery,
           show_histogram: this.searchObj.meta.showHistogram,
           sqlMode: this.searchObj.meta.sqlMode,
@@ -283,7 +298,7 @@ export default defineComponent({
             button: "Get More Data",
             user_org: this.store.state.selectedOrganization.identifier,
             user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.value,
+            stream_name: this.searchObj.data.stream.selectedStream.join(","),
             page: "Search Logs",
           });
         }
@@ -307,7 +322,7 @@ export default defineComponent({
             button: "Get More Data",
             user_org: this.store.state.selectedOrganization.identifier,
             user_id: this.store.state.userInfo.email,
-            stream_name: this.searchObj.data.stream.selectedStream.value,
+            stream_name: this.searchObj.data.stream.selectedStream.join(","),
             page: "Search Logs",
           });
         }
@@ -419,7 +434,7 @@ export default defineComponent({
 
       const isStreamChanged =
         queryParams.stream_type !== searchObj.data.stream.streamType ||
-        queryParams.stream !== searchObj.data.stream.selectedStream.value;
+        queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
 
       if (
         isStreamChanged &&
@@ -534,30 +549,40 @@ export default defineComponent({
           let whereClause = "";
           let currentQuery = searchObj.data.query;
 
+          const hasSelect =
+            currentQuery != "" &&
+            (currentQuery.toLowerCase() === "select" ||
+              currentQuery.toLowerCase().indexOf("select ") == 0);
           //check if user try to applied saved views in which sql mode is enabled.
+          if (currentQuery.indexOf("SELECT") >= 0) {
+            return;
+          }
 
           // Parse the query and check if it is valid
           // It should have one column and one table
 
-          const hasSelect =
-            currentQuery.toLowerCase() === "select" ||
-            currentQuery.toLowerCase().indexOf("select ") == 0;
+          // const hasSelect =
+          //   currentQuery.toLowerCase() === "select" ||
+          //   currentQuery.toLowerCase().indexOf("select ") == 0;
 
           if (!hasSelect) {
-            currentQuery = currentQuery.split("|");
-            if (currentQuery.length > 1) {
-              selectFields = "," + currentQuery[0].trim();
-              if (currentQuery[1].trim() != "") {
-                whereClause = "WHERE " + currentQuery[1].trim();
-              }
-            } else if (currentQuery[0].trim() != "") {
-              if (currentQuery[0].trim() != "") {
-                whereClause = "WHERE " + currentQuery[0].trim();
+            if (currentQuery != "") {
+              currentQuery = currentQuery.split("|");
+              if (currentQuery.length > 1) {
+                selectFields = "," + currentQuery[0].trim();
+                if (currentQuery[1].trim() != "") {
+                  whereClause = "WHERE " + currentQuery[1].trim();
+                }
+              } else if (currentQuery[0].trim() != "") {
+                if (currentQuery[0].trim() != "") {
+                  whereClause = "WHERE " + currentQuery[0].trim();
+                }
               }
             }
+
             searchObj.data.query =
               `SELECT [FIELD_LIST]${selectFields} FROM "` +
-              searchObj.data.stream.selectedStream.value +
+              searchObj.data.stream.selectedStream.join(",") +
               `" ` +
               whereClause;
 
@@ -606,7 +631,7 @@ export default defineComponent({
             searchObj.data.query,
             store.state.zoConfig.timestamp_column,
             "DESC",
-            searchObj.data.stream.selectedStream.value
+            searchObj.data.stream.selectedStream.join(",")
           );
 
           searchObj.data.editorValue = searchObj.data.query;
@@ -714,8 +739,8 @@ export default defineComponent({
           .sqlify(parsedSQL)
           .replace(/`/g, "")
           .replace(
-            searchObj.data.stream.selectedStream.value,
-            `"${searchObj.data.stream.selectedStream.value}"`
+            searchObj.data.stream.selectedStream[0],
+            `"${searchObj.data.stream.selectedStream[0]}"`
           );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
@@ -1004,6 +1029,11 @@ $navbarHeight: 64px;
       top: 5px;
       font-size: 12px !important;
     }
+  }
+
+  .search-result-container {
+    position: fixed;
+    width: 100%;
   }
 }
 </style>
