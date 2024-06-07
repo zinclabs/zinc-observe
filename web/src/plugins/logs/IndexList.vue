@@ -167,9 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="field_overlay">
                   <q-btn
-                    v-if="
-                      props.row.isSchemaField
-                    "
+                    v-if="props.row.isSchemaField"
                     :icon="outlinedAdd"
                     :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                     style="margin-right: 0.375rem"
@@ -279,9 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div class="field_overlay">
                       <q-btn
-                        v-if="
-                          props.row.isSchemaField
-                        "
+                        v-if="props.row.isSchemaField"
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
                         style="margin-right: 0.375rem"
@@ -1041,18 +1037,27 @@ export default defineComponent({
           }
           if (field.streams.length > 0) {
             for (const selectedStream of field.streams) {
-              if (
-                localStreamFields[
-                  searchObj.organizationIdetifier + "_" + selectedStream
-                ] == undefined
-              ) {
-                localStreamFields[
-                  searchObj.organizationIdetifier + "_" + selectedStream
-                ] = [];
+              if(selectedStream != undefined) {
+                if (
+                  localStreamFields[
+                    searchObj.organizationIdetifier + "_" + selectedStream
+                  ] == undefined
+                ) {
+                  localStreamFields[
+                    searchObj.organizationIdetifier + "_" + selectedStream
+                  ] = [];
+                }
+
+                if (
+                  localStreamFields[
+                    searchObj.organizationIdetifier + "_" + selectedStream
+                  ].indexOf(field.name) == -1
+                ) {
+                  localStreamFields[
+                    searchObj.organizationIdetifier + "_" + selectedStream
+                  ].push(field.name);
+                }
               }
-              localStreamFields[
-                searchObj.organizationIdetifier + "_" + selectedStream
-              ].push(field.name);
             }
           }
           useLocalInterestingFields(localStreamFields);

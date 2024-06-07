@@ -2181,8 +2181,10 @@ const useLogs = () => {
         const schemaMaps: any = [];
         const commonSchemaMaps: any = [];
         let schemaFieldsIndex: number = -1;
+        let commonSchemaFieldsIndex: number = -1;
         let fieldObj: any = {};
         const localInterestingFields: any = useLocalInterestingFields();
+        let streamInterestingFields: any = [];
 
         const selectedStreamValues = searchObj.data.stream.selectedStream
           .join(",")
@@ -2316,14 +2318,24 @@ const useLogs = () => {
               ) {
                 if (userDefineSchemaSettings.includes(field.name)) {
                   schemaFieldsIndex = schemaFields.indexOf(field.name);
+                  commonSchemaFieldsIndex = commonSchemaFields.indexOf(
+                    field.name
+                  );
                   if (schemaFieldsIndex > -1) {
                     fieldObj.group = "common";
+                    fieldObj.streams.push(
+                      ...schemaMaps[schemaFieldsIndex].streams
+                    );
                     commonSchemaMaps.push(fieldObj);
                     commonSchemaFields.push(field.name);
 
                     //remove the element from the index
                     schemaFields.splice(schemaFieldsIndex, 1);
                     schemaMaps.splice(schemaFieldsIndex, 1);
+                  } else if (commonSchemaFieldsIndex > -1) {
+                    commonSchemaFields[commonSchemaFieldsIndex].streams.push(
+                      stream.name
+                    );
                   } else {
                     schemaMaps.push(fieldObj);
                     schemaFields.push(field.name);
@@ -2335,14 +2347,24 @@ const useLogs = () => {
                 // }
               } else {
                 schemaFieldsIndex = schemaFields.indexOf(field.name);
+                commonSchemaFieldsIndex = commonSchemaFields.indexOf(
+                  field.name
+                );
                 if (schemaFieldsIndex > -1) {
                   fieldObj.group = "common";
+                  fieldObj.streams.push(
+                    ...schemaMaps[schemaFieldsIndex].streams
+                  );
                   commonSchemaMaps.push(fieldObj);
                   commonSchemaFields.push(field.name);
 
                   //remove the element from the index
                   schemaFields.splice(schemaFieldsIndex, 1);
                   schemaMaps.splice(schemaFieldsIndex, 1);
+                } else if (commonSchemaFieldsIndex > -1) {
+                  commonSchemaFields[commonSchemaFieldsIndex].streams.push(
+                    stream.name
+                  );
                 } else {
                   schemaMaps.push(fieldObj);
                   schemaFields.push(field.name);
@@ -2417,30 +2439,29 @@ const useLogs = () => {
             }
 
             // cross verify list of interesting fields belowgs to selected stream fields
-            for (
-              let i = searchObj.data.stream.interestingFieldList.length - 1;
-              i >= 0;
-              i--
-            ) {
-              const fieldName = searchObj.data.stream.interestingFieldList[i];
-              if (
-                !schemaFields.includes(fieldName) ||
-                !commonSchemaFields.includes(fieldName)
-              ) {
-                searchObj.data.stream.interestingFieldList.splice(i, 1);
-              }
-            }
+            // streamInterestingFields = JSON.parse(
+            //   JSON.stringify(searchObj.data.stream.interestingFieldList)
+            // );
+            // for (let i = streamInterestingFields.length - 1; i >= 0; i--) {
+            //   const fieldName = streamInterestingFields[i];
+            //   if (
+            //     !schemaFields.includes(fieldName) &&
+            //     !commonSchemaFields.includes(fieldName)
+            //   ) {
+            //     streamInterestingFields.splice(i, 1);
+            //   }
+            // }
 
-            let localFields: any = {};
-            if (localInterestingFields.value != null) {
-              localFields = localInterestingFields.value;
-            }
-            localFields[
-              searchObj.organizationIdetifier +
-                "_" +
-                searchObj.data.stream.selectedStream.value
-            ] = searchObj.data.stream.interestingFieldList;
-            useLocalInterestingFields(localFields);
+            // let localFields: any = {};
+            // if (localInterestingFields.value != null) {
+            //   localFields = localInterestingFields.value;
+            // }
+            // localFields[
+            //   searchObj.organizationIdetifier +
+            //     "_" +
+            //     searchObj.data.stream.selectedStream.value
+            // ] = streamInterestingFields;
+            // useLocalInterestingFields(localFields);
             searchObj.data.stream.userDefinedSchema =
               userDefineSchemaSettings || [];
           }
@@ -3223,6 +3244,10 @@ const useLogs = () => {
     searchObj.data.query = query;
     searchObj.data.tempFunctionContent = "";
     searchObj.meta.searchApplied = false;
+
+    if (searchObj.data.stream.selectedStream.length > 1) {
+      searchObj.meta.showHistogram = false;
+    }
 
     if (store.state.zoConfig.query_on_stream_selection == false) {
       handleQueryData();
