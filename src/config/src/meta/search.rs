@@ -581,6 +581,7 @@ pub struct MultiStreamRequest {
     pub regions: Vec<String>, // default query all regions, local: only query local region clusters
     #[serde(default)]
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
+    pub search_type: Option<SearchEventType>,
 }
 
 impl MultiStreamRequest {
@@ -609,6 +610,7 @@ impl MultiStreamRequest {
                 clusters: self.clusters.clone(),
                 encoding: self.encoding,
                 timeout: self.timeout,
+                search_type: self.search_type,
             });
         }
         res

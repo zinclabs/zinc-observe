@@ -37,7 +37,9 @@ use crate::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::{
             functions,
-            http::{get_stream_type_from_request, RequestHeaderExtractor},
+            http::{
+                get_search_type_from_request, get_stream_type_from_request, RequestHeaderExtractor,
+            },
         },
     },
     service::{search as SearchService, usage::report_request_usage_stats},
@@ -139,6 +141,11 @@ pub async fn search_multi(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
+    let search_type = match get_search_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
     // handle encoding for query and aggs
     let mut multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
         Ok(v) => v,
@@ -166,6 +173,7 @@ pub async fn search_multi(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     }
+    let queries_len = queries.len();
 
     for mut req in queries {
         let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
@@ -292,6 +300,8 @@ pub async fn search_multi(
                     user_email: Some(user_id.to_string()),
                     min_ts: Some(req.query.start_time),
                     max_ts: Some(req.query.end_time),
+                    cached_ratio: Some(res.cached_ratio),
+                    search_type,
                     ..Default::default()
                 };
                 let num_fn = req.query.query_fn.is_some() as u16;
@@ -320,6 +330,7 @@ pub async fn search_multi(
                 multi_res.aggs.extend(res.aggs.into_iter());
                 multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
+                multi_res.cached_ratio = res.cached_ratio;
             }
             Err(err) => {
                 let time = start.elapsed().as_secs_f64();
@@ -358,6 +369,7 @@ pub async fn search_multi(
         }
     }
 
+    multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
         let a_ts = a.get("_timestamp").unwrap().as_i64().unwrap();
         let b_ts = b.get("_timestamp").unwrap().as_i64().unwrap();
@@ -580,9 +592,14 @@ pub async fn around_multi(
         Some(v) => v.parse::<i64>().unwrap_or(0),
         None => return Ok(MetaHttpResponse::bad_request("around key is empty")),
     };
-    let query_fn = query
+    let mut query_fn = query
         .get("query_fn")
         .and_then(|v| base64::decode_url(v).ok());
+    if let Some(vrl_function) = &query_fn {
+        if !vrl_function.trim().ends_with('.') {
+            query_fn = Some(format!("{} \n .", vrl_function));
+        }
+    }
 
     let mut around_sqls = stream_names
         .split(',')
@@ -609,6 +626,20 @@ pub async fn around_multi(
         .get("size")
         .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
 
+    let regions = query.get("regions").map_or(vec![], |regions| {
+        regions
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
+    let clusters = query.get("clusters").map_or(vec![], |clusters| {
+        clusters
+            .split(',')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>()
+    });
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -675,9 +706,10 @@ pub async fn around_multi(
             },
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
-            regions: vec![],
-            clusters: vec![],
+            regions: regions.clone(),
+            clusters: clusters.clone(),
             timeout,
+            search_type: Some(search::SearchEventType::UI),
         };
         let search_fut =
             SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
@@ -751,9 +783,10 @@ pub async fn around_multi(
             },
             aggs: HashMap::new(),
             encoding: config::meta::search::RequestEncoding::Empty,
-            regions: vec![],
-            clusters: vec![],
+            regions: regions.clone(),
+            clusters: clusters.clone(),
             timeout,
+            search_type: Some(search::SearchEventType::UI),
         };
         let search_fut =
             SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req);
