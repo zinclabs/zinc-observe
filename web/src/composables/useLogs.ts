@@ -239,6 +239,9 @@ const useLogs = () => {
   const { updateFieldKeywords } = useSqlSuggestions();
 
   onBeforeMount(async () => {
+    if (router.currentRoute.value.query?.quick_mode == "true") {
+      searchObj.meta.quickMode = true;
+    }
     await importSqlParser();
   });
 
