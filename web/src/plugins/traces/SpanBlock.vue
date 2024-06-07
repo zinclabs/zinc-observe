@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
   >
     <div
-      class="flex justify-between items-end cursor-pointer span-block relative-position span-block-overlay"
+      class="flex justify-between items-end cursor-pointer span-block relative-position"
       :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
       :style="{
         height: spanDimensions.height + 'px',
@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       ref="spanBlock"
       @click="selectSpan"
+      @mouseover="onSpanHover"
     >
       <div
         :style="{
@@ -90,14 +91,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             {{ formatTimeWithSuffix(span.durationUs) }}
           </div>
-          <q-btn
-            class="q-mx-xs view-span-logs"
-            size="8px"
-            icon="search"
-            dense
-            :title="t('traces.viewLogs')"
-            @click.stop="viewSpanLogs"
-          />
         </div>
         <q-resize-observer debounce="300" @resize="onResize" />
       </div>
@@ -162,7 +155,7 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  emits: ["toggleCollapse", "selectSpan"],
+  emits: ["toggleCollapse", "selectSpan", "hover", "view-logs"],
   components: { SpanDetails },
   setup(props, { emit }) {
     const store = useStore();
@@ -265,31 +258,11 @@ export default defineComponent({
     };
 
     const viewSpanLogs = () => {
-      const stream: string =
-        searchObj.data.traceDetails.selectedLogStreams.join(",");
-      const from = props.span.startTimeMs * 1000 - 10000000;
-      const to = props.span.endTimeMs * 1000 + 10000000;
-      const refresh = 0;
-      const query = b64EncodeStandard(
-        `span_id='${props.span.spanId}' AND trace_id='${searchObj.data.traceDetails.selectedTrace.trace_id}'`
-      );
+      emit("view-logs");
+    };
 
-      router.push({
-        path: "/logs",
-        query: {
-          stream_type: "logs",
-          stream,
-          from,
-          to,
-          refresh,
-          sql_mode: "false",
-          query,
-          org_identifier: store.state.selectedOrganization.identifier,
-          show_histogram: "true",
-          type: "trace_explorer",
-          quick_mode: "false",
-        },
-      });
+    const onSpanHover = () => {
+      emit("hover");
     };
 
     return {
@@ -311,6 +284,7 @@ export default defineComponent({
       isSpanSelected,
       store,
       viewSpanLogs,
+      onSpanHover,
     };
   },
 });

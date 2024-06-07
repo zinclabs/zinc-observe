@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <template v-for="span in spans as any[]" :key="span.spanId">
+  <template v-for="(span, index) in spans as any[]" :key="span.spanId">
     <div
       :style="{
         position: 'relative',
@@ -41,10 +41,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="span.operationName"
         >
           <div
-            class="flex no-wrap q-pt-sm full-width"
+            class="flex no-wrap q-pt-sm full-width relative-position operation-name-container"
             :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
             :style="{ height: '30px' }"
+            @mouseover="() => (spanHoveredIndex = index)"
+            @mouseout="() => (spanHoveredIndex = -1)"
           >
+            <div
+              class="absolute view-logs-container"
+              :class="spanHoveredIndex === index ? 'show' : ''"
+            >
+              <q-btn
+                class="q-mx-xs view-span-logs"
+                :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+                size="10px"
+                icon="search"
+                dense
+                no-caps
+                :title="t('traces.viewLogs')"
+                @click.stop="viewSpanLogs(span)"
+              >
+                <!-- <span class="text view-logs-btn-text">View Logs</span> -->
+              </q-btn>
+            </div>
             <div
               v-if="span.hasChildSpans"
               :style="{
@@ -123,17 +142,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :spanData="spanMap[span.spanId]"
         @toggle-collapse="toggleSpanCollapse"
         @select-span="selectSpan"
+        @mouseover="() => (spanHoveredIndex = index)"
+        @mouseout="() => (spanHoveredIndex = -1)"
+        @view-logs="viewSpanLogs(span)"
       />
     </div>
   </template>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, onBeforeMount, ref } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
 import SpanBlock from "./SpanBlock.vue";
+import type { Ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { b64EncodeStandard } from "@/utils/zincutils";
+import { useRouter } from "vue-router";
 
 export default defineComponent({
   name: "TraceTree",
@@ -176,6 +202,12 @@ export default defineComponent({
     const { searchObj } = useTraces();
     const store = useStore();
 
+    const { t } = useI18n();
+
+    const spanHoveredIndex = ref(-1);
+
+    const router = useRouter();
+
     function toggleSpanCollapse(spanId: number | string) {
       emit("toggleCollapse", spanId);
     }
@@ -183,11 +215,44 @@ export default defineComponent({
       emit("selectSpan", spanId);
     };
 
+    const viewSpanLogs = (span: any) => {
+      const stream: string =
+        searchObj.data.traceDetails.selectedLogStreams.join(",");
+
+      // 1 minute before and after the span
+      const from = span.startTimeMs * 1000 - 60000000;
+      const to = span.endTimeMs * 1000 + 60000000;
+      const refresh = 0;
+      const query = b64EncodeStandard(
+        `span_id='${span.spanId}' AND trace_id='${searchObj.data.traceDetails.selectedTrace.trace_id}'`
+      );
+
+      router.push({
+        path: "/logs",
+        query: {
+          stream_type: "logs",
+          stream,
+          from,
+          to,
+          refresh,
+          sql_mode: "false",
+          query,
+          org_identifier: store.state.selectedOrganization.identifier,
+          show_histogram: "true",
+          type: "trace_explorer",
+          quick_mode: "false",
+        },
+      });
+    };
+
     return {
       toggleSpanCollapse,
       getImageURL,
       selectSpan,
       store,
+      viewSpanLogs,
+      t,
+      spanHoveredIndex,
     };
   },
   components: { SpanBlock },
@@ -195,6 +260,10 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+.view-logs-container {
+  top: 7px;
+  right: 0;
+}
 .spans-container {
   position: relative;
 }
@@ -203,5 +272,33 @@ export default defineComponent({
   width: 14px;
   height: auto;
   opacity: 0.6;
+}
+
+.operation-name-container {
+  .view-logs-container {
+    visibility: hidden;
+  }
+  .view-logs-container {
+    &.show {
+      visibility: visible !important;
+    }
+  }
+}
+</style>
+<style lang="scss">
+.view-logs-btn-text {
+  visibility: visible;
+}
+.view-span-logs {
+  background-color: inherit;
+  .view-logs-btn-text {
+    visibility: hidden;
+    width: 0px;
+    transition: width 0.3s ease-in;
+  }
+  &:hover .view-logs-btn-text {
+    visibility: visible;
+    width: auto;
+  }
 }
 </style>

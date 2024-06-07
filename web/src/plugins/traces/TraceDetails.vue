@@ -856,9 +856,9 @@ export default defineComponent({
       const stream: string =
         searchObj.data.traceDetails.selectedLogStreams.join(",");
       const from =
-        searchObj.data.traceDetails.selectedTrace.trace_start_time - 30000000;
+        searchObj.data.traceDetails.selectedTrace.trace_start_time - 60000000;
       const to =
-        searchObj.data.traceDetails.selectedTrace.trace_end_time + 30000000;
+        searchObj.data.traceDetails.selectedTrace.trace_end_time + 60000000;
       const refresh = 0;
       const query = b64EncodeUnicode(
         `trace_id='${spanList.value[0]["trace_id"]}'`
