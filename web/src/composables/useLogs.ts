@@ -2184,7 +2184,7 @@ const useLogs = () => {
         let commonSchemaFieldsIndex: number = -1;
         let fieldObj: any = {};
         const localInterestingFields: any = useLocalInterestingFields();
-        let streamInterestingFields: any = [];
+        const streamInterestingFields: any = [];
 
         const selectedStreamValues = searchObj.data.stream.selectedStream
           .join(",")
@@ -2393,7 +2393,7 @@ const useLogs = () => {
               searchObj.data.queryResults.hasOwnProperty("hits") &&
               searchObj.data.queryResults?.hits.length > 0 &&
               (!store.state.zoConfig.user_defined_schemas_enabled ||
-                searchObj.meta.useUserDefinedSchemas != "user_defined_schema")
+                !searchObj.meta.hasUserDefinedSchemas)
             ) {
               // Find the index of the record with max attributes
               const maxAttributesIndex =
@@ -2419,7 +2419,11 @@ const useLogs = () => {
 
               // Object.keys(recordwithMaxAttribute).forEach((key) => {
               for (const key of Object.keys(recordwithMaxAttribute)) {
-                if (!schemaFields.includes(key)) {
+                if (
+                  !schemaFields.includes(key) &&
+                  !commonSchemaFields.includes(key) &&
+                  key != "_stream_name"
+                ) {
                   fieldObj = {
                     name: key,
                     type: "Utf8",
