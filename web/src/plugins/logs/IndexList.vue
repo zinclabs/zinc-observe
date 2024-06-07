@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :rows-per-page-options="[]"
         :hide-bottom="
           (!store.state.zoConfig.user_defined_schemas_enabled ||
-            searchObj.data.stream.userDefinedSchema.length == 0) &&
+          !searchObj.meta.hasUserDefinedSchemas) &&
           searchObj.data.stream.selectedStreamFields != undefined &&
           (searchObj.data.stream.selectedStreamFields.length <=
             pagination.rowsPerPage ||
@@ -486,7 +486,7 @@ class="text-bold" style="opacity: 0.7">
           <div
             v-if="
               store.state.zoConfig.user_defined_schemas_enabled &&
-              searchObj.data.stream.userDefinedSchema.length > 0
+              searchObj.meta.hasUserDefinedSchemas
             "
           >
             <q-btn-toggle
@@ -1453,5 +1453,9 @@ $streamSelectorHeight: 44px;
   overflow: hidden !important;
   white-space: nowrap !important;
   max-height: 40px !important;
+  
+  span, .q-field__input {
+    margin-top: -12px;
+  }
 }
 </style>

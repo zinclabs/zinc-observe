@@ -2268,7 +2268,9 @@ const useLogs = () => {
                 );
               }
             } else {
-              searchObj.meta.hasUserDefinedSchemas = false;
+              searchObj.meta.hasUserDefinedSchemas =
+                searchObj.meta.hasUserDefinedSchemas &&
+                searchObj.data.stream.selectedStream.length > 1;
             }
 
             searchObj.data.stream.interestingFieldList =
