@@ -229,7 +229,7 @@ const useLogs = () => {
   const $q = useQuasar();
   const { getAllFunctions } = useFunctions();
   const { showErrorNotification } = useNotifications();
-  const { getStreams, getStream, streams, getMultiStreams } = useStreams();
+  const { getStreams, getStream, getMultiStreams } = useStreams();
   const router = useRouter();
   let parser: any;
   const fieldValues = ref();
