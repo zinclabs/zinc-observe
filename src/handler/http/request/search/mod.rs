@@ -39,7 +39,8 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse},
+        infra::config::QUERY_RESULT_CACHE,
+        meta::{self, http::HttpResponse as MetaHttpResponse, search::ResultMeta},
         utils::{
             functions,
             http::{
@@ -238,6 +239,39 @@ pub async fn search(
         // Check permissions on stream ends
     }
 
+    // Result caching
+    let req_sql = req.query.sql.clone();
+    let mut hasher = DefaultHasher::new();
+    req_sql.hash(&mut hasher);
+    let query_hash = hasher.finish();
+    let file_path = format!("{}/{}/{}", org_id, stream_type.to_string(), stream_name);
+    let file_name = format!(
+        "{}_{}_{}.json",
+        req.query.start_time, req.query.end_time, query_hash
+    );
+    let is_aggregate =
+        crate::service::search::result_utils::is_aggregate_query(&req_sql).unwrap_or_default();
+
+    let query_key = format!(
+        "{}_{}_{}_{}",
+        org_id,
+        stream_type.to_string(),
+        stream_name,
+        query_hash
+    );
+
+    let r = QUERY_RESULT_CACHE.read().await;
+    let is_cached = r.get(&query_key);
+
+    if let Some(result_meta) = is_cached {
+        if req.query.start_time >= result_meta.start_time
+            && req.query.end_time >= result_meta.end_time
+            && is_aggregate == result_meta.is_aggregate
+        {}
+    };
+    drop(r);
+
+    // Result caching
     let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
     if let Some(vrl_function) = &query_fn {
         if !vrl_function.trim().ends_with('.') {
@@ -281,10 +315,6 @@ pub async fn search(
     } else {
         search_fut.await
     };
-
-    // let req_start_time = req.query.start_time;
-    // let req_end_time = req.query.end_time;
-    let req_sql = req.query.sql.clone();
 
     // do search
     match search_res {
@@ -345,23 +375,31 @@ pub async fn search(
             )
             .await;
 
-            let is_Aggregate = crate::service::search::result_utils::is_aggregate_query(&req_sql)
-                .unwrap_or_default();
-            println!("is_Aggregate: {}", is_Aggregate);
+            // result cache changes
 
             let res_cache = serde_json::to_string(&res).unwrap();
-            let mut hasher = DefaultHasher::new();
-            req_sql.hash(&mut hasher);
-            let query_hash = hasher.finish();
-            let file_path = format!("{}/{}/{}", org_id, stream_type.to_string(), stream_name);
-            let file_name = format!(
-                "{}_{}_{}.json",
-                req.query.start_time, req.query.end_time, query_hash
-            );
+
             tokio::spawn(async move {
-                let _ =
-                    result_writer::cache_results_to_disk(&file_path, &file_name, &res_cache).await;
+                match result_writer::cache_results_to_disk(&file_path, &file_name, &res_cache).await
+                {
+                    Ok(_) => {
+                        let mut w = QUERY_RESULT_CACHE.write().await;
+                        w.insert(
+                            query_key,
+                            ResultMeta {
+                                start_time: req.query.start_time,
+                                end_time: req.query.end_time,
+                                is_aggregate,
+                            },
+                        );
+                        drop(w);
+                    }
+                    Err(e) => {
+                        println!("Cache results to disk failed: {:?}", e);
+                    }
+                }
             });
+            // result cache changes
 
             Ok(HttpResponse::Ok().json(res))
         }

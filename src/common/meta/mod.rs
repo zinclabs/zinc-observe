@@ -26,6 +26,7 @@ pub mod pipelines;
 pub mod prom;
 pub mod proxy;
 pub mod saved_view;
+pub mod search;
 pub mod service;
 pub mod stream;
 pub mod syslog;
