@@ -1,12 +1,11 @@
 <template>
-  <div class="q-px-md q-py-md">
+  <div class="q-px-md q-pt-md q-pb-md">
     <div class="text-body1 text-bold">
-      {{ t("settings.traceDetails") }}
+      {{ t("settings.logDetails") }}
     </div>
   </div>
-  <q-separator />
 
-  <div class="q-ma-md">
+  <div class="q-mx-md q-mb-md">
     <div
       data-test="add-role-rolename-input-btn"
       class="trace-id-field-name o2-input q-mb-sm"
@@ -91,10 +90,13 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import organizations from "@/services/organizations";
+import { useStore } from "vuex";
 
 const { t } = useI18n();
 const traceIdFieldName = ref("trace_id");
 const spanIdFieldName = ref("span_id");
+const store = useStore();
 
 const isValidSpanField = ref(true);
 const isValidTraceField = ref(true);
@@ -119,7 +121,25 @@ const updateFieldName = (fieldName: string) => {
     isValidTraceField.value = validateFieldName(traceIdFieldName.value);
 };
 
-const saveOrgSettings = () => {};
+const saveOrgSettings = async () => {
+  try {
+    await organizations.post_organization_settings(
+      store.state.selectedOrganization.identifier,
+      {
+        trace_id_field_name: traceIdFieldName.value,
+        span_id_field_name: spanIdFieldName.value,
+      }
+    );
+
+    store.dispatch("setOrganizationSettings", {
+      ...store.state?.organizationData?.organizationSettings,
+      trace_id_field_name: traceIdFieldName.value,
+      span_id_field_name: spanIdFieldName.value,
+    });
+  } catch (e) {
+    console.log("Error saving organization settings");
+  }
+};
 </script>
 
 <style scoped lang="scss">

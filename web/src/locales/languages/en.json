@@ -853,7 +853,7 @@
     "logo": "Logo",
     "customLogoText": "Custom Logo Text",
     "orgLabel": "Organization Settings",
-    "traceDetails": "Trace Details",
+    "logDetails": "Log Details",
     "traceIdFieldName": "Trace ID Field Name",
     "spanIdFieldName": "Span ID Field Name"
   },
