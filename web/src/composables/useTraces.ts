@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive } from "vue";
-import { useLocalTraceFilterField } from "@/utils/zincutils";
+import { b64EncodeUnicode, useLocalTraceFilterField } from "@/utils/zincutils";
+import { useStore } from "vuex";
+import { useRouter } from "vue-router";
+import { copyToClipboard, useQuasar } from "quasar";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -136,6 +139,10 @@ const defaultObject = {
 const searchObj = reactive(Object.assign({}, defaultObject));
 
 const useTraces = () => {
+  const store = useStore();
+  const router = useRouter();
+  const $q = useQuasar();
+
   const resetSearchObj = () => {
     // delete searchObj.data;
     searchObj.data.errorMsg = "No stream found in selected organization!";
@@ -170,7 +177,80 @@ const useTraces = () => {
     useLocalTraceFilterField(selectedFields);
   };
 
-  return { searchObj, resetSearchObj, updatedLocalLogFilterField };
+  function getUrlQueryParams(getShareLink: boolean = false) {
+    const date = searchObj.data.datetime;
+    const query: any = {};
+
+    query["stream"] = searchObj.data.stream.selectedStream.value;
+
+    if (date.type == "relative" && !getShareLink) {
+      query["period"] = date.relativeTimePeriod;
+    } else {
+      query["from"] = date.startTime;
+      query["to"] = date.endTime;
+    }
+
+    query["query"] = b64EncodeUnicode(searchObj.data.editorValue);
+
+    query["filter_type"] = searchObj.meta.filterType;
+
+    query["org_identifier"] = store.state.selectedOrganization.identifier;
+
+    query["trace_id"] = router.currentRoute.value.query.trace_id;
+
+    if (router.currentRoute.value.query.span_id)
+      query["span_id"] = router.currentRoute.value.query.span_id;
+
+    return query;
+  }
+
+  const copyTracesUrl = (
+    customTimeRange: { from: string; to: string } | null = null
+  ) => {
+    const queryParams = getUrlQueryParams(true);
+
+    if (customTimeRange) {
+      queryParams.from = customTimeRange.from;
+      queryParams.to = customTimeRange.to;
+    }
+
+    const queryString = Object.entries(queryParams)
+      .map(
+        ([key, value]: any) =>
+          `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+      )
+      .join("&");
+
+    let shareURL = window.location.origin + window.location.pathname;
+
+    if (queryString != "") {
+      shareURL += "?" + queryString;
+    }
+
+    copyToClipboard(shareURL)
+      .then(() => {
+        $q.notify({
+          type: "positive",
+          message: "Link Copied Successfully!",
+          timeout: 5000,
+        });
+      })
+      .catch(() => {
+        $q.notify({
+          type: "negative",
+          message: "Error while copy link.",
+          timeout: 5000,
+        });
+      });
+  };
+
+  return {
+    searchObj,
+    resetSearchObj,
+    updatedLocalLogFilterField,
+    getUrlQueryParams,
+    copyTracesUrl,
+  };
 };
 
 export default useTraces;

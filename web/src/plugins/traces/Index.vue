@@ -259,7 +259,8 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const { t } = useI18n();
-    const { searchObj, resetSearchObj } = useTraces();
+    const { searchObj, resetSearchObj, getUrlQueryParams, copyTracesUrl } =
+      useTraces();
     let refreshIntervalID = 0;
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -577,9 +578,11 @@ export default defineComponent({
         req.query.sql = b64EncodeUnicode(req.query.sql);
 
         const queryParams = getUrlQueryParams();
+
         router.push({ query: queryParams });
         return req;
       } catch (e) {
+        console.log(e);
         searchObj.loading = false;
         showErrorNotification("Invalid SQL Syntax");
       }

@@ -300,6 +300,7 @@ import {
   watch,
   defineAsyncComponent,
   onBeforeMount,
+  onActivated,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
@@ -349,7 +350,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
-    const { searchObj } = useTraces();
+    const { searchObj, copyTracesUrl } = useTraces();
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -424,7 +425,31 @@ export default defineComponent({
 
     const showTraceDetails = ref(false);
 
+    onActivated(() => {
+      const params = router.currentRoute.value.query;
+
+      if (
+        searchObj.data.traceDetails.selectedTrace &&
+        params.trace_id !== searchObj.data.traceDetails.selectedTrace.trace_id
+      ) {
+        searchObj.data.traceDetails.showSpanDetails = false;
+        searchObj.data.traceDetails.selectedSpanId = "";
+        searchObj.data.traceDetails.selectedTrace = {};
+        searchObj.data.traceDetails.spanList = [];
+        searchObj.data.traceDetails.loading = true;
+        setupTraceDetails();
+      }
+    });
+
     onBeforeMount(async () => {
+      setupTraceDetails();
+    });
+
+    const setupTraceDetails = async () => {
+      showTraceDetails.value = false;
+      searchObj.data.traceDetails.showSpanDetails = false;
+      searchObj.data.traceDetails.selectedSpanId = "";
+
       await getTraceMeta();
       await getStreams("logs", false)
         .then((res: any) => {
@@ -440,7 +465,7 @@ export default defineComponent({
         })
         .catch(() => Promise.reject())
         .finally(() => {});
-    });
+    };
 
     onMounted(() => {
       const params = router.currentRoute.value.query;
@@ -1015,7 +1040,10 @@ export default defineComponent({
     };
 
     const shareLink = () => {
-      emit("shareLink");
+      copyTracesUrl({
+        from: router.currentRoute.value.query.from,
+        to: router.currentRoute.value.query.to,
+      });
     };
 
     const redirectToLogs = () => {
