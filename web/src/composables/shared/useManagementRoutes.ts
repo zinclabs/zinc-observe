@@ -23,6 +23,15 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        {
+          path: "organization",
+          name: "organizationSettings",
+          component: () =>
+            import("@/components/settings/OrganizationSettings.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
       ],
     },
   ];

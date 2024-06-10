@@ -839,7 +839,7 @@
     "updateuserKey": "Update User Key",
     "id": "Id",
     "update": "Update",
-    "generalLabel": "Settings",
+    "generalLabel": "General Settings",
     "queryManagement": "Query Management",
     "apikeyLabel": "API Keys",
     "generalPageTitle": "General Settings",
@@ -851,7 +851,11 @@
     "deleteLogoMessage": "Are you sure you want to delete this logo image? Click Ok to delete.",
     "deleteLogo": "Delete Logo",
     "logo": "Logo",
-    "customLogoText": "Custom Logo Text"
+    "customLogoText": "Custom Logo Text",
+    "orgLabel": "Organization Settings",
+    "traceDetails": "Trace Details",
+    "traceIdFieldName": "Trace ID Field Name",
+    "spanIdFieldName": "Span ID Field Name"
   },
   "reports": {
     "header": "Reports",
