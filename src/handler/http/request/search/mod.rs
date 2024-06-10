@@ -713,6 +713,7 @@ pub async fn around(
         max_ts: Some(around_end_time),
         cached_ratio: Some(resp.cached_ratio),
         trace_id: Some(trace_id),
+        search_type: Some(SearchEventType::UI),
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;

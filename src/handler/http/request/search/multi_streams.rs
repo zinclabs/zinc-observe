@@ -289,7 +289,7 @@ pub async fn search_multi(
                         stream_type.to_string().as_str(),
                     ])
                     .inc();
-                res.set_trace_id(trace_id);
+                res.set_trace_id(trace_id.clone());
                 res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
 
                 let req_stats = RequestStats {
@@ -302,6 +302,7 @@ pub async fn search_multi(
                     max_ts: Some(req.query.end_time),
                     cached_ratio: Some(res.cached_ratio),
                     search_type,
+                    trace_id: Some(trace_id),
                     ..Default::default()
                 };
                 let num_fn = req.query.query_fn.is_some() as u16;
@@ -666,6 +667,7 @@ pub async fn around_multi(
         .to_str()
         .ok()
         .map(|v| v.to_string());
+    let sql_len = around_sqls.len();
 
     for around_sql in around_sqls.iter() {
         // get a local search queue lock
@@ -855,6 +857,8 @@ pub async fn around_multi(
         multi_resp.total += total_hits;
         multi_resp.scan_size += total_scan_size;
         multi_resp.took += resp_forward.took + resp_backward.took;
+        let cached_ratio = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
+        multi_resp.cached_ratio += cached_ratio;
 
         let time = start.elapsed().as_secs_f64();
         metrics::HTTP_RESPONSE_TIME
@@ -888,6 +892,9 @@ pub async fn around_multi(
             user_email: Some(user_id.to_string()),
             min_ts: Some(around_start_time),
             max_ts: Some(around_end_time),
+            cached_ratio: Some(cached_ratio),
+            search_type: Some(search::SearchEventType::UI),
+            trace_id: Some(trace_id.clone()),
             ..Default::default()
         };
         let num_fn = query_fn.is_some() as u16;
@@ -902,6 +909,7 @@ pub async fn around_multi(
         .await;
     }
 
+    multi_resp.cached_ratio /= sql_len;
     multi_resp.hits.sort_by(|a, b| {
         let a_ts = a.get("_timestamp").unwrap().as_i64().unwrap();
         let b_ts = b.get("_timestamp").unwrap().as_i64().unwrap();
