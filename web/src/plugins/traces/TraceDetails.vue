@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="trace-details"
+    class="trace-details full-width"
     :style="{
-      width: '97vw !important',
       background: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
     }"
   >
@@ -28,6 +27,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="full-width flex items-center toolbar flex justify-between">
         <div class="flex items-center">
+          <div
+            data-test="add-alert-back-btn"
+            class="flex justify-center items-center q-mr-md cursor-pointer"
+            style="
+              border: 1.5px solid;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+            "
+            title="Go Back"
+            @click="router.back()"
+          >
+            <q-icon name="arrow_back_ios_new" size="14px" />
+          </div>
           <div class="text-h6 q-mr-lg">
             {{ traceTree[0]["operationName"] }}
           </div>
@@ -145,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('search.shareLink')"
             @click="shareLink"
           />
-          <q-btn v-close-popup="true" round flat icon="cancel" size="md" />
+          <q-btn round flat icon="cancel" size="md" @click="router.back()" />
         </div>
       </div>
 
@@ -261,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <trace-details-sidebar
           :span="showTraceDetails ? traceDetails : spanMap[selectedSpanId as string]"
+          :span-id="selectedSpanId"
           @view-logs="redirectToLogs"
           @close="closeSidebar"
         />
@@ -309,6 +323,8 @@ import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
+import searchService from "@/services/search";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -358,6 +374,8 @@ export default defineComponent({
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
 
+    const { showErrorNotification } = useNotifications();
+
     const logStreams = ref([]);
 
     const filteredStreamOptions = ref([]);
@@ -391,6 +409,9 @@ export default defineComponent({
 
     const throttledResizing = ref<any>(null);
 
+    const serviceColorIndex = ref(0);
+    const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
+
     const spanList: any = computed(() => {
       return searchObj.data.traceDetails.spanList;
     });
@@ -403,8 +424,9 @@ export default defineComponent({
 
     const showTraceDetails = ref(false);
 
-    onBeforeMount(() => {
-      getStreams("logs", false)
+    onBeforeMount(async () => {
+      await getTraceMeta();
+      await getStreams("logs", false)
         .then((res: any) => {
           logStreams.value = res.list.map((option: any) => option.name);
           filteredStreamOptions.value = JSON.parse(
@@ -421,8 +443,11 @@ export default defineComponent({
     });
 
     onMounted(() => {
-      traceDetails.value = searchObj.data.traceDetails.selectedTrace;
-      buildTracesTree();
+      const params = router.currentRoute.value.query;
+      if (params.span_id) {
+        searchObj.data.traceDetails.showSpanDetails = true;
+        searchObj.data.traceDetails.selectedSpanId = params.span_id;
+      }
     });
 
     watch(
@@ -442,6 +467,148 @@ export default defineComponent({
     const selectedSpanId = computed(() => {
       return searchObj.data.traceDetails.selectedSpanId;
     });
+
+    const getTraceMeta = () => {
+      searchObj.loading = true;
+
+      let filter = router.currentRoute.value.query.filter || "";
+
+      if (filter?.length)
+        filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
+      else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
+
+      searchService
+        .get_traces({
+          org_identifier: router.currentRoute.value.query.org_identifier,
+          start_time: Number(router.currentRoute.value.query.from),
+          end_time: Number(router.currentRoute.value.query.to),
+          filter: filter || "",
+          size: 1,
+          from: 0,
+          stream_name: router.currentRoute.value.query.stream,
+        })
+        .then(async (res: any) => {
+          const trace = getTracesMetaData(res.data.hits)[0];
+          if (!trace) {
+            showTraceDetailsError();
+            return;
+          }
+          searchObj.data.traceDetails.selectedTrace = trace;
+          getTraceDetails();
+        })
+        .catch(() => {
+          showTraceDetailsError();
+        })
+        .finally(() => {
+          searchObj.loading = false;
+        });
+    };
+
+    const getDefaultRequest = () => {
+      return {
+        query: {
+          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time/1000) as trace_start_time, max(end_time/1000) as trace_end_time, min(service_name) as service_name, min(operation_name) as operation_name, count(trace_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
+          start_time: (new Date().getTime() - 900000) * 1000,
+          end_time: new Date().getTime() * 1000,
+          from: 0,
+          size: 0,
+        },
+        encoding: "base64",
+      };
+    };
+
+    const buildTraceSearchQuery = (trace: any) => {
+      const req = getDefaultRequest();
+      req.query.from = 0;
+      req.query.size = 1000;
+      req.query.start_time = Number(trace.from) - 30000000;
+      req.query.end_time = Number(trace.from) + 30000000;
+
+      req.query.sql = b64EncodeUnicode(
+        `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
+      );
+
+      return req;
+    };
+
+    const getTraceDetails = async () => {
+      searchObj.meta.showTraceDetails = true;
+      searchObj.data.traceDetails.loading = true;
+      searchObj.data.traceDetails.spanList = [];
+      const req = buildTraceSearchQuery(router.currentRoute.value.query);
+
+      searchService
+        .search(
+          {
+            org_identifier: router.currentRoute.value.query?.org_identifier,
+            query: req,
+            page_type: "traces",
+          },
+          "UI"
+        )
+        .then((res: any) => {
+          searchObj.data.traceDetails.spanList = res.data?.hits || [];
+          buildTracesTree();
+        })
+        .finally(() => {
+          searchObj.data.traceDetails.loading = false;
+        });
+    };
+
+    const getTracesMetaData = (traces: any[]) => {
+      if (!traces.length) return [];
+
+      return traces.map((trace) => {
+        const _trace = {
+          trace_id: trace.trace_id,
+          trace_start_time: Math.round(trace.start_time / 1000),
+          trace_end_time: Math.round(trace.end_time / 1000),
+          service_name: trace.service_name,
+          operation_name: trace.operation_name,
+          spans: trace.spans[0],
+          errors: trace.spans[1],
+          duration: trace.duration,
+          services: {} as any,
+          zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
+        };
+        trace.service_name.forEach((service: any) => {
+          if (!searchObj.meta.serviceColors[service.service_name]) {
+            if (serviceColorIndex.value >= colors.value.length)
+              generateNewColor();
+
+            searchObj.meta.serviceColors[service.service_name] =
+              colors.value[serviceColorIndex.value];
+
+            serviceColorIndex.value++;
+          }
+          _trace.services[service.service_name] = service.count;
+        });
+        return _trace;
+      });
+    };
+
+    const showTraceDetailsError = () => {
+      showErrorNotification(
+        `Trace ${router.currentRoute.value.query.trace_id} not found`
+      );
+      const query = cloneDeep(router.currentRoute.value.query);
+      delete query.trace_id;
+      router.push({
+        name: "traces",
+        query: {
+          ...query,
+        },
+      });
+      return;
+    };
+
+    function generateNewColor() {
+      // Generate a color in HSL format
+      const hue = colors.value.length * (360 / 50);
+      const lightness = 50 + (colors.value.length % 2) * 15;
+      colors.value.push(`hsl(${hue}, 100%, ${lightness}%)`);
+      return colors;
+    }
 
     const calculateTracePosition = () => {
       const tics = [];
@@ -900,6 +1067,7 @@ export default defineComponent({
     };
 
     return {
+      router,
       t,
       traceTree,
       collapseMapping,
@@ -952,6 +1120,7 @@ $seperatorWidth: 2px;
 $toolbarHeight: 50px;
 $traceHeaderHeight: 30px;
 $traceChartHeight: 210px;
+$appNavbarHeight: 57px;
 
 $traceChartCollapseHeight: 42px;
 
@@ -959,7 +1128,6 @@ $traceChartCollapseHeight: 42px;
   height: $toolbarHeight;
 }
 .trace-details {
-  height: 100vh;
   overflow: auto;
 }
 .histogram-container-full {
@@ -971,23 +1139,27 @@ $traceChartCollapseHeight: 42px;
 
 .histogram-sidebar {
   width: $sidebarWidth;
-  height: calc(100vh - $toolbarHeight - $traceChartHeight - 44px);
+  height: calc(
+    100vh - $toolbarHeight - $traceChartHeight - 44px - $appNavbarHeight
+  );
   overflow-y: auto;
   overflow-x: hidden;
 
   &.full {
-    height: calc(100vh - $toolbarHeight - 8px - 44px);
+    height: calc(100vh - $toolbarHeight - 8px - 44px - $appNavbarHeight);
   }
 }
 
 .histogram-spans-container {
-  height: calc(100vh - $toolbarHeight - $traceChartHeight - 44px);
+  height: calc(
+    100vh - $toolbarHeight - $traceChartHeight - 44px - $appNavbarHeight
+  );
   overflow-y: auto;
   position: relative;
   overflow-x: hidden;
 
   &.full {
-    height: calc(100vh - $toolbarHeight - 8px - 44px);
+    height: calc(100vh - $toolbarHeight - 8px - 44px - $appNavbarHeight);
   }
 }
 

@@ -340,6 +340,10 @@ export default defineComponent({
       type: Object,
       default: () => null,
     },
+    spanId: {
+      type: String,
+      default: "",
+    },
   },
   emits: ["close", "view-logs"],
   setup(props, { emit }) {
@@ -500,6 +504,8 @@ export default defineComponent({
     watch(
       () => props.span,
       () => {
+        tags.value = {};
+        processes.value = {};
         Object.keys(props.span).forEach((key: string) => {
           if (!span_details.has(key)) {
             tags.value[key] = props.span[key];
@@ -733,7 +739,7 @@ export default defineComponent({
   }
 }
 .span_details_tab-panels {
-  height: calc(100% - 102px);
+  height: calc(100% - 104px);
   overflow-y: auto;
   overflow-x: hidden;
 }

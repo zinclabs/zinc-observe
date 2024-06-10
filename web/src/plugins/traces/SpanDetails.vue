@@ -750,7 +750,7 @@ const copySpanId = () => {
   }
 }
 .span_details_tab-panels {
-  height: calc(100% - 102px);
+  height: calc(100% - 104px);
   overflow-y: auto;
   overflow-x: hidden;
 }

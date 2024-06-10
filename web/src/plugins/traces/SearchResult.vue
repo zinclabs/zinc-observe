@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-item>
       </q-virtual-scroll>
-      <q-dialog
+      <!-- <q-dialog
         v-model="searchObj.meta.showTraceDetails"
         position="right"
         full-height
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @hide="closeTraceDetails"
       >
         <trace-details @shareLink="shareLink" />
-      </q-dialog>
+      </q-dialog> -->
     </div>
   </div>
 </template>
@@ -182,10 +182,13 @@ export default defineComponent({
     const expandRowDetail = (props: any) => {
       searchObj.data.traceDetails.selectedTrace = props;
       router.push({
-        name: "traces",
+        name: "traceDetails",
         query: {
-          ...router.currentRoute.value.query,
+          stream: router.currentRoute.value.query.stream,
           trace_id: props.trace_id,
+          from: props.trace_start_time - 10000000,
+          to: props.trace_end_time + 10000000,
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
       setTimeout(() => {
