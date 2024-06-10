@@ -532,7 +532,6 @@ export default defineComponent({
     };
 
     const getTraceDetails = async () => {
-      searchObj.meta.showTraceDetails = true;
       searchObj.data.traceDetails.loading = true;
       searchObj.data.traceDetails.spanList = [];
       const req = buildTraceSearchQuery(router.currentRoute.value.query);

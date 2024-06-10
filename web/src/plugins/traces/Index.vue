@@ -1328,7 +1328,6 @@ export default defineComponent({
       updateGridColumns,
       getConsumableDateTime,
       runQueryFn,
-      getTraceDetails,
       verifyOrganizationStatus,
       fieldValues,
       onSplitterUpdate,

@@ -54,16 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </q-item>
       </q-virtual-scroll>
-      <!-- <q-dialog
-        v-model="searchObj.meta.showTraceDetails"
-        position="right"
-        full-height
-        full-width
-        maximized
-        @hide="closeTraceDetails"
-      >
-        <trace-details @shareLink="shareLink" />
-      </q-dialog> -->
     </div>
   </div>
 </template>
@@ -81,7 +71,6 @@ import TraceDetails from "./TraceDetails.vue";
 import { convertTraceData } from "@/utils/traces/convertTraceData";
 import TraceBlock from "./TraceBlock.vue";
 import { useRouter } from "vue-router";
-import { cloneDeep } from "lodash-es";
 
 export default defineComponent({
   name: "SearchResult",
@@ -151,7 +140,6 @@ export default defineComponent({
     const $q = useQuasar();
     const router = useRouter();
 
-    const showTraceDetails = ref(false);
     const { searchObj, updatedLocalLogFilterField } = useTraces();
     const totalHeight = ref(0);
 
@@ -191,9 +179,6 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
-      setTimeout(() => {
-        searchObj.meta.showTraceDetails = true;
-      }, 100);
 
       emit("get:traceDetails", props);
     };
@@ -270,8 +255,6 @@ export default defineComponent({
       totalHeight,
       reDrawChart,
       getImageURL,
-      showTraceDetails,
-      closeTraceDetails,
       onChartClick,
       shareLink,
     };
