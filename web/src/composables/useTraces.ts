@@ -124,7 +124,11 @@ const defaultObject = {
       histogramHide: false,
     },
     traceDetails: {
-      selectedTrace: null,
+      selectedTrace: null as {
+        trace_id: string;
+        trace_start_time: number;
+        trace_end_time: number;
+      } | null,
       traceId: "",
       spanList: [],
       loading: false,

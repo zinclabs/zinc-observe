@@ -224,7 +224,11 @@ export default defineComponent({
       const to = span.endTimeMs * 1000 + 60000000;
       const refresh = 0;
       const query = b64EncodeStandard(
-        `span_id='${span.spanId}' AND trace_id='${searchObj.data.traceDetails.selectedTrace.trace_id}'`
+        `span_id='${span.spanId}' ${
+          searchObj.data.traceDetails.selectedTrace?.trace_id
+            ? `AND trace_id='${searchObj.data.traceDetails.selectedTrace?.trace_id}'`
+            : ""
+        }`
       );
 
       router.push({

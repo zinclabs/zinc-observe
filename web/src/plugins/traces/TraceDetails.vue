@@ -84,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               fill-input
               :title="selectedStreamsString"
-              @update:model-value="onStreamChange('')"
             >
               <template #no-option>
                 <div class="o2-input log-stream-search-input">
@@ -274,7 +273,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <trace-details-sidebar
           :span="showTraceDetails ? traceDetails : spanMap[selectedSpanId as string]"
-          :span-id="selectedSpanId"
           @view-logs="redirectToLogs"
           @close="closeSidebar"
         />
@@ -381,7 +379,7 @@ export default defineComponent({
 
     const filteredStreamOptions = ref([]);
 
-    const streamSearchValue = ref("");
+    const streamSearchValue = ref<string>("");
 
     const { t } = useI18n();
 
@@ -430,11 +428,15 @@ export default defineComponent({
 
       if (
         searchObj.data.traceDetails.selectedTrace &&
-        params.trace_id !== searchObj.data.traceDetails.selectedTrace.trace_id
+        params.trace_id !== searchObj.data.traceDetails.selectedTrace?.trace_id
       ) {
         searchObj.data.traceDetails.showSpanDetails = false;
         searchObj.data.traceDetails.selectedSpanId = "";
-        searchObj.data.traceDetails.selectedTrace = {};
+        searchObj.data.traceDetails.selectedTrace = {
+          trace_id: "",
+          trace_start_time: 0,
+          trace_end_time: 0,
+        };
         searchObj.data.traceDetails.spanList = [];
         searchObj.data.traceDetails.loading = true;
         setupTraceDetails();
@@ -471,7 +473,7 @@ export default defineComponent({
       const params = router.currentRoute.value.query;
       if (params.span_id) {
         searchObj.data.traceDetails.showSpanDetails = true;
-        searchObj.data.traceDetails.selectedSpanId = params.span_id;
+        searchObj.data.traceDetails.selectedSpanId = params.span_id as string;
       }
     });
 
@@ -496,7 +498,7 @@ export default defineComponent({
     const getTraceMeta = () => {
       searchObj.loading = true;
 
-      let filter = router.currentRoute.value.query.filter || "";
+      let filter = (router.currentRoute.value.query.filter as string) || "";
 
       if (filter?.length)
         filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
@@ -504,13 +506,14 @@ export default defineComponent({
 
       searchService
         .get_traces({
-          org_identifier: router.currentRoute.value.query.org_identifier,
+          org_identifier: router.currentRoute.value.query
+            .org_identifier as string,
           start_time: Number(router.currentRoute.value.query.from),
           end_time: Number(router.currentRoute.value.query.to),
           filter: filter || "",
           size: 1,
           from: 0,
-          stream_name: router.currentRoute.value.query.stream,
+          stream_name: router.currentRoute.value.query.stream as string,
         })
         .then(async (res: any) => {
           const trace = getTracesMetaData(res.data.hits)[0];
@@ -551,7 +554,7 @@ export default defineComponent({
 
       req.query.sql = b64EncodeUnicode(
         `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
-      );
+      ) as string;
 
       return req;
     };
@@ -564,7 +567,8 @@ export default defineComponent({
       searchService
         .search(
           {
-            org_identifier: router.currentRoute.value.query?.org_identifier,
+            org_identifier: router.currentRoute.value.query
+              ?.org_identifier as string,
             query: req,
             page_type: "traces",
           },
@@ -1041,18 +1045,21 @@ export default defineComponent({
 
     const shareLink = () => {
       copyTracesUrl({
-        from: router.currentRoute.value.query.from,
-        to: router.currentRoute.value.query.to,
+        from: router.currentRoute.value.query.from as string,
+        to: router.currentRoute.value.query.to as string,
       });
     };
 
     const redirectToLogs = () => {
+      if (!searchObj.data.traceDetails.selectedTrace) {
+        return;
+      }
       const stream: string =
         searchObj.data.traceDetails.selectedLogStreams.join(",");
       const from =
-        searchObj.data.traceDetails.selectedTrace.trace_start_time - 60000000;
+        searchObj.data.traceDetails.selectedTrace?.trace_start_time - 60000000;
       const to =
-        searchObj.data.traceDetails.selectedTrace.trace_end_time + 60000000;
+        searchObj.data.traceDetails.selectedTrace?.trace_end_time + 60000000;
       const refresh = 0;
       const query = b64EncodeUnicode(
         `trace_id='${spanList.value[0]["trace_id"]}'`
@@ -1076,7 +1083,7 @@ export default defineComponent({
       });
     };
 
-    const filterStreamFn = (val: string) => {
+    const filterStreamFn = (val: any = "") => {
       filteredStreamOptions.value = logStreams.value.filter((stream: any) => {
         return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
       });

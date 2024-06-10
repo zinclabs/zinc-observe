@@ -340,10 +340,6 @@ export default defineComponent({
       type: Object,
       default: () => null,
     },
-    spanId: {
-      type: String,
-      default: "",
-    },
   },
   emits: ["close", "view-logs"],
   setup(props, { emit }) {
