@@ -805,8 +805,6 @@ export default defineComponent({
             //update grid columns
             updateGridColumns();
 
-            if (router.currentRoute.value.query.trace_id) openTraceDetails();
-
             // dismiss();
           })
           .catch((err) => {
