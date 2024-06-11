@@ -568,11 +568,11 @@ export default defineComponent({
       req.query.size = 1000;
       req.query.start_time =
         Math.ceil(
-          Number(searchObj.data.traceDetails.selectedTrace.trace_start_time)
+          Number(searchObj.data.traceDetails.selectedTrace?.trace_start_time)
         ) - 30000000;
       req.query.end_time =
         Math.ceil(
-          Number(searchObj.data.traceDetails.selectedTrace.trace_end_time)
+          Number(searchObj.data.traceDetails.selectedTrace?.trace_end_time)
         ) + 30000000;
 
       req.query.sql = b64EncodeUnicode(
