@@ -224,6 +224,7 @@ pub struct ResponseTook {
     pub wait_queue: usize,
     pub cluster_total: usize,
     pub cluster_wait_queue: usize,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub nodes: Vec<ResponseNodeTook>,
 }
