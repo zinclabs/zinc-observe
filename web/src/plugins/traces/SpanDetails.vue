@@ -1,5 +1,8 @@
 <template>
-  <div class="full-width q-mb-md q-px-md span-details-container">
+  <div
+    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
+    class="full-width q-mb-md q-px-md span-details-container"
+  >
     <div
       class="flex justify-between items-center full-width"
       style="border-bottom: 1px solid #e9e9e9"
@@ -371,6 +374,72 @@
           </div>
         </div>
       </div>
+      <div v-if="links.length">
+        <div
+          class="flex items-center no-wrap cursor-pointer"
+          @click="toggleLinks"
+        >
+          <q-icon
+            name="expand_more"
+            :class="!isLinksExpanded ? 'rotate-270' : ''"
+            size="14px"
+            class="cursor-pointer text-grey-7"
+          />
+          <div class="cursor-pointer text-bold">References</div>
+          <div
+            class="q-ml-sm text-grey-9"
+            style="
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              font-size: 12px;
+            "
+          >
+            {{ links.length }}
+          </div>
+        </div>
+        <div v-show="isLinksExpanded" class="q-px-md q-my-sm">
+          <q-separator />
+          <template v-for="link in links" :key="link.context.spanId">
+            <div
+              class="flex row justify-between items-center q-pa-xs links-container"
+            >
+              <div
+                class="ref-span-link cursor-pointer"
+                @click="openReferenceTrace('span', link)"
+              >
+                Span in another trace
+              </div>
+              <div class="flex items-center link-id-container">
+                <div class="q-mr-sm link-span-id ellipsis">
+                  <span class="text-grey-7">Span ID: </span>
+                  <span
+                    class="id-link cursor-pointer"
+                    @click="openReferenceTrace('span', link)"
+                    >{{ link.context.spanId }}</span
+                  >
+                </div>
+                <div class="link-trace-id ellipsis">
+                  <span class="text-grey-7">Trace ID: </span>
+                  <span
+                    class="id-link cursor-pointer"
+                    @click="openReferenceTrace('trace', link)"
+                  >
+                    {{ link.context.traceId }}</span
+                  >
+                </div>
+              </div>
+            </div>
+            <q-separator />
+          </template>
+          <div
+            class="full-width text-center q-pt-lg text-bold"
+            v-if="!links.length"
+          >
+            No events present for this span
+          </div>
+        </div>
+      </div>
       <div class="text-right flex items-center justify-end">
         <span class="text-grey-7 q-mr-xs">Span Id: </span
         ><span class="">{{ span.spanId }}</span>
@@ -396,6 +465,7 @@ import { formatTimeWithSuffix } from "@/utils/zincutils";
 import { date, useQuasar } from "quasar";
 import { copyToClipboard } from "quasar";
 import { useI18n } from "vue-i18n";
+import { useRouter } from "vue-router";
 
 const props = defineProps({
   span: {
@@ -412,11 +482,34 @@ const props = defineProps({
   },
 });
 
+const links = [
+  {
+    context: {
+      traceId: "f6e08ab2a928aa393375f0d9b05a9054",
+      spanId: "ecc59cb843104cf8",
+      traceFlags: 1,
+      traceState: undefined,
+    },
+    attributes: {},
+  },
+  {
+    context: {
+      traceId: "6d88ba59ea87ffffdbad56b9e8acc1b3",
+      spanId: "39d6bc6878b73c60",
+      traceFlags: 1,
+      traceState: undefined,
+    },
+    attributes: {},
+  },
+];
+
 const emit = defineEmits(["view-logs"]);
 
 const store = useStore();
 
 const { t } = useI18n();
+
+const router = useRouter();
 
 const getDuration = computed(() => formatTimeWithSuffix(props.span.durationUs));
 
@@ -541,6 +634,12 @@ const areEventsExpananded = ref(false);
 
 const isExceptionExpanded = ref(false);
 
+const isLinksExpanded = ref(false);
+
+const toggleLinks = () => {
+  isLinksExpanded.value = !isLinksExpanded.value;
+};
+
 const toggleProcess = () => {
   areProcessExpananded.value = !areProcessExpananded.value;
 };
@@ -574,6 +673,26 @@ const copySpanId = () => {
     timeout: 2000,
   });
   copyToClipboard(props.span.spanId);
+};
+
+const openReferenceTrace = (type: string, link: any) => {
+  const query = {
+    stream: router.currentRoute.value.query.stream,
+    trace_id: link.context.traceId,
+    span_id: link.context.spanId,
+    from: props.span.startTimeMs * 1000 - 3600000000,
+    to: props.span.startTimeMs * 1000 + 3600000000,
+    org_identifier: store.state.selectedOrganization.identifier,
+  };
+
+  if (type !== "span") {
+    delete query.span_id;
+  }
+
+  router.push({
+    name: "traceDetails",
+    query,
+  });
 };
 </script>
 
@@ -758,6 +877,38 @@ const copySpanId = () => {
 .hearder_bg {
   border-top: 1px solid $border-color;
   background-color: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.link-id-container {
+  .link-trace-id {
+    width: 320px;
+  }
+
+  .link-span-id {
+    width: 200px;
+  }
+}
+
+.ref-span-link,
+.id-link {
+  &:hover {
+    opacity: 0.6;
+    text-decoration: underline;
+  }
+}
+
+.dark-theme {
+  .links-container {
+    border-left: 1px solid #ffffff47;
+    border-right: 1px solid #ffffff47;
+  }
+}
+
+.light-theme {
+  .links-container {
+    border-left: 1px solid #0000001f;
+    border-right: 1px solid #0000001f;
+  }
 }
 </style>
 <style lang="scss">

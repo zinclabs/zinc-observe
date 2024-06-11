@@ -852,7 +852,7 @@
     "deleteLogo": "Delete Logo",
     "logo": "Logo",
     "customLogoText": "Custom Logo Text",
-    "orgLabel": "Organization Settings",
+    "orgLabel": "Organization Parameters",
     "logDetails": "Log Details",
     "traceIdFieldName": "Trace ID Field Name",
     "spanIdFieldName": "Span ID Field Name"

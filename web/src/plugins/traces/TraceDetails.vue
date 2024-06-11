@@ -430,15 +430,7 @@ export default defineComponent({
         searchObj.data.traceDetails.selectedTrace &&
         params.trace_id !== searchObj.data.traceDetails.selectedTrace?.trace_id
       ) {
-        searchObj.data.traceDetails.showSpanDetails = false;
-        searchObj.data.traceDetails.selectedSpanId = "";
-        searchObj.data.traceDetails.selectedTrace = {
-          trace_id: "",
-          trace_start_time: 0,
-          trace_end_time: 0,
-        };
-        searchObj.data.traceDetails.spanList = [];
-        searchObj.data.traceDetails.loading = true;
+        resetTraceDetails();
         setupTraceDetails();
       }
     });
@@ -446,6 +438,32 @@ export default defineComponent({
     onBeforeMount(async () => {
       setupTraceDetails();
     });
+
+    watch(
+      () => router.currentRoute.value.query.trace_id,
+      (_new, _old) => {
+        if (_new !== _old) {
+          resetTraceDetails();
+          setupTraceDetails();
+          const params = router.currentRoute.value.query;
+          if (params.span_id) {
+            updateSelectedSpan(params.span_id as string);
+          }
+        }
+      }
+    );
+
+    const resetTraceDetails = () => {
+      searchObj.data.traceDetails.showSpanDetails = false;
+      searchObj.data.traceDetails.selectedSpanId = "";
+      searchObj.data.traceDetails.selectedTrace = {
+        trace_id: "",
+        trace_start_time: 0,
+        trace_end_time: 0,
+      };
+      searchObj.data.traceDetails.spanList = [];
+      searchObj.data.traceDetails.loading = true;
+    };
 
     const setupTraceDetails = async () => {
       showTraceDetails.value = false;
@@ -472,8 +490,7 @@ export default defineComponent({
     onMounted(() => {
       const params = router.currentRoute.value.query;
       if (params.span_id) {
-        searchObj.data.traceDetails.showSpanDetails = true;
-        searchObj.data.traceDetails.selectedSpanId = params.span_id as string;
+        updateSelectedSpan(params.span_id as string);
       }
     });
 
@@ -549,8 +566,14 @@ export default defineComponent({
       const req = getDefaultRequest();
       req.query.from = 0;
       req.query.size = 1000;
-      req.query.start_time = Number(trace.from) - 30000000;
-      req.query.end_time = Number(trace.from) + 30000000;
+      req.query.start_time =
+        Math.ceil(
+          Number(searchObj.data.traceDetails.selectedTrace.trace_start_time)
+        ) - 30000000;
+      req.query.end_time =
+        Math.ceil(
+          Number(searchObj.data.traceDetails.selectedTrace.trace_end_time)
+        ) + 30000000;
 
       req.query.sql = b64EncodeUnicode(
         `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
