@@ -51,10 +51,10 @@ use crate::{
     service::format_partition_key,
 };
 
+pub mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
-pub mod result_utils;
 pub(crate) mod sql;
 
 pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
