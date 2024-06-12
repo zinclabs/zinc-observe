@@ -390,9 +390,20 @@ export default defineComponent({
         let selectFilter = "";
         // Handle different filter types and operators
         if (field.type == "list" && field.values?.length > 0) {
-          selectFilter += `${field.column} IN (${field.values
-            .map((it) => `'${it}'`)
-            .join(", ")})`;
+          switch (field?.operator) {
+            case "IN": {
+              selectFilter += `${field.column} IN (${field.values
+                .map((it) => `'${it}'`)
+                .join(", ")})`;
+              break;
+            }
+            case "Not IN": {
+              selectFilter += `${field.column} NOT IN (${field.values
+                .map((it) => `'${it}'`)
+                .join(", ")})`;
+              break;
+            }
+          }
         } else if (field.type == "condition" && field.operator != null) {
           selectFilter += `${field?.column} `;
           if (["Is Null", "Is Not Null"].includes(field.operator)) {
@@ -532,9 +543,20 @@ export default defineComponent({
       const filterConditions = filterData.map((field: any) => {
         let selectFilter = "";
         if (field.type === "list" && field.values?.length > 0) {
-          selectFilter += `${field.column} IN (${field.values
-            .map((it: string) => `'${it}'`)
-            .join(", ")})`;
+          switch (field.operator) {
+            case "IN": {
+              selectFilter += `${field.column} IN (${field.values
+                .map((it: string) => `'${it}'`)
+                .join(", ")})`;
+              break;
+            }
+            case "Not In": {
+              selectFilter += `${field.column} NOT IN (${field.values
+                .map((it: string) => `'${it}'`)
+                .join(", ")})`;
+              break;
+            }
+          }
         } else if (field.type === "condition" && field.operator != null) {
           selectFilter += `${field.column} `;
           if (["Is Null", "Is Not Null"].includes(field.operator)) {
@@ -694,9 +716,19 @@ export default defineComponent({
       const filterData = filter?.map((field, i) => {
         let selectFilter = "";
         if (field.type == "list" && field.values?.length > 0) {
-          selectFilter += `${field.column} IN (${field.values
-            .map((it) => `'${it}'`)
-            .join(", ")})`;
+          switch (field?.operator) {
+            case "IN":
+              selectFilter += `${field.column} IN (${field.values
+                .map((it) => `'${it}'`)
+                .join(", ")})`;
+              break;
+            case "Not IN": {
+              selectFilter += `${field.column} NOT IN (${field.values
+                .map((it) => `'${it}'`)
+                .join(", ")})`;
+              break;
+            }
+          }
         } else if (field.type == "condition" && field.operator != null) {
           selectFilter += `${field?.column} `;
           if (["Is Null", "Is Not Null"].includes(field.operator)) {
@@ -838,25 +870,38 @@ export default defineComponent({
 
         // Get the parsed query
         try {
-          let currentQuery = dashboardPanelData.data.queries[
+          let currentQuery =
+            dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].query
-          
-           // replace variables with dummy values to verify query is correct or not
-          if(/\${[a-zA-Z0-9_-]+:csv}/.test(currentQuery)){
-            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:csv}/g, "1,2")
+            ].query;
+
+          // replace variables with dummy values to verify query is correct or not
+          if (/\${[a-zA-Z0-9_-]+:csv}/.test(currentQuery)) {
+            currentQuery = currentQuery.replaceAll(
+              /\${[a-zA-Z0-9_-]+:csv}/g,
+              "1,2"
+            );
           }
-          if(/\${[a-zA-Z0-9_-]+:singlequote}/.test(currentQuery)){
-            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:singlequote}/g, "'1','2'")
+          if (/\${[a-zA-Z0-9_-]+:singlequote}/.test(currentQuery)) {
+            currentQuery = currentQuery.replaceAll(
+              /\${[a-zA-Z0-9_-]+:singlequote}/g,
+              "'1','2'"
+            );
           }
-          if(/\${[a-zA-Z0-9_-]+:doublequote}/.test(currentQuery)){
-            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:doublequote}/g, '"1","2"')
+          if (/\${[a-zA-Z0-9_-]+:doublequote}/.test(currentQuery)) {
+            currentQuery = currentQuery.replaceAll(
+              /\${[a-zA-Z0-9_-]+:doublequote}/g,
+              '"1","2"'
+            );
           }
-          if(/\${[a-zA-Z0-9_-]+:pipe}/.test(currentQuery)){
-            currentQuery = currentQuery.replaceAll(/\${[a-zA-Z0-9_-]+:pipe}/g, "1|2")
+          if (/\${[a-zA-Z0-9_-]+:pipe}/.test(currentQuery)) {
+            currentQuery = currentQuery.replaceAll(
+              /\${[a-zA-Z0-9_-]+:pipe}/g,
+              "1|2"
+            );
           }
-          if(/\$(\w+|\{\w+\})/.test(currentQuery)){
-            currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, "10")
+          if (/\$(\w+|\{\w+\})/.test(currentQuery)) {
+            currentQuery = currentQuery.replaceAll(/\$(\w+|\{\w+\})/g, "10");
           }
 
           dashboardPanelData.meta.parsedQuery = parser.astify(currentQuery);

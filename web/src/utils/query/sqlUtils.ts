@@ -86,35 +86,40 @@ export const addLabelToSQlQuery = async (
     case "Is Not Null":
       operator = "IS NOT NULL";
       break;
+    case "Not IN": {
+      operator = "NOT IN";
+      break;
+    }
   }
 
   // Construct condition based on operator
-  condition = operator === "IS NULL" || operator === "IS NOT NULL" ?
-    {
-      type: "binary_expr",
-      operator: operator,
-      left: {
-        type: "column_ref",
-        table: null,
-        column: label,
-      },
-      right: {
-        type: "",
-      },
-    } :
-    {
-      type: "binary_expr",
-      operator: operator,
-      left: {
-        type: "column_ref",
-        table: null,
-        column: label,
-      },
-      right: {
-        type: "string",
-        value: value,
-      },
-    };
+  condition =
+    operator === "IS NULL" || operator === "IS NOT NULL"
+      ? {
+          type: "binary_expr",
+          operator: operator,
+          left: {
+            type: "column_ref",
+            table: null,
+            column: label,
+          },
+          right: {
+            type: "",
+          },
+        }
+      : {
+          type: "binary_expr",
+          operator: operator,
+          left: {
+            type: "column_ref",
+            table: null,
+            column: label,
+          },
+          right: {
+            type: "string",
+            value: value,
+          },
+        };
 
   const ast: any = parser.astify(originalQuery);
 

@@ -244,6 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         '>',
                         '<',
                         'IN',
+                        'Not IN',
                         'Contains',
                         'Not Contains',
                         'Is Null',

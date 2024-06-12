@@ -979,6 +979,7 @@ export default defineComponent({
         ">",
         "<",
         "IN",
+        "Not IN",
         "Contains",
         "Not Contains",
         "Is Null",
