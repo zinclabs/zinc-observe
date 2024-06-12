@@ -1,8 +1,7 @@
-use std::path;
+use std::{io::Read, path};
 
-use config::{get_config};
+use config::get_config;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
-use std::io::Read;
 
 pub async fn cache_results_to_disk(
     file_path: &str,
@@ -26,7 +25,8 @@ pub async fn cache_results_to_disk(
 }
 
 pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<String> {
-    let path = path::Path::new(&get_config().common.result_cache_dir).join(format!("{}/{}",file_path,file_name));
+    let path = path::Path::new(&get_config().common.result_cache_dir)
+        .join(format!("{}/{}", file_path, file_name));
     let file = std::fs::File::open(path);
     let mut contents = String::new();
     file.unwrap().read_to_string(&mut contents)?;
