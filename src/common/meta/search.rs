@@ -18,4 +18,5 @@ pub struct CachedQueryResponse {
 pub struct QueryDelta {
     pub delta_start_time: i64,
     pub delta_end_time: i64,
+    pub delta_removed_hits: bool,
 }
