@@ -67,99 +67,105 @@ export const addLabelToSQlQuery = async (
   value: any,
   operator: any
 ) => {
-  await importSqlParser();
+  try {
+    await importSqlParser();
 
-  let condition: any;
+    let condition: any;
 
-  switch (operator) {
-    case "Contains":
-      operator = "LIKE";
-      value = "%" + value + "%";
-      break;
-    case "Not Contains":
-      operator = "NOT LIKE";
-      value = "%" + value + "%";
-      break;
-    case "Is Null":
-      operator = "IS NULL";
-      break;
-    case "Is Not Null":
-      operator = "IS NOT NULL";
-      break;
-    case "Not IN": {
-      operator = "NOT IN";
-      break;
+    switch (operator) {
+      case "Contains":
+        operator = "LIKE";
+        value = "%" + value + "%";
+        break;
+      case "Not Contains":
+        operator = "NOT LIKE";
+        value = "%" + value + "%";
+        break;
+      case "Is Null":
+        operator = "IS NULL";
+        break;
+      case "Is Not Null":
+        operator = "IS NOT NULL";
+        break;
+      case "Not IN": {
+        operator = "NOT IN";
+        break;
+      }
     }
-  }
 
-  // Construct condition based on operator
-  condition =
-    operator === "IS NULL" || operator === "IS NOT NULL"
-      ? {
-          type: "binary_expr",
-          operator: operator,
-          left: {
-            type: "column_ref",
-            table: null,
-            column: label,
-          },
-          right: {
-            type: "",
-          },
-        }
-      : {
-          type: "binary_expr",
-          operator: operator,
-          left: {
-            type: "column_ref",
-            table: null,
-            column: label,
-          },
-          right: {
-            type: "string",
-            value: value,
-          },
-        };
+    console.log(typeof value, value);
 
-  const ast: any = parser.astify(originalQuery);
+    // Construct condition based on operator
+    condition =
+      operator === "IS NULL" || operator === "IS NOT NULL"
+        ? {
+            type: "binary_expr",
+            operator: operator,
+            left: {
+              type: "column_ref",
+              table: null,
+              column: label,
+            },
+            right: {
+              type: "",
+            },
+          }
+        : {
+            type: "binary_expr",
+            operator: operator,
+            left: {
+              type: "column_ref",
+              table: null,
+              column: label,
+            },
+            right: {
+              type: "string",
+              value: value,
+            },
+          };
 
-  let query = "";
-  if (!ast.where) {
-    // If there is no WHERE clause, create a new one
-    const newWhereClause = condition;
+    const ast: any = parser.astify(originalQuery);
 
-    const newAst = {
-      ...ast,
-      where: newWhereClause,
-    };
+    let query = "";
+    if (!ast.where) {
+      // If there is no WHERE clause, create a new one
+      const newWhereClause = condition;
 
-    const sql = parser.sqlify(newAst);
-    const quotedSql = sql.replace(/`/g, '"');
-    query = quotedSql;
-  } else {
-    const newCondition = {
-      type: "binary_expr",
-      operator: "AND",
-      // parentheses: true,
-      left: {
+      const newAst = {
+        ...ast,
+        where: newWhereClause,
+      };
+
+      const sql = parser.sqlify(newAst);
+      const quotedSql = sql.replace(/`/g, '"');
+      query = quotedSql;
+    } else {
+      const newCondition = {
+        type: "binary_expr",
+        operator: "AND",
         // parentheses: true,
-        ...ast.where,
-      },
-      right: condition,
-    };
+        left: {
+          // parentheses: true,
+          ...ast.where,
+        },
+        right: condition,
+      };
 
-    const newAst = {
-      ...ast,
-      where: newCondition,
-    };
+      const newAst = {
+        ...ast,
+        where: newCondition,
+      };
 
-    const sql = parser.sqlify(newAst);
-    const quotedSql = sql.replace(/`/g, '"');
+      const sql = parser.sqlify(newAst);
+      const quotedSql = sql.replace(/`/g, '"');
 
-    query = quotedSql;
+      query = quotedSql;
+    }
+
+    return query;
+  } catch (error) {
+    console.log(error);
   }
-
-  return query;
 };
 
 export const getStreamFromQuery = async (query: any) => {

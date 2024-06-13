@@ -938,12 +938,10 @@ export default defineComponent({
             ].fields.filter[index].operator;
 
           if (operator === "Contains" || operator === "Not Contains") {
-            value = it.multiSelect
-              ? "(" + "$" + "{" + it.name + "}" + ")"
-              : "$" + it.name;
+            value = it.multiSelect ? "(" + "$" + it.name + ")" : "$" + it.name;
           } else {
             value = it.multiSelect
-              ? "(" + "$" + "{" + it.name + "}" + ")"
+              ? "(" + "$" + it.name + ")"
               : "'" + "$" + it.name + "'";
           }
 

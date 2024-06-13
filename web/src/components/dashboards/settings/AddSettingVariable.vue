@@ -256,12 +256,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         !['Is Null', 'Is Not Null'].includes(filter.operator)
                       "
                       v-model="filter.value"
-                      :items="dashboardVariablesFilterItems"
+                      :items="dashboardVariablesFilterItems(index)"
                       searchRegex="(?:^|[^$])\$?(\w+)"
                       :rules="[(val: any) => val?.length > 0 || 'Required']"
-                      debounce="1000"
+                      debounce="100"
                       style="margin-top: none !important; width: 41% !important"
                       placeholder="Enter Value"
+                      :inputRules="[
+                        (value) =>
+                          /^\(\s*('[^']*'|\$[a-zA-Z_][a-zA-Z0-9_]*)\s*\)$/.test(
+                            value
+                          ) || 'Invalid value',
+                      ]"
                     ></CommonAutoComplete>
                     <q-btn
                       size="sm"
@@ -838,14 +844,31 @@ export default defineComponent({
       emit("close");
     };
 
-    const dashboardVariablesFilterItems = computed(() =>
-      props.dashboardVariablesList
-        .map((it: any) => ({
-          label: it.name,
-          value: "$" + it.name,
-        }))
-        .filter((it: any) => it.label !== variableData.name)
+    const dashboardVariablesFilterItems = computed(
+      () => (index: number) =>
+        (props.dashboardVariablesList ?? [])
+          .map((it: any) => {
+            let value;
+            const operator = variableData.query_data.filter[index].operator;
+
+            if (operator === "Contains" || operator === "Not Contains") {
+              value = it.multiSelect
+                ? "(" + "$" + it.name + ")"
+                : "$" + it.name;
+            } else {
+              value = it.multiSelect
+                ? "(" + "$" + it.name + ")"
+                : "'" + "$" + it.name + "'";
+            }
+
+            return {
+              label: it.name,
+              value: value,
+            };
+          })
+          .filter((it: any) => it.label !== variableData.name)
     );
+
     return {
       variableData,
       store,

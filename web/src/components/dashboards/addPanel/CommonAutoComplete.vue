@@ -10,6 +10,7 @@
       @blur="hideOptions"
       v-bind="$attrs"
       style="width: 100%"
+      :rules="inputRules"
     >
       <template v-if="hasSlot('label')" v-slot:label>
         <slot name="label"></slot>
@@ -60,6 +61,10 @@ export default defineComponent({
       // special treatment needed to any value replacing function, then this can be used
       type: Function,
       default: (selectedValue) => selectedValue,
+    },
+    inputRules: {
+      type: Array,
+      default: () => [],
     },
   },
   emits: ["update:modelValue"],
