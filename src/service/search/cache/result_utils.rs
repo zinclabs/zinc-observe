@@ -1,3 +1,7 @@
+use std::io::{self, Read, Write};
+
+use config::utils::{base64, json};
+use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
 use sqlparser::{
     ast::{Expr, Function, Query, SelectItem, SetExpr, Statement},
     dialect::GenericDialect,
@@ -34,12 +38,9 @@ fn is_aggregate_in_select(query: Box<Query>) -> bool {
 
 fn is_aggregate_expression(expr: &Expr) -> bool {
     match expr {
-        Expr::Function(Function {
-            name,
-            args: _,
-            distinct: _,
-            ..
-        }) => AGGREGATE_UDF_LIST.contains(&name.to_string().to_lowercase().as_str()),
+        Expr::Function(Function { name, args: _, .. }) => {
+            AGGREGATE_UDF_LIST.contains(&name.to_string().to_lowercase().as_str())
+        }
 
         _ => false,
     }
@@ -54,3 +55,20 @@ const AGGREGATE_UDF_LIST: [&str; 7] = [
     "array_agg",
     "approx_percentile_cont",
 ];
+
+pub fn encode_sql_to_foldername(sql_query: &str) -> io::Result<String> {
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(sql_query.as_bytes())?;
+    let compressed_bytes = encoder.finish()?;
+
+    Ok(base64::encode(json::from_slice(&compressed_bytes).unwrap()))
+}
+
+pub fn decode_foldername_to_sql(folder_name: &str) -> io::Result<String> {
+    let compressed_bytes = base64::decode(folder_name)?;
+    let mut decoder = ZlibDecoder::new(compressed_bytes.as_bytes());
+    let mut decompressed_bytes = Vec::new();
+    decoder.read_to_end(&mut decompressed_bytes)?;
+
+    Ok(String::from_utf8(decompressed_bytes).unwrap())
+}

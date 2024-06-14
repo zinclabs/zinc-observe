@@ -50,7 +50,7 @@ static RE_ONLY_GROUPBY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 static RE_SELECT_FIELD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select (.*) from[ ]+query").unwrap());
-static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
+pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
 static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
 
 static RE_ONLY_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where ").unwrap());

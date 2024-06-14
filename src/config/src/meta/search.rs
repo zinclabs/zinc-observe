@@ -182,6 +182,7 @@ pub struct Response {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub took_detail: Option<ResponseTook>,
+    #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub columns: Vec<String>,
     #[schema(value_type = Vec<Object>)]
@@ -205,6 +206,7 @@ pub struct Response {
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub trace_id: String,
+    #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub function_error: String,
     #[serde(default)]

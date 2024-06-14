@@ -1,6 +1,8 @@
 use std::{io::Read, path};
 
-use config::get_config;
+use bytes::Bytes;
+use config::{get_config, utils::file};
+use infra::cache::file_data::disk;
 use tokio::{fs::OpenOptions, io::AsyncWriteExt};
 
 pub async fn cache_results_to_disk(
@@ -32,4 +34,15 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
     file.unwrap().read_to_string(&mut contents)?;
 
     Ok(contents)
+}
+
+pub async fn cache_results_to_disk_v1(
+    trace_id: &str,
+    file_path: &str,
+    file_name: &str,
+    data: String,
+) -> std::io::Result<()> {
+    let file = format!("{}/{}", file_path, file_name);
+    let _ = disk::set(trace_id, &file, Bytes::from(data)).await;
+    Ok(())
 }

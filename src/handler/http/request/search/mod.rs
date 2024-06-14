@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    hash::{DefaultHasher, Hash, Hasher},
-    io::Error,
-};
+use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use chrono::Duration;
@@ -40,7 +36,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::{
         infra::config::QUERY_RESULT_CACHE,
-        meta::{self, http::HttpResponse as MetaHttpResponse, search::ResultMeta},
+        meta::{self, http::HttpResponse as MetaHttpResponse, search::ResultCacheMeta},
         utils::{
             functions,
             http::{
@@ -50,7 +46,10 @@ use crate::{
         },
     },
     service::{
-        search::{self as SearchService, sql::RE_ONLY_SELECT},
+        search::{
+            self as SearchService,
+            sql::{SqlMode, RE_ONLY_SELECT, RE_SELECT_FROM},
+        },
         usage::report_request_usage_stats,
     },
 };
@@ -173,8 +172,8 @@ pub async fn search(
     let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
-    let stream_name = match config::meta::sql::Sql::new(&req.query.sql) {
-        Ok(v) => v.source.to_string(),
+    let parsed_sql = match config::meta::sql::Sql::new(&req.query.sql) {
+        Ok(v) => v,
         Err(e) => {
             return Ok(
                 HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
@@ -203,6 +202,7 @@ pub async fn search(
             }
         }
     }
+    let stream_name = parsed_sql.source;
 
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
@@ -239,17 +239,33 @@ pub async fn search(
         // Check permissions on stream ends
     }
 
-    // Result caching
-    let req_sql = req.query.sql.clone();
-    let mut hasher = DefaultHasher::new();
-    req_sql.hash(&mut hasher);
-    let query_hash = hasher.finish();
-    let file_path = format!("{}/{}/{}", org_id, stream_type.to_string(), stream_name);
-    let file_name = format!(
-        "{}_{}_{}.json",
-        req.query.start_time, req.query.end_time, query_hash
+    // Result caching start
+    let mut origin_sql = req.query.sql.clone();
+    // check sql_mode
+    let sql_mode: SqlMode = rpc_req.query.as_ref().unwrap().sql_mode.as_str().into();
+    // Hack select for _timestamp
+    if !sql_mode.eq(&SqlMode::Full) && parsed_sql.order_by.is_empty() && !origin_sql.contains('*') {
+        let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
+        let cap_str = caps.get(1).unwrap().as_str();
+        if !cap_str.contains(&cfg.common.column_timestamp) {
+            origin_sql = origin_sql.replace(
+                cap_str,
+                &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
+            );
+        }
+        rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
+    }
+
+    let encoded_query = SearchService::cache::result_utils::encode_sql_to_foldername(&origin_sql)?;
+    let file_path = format!(
+        "{}/{}/{}/{}",
+        org_id,
+        stream_type.to_string(),
+        stream_name,
+        encoded_query
     );
-    let is_aggregate = crate::service::search::cache::result_utils::is_aggregate_query(&req_sql)
+    let file_name = format!("{}_{}.json", req.query.start_time, req.query.end_time);
+    let is_aggregate = crate::service::search::cache::result_utils::is_aggregate_query(&origin_sql)
         .unwrap_or_default();
 
     let query_key = format!(
@@ -257,10 +273,9 @@ pub async fn search(
         org_id,
         stream_type.to_string(),
         stream_name,
-        query_hash
+        encoded_query
     );
-
-    if let Some(res) = crate::service::search::cache::cacher::get_cached_results(
+    match crate::service::search::cache::cacher::get_cached_results(
         req.query.start_time,
         req.query.end_time,
         is_aggregate,
@@ -270,8 +285,16 @@ pub async fn search(
     )
     .await
     {
-        return Ok(HttpResponse::Ok().json(res));
-    }
+        Some(cached_resp) => {
+            if cached_resp.deltas.is_empty() {
+                log::debug!("cached response found");
+                return Ok(HttpResponse::Ok().json(cached_resp.cached_response));
+            }
+        }
+        None => {
+            log::debug!("cached response not found");
+        }
+    };
 
     // Result caching
     let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
@@ -363,7 +386,7 @@ pub async fn search(
                 max_ts: Some(req.query.end_time),
                 cached_ratio: Some(res.cached_ratio),
                 search_type,
-                trace_id: Some(trace_id),
+                trace_id: Some(trace_id.clone()),
                 ..Default::default()
             };
             let num_fn = req.query.query_fn.is_some() as u16;
@@ -382,13 +405,16 @@ pub async fn search(
             let res_cache = json::to_string(&res).unwrap();
 
             tokio::spawn(async move {
-                match result_writer::cache_results_to_disk(&file_path, &file_name, &res_cache).await
+                match result_writer::cache_results_to_disk_v1(
+                    &trace_id, &file_path, &file_name, res_cache,
+                )
+                .await
                 {
                     Ok(_) => {
                         let mut w = QUERY_RESULT_CACHE.write().await;
                         w.insert(
                             query_key,
-                            ResultMeta {
+                            ResultCacheMeta {
                                 start_time: req.query.start_time,
                                 end_time: req.query.end_time,
                                 is_aggregate,
