@@ -42,7 +42,6 @@ use crate::{
             http::{
                 get_search_type_from_request, get_stream_type_from_request, RequestHeaderExtractor,
             },
-            result_writer,
         },
     },
     service::{
@@ -405,7 +404,7 @@ pub async fn search(
             let res_cache = json::to_string(&res).unwrap();
 
             tokio::spawn(async move {
-                match result_writer::cache_results_to_disk_v1(
+                match SearchService::cache::cacher::cache_results_to_disk(
                     &trace_id, &file_path, &file_name, res_cache,
                 )
                 .await

@@ -1,15 +1,16 @@
+use bytes::Bytes;
 use config::{get_config, meta::search::Response, utils::json};
+use infra::cache::file_data::disk;
 
 use crate::common::{
     infra::config::QUERY_RESULT_CACHE,
     meta::search::{CachedQueryResponse, QueryDelta, ResultCacheMeta},
-    utils::result_writer,
 };
 
 pub async fn get_cached_results(
     start_time: i64,
     end_time: i64,
-    is_aggregate: bool,
+    _is_aggregate: bool,
     query_key: String,
     file_path: String,
     file_name: String,
@@ -27,7 +28,7 @@ pub async fn get_cached_results(
         let remove_hits: Vec<&QueryDelta> =
             deltas.iter().filter(|d| d.delta_removed_hits).collect();
 
-        match result_writer::get_results(&file_path, &file_name).await {
+        match get_results(&file_path, &file_name).await {
             Ok(v) => {
                 let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
                 // also remove hits if time range is lesser than cached time range
@@ -179,5 +180,27 @@ pub fn calculate_deltas_v1(
             delta_end_time: result_meta.end_time,
             delta_removed_hits: true,
         });
+    }
+}
+
+pub async fn cache_results_to_disk(
+    trace_id: &str,
+    file_path: &str,
+    file_name: &str,
+    data: String,
+) -> std::io::Result<()> {
+    let file = format!("results/{}/{}", file_path, file_name);
+    let _ = disk::set(trace_id, &file, Bytes::from(data)).await;
+    Ok(())
+}
+
+pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<String> {
+    let file = format!("results/{}/{}", file_path, file_name);
+    match disk::get(&file, None).await {
+        Some(v) => Ok(String::from_utf8(v.to_vec()).unwrap()),
+        None => Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "File not found",
+        )),
     }
 }

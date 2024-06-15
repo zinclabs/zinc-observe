@@ -17,6 +17,5 @@ pub mod auth;
 pub mod functions;
 pub mod http;
 pub mod jwt;
-pub mod result_writer;
 pub mod stream;
 pub mod zo_logger;
