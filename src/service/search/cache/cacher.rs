@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use chrono::TimeZone;
 use config::{get_config, meta::search::Response, utils::json};
 use infra::cache::file_data::disk;
 
@@ -20,17 +21,34 @@ pub async fn get_cached_results(
     let is_cached = r.get(&query_key).cloned(); //org_streamy_type_stream_name_query -> 
     drop(r);
 
+    let st = chrono::Utc.timestamp_micros(start_time).unwrap();
+
+    let end = chrono::Utc.timestamp_micros(end_time).unwrap();
+
+    log::info!("#################################################");
+
+    log::info!("Query start time & end time is {} - {}", st, end);
+
     if let Some(cache_metas) = is_cached {
         match cache_metas
             .iter()
             .filter(|cache_meta| {
-                // to make sure there is ovlap between cache time range and query time range & cache
-                // can at least serve query_cache_min_contribution
+                // to make sure there is overlap between cache time range and query time range &
+                // cache can at least serve query_cache_min_contribution
 
                 let cached_duration = cache_meta.end_time - cache_meta.start_time;
                 let query_duration = end_time - start_time;
 
-                cached_duration < query_duration / cfg.limit.query_cache_min_contribution
+                let st = chrono::Utc.timestamp_micros(cache_meta.start_time).unwrap();
+
+                let end = chrono::Utc.timestamp_micros(cache_meta.end_time).unwrap();
+
+                log::info!(
+                    "########## Cached start time & end time is {} - {}",
+                    st,
+                    end
+                );
+                cached_duration > query_duration / cfg.limit.query_cache_min_contribution
                     && cache_meta.start_time <= end_time
                     && cache_meta.end_time >= start_time
             })
@@ -38,6 +56,21 @@ pub async fn get_cached_results(
         {
             Some(matching_cache_meta) => {
                 // calculate delta time range to fetch the delta data using search query
+                log::info!("#################################################");
+                let st = chrono::Utc
+                    .timestamp_micros(matching_cache_meta.start_time)
+                    .unwrap();
+
+                let end = chrono::Utc
+                    .timestamp_micros(matching_cache_meta.end_time)
+                    .unwrap();
+
+                log::info!(
+                    "########## Used start time & end time is {} - {} ##########",
+                    st,
+                    end
+                );
+
                 let mut deltas = vec![];
                 let has_pre_cache_delta =
                     calculate_deltas_v1(&matching_cache_meta, start_time, end_time, &mut deltas);
@@ -48,7 +81,7 @@ pub async fn get_cached_results(
                 match get_results(&file_path, &file_name).await {
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
-                        // also remove hits if time range is lesser than cached time range
+                        // remove hits if time range is lesser than cached time range
 
                         if !remove_hits.is_empty() {
                             for delta in remove_hits {
