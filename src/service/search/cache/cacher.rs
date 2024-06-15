@@ -20,45 +20,69 @@ pub async fn get_cached_results(
     let is_cached = r.get(&query_key).cloned(); //org_streamy_type_stream_name_query -> 
     drop(r);
 
-    if let Some(result_meta) = is_cached {
-        // calculate delta time range to fetch the delta data using search query
-        let mut deltas = vec![];
-        calculate_deltas_v1(&result_meta, start_time, end_time, &mut deltas);
+    if let Some(cache_metas) = is_cached {
+        match cache_metas
+            .iter()
+            .filter(|cache_meta| {
+                // to make sure there is ovlap between cache time range and query time range & cache
+                // can at least serve query_cache_min_contribution
 
-        let remove_hits: Vec<&QueryDelta> =
-            deltas.iter().filter(|d| d.delta_removed_hits).collect();
+                let cached_duration = cache_meta.end_time - cache_meta.start_time;
+                let query_duration = end_time - start_time;
 
-        match get_results(&file_path, &file_name).await {
-            Ok(v) => {
-                let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
-                // also remove hits if time range is lesser than cached time range
+                cached_duration < query_duration / cfg.limit.query_cache_min_contribution
+                    && cache_meta.start_time <= end_time
+                    && cache_meta.end_time >= start_time
+            })
+            .max_by_key(|result| result.end_time.min(end_time) - result.start_time.max(start_time))
+        {
+            Some(matching_cache_meta) => {
+                // calculate delta time range to fetch the delta data using search query
+                let mut deltas = vec![];
+                let has_pre_cache_delta =
+                    calculate_deltas_v1(&matching_cache_meta, start_time, end_time, &mut deltas);
 
-                if remove_hits.is_empty() {
-                } else {
-                    for delta in remove_hits {
-                        cached_response.hits = cached_response
-                            .hits
-                            .into_iter()
-                            .filter(|hit| {
-                                let hit_ts = hit
-                                    .get(&cfg.common.column_timestamp)
-                                    .unwrap()
-                                    .as_i64()
-                                    .unwrap();
+                let remove_hits: Vec<&QueryDelta> =
+                    deltas.iter().filter(|d| d.delta_removed_hits).collect();
 
-                                hit_ts >= delta.delta_start_time && hit_ts < delta.delta_end_time
-                            })
-                            .collect();
+                match get_results(&file_path, &file_name).await {
+                    Ok(v) => {
+                        let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
+                        // also remove hits if time range is lesser than cached time range
+
+                        if !remove_hits.is_empty() {
+                            for delta in remove_hits {
+                                cached_response.hits = cached_response
+                                    .hits
+                                    .into_iter()
+                                    .filter(|hit| {
+                                        let hit_ts = hit
+                                            .get(&cfg.common.column_timestamp)
+                                            .unwrap()
+                                            .as_i64()
+                                            .unwrap();
+
+                                        hit_ts >= delta.delta_start_time
+                                            && hit_ts < delta.delta_end_time
+                                    })
+                                    .collect();
+                            }
+                        };
+
+                        return Some(CachedQueryResponse {
+                            cached_response,
+                            deltas,
+                            has_pre_cache_delta,
+                        });
                     }
-                };
-
-                return Some(CachedQueryResponse {
-                    cached_response,
-                    deltas,
-                });
+                    Err(e) => {
+                        log::error!("Get results from disk failed: {:?}", e);
+                        None
+                    }
+                }
             }
-            Err(e) => {
-                log::error!("Get results from disk failed: {:?}", e);
+            None => {
+                log::debug!("No matching cache found for query key: {}", query_key);
                 None
             }
         }
@@ -67,87 +91,90 @@ pub async fn get_cached_results(
     }
 }
 
-pub fn calculate_deltas(
-    result_meta: &ResultCacheMeta,
-    start_time: i64,
-    end_time: i64,
-    mut deltas: Vec<QueryDelta>,
-) {
-    if start_time == result_meta.start_time && end_time == result_meta.end_time {
-        // If query start time and end time are the same as cache times, return results from cache
-        return;
-    }
-    // Query Start time > ResultCacheMeta start time & Query End time > ResultCacheMeta End time ->
-    // typical last x min/hours/days of data
-    if start_time > result_meta.start_time && end_time > result_meta.end_time {
-        // q start time : 10:00, q end time : 11:00, r start time : 09:00, r end time : 10:30
-        // Drop data between Query End time & ResultCacheMeta End time
-        deltas.push(QueryDelta {
-            delta_start_time: result_meta.end_time,
-            delta_end_time: end_time,
-            delta_removed_hits: false,
-        });
-        // Fetch data between ResultCacheMeta Start time & Query start time
-        deltas.push(QueryDelta {
-            delta_start_time: result_meta.start_time,
-            delta_end_time: start_time,
-            delta_removed_hits: true,
-        });
-    }
-    // Query Start time < ResultCacheMeta start time & Query End time > ResultCacheMeta End time
-    else if start_time < result_meta.start_time && end_time > result_meta.end_time {
-        // q start time : 10:00, q end time : 11:00, r start time : 10:30, r end time : 10:45
-        // If query times are wider than cached times, fetch both ends
-        deltas.push(QueryDelta {
-            delta_start_time: result_meta.end_time,
-            delta_end_time: end_time,
-            delta_removed_hits: false,
-        });
-        deltas.push(QueryDelta {
-            delta_start_time: start_time,
-            delta_end_time: result_meta.start_time,
-            delta_removed_hits: false,
-        });
-    }
-    // Query Start time > ResultCacheMeta start time & Query End time < ResultCacheMeta End time
-    else if start_time > result_meta.start_time && end_time < result_meta.end_time {
-        // q start time : 10:00, q end time : 11:00, r start time : 9:30, r end time : 11:15
-        // Fetch data between ResultCacheMeta Start time & Query start time
-        deltas.push(QueryDelta {
-            delta_start_time: result_meta.start_time,
-            delta_end_time: start_time,
-            delta_removed_hits: true,
-        });
-        deltas.push(QueryDelta {
-            delta_start_time: end_time,
-            delta_end_time: result_meta.end_time,
-            delta_removed_hits: true,
-        });
-    } else if start_time < result_meta.start_time && end_time < result_meta.end_time {
-        // If query starts before and ends before cache ends
-        // q start time : 10:00, q end time : 11:00, r start time : 10:30, r end time : 11:15
-        deltas.push(QueryDelta {
-            delta_start_time: start_time,
-            delta_end_time: result_meta.start_time,
-            delta_removed_hits: false,
-        });
-        deltas.push(QueryDelta {
-            delta_start_time: end_time,
-            delta_end_time: result_meta.end_time,
-            delta_removed_hits: true,
-        });
-    }
-}
+// pub fn calculate_deltas(
+//     result_meta: &ResultCacheMeta,
+//     start_time: i64,
+//     end_time: i64,
+//     mut deltas: Vec<QueryDelta>,
+// ) -> bool {
+//     let has_post_cache_delta = false;
+//     if start_time == result_meta.start_time && end_time == result_meta.end_time {
+//         // If query start time and end time are the same as cache times, return results from
+// cache         return;
+//     }
+//     // Query Start time > ResultCacheMeta start time & Query End time > ResultCacheMeta End time
+// ->     // typical last x min/hours/days of data
+//     if start_time > result_meta.start_time && end_time > result_meta.end_time {
+//         // q start time : 10:00, q end time : 11:00, r start time : 09:00, r end time : 10:30
+//         // Drop data between Query End time & ResultCacheMeta End time
+//         deltas.push(QueryDelta {
+//             delta_start_time: result_meta.end_time,
+//             delta_end_time: end_time,
+//             delta_removed_hits: false,
+//         });
+//         // Fetch data between ResultCacheMeta Start time & Query start time
+//         deltas.push(QueryDelta {
+//             delta_start_time: result_meta.start_time,
+//             delta_end_time: start_time,
+//             delta_removed_hits: true,
+//         });
+//     }
+//     // Query Start time < ResultCacheMeta start time & Query End time > ResultCacheMeta End time
+//     else if start_time < result_meta.start_time && end_time > result_meta.end_time {
+//         // q start time : 10:00, q end time : 11:00, r start time : 10:30, r end time : 10:45
+//         // If query times are wider than cached times, fetch both ends
+//         deltas.push(QueryDelta {
+//             delta_start_time: result_meta.end_time,
+//             delta_end_time: end_time,
+//             delta_removed_hits: false,
+//         });
+//         deltas.push(QueryDelta {
+//             delta_start_time: start_time,
+//             delta_end_time: result_meta.start_time,
+//             delta_removed_hits: false,
+//         });
+//     }
+//     // Query Start time > ResultCacheMeta start time & Query End time < ResultCacheMeta End time
+//     else if start_time > result_meta.start_time && end_time < result_meta.end_time {
+//         // q start time : 10:00, q end time : 11:00, r start time : 9:30, r end time : 11:15
+//         // Fetch data between ResultCacheMeta Start time & Query start time
+//         deltas.push(QueryDelta {
+//             delta_start_time: result_meta.start_time,
+//             delta_end_time: start_time,
+//             delta_removed_hits: true,
+//         });
+//         deltas.push(QueryDelta {
+//             delta_start_time: end_time,
+//             delta_end_time: result_meta.end_time,
+//             delta_removed_hits: true,
+//         });
+//     } else if start_time < result_meta.start_time && end_time < result_meta.end_time {
+//         // If query starts before and ends before cache ends
+//         // q start time : 10:00, q end time : 11:00, r start time : 10:30, r end time : 11:15
+//         deltas.push(QueryDelta {
+//             delta_start_time: start_time,
+//             delta_end_time: result_meta.start_time,
+//             delta_removed_hits: false,
+//         });
+//         deltas.push(QueryDelta {
+//             delta_start_time: end_time,
+//             delta_end_time: result_meta.end_time,
+//             delta_removed_hits: true,
+//         });
+//     }
+//     has_post_cache_delta
+// }
 
 pub fn calculate_deltas_v1(
     result_meta: &ResultCacheMeta,
     start_time: i64,
     end_time: i64,
     deltas: &mut Vec<QueryDelta>,
-) {
+) -> bool {
+    let mut has_pre_cache_delta = false;
     if start_time == result_meta.start_time && end_time == result_meta.end_time {
         // If query start time and end time are the same as cache times, return results from cache
-        return;
+        return has_pre_cache_delta;
     }
     // Query Start time > ResultCacheMeta start time & Query End time > ResultCacheMeta End time ->
     // typical last x min/hours/days of data
@@ -165,6 +192,7 @@ pub fn calculate_deltas_v1(
             delta_end_time: result_meta.start_time,
             delta_removed_hits: false,
         });
+        has_pre_cache_delta = true;
     }
     // Query Start time < ResultCacheMeta start time & Query End time > ResultCacheMeta End time
     if end_time > result_meta.end_time {
@@ -181,6 +209,7 @@ pub fn calculate_deltas_v1(
             delta_removed_hits: true,
         });
     }
+    has_pre_cache_delta
 }
 
 pub async fn cache_results_to_disk(

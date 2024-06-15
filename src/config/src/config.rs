@@ -506,8 +506,6 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
-    #[env_config(name = "ZO_RESULT_CACHE_DIR", default = "")] // ./data/openobserve/cache/
-    pub result_cache_dir: String,
     #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
     pub wal_memory_mode_enabled: bool,
     #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
@@ -841,6 +839,9 @@ pub struct Limit {
     pub consistent_hash_vnodes: usize,
     #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
     pub datafusion_file_stat_cache_max_entries: usize,
+    #[env_config(name = "ZO_QUERY_CACHE_MIN_CONTRIBUTION_PERCENTAGE", default = "20%")] //
+    pub query_cache_min_contribution_percentage: String,
+    pub query_cache_min_contribution: i64,
 }
 
 #[derive(EnvConfig)]
@@ -1165,6 +1166,9 @@ pub fn init() -> Config {
         cfg.limit.consistent_hash_vnodes = 3;
     }
 
+    cfg.limit.query_cache_min_contribution =
+        parse_percentage(&cfg.limit.query_cache_min_contribution_percentage).unwrap_or(20) as i64;
+
     // check common config
     if let Err(e) = check_common_config(&mut cfg) {
         panic!("common config error: {e}");
@@ -1355,14 +1359,8 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.data_cache_dir.is_empty() {
         cfg.common.data_cache_dir = format!("{}cache/", cfg.common.data_dir);
     }
-    if cfg.common.result_cache_dir.is_empty() {
-        cfg.common.result_cache_dir = format!("{}result/", cfg.common.data_dir);
-    }
     if !cfg.common.data_cache_dir.ends_with('/') {
         cfg.common.data_cache_dir = format!("{}/", cfg.common.data_cache_dir);
-    }
-    if !cfg.common.result_cache_dir.ends_with('/') {
-        cfg.common.result_cache_dir = format!("{}/", cfg.common.result_cache_dir);
     }
     if cfg.common.mmdb_data_dir.is_empty() {
         cfg.common.mmdb_data_dir = format!("{}mmdb/", cfg.common.data_dir);
@@ -1600,6 +1598,15 @@ pub fn get_cluster_name() -> String {
     } else {
         INSTANCE_ID.get("instance_id").unwrap().to_string()
     }
+}
+
+fn parse_percentage(s: &str) -> Result<u64, anyhow::Error> {
+    let s = s.trim_end_matches('%');
+    let n = s.parse::<u64>()?;
+    if n > 100 {
+        return Err(anyhow::anyhow!("{} is greater than 100", s));
+    }
+    Ok(n)
 }
 
 #[cfg(test)]

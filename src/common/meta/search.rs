@@ -13,6 +13,7 @@ pub struct ResultCacheMeta {
 pub struct CachedQueryResponse {
     pub cached_response: Response,
     pub deltas: Vec<QueryDelta>,
+    pub has_pre_cache_delta: bool,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct QueryDelta {

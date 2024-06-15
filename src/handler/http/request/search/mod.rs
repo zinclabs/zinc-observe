@@ -25,7 +25,7 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, json},
+    utils::{base64, hash::Sum64, json},
     DISTINCT_FIELDS,
 };
 use infra::{errors, schema::STREAM_SCHEMAS_LATEST};
@@ -238,7 +238,7 @@ pub async fn search(
         // Check permissions on stream ends
     }
 
-    // Result caching start
+    // Result caching check start
     let mut origin_sql = req.query.sql.clone();
     // check sql_mode
     let sql_mode: SqlMode = rpc_req.query.as_ref().unwrap().sql_mode.as_str().into();
@@ -255,13 +255,14 @@ pub async fn search(
         rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
     }
 
-    let encoded_query = SearchService::cache::result_utils::encode_sql_to_foldername(&origin_sql)?;
+    let mut h = config::utils::hash::gxhash::new();
+    let hashed_query = h.sum64(&origin_sql);
     let file_path = format!(
         "{}/{}/{}/{}",
         org_id,
         stream_type.to_string(),
         stream_name,
-        encoded_query
+        hashed_query
     );
     let file_name = format!("{}_{}.json", req.query.start_time, req.query.end_time);
     let is_aggregate = crate::service::search::cache::result_utils::is_aggregate_query(&origin_sql)
@@ -272,7 +273,7 @@ pub async fn search(
         org_id,
         stream_type.to_string(),
         stream_name,
-        encoded_query
+        hashed_query
     );
     match crate::service::search::cache::cacher::get_cached_results(
         req.query.start_time,
@@ -295,7 +296,7 @@ pub async fn search(
         }
     };
 
-    // Result caching
+    // Result caching check ends
     let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
     if let Some(vrl_function) = &query_fn {
         if !vrl_function.trim().ends_with('.') {
@@ -399,10 +400,8 @@ pub async fn search(
             )
             .await;
 
-            // result cache changes
-
+            // result cache save changes start
             let res_cache = json::to_string(&res).unwrap();
-
             tokio::spawn(async move {
                 match SearchService::cache::cacher::cache_results_to_disk(
                     &trace_id, &file_path, &file_name, res_cache,
@@ -411,14 +410,13 @@ pub async fn search(
                 {
                     Ok(_) => {
                         let mut w = QUERY_RESULT_CACHE.write().await;
-                        w.insert(
-                            query_key,
-                            ResultCacheMeta {
+                        w.entry(query_key)
+                            .or_insert_with(Vec::new)
+                            .push(ResultCacheMeta {
                                 start_time: req.query.start_time,
                                 end_time: req.query.end_time,
                                 is_aggregate,
-                            },
-                        );
+                            });
                         drop(w);
                     }
                     Err(e) => {
@@ -426,7 +424,7 @@ pub async fn search(
                     }
                 }
             });
-            // result cache changes
+            //  // result cache save changes Ends
 
             Ok(HttpResponse::Ok().json(res))
         }
