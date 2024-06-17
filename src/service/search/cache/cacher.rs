@@ -1,20 +1,19 @@
 use bytes::Bytes;
 use chrono::TimeZone;
 use config::{get_config, meta::search::Response, utils::json};
-use infra::cache::file_data::disk;
-
-use crate::common::{
-    infra::config::QUERY_RESULT_CACHE,
-    meta::search::{CachedQueryResponse, QueryDelta, ResultCacheMeta},
+use infra::cache::{
+    file_data::disk::{self, QUERY_RESULT_CACHE},
+    meta::ResultCacheMeta,
 };
+
+use crate::common::meta::search::{CachedQueryResponse, QueryDelta};
 
 pub async fn get_cached_results(
     start_time: i64,
     end_time: i64,
-    _is_aggregate: bool,
+    is_aggregate: bool,
     query_key: String,
     file_path: String,
-    file_name: String,
 ) -> Option<CachedQueryResponse> {
     let cfg = get_config();
     let r = QUERY_RESULT_CACHE.read().await;
@@ -78,6 +77,12 @@ pub async fn get_cached_results(
                 let remove_hits: Vec<&QueryDelta> =
                     deltas.iter().filter(|d| d.delta_removed_hits).collect();
 
+                let file_name = format!(
+                    "{}_{}_{}.json",
+                    matching_cache_meta.start_time,
+                    matching_cache_meta.end_time,
+                    if is_aggregate { 1 } else { 0 }
+                );
                 match get_results(&file_path, &file_name).await {
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
@@ -95,8 +100,8 @@ pub async fn get_cached_results(
                                             .as_i64()
                                             .unwrap();
 
-                                        hit_ts >= delta.delta_start_time
-                                            && hit_ts < delta.delta_end_time
+                                        !(hit_ts >= delta.delta_start_time
+                                            && hit_ts < delta.delta_end_time)
                                     })
                                     .collect();
                             }
@@ -109,7 +114,7 @@ pub async fn get_cached_results(
                         });
                     }
                     Err(e) => {
-                        log::error!("Get results from disk failed: {:?}", e);
+                        log::error!("Get results from disk failed for : {:?}", e);
                         None
                     }
                 }
@@ -211,36 +216,40 @@ pub fn calculate_deltas_v1(
     }
     // Query Start time > ResultCacheMeta start time & Query End time > ResultCacheMeta End time ->
     // typical last x min/hours/days of data
-    if start_time > result_meta.start_time {
-        // q start time : 10:00,  r start time : 09:00
-        // Fetch data between ResultCacheMeta Start time & Query start time
-        deltas.push(QueryDelta {
-            delta_start_time: result_meta.start_time,
-            delta_end_time: start_time,
-            delta_removed_hits: true,
-        });
-    } else {
-        deltas.push(QueryDelta {
-            delta_start_time: start_time,
-            delta_end_time: result_meta.start_time,
-            delta_removed_hits: false,
-        });
-        has_pre_cache_delta = true;
-    }
+    if start_time != result_meta.start_time {
+        if start_time > result_meta.start_time {
+            // q start time : 10:00,  r start time : 09:00
+            // Fetch data between ResultCacheMeta Start time & Query start time
+            deltas.push(QueryDelta {
+                delta_start_time: result_meta.start_time,
+                delta_end_time: start_time,
+                delta_removed_hits: true,
+            });
+        } else {
+            deltas.push(QueryDelta {
+                delta_start_time: start_time,
+                delta_end_time: result_meta.start_time,
+                delta_removed_hits: false,
+            });
+            has_pre_cache_delta = true;
+        }
+    };
     // Query Start time < ResultCacheMeta start time & Query End time > ResultCacheMeta End time
-    if end_time > result_meta.end_time {
-        // q end time : 11:00, r end time : 10:45
-        deltas.push(QueryDelta {
-            delta_start_time: start_time,
-            delta_end_time: result_meta.start_time,
-            delta_removed_hits: false,
-        });
-    } else {
-        deltas.push(QueryDelta {
-            delta_start_time: end_time,
-            delta_end_time: result_meta.end_time,
-            delta_removed_hits: true,
-        });
+    if end_time != result_meta.end_time {
+        if end_time > result_meta.end_time {
+            // q end time : 11:00, r end time : 10:45
+            deltas.push(QueryDelta {
+                delta_start_time: result_meta.end_time,
+                delta_end_time: end_time,
+                delta_removed_hits: false,
+            });
+        } else {
+            deltas.push(QueryDelta {
+                delta_start_time: end_time,
+                delta_end_time: result_meta.end_time,
+                delta_removed_hits: true,
+            });
+        }
     }
     has_pre_cache_delta
 }
@@ -252,12 +261,22 @@ pub async fn cache_results_to_disk(
     data: String,
 ) -> std::io::Result<()> {
     let file = format!("results/{}/{}", file_path, file_name);
-    let _ = disk::set(trace_id, &file, Bytes::from(data)).await;
+    match disk::set(trace_id, &file, Bytes::from(data)).await {
+        Ok(_) => (),
+        Err(e) => {
+            log::error!("Error caching results to disk: {:?}", e);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Error caching results to disk",
+            ));
+        }
+    }
     Ok(())
 }
 
 pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<String> {
     let file = format!("results/{}/{}", file_path, file_name);
+    println!("getting file: {:?}", file);
     match disk::get(&file, None).await {
         Some(v) => Ok(String::from_utf8(v.to_vec()).unwrap()),
         None => Err(std::io::Error::new(

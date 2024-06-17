@@ -27,12 +27,14 @@ use config::{
         asynchronism::file::*,
         hash::{gxhash, Sum64},
     },
+    RwAHashMap,
 };
+use hashbrown::HashMap;
 use once_cell::sync::Lazy;
 use tokio::{fs, sync::RwLock};
 
 use super::CacheStrategy;
-use crate::storage;
+use crate::{cache::meta::ResultCacheMeta, storage};
 
 static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
@@ -42,6 +44,9 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     }
     files
 });
+
+pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
+    Lazy::new(Default::default);
 
 pub struct FileData {
     max_size: usize,
@@ -287,6 +292,9 @@ pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::
 #[async_recursion]
 async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Error> {
     let mut entries = tokio::fs::read_dir(&scan_dir).await?;
+
+    let mut result_cache: HashMap<String, Vec<ResultCacheMeta>> = HashMap::new();
+
     loop {
         match entries.next_entry().await {
             Err(e) => return Err(e.into()),
@@ -346,6 +354,21 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
                     // metrics
                     let columns = file_key.split('/').collect::<Vec<&str>>();
+                    if columns[0] == "results" {
+                        let query_key = format!(
+                            "{}_{}_{}_{}",
+                            columns[1], columns[2], columns[3], columns[4]
+                        );
+                        let meta = columns[5].split('_').collect::<Vec<&str>>();
+                        let is_aggregate = if meta[2] == "1" { true } else { false };
+                        result_cache.entry(query_key).or_insert_with(Vec::new).push(
+                            ResultCacheMeta {
+                                start_time: meta[0].parse().unwrap(),
+                                end_time: meta[1].parse().unwrap(),
+                                is_aggregate,
+                            },
+                        );
+                    };
                     metrics::QUERY_DISK_CACHE_FILES
                         .with_label_values(&[columns[1], columns[2]])
                         .inc();
@@ -356,6 +379,8 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             }
         }
     }
+    // write all data from result_cache to QUERY_RESULT_CACHE
+    QUERY_RESULT_CACHE.write().await.extend(result_cache);
     Ok(())
 }
 

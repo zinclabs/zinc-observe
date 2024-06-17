@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod file_data;
+pub mod meta;
 pub mod stats;
 pub mod tmpfs;
 

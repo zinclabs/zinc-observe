@@ -28,15 +28,18 @@ use config::{
     utils::{base64, hash::Sum64, json},
     DISTINCT_FIELDS,
 };
-use infra::{errors, schema::STREAM_SCHEMAS_LATEST};
+use infra::{
+    cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
+    errors,
+    schema::STREAM_SCHEMAS_LATEST,
+};
 use opentelemetry::{global, trace::TraceContextExt};
 use tracing::{Instrument, Span};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
-        infra::config::QUERY_RESULT_CACHE,
-        meta::{self, http::HttpResponse as MetaHttpResponse, search::ResultCacheMeta},
+        meta::{self, http::HttpResponse as MetaHttpResponse, search::QueryDelta},
         utils::{
             functions,
             http::{
@@ -264,9 +267,18 @@ pub async fn search(
         stream_name,
         hashed_query
     );
-    let file_name = format!("{}_{}.json", req.query.start_time, req.query.end_time);
+
     let is_aggregate = crate::service::search::cache::result_utils::is_aggregate_query(&origin_sql)
         .unwrap_or_default();
+
+    let file_name = format!(
+        "{}_{}_{}.json",
+        req.query.start_time,
+        req.query.end_time,
+        if is_aggregate { 1 } else { 0 }
+    );
+    let mut should_exec_query = true;
+    let mut ext_took_wait = 0;
 
     let query_key = format!(
         "{}_{}_{}_{}",
@@ -275,207 +287,240 @@ pub async fn search(
         stream_name,
         hashed_query
     );
-    let c_resp = match crate::service::search::cache::cacher::get_cached_results(
-        req.query.start_time,
-        req.query.end_time,
-        is_aggregate,
-        query_key.clone(),
-        file_path.clone(),
-        file_name.clone(),
-    )
-    .await
-    {
-        Some(cached_resp) => {
-            if cached_resp.deltas.is_empty() {
-                log::debug!("cached response found");
-            } else if cached_resp.deltas.len() == 1 {
-                let delta = &cached_resp.deltas[0];
-                req.query.start_time = delta.delta_start_time;
-                req.query.end_time = delta.delta_end_time;
+    let c_resp = if !sql_mode.eq(&SqlMode::Full) {
+        match crate::service::search::cache::cacher::get_cached_results(
+            req.query.start_time,
+            req.query.end_time,
+            is_aggregate,
+            query_key.clone(),
+            file_path.clone(),
+        )
+        .await
+        {
+            Some(cached_resp) => {
+                let search_delta: Vec<&QueryDelta> = cached_resp
+                    .deltas
+                    .iter()
+                    .filter(|d| !d.delta_removed_hits)
+                    .collect();
+                if search_delta.is_empty() {
+                    log::info!("cached response found");
+                    should_exec_query = false;
+                } else if search_delta.len() == 1 {
+                    log::info!(
+                        "original query start_time {} end_time {}",
+                        req.query.start_time,
+                        req.query.end_time
+                    );
+
+                    let delta = &search_delta[0];
+                    req.query.start_time = delta.delta_start_time;
+                    req.query.end_time = delta.delta_end_time;
+
+                    log::info!(
+                        "new query start_time {} end_time {}",
+                        req.query.start_time,
+                        req.query.end_time
+                    );
+                }
+                cached_resp.cached_response
             }
-            cached_resp.cached_response
+            None => {
+                log::debug!("cached response not found");
+                config::meta::search::Response::default()
+            }
         }
-        None => {
-            log::debug!("cached response not found");
-            config::meta::search::Response::default()
-        }
+    } else {
+        config::meta::search::Response::default()
     };
 
     // Result caching check ends
-    let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
-    if let Some(vrl_function) = &query_fn {
-        if !vrl_function.trim().ends_with('.') {
-            query_fn = Some(format!("{} \n .", vrl_function));
+    let mut res = if should_exec_query {
+        let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
+        if let Some(vrl_function) = &query_fn {
+            if !vrl_function.trim().ends_with('.') {
+                query_fn = Some(format!("{} \n .", vrl_function));
+            }
         }
-    }
-    req.query.query_fn = query_fn;
+        req.query.query_fn = query_fn;
 
-    for fn_name in functions::get_all_transform_keys(&org_id).await {
-        if req.query.sql.contains(&format!("{}(", fn_name)) {
-            req.query.uses_zo_fn = true;
-            break;
+        for fn_name in functions::get_all_transform_keys(&org_id).await {
+            if req.query.sql.contains(&format!("{}(", fn_name)) {
+                req.query.uses_zo_fn = true;
+                break;
+            }
         }
-    }
 
-    let cfg = get_config();
-    // get a local search queue lock
-    #[cfg(not(feature = "enterprise"))]
-    let locker = SearchService::QUEUE_LOCKER.clone();
-    #[cfg(not(feature = "enterprise"))]
-    let locker = locker.lock().await;
-    #[cfg(not(feature = "enterprise"))]
-    if !cfg.common.feature_query_queue_enabled {
-        drop(locker);
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let took_wait = start.elapsed().as_millis() as usize;
-    #[cfg(feature = "enterprise")]
-    let took_wait = 0;
-    log::info!("http search API wait in local queue took: {} ms", took_wait);
+        let cfg = get_config();
+        // get a local search queue lock
+        #[cfg(not(feature = "enterprise"))]
+        let locker = SearchService::QUEUE_LOCKER.clone();
+        #[cfg(not(feature = "enterprise"))]
+        let locker = locker.lock().await;
+        #[cfg(not(feature = "enterprise"))]
+        if !cfg.common.feature_query_queue_enabled {
+            drop(locker);
+        }
+        #[cfg(not(feature = "enterprise"))]
+        let took_wait = start.elapsed().as_millis() as usize;
+        #[cfg(feature = "enterprise")]
+        let took_wait = 0;
+        log::info!("http search API wait in local queue took: {} ms", took_wait);
 
-    let search_fut = SearchService::search(
-        &trace_id,
-        &org_id,
-        stream_type,
-        Some(user_id.to_str().unwrap().to_string()),
-        &req,
-    );
-    let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-        search_fut.instrument(http_span.unwrap()).await
+        let search_fut = SearchService::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            Some(user_id.to_str().unwrap().to_string()),
+            &req,
+        );
+        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
+            search_fut.instrument(http_span.unwrap()).await
+        } else {
+            search_fut.await
+        };
+
+        let res = match search_res {
+            Ok(mut res) => {
+                if !c_resp.hits.is_empty() {
+                    merge_response(c_resp, &mut res);
+                }
+                res
+            }
+            Err(err) => {
+                let time = start.elapsed().as_secs_f64();
+                metrics::HTTP_RESPONSE_TIME
+                    .with_label_values(&[
+                        "/api/org/_search",
+                        "500",
+                        &org_id,
+                        "",
+                        stream_type.to_string().as_str(),
+                    ])
+                    .observe(time);
+                metrics::HTTP_INCOMING_REQUESTS
+                    .with_label_values(&[
+                        "/api/org/_search",
+                        "500",
+                        &org_id,
+                        "",
+                        stream_type.to_string().as_str(),
+                    ])
+                    .inc();
+                log::error!("search error: {:?}", err);
+                return Ok(match err {
+                    errors::Error::ErrorCode(code) => match code {
+                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                            .json(meta::http::HttpResponse::error_code_with_trace_id(
+                                code,
+                                Some(trace_id),
+                            )),
+                        _ => HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error_code_with_trace_id(
+                                code,
+                                Some(trace_id),
+                            ),
+                        ),
+                    },
+                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                        StatusCode::INTERNAL_SERVER_ERROR.into(),
+                        err.to_string(),
+                    )),
+                });
+            }
+        };
+        res
     } else {
-        search_fut.await
+        c_resp
     };
 
     // do search
-    match search_res {
-        Ok(mut res) => {
-            if !c_resp.hits.is_empty() {
-                merge_response(c_resp, &mut res);
-            }
 
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_search",
-                    "200",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_search",
-                    "200",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
-            res.set_trace_id(trace_id.clone());
-            res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
-            if !range_error.is_empty() {
-                res.is_partial = true;
-                res.function_error = if res.function_error.is_empty() {
-                    range_error
-                } else {
-                    format!("{} \n {}", range_error, res.function_error)
-                };
-                res.new_start_time = Some(req.query.start_time);
-                res.new_end_time = Some(req.query.end_time);
-            }
-
-            let req_stats = RequestStats {
-                records: res.hits.len() as i64,
-                response_time: time,
-                size: res.scan_size as f64,
-                request_body: Some(req.query.sql),
-                user_email: Some(user_id.to_str().unwrap().to_string()),
-                min_ts: Some(req.query.start_time),
-                max_ts: Some(req.query.end_time),
-                cached_ratio: Some(res.cached_ratio),
-                search_type,
-                trace_id: Some(trace_id.clone()),
-                ..Default::default()
-            };
-            let num_fn = req.query.query_fn.is_some() as u16;
-            report_request_usage_stats(
-                req_stats,
-                &org_id,
-                &stream_name,
-                StreamType::Logs,
-                UsageType::Search,
-                num_fn,
-            )
-            .await;
-
-            // result cache save changes start
-            let res_cache = json::to_string(&res).unwrap();
-            tokio::spawn(async move {
-                match SearchService::cache::cacher::cache_results_to_disk(
-                    &trace_id, &file_path, &file_name, res_cache,
-                )
-                .await
-                {
-                    Ok(_) => {
-                        let mut w = QUERY_RESULT_CACHE.write().await;
-                        w.entry(query_key)
-                            .or_insert_with(Vec::new)
-                            .push(ResultCacheMeta {
-                                start_time: req.query.start_time,
-                                end_time: req.query.end_time,
-                                is_aggregate,
-                            });
-                        drop(w);
-                    }
-                    Err(e) => {
-                        println!("Cache results to disk failed: {:?}", e);
-                    }
-                }
-            });
-            //  // result cache save changes Ends
-
-            Ok(HttpResponse::Ok().json(res))
-        }
-        Err(err) => {
-            let time = start.elapsed().as_secs_f64();
-            metrics::HTTP_RESPONSE_TIME
-                .with_label_values(&[
-                    "/api/org/_search",
-                    "500",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
-                .observe(time);
-            metrics::HTTP_INCOMING_REQUESTS
-                .with_label_values(&[
-                    "/api/org/_search",
-                    "500",
-                    &org_id,
-                    "",
-                    stream_type.to_string().as_str(),
-                ])
-                .inc();
-            log::error!("search error: {:?}", err);
-            Ok(match err {
-                errors::Error::ErrorCode(code) => match code {
-                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                        .json(meta::http::HttpResponse::error_code_with_trace_id(
-                            code,
-                            Some(trace_id),
-                        )),
-                    _ => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                    ),
-                },
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            })
-        }
+    let time = start.elapsed().as_secs_f64();
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            "/api/org/_search",
+            "200",
+            &org_id,
+            "",
+            stream_type.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            "/api/org/_search",
+            "200",
+            &org_id,
+            "",
+            stream_type.to_string().as_str(),
+        ])
+        .inc();
+    res.set_trace_id(trace_id.clone());
+    res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
+    if !range_error.is_empty() {
+        res.is_partial = true;
+        res.function_error = if res.function_error.is_empty() {
+            range_error
+        } else {
+            format!("{} \n {}", range_error, res.function_error)
+        };
+        res.new_start_time = Some(req.query.start_time);
+        res.new_end_time = Some(req.query.end_time);
     }
+
+    let req_stats = RequestStats {
+        records: res.hits.len() as i64,
+        response_time: time,
+        size: res.scan_size as f64,
+        request_body: Some(req.query.sql),
+        user_email: Some(user_id.to_str().unwrap().to_string()),
+        min_ts: Some(req.query.start_time),
+        max_ts: Some(req.query.end_time),
+        cached_ratio: Some(res.cached_ratio),
+        search_type,
+        trace_id: Some(trace_id.clone()),
+        ..Default::default()
+    };
+    let num_fn = req.query.query_fn.is_some() as u16;
+    report_request_usage_stats(
+        req_stats,
+        &org_id,
+        &stream_name,
+        StreamType::Logs,
+        UsageType::Search,
+        num_fn,
+    )
+    .await;
+
+    // result cache save changes start
+    if should_exec_query {
+        let res_cache = json::to_string(&res).unwrap();
+        tokio::spawn(async move {
+            match SearchService::cache::cacher::cache_results_to_disk(
+                &trace_id, &file_path, &file_name, res_cache,
+            )
+            .await
+            {
+                Ok(_) => {
+                    let mut w = QUERY_RESULT_CACHE.write().await;
+                    w.entry(query_key)
+                        .or_insert_with(Vec::new)
+                        .push(ResultCacheMeta {
+                            start_time: req.query.start_time,
+                            end_time: req.query.end_time,
+                            is_aggregate,
+                        });
+                    drop(w);
+                }
+                Err(e) => {
+                    println!("Cache results to disk failed: {:?}", e);
+                }
+            }
+        });
+    }
+    // result cache save changes Ends
+
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// SearchAround

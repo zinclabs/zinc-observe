@@ -31,7 +31,6 @@ use crate::{
         organization::OrganizationSetting,
         pipelines::PipeLine,
         prom::ClusterLeader,
-        search::ResultCacheMeta,
         syslog::SyslogRoute,
         user::User,
     },
@@ -88,6 +87,3 @@ pub static GEOIP_ASN_TABLE: Lazy<Arc<RwLock<Option<Geoip>>>> =
 
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static STREAM_PIPELINES: Lazy<RwHashMap<String, PipeLine>> = Lazy::new(DashMap::default);
-
-pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
-    Lazy::new(Default::default);
