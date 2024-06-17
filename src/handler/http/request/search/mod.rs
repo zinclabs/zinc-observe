@@ -275,7 +275,7 @@ pub async fn search(
         stream_name,
         hashed_query
     );
-    match crate::service::search::cache::cacher::get_cached_results(
+    let c_resp = match crate::service::search::cache::cacher::get_cached_results(
         req.query.start_time,
         req.query.end_time,
         is_aggregate,
@@ -288,11 +288,16 @@ pub async fn search(
         Some(cached_resp) => {
             if cached_resp.deltas.is_empty() {
                 log::debug!("cached response found");
-                return Ok(HttpResponse::Ok().json(cached_resp.cached_response));
+            } else if cached_resp.deltas.len() == 1 {
+                let delta = &cached_resp.deltas[0];
+                req.query.start_time = delta.delta_start_time;
+                req.query.end_time = delta.delta_end_time;
             }
+            cached_resp.cached_response
         }
         None => {
             log::debug!("cached response not found");
+            config::meta::search::Response::default()
         }
     };
 
@@ -344,6 +349,10 @@ pub async fn search(
     // do search
     match search_res {
         Ok(mut res) => {
+            if !c_resp.hits.is_empty() {
+                merge_response(c_resp, &mut res);
+            }
+
             let time = start.elapsed().as_secs_f64();
             metrics::HTTP_RESPONSE_TIME
                 .with_label_values(&[
@@ -1642,4 +1651,17 @@ pub async fn search_partition(
             })
         }
     }
+}
+
+fn merge_response(
+    cache_response: config::meta::search::Response,
+    search_response: &mut config::meta::search::Response,
+) {
+    search_response.hits.extend(cache_response.hits);
+    search_response.total += cache_response.total;
+    search_response.size += cache_response.size;
+    search_response.scan_size += cache_response.scan_size;
+    search_response.took += cache_response.took;
+    // search_response.cached_ratio = (search_response.cached_ratio + cache_response.cached_ratio) /
+    // 2;
 }
