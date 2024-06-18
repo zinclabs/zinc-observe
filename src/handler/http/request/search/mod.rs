@@ -288,7 +288,7 @@ pub async fn search(
         })
     }
     // Result caching check ends
-
+    let mut results = Vec::new();
     let mut res = if should_exec_query {
         let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
         if let Some(vrl_function) = &query_fn {
@@ -351,8 +351,6 @@ pub async fn search(
             });
             tasks.push(task);
         }
-
-        let mut results = Vec::new();
 
         for task in tasks {
             match task.await {
@@ -418,7 +416,7 @@ pub async fn search(
             }
         }
         if c_resp.has_cached_data {
-            merge_response(&mut c_resp.cached_response, results);
+            merge_response(&mut c_resp.cached_response, &results);
             c_resp.cached_response
         } else {
             results[0].clone()
@@ -486,7 +484,10 @@ pub async fn search(
     .await;
 
     // result cache save changes start
-    if should_exec_query && c_resp.cache_query_response {
+    if should_exec_query
+        && c_resp.cache_query_response
+        && (!results.first().unwrap().hits.is_empty() || !results.last().unwrap().hits.is_empty())
+    {
         let res_cache = json::to_string(&res).unwrap();
         tokio::spawn(async move {
             match SearchService::cache::cacher::cache_results_to_disk(
@@ -1695,7 +1696,7 @@ pub async fn search_partition(
 // or end to cache response
 fn merge_response(
     cache_response: &mut config::meta::search::Response,
-    search_response: Vec<config::meta::search::Response>,
+    search_response: &Vec<config::meta::search::Response>,
 ) {
     let cfg = get_config();
 
@@ -1703,6 +1704,11 @@ fn merge_response(
         && search_response.first().unwrap().hits.is_empty()
         && search_response.last().unwrap().hits.is_empty()
     {
+        for res in search_response {
+            cache_response.total += res.total;
+            cache_response.scan_size += res.scan_size;
+            cache_response.took += res.took;
+        }
         return;
     }
 
@@ -1746,14 +1752,9 @@ fn merge_response(
             .as_i64()
             .unwrap();
         if search_ts < cache_ts {
-            cache_response.hits.extend(res.hits);
+            cache_response.hits.extend(res.hits.clone());
         } else {
-            cache_response.hits = res
-                .hits
-                .iter()
-                .chain(cache_response.hits.iter())
-                .cloned()
-                .collect();
+            cache_response.hits.extend(res.hits.clone());
         }
     }
 }
