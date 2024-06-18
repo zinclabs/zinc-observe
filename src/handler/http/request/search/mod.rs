@@ -1754,7 +1754,12 @@ fn merge_response(
         if search_ts < cache_ts {
             cache_response.hits.extend(res.hits.clone());
         } else {
-            cache_response.hits.extend(res.hits.clone());
+            cache_response.hits = res
+                .hits
+                .iter()
+                .chain(cache_response.hits.iter())
+                .cloned()
+                .collect();
         }
     }
 }
