@@ -168,7 +168,7 @@ pub async fn get_cached_results(
                     matching_cache_meta.end_time,
                     if is_aggregate { 1 } else { 0 }
                 );
-                match get_results(&file_path, &file_name).await {
+                match get_results(file_path, &file_name).await {
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
                         // remove hits if time range is lesser than cached time range
