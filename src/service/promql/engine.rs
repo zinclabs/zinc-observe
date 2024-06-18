@@ -22,16 +22,15 @@ use datafusion::{
         datatypes::Schema,
     },
     error::{DataFusionError, Result},
-    prelude::{col, lit, SessionContext},
+    prelude::{col, lit, max, SessionContext},
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use promql_parser::{
     label::MatchOp,
     parser::{
-        token, AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function,
-        FunctionArgs, LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr,
-        StringLiteral, UnaryExpr, VectorMatchCardinality, VectorSelector,
+        token, AggregateExpr, Call, Expr as PromExpr, Function, FunctionArgs, LabelModifier,
+        MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr, VectorSelector,
     },
 };
 
@@ -44,8 +43,6 @@ pub struct Engine {
     ctx: Arc<super::exec::Query>,
     /// The time boundaries for the evaluation.
     time: i64,
-    /// Filters to (include, exclude) certain columns
-    col_filters: (HashSet<String>, HashSet<String>),
     result_type: Option<String>,
 }
 
@@ -54,145 +51,13 @@ impl Engine {
         Self {
             ctx,
             time,
-            col_filters: (HashSet::new(), HashSet::new()),
             result_type: None,
         }
     }
 
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
-        if matches!(
-            prom_expr,
-            PromExpr::Aggregate(_) | PromExpr::Unary(_) | PromExpr::Binary(_) | PromExpr::Call(_)
-        ) {
-            // Only filter columns for agg, unary, binary, & function call queries
-            self.extract_columns_from_prom_expr(prom_expr)?;
-        }
         let value = self.exec_expr(prom_expr).await?;
         Ok((value, self.result_type.clone()))
-    }
-
-    /// Recursively filters the necessary columns needed for before executing the given PromQL
-    /// expression.
-    pub fn extract_columns_from_prom_expr(&mut self, prom_expr: &PromExpr) -> Result<()> {
-        match prom_expr {
-            PromExpr::Aggregate(AggregateExpr {
-                op,
-                expr,
-                param,
-                modifier,
-            }) => {
-                self.extract_columns_from_prom_expr(expr)?;
-                if let Some(expr) = param {
-                    self.extract_columns_from_prom_expr(expr)?;
-                }
-                self.extract_columns_from_modifier(modifier, op);
-                Ok(())
-            }
-            PromExpr::Unary(UnaryExpr { expr }) => self.extract_columns_from_prom_expr(expr),
-            PromExpr::Binary(BinaryExpr {
-                op,
-                lhs,
-                rhs,
-                modifier,
-            }) => {
-                match modifier {
-                    None => {
-                        self.extract_columns_from_prom_expr(lhs)?;
-                        self.extract_columns_from_prom_expr(rhs)?;
-                    }
-                    Some(BinModifier {
-                        card,
-                        matching,
-                        return_bool: _,
-                    }) => match card {
-                        VectorMatchCardinality::OneToOne => {
-                            self.extract_columns_from_prom_expr(lhs)?;
-                            self.extract_columns_from_prom_expr(rhs)?;
-                            self.extract_columns_from_modifier(matching, op);
-                        }
-                        // group_left
-                        VectorMatchCardinality::ManyToOne(labels) => {
-                            self.col_filters.0.extend(labels.labels.iter().cloned());
-                            self.extract_columns_from_prom_expr(lhs)?;
-                        }
-                        // group_right
-                        VectorMatchCardinality::OneToMany(labels) => {
-                            self.col_filters.0.extend(labels.labels.iter().cloned());
-                            self.extract_columns_from_prom_expr(rhs)?;
-                        }
-                        VectorMatchCardinality::ManyToMany => {
-                            self.extract_columns_from_modifier(matching, op);
-                        }
-                    },
-                }
-                Ok(())
-            }
-            PromExpr::Paren(ParenExpr { expr }) => self.extract_columns_from_prom_expr(expr),
-            PromExpr::Subquery(expr) => self.extract_columns_from_prom_expr(&expr.expr),
-            PromExpr::VectorSelector(selector) => {
-                self.col_filters.0.extend(
-                    selector
-                        .matchers
-                        .matchers
-                        .iter()
-                        .map(|mat| mat.name.to_owned()),
-                );
-                Ok(())
-            }
-            PromExpr::MatrixSelector(MatrixSelector {
-                vs: selector,
-                range: _,
-            }) => {
-                self.col_filters.0.extend(
-                    selector
-                        .matchers
-                        .matchers
-                        .iter()
-                        .map(|mat| mat.name.to_owned()),
-                );
-                Ok(())
-            }
-            PromExpr::Call(Call { func: _, args }) => {
-                _ = args
-                    .args
-                    .iter()
-                    .map(|expr| self.extract_columns_from_prom_expr(expr))
-                    .collect::<Vec<_>>();
-                Ok(())
-            }
-            PromExpr::Extension(expr) => Err(DataFusionError::NotImplemented(format!(
-                "Unsupported Extension: {:?}",
-                expr
-            ))),
-            _ => Ok(()),
-        }
-    }
-
-    /// Help function to extract columns from [LabelModifier].
-    /// Aggregation function topk & bottomk are special cases where
-    /// modifier is applied to grouped result -> not columns filtered.
-    fn extract_columns_from_modifier(
-        &mut self,
-        modifier: &Option<LabelModifier>,
-        op: &token::TokenType,
-    ) {
-        if let Some(label_modifier) = modifier {
-            match op.id() {
-                // topk and bottomk query all columns when with modifiers
-                token::T_TOPK | token::T_BOTTOMK => {
-                    self.col_filters.0.clear();
-                    self.col_filters.1.clear();
-                }
-                _ => match label_modifier {
-                    LabelModifier::Include(labels) => {
-                        self.col_filters.0.extend(labels.labels.iter().cloned());
-                    }
-                    LabelModifier::Exclude(labels) => {
-                        self.col_filters.1.extend(labels.labels.iter().cloned());
-                    }
-                },
-            }
-        }
     }
 
     #[async_recursion]
@@ -558,10 +423,8 @@ impl Engine {
         let mut tasks = Vec::new();
         for (ctx, schema, scan_stats) in ctxs {
             let selector = selector.clone();
-            let col_filters = &self.col_filters;
             let task = tokio::time::timeout(Duration::from_secs(self.ctx.timeout), async move {
-                selector_load_data_from_datafusion(ctx, schema, selector, start, end, col_filters)
-                    .await
+                selector_load_data_from_datafusion(ctx, schema, selector, start, end).await
             });
             tasks.push(task);
             // update stats
@@ -1040,7 +903,6 @@ async fn selector_load_data_from_datafusion(
     selector: VectorSelector,
     start: i64,
     end: i64,
-    col_filters: &(HashSet<String>, HashSet<String>),
 ) -> Result<HashMap<String, RangeValue>> {
     let table_name = selector.name.as_ref().unwrap();
     let table = match ctx.table(table_name).await {
@@ -1051,7 +913,7 @@ async fn selector_load_data_from_datafusion(
     };
 
     let cfg = config::get_config();
-    let mut df_group = table.clone().filter(
+    let mut df_group = table.filter(
         col(&cfg.common.column_timestamp)
             .gt(lit(start))
             .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
@@ -1087,61 +949,58 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    // Can filter necessary columns when either is not empty
-    if !col_filters.0.is_empty() ^ !col_filters.1.is_empty() {
-        let selected_cols: Vec<_> = {
-            if !col_filters.0.is_empty() {
-                // include only found columns and required hash, _timestamp, & value cols
-                col_filters
-                    .0
-                    .iter()
-                    .chain(
-                        [
-                            HASH_LABEL.to_string(),
-                            cfg.common.column_timestamp.clone(),
-                            VALUE_LABEL.to_string(),
-                        ]
-                        .iter(),
-                    )
-                    .filter_map(|incl| {
-                        if schema.column_with_name(incl).is_some() {
-                            Some(col(incl))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            } else {
-                // exclude found columns from schema
-                schema
-                    .fields()
-                    .iter()
-                    .filter_map(|field| {
-                        if col_filters.1.contains(field.name()) {
-                            None
-                        } else {
-                            Some(col(field.name()))
-                        }
-                    })
-                    .collect()
-            }
-        };
+    let mut metrics: HashMap<String, RangeValue> = HashMap::default();
 
-        df_group = match df_group.select(selected_cols) {
-            Ok(df) => df,
-            Err(e) => {
-                log::error!("Selecting cols error: {:?}", e);
-                return Ok(HashMap::default());
+    let label_cols = schema
+        .fields()
+        .iter()
+        .filter_map(|field| {
+            let name = field.name().as_str();
+            if name == cfg.common.column_timestamp || name == HASH_LABEL || name == VALUE_LABEL {
+                None
+            } else {
+                Some(max(col(name)).alias(name))
             }
-        };
+        })
+        .collect::<Vec<_>>();
+
+    let series = df_group
+        .clone()
+        .aggregate(vec![col(HASH_LABEL)], label_cols)?
+        .collect()
+        .await?;
+
+    for batch in series {
+        let hash_values = batch
+            .column_by_name(HASH_LABEL)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        for i in 0..batch.num_rows() {
+            let mut labels = Vec::with_capacity(batch.num_columns());
+            for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
+                let name = k.name();
+                let value = v.as_any().downcast_ref::<StringArray>().unwrap();
+                labels.push(Arc::new(Label {
+                    name: name.to_string(),
+                    value: value.value(i).to_string(),
+                }));
+            }
+            labels.sort_by(|a, b| a.name.cmp(&b.name));
+            metrics.insert(
+                hash_values.value(i).to_string(),
+                RangeValue::new(labels, Vec::with_capacity(20)),
+            );
+        }
     }
 
     let batches = df_group
+        .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
         .await?;
 
-    let mut metrics: HashMap<String, RangeValue> = HashMap::default();
     for batch in &batches {
         let hash_values = batch
             .column_by_name(HASH_LABEL)
@@ -1163,28 +1022,11 @@ async fn selector_load_data_from_datafusion(
             .unwrap();
         for i in 0..batch.num_rows() {
             let hash = hash_values.value(i).to_string();
-            let entry = metrics.entry(hash).or_insert_with(|| {
-                let mut labels = Vec::with_capacity(batch.num_columns());
-                for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
-                    let name = k.name();
-                    if name == &cfg.common.column_timestamp
-                        || name == HASH_LABEL
-                        || name == VALUE_LABEL
-                    {
-                        continue;
-                    }
-                    let value = v.as_any().downcast_ref::<StringArray>().unwrap();
-                    labels.push(Arc::new(Label {
-                        name: name.to_string(),
-                        value: value.value(i).to_string(),
-                    }));
-                }
-                labels.sort_by(|a, b| a.name.cmp(&b.name));
-                RangeValue::new(labels, Vec::with_capacity(20))
+            metrics.entry(hash).and_modify(|entry| {
+                entry
+                    .samples
+                    .push(Sample::new(time_values.value(i), value_values.value(i)))
             });
-            entry
-                .samples
-                .push(Sample::new(time_values.value(i), value_values.value(i)));
         }
     }
     Ok(metrics)
