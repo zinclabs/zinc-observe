@@ -39,7 +39,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse, search::QueryDelta},
+        meta::{self, http::HttpResponse as MetaHttpResponse, search::CachedQueryResponse},
         utils::{
             functions,
             http::{
@@ -48,10 +48,7 @@ use crate::{
         },
     },
     service::{
-        search::{
-            self as SearchService,
-            sql::{SqlMode, RE_ONLY_SELECT, RE_SELECT_FROM},
-        },
+        search::{self as SearchService, cache::cacher::check_cache, sql::RE_ONLY_SELECT},
         usage::report_request_usage_stats,
     },
 };
@@ -131,6 +128,8 @@ pub async fn search(
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
+    let user_id_hdr = in_req.headers().get("user_id").unwrap();
+    let user_id = user_id_hdr.to_str().unwrap().to_string();
     let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
@@ -170,7 +169,6 @@ pub async fn search(
         return Ok(MetaHttpResponse::bad_request(e));
     }
 
-    let user_id = in_req.headers().get("user_id").unwrap();
     let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();
     rpc_req.stream_type = stream_type.to_string();
@@ -214,15 +212,13 @@ pub async fn search(
             utils::auth::{is_root_user, AuthExtractor},
         };
 
-        if !is_root_user(user_id.to_str().unwrap()) {
-            let user: meta::user::User = USERS
-                .get(&format!("{org_id}/{}", user_id.to_str().unwrap()))
-                .unwrap()
-                .clone();
+        if !is_root_user(&user_id) {
+            let user: meta::user::User =
+                USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
 
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(
-                    user_id.to_str().unwrap(),
+                    &user_id,
                     AuthExtractor {
                         auth: "".to_string(),
                         method: "GET".to_string(),
@@ -243,33 +239,15 @@ pub async fn search(
 
     // Result caching check start
     let mut origin_sql = req.query.sql.clone();
-    // check sql_mode
-    let sql_mode: SqlMode = rpc_req.query.as_ref().unwrap().sql_mode.as_str().into();
-    // Hack select for _timestamp
-    if !sql_mode.eq(&SqlMode::Full) && parsed_sql.order_by.is_empty() && !origin_sql.contains('*') {
-        let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
-        let cap_str = caps.get(1).unwrap().as_str();
-        if !cap_str.contains(&cfg.common.column_timestamp) {
-            origin_sql = origin_sql.replace(
-                cap_str,
-                &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
-            );
-        }
-        rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
-    }
+    let is_aggregate = crate::service::search::cache::result_utils::is_aggregate_query(&origin_sql)
+        .unwrap_or_default();
 
     let mut h = config::utils::hash::gxhash::new();
     let hashed_query = h.sum64(&origin_sql);
     let file_path = format!(
         "{}/{}/{}/{}",
-        org_id,
-        stream_type.to_string(),
-        stream_name,
-        hashed_query
+        org_id, stream_type, stream_name, hashed_query
     );
-
-    let is_aggregate = crate::service::search::cache::result_utils::is_aggregate_query(&origin_sql)
-        .unwrap_or_default();
 
     let file_name = format!(
         "{}_{}_{}.json",
@@ -282,57 +260,38 @@ pub async fn search(
 
     let query_key = format!(
         "{}_{}_{}_{}",
-        org_id,
-        stream_type.to_string(),
-        stream_name,
-        hashed_query
+        org_id, stream_type, stream_name, hashed_query
     );
-    let c_resp = if !sql_mode.eq(&SqlMode::Full) {
-        match crate::service::search::cache::cacher::get_cached_results(
-            req.query.start_time,
-            req.query.end_time,
-            is_aggregate,
-            query_key.clone(),
-            file_path.clone(),
-        )
-        .await
-        {
-            Some(cached_resp) => {
-                let search_delta: Vec<&QueryDelta> = cached_resp
-                    .deltas
-                    .iter()
-                    .filter(|d| !d.delta_removed_hits)
-                    .collect();
-                if search_delta.is_empty() {
-                    log::info!("cached response found");
-                    should_exec_query = false;
-                } else if search_delta.len() == 1 {
-                    log::info!(
-                        "original query start_time {} end_time {}",
-                        req.query.start_time,
-                        req.query.end_time
-                    );
 
-                    let delta = &search_delta[0];
-                    req.query.start_time = delta.delta_start_time;
-                    req.query.end_time = delta.delta_end_time;
+    let mut c_resp: CachedQueryResponse = check_cache(
+        &mut rpc_req,
+        &mut req,
+        &mut origin_sql,
+        &parsed_sql,
+        &query_key,
+        &file_path,
+        is_aggregate,
+        &mut should_exec_query,
+    )
+    .await;
 
-                    log::info!(
-                        "new query start_time {} end_time {}",
-                        req.query.start_time,
-                        req.query.end_time
-                    );
-                }
-                cached_resp.cached_response
-            }
-            None => {
-                log::debug!("cached response not found");
-                config::meta::search::Response::default()
-            }
-        }
-    } else {
-        config::meta::search::Response::default()
-    };
+    //  if c_resp.de   len() == 1 {
+    // log::info!(
+    // "original query start_time {} end_time {}",
+    // req.query.start_time,
+    // req.query.end_time
+    // );
+    //
+    // let delta = &search_delta[0];
+    // req.query.start_time = delta.delta_start_time;
+    // req.query.end_time = delta.delta_end_time;
+    //
+    // log::info!(
+    // "new query start_time {} end_time {}",
+    // req.query.start_time,
+    // req.query.end_time
+    // );
+    // }
 
     // Result caching check ends
     let mut res = if should_exec_query {
@@ -365,73 +324,108 @@ pub async fn search(
         let took_wait = start.elapsed().as_millis() as usize;
         #[cfg(feature = "enterprise")]
         let took_wait = 0;
-        log::info!("http search API wait in local queue took: {} ms", took_wait);
+        ext_took_wait = took_wait;
+        log::info!("http search API wait in queue took: {} ms", took_wait);
+        let search_tracing = !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled;
+        let mut tasks = Vec::new();
 
-        let search_fut = SearchService::search(
-            &trace_id,
-            &org_id,
-            stream_type,
-            Some(user_id.to_str().unwrap().to_string()),
-            &req,
-        );
-        let search_res = if !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled {
-            search_fut.instrument(http_span.unwrap()).await
-        } else {
-            search_fut.await
-        };
+        for delta in c_resp.deltas {
+            let http_span_local = http_span.clone();
+            let mut req = req.clone();
+            let org_id = org_id.clone();
+            let trace_id = trace_id.clone();
+            let user_id = user_id.clone();
 
-        let res = match search_res {
-            Ok(mut res) => {
-                if !c_resp.hits.is_empty() {
-                    merge_response(c_resp, &mut res);
+            let task = tokio::task::spawn(async move {
+                let trace_id = trace_id.clone();
+                req.query.start_time = delta.delta_start_time;
+                req.query.end_time = delta.delta_end_time;
+
+                let search_fut = SearchService::search(
+                    &trace_id,
+                    &org_id,
+                    stream_type,
+                    Some(user_id.to_string()),
+                    &req,
+                );
+                if search_tracing {
+                    search_fut.instrument(http_span_local.unwrap()).await
+                } else {
+                    search_fut.await
                 }
-                res
-            }
-            Err(err) => {
-                let time = start.elapsed().as_secs_f64();
-                metrics::HTTP_RESPONSE_TIME
-                    .with_label_values(&[
-                        "/api/org/_search",
-                        "500",
-                        &org_id,
-                        "",
-                        stream_type.to_string().as_str(),
-                    ])
-                    .observe(time);
-                metrics::HTTP_INCOMING_REQUESTS
-                    .with_label_values(&[
-                        "/api/org/_search",
-                        "500",
-                        &org_id,
-                        "",
-                        stream_type.to_string().as_str(),
-                    ])
-                    .inc();
-                log::error!("search error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            )),
-                        _ => HttpResponse::InternalServerError().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
+            });
+            tasks.push(task);
+        }
+
+        let mut results = Vec::new();
+
+        for task in tasks {
+            match task.await {
+                Ok(res) => match res {
+                    Ok(res) => results.push(res),
+                    Err(err) => {
+                        let time = start.elapsed().as_secs_f64();
+                        metrics::HTTP_RESPONSE_TIME
+                            .with_label_values(&[
+                                "/api/org/_search",
+                                "500",
+                                &org_id,
+                                "",
+                                stream_type.to_string().as_str(),
+                            ])
+                            .observe(time);
+                        metrics::HTTP_INCOMING_REQUESTS
+                            .with_label_values(&[
+                                "/api/org/_search",
+                                "500",
+                                &org_id,
+                                "",
+                                stream_type.to_string().as_str(),
+                            ])
+                            .inc();
+                        log::error!("search error: {:?}", err);
+                        return Ok(HttpResponse::InternalServerError().json(
+                            meta::http::HttpResponse::error(
+                                StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                err.to_string(),
                             ),
+                        ));
+                    }
+                },
+                Err(err) => {
+                    let time = start.elapsed().as_secs_f64();
+                    metrics::HTTP_RESPONSE_TIME
+                        .with_label_values(&[
+                            "/api/org/_search",
+                            "500",
+                            &org_id,
+                            "",
+                            stream_type.to_string().as_str(),
+                        ])
+                        .observe(time);
+                    metrics::HTTP_INCOMING_REQUESTS
+                        .with_label_values(&[
+                            "/api/org/_search",
+                            "500",
+                            &org_id,
+                            "",
+                            stream_type.to_string().as_str(),
+                        ])
+                        .inc();
+                    log::error!("search error: {:?}", err);
+                    return Ok(HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error(
+                            StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            err.to_string(),
                         ),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
+                    ));
+                }
             }
-        };
-        res
+        }
+        merge_response(&mut c_resp.cached_response, results);
+        c_resp.cached_response
     } else {
-        c_resp
+        c_resp.cached_response
     };
 
     // do search
@@ -473,7 +467,7 @@ pub async fn search(
         response_time: time,
         size: res.scan_size as f64,
         request_body: Some(req.query.sql),
-        user_email: Some(user_id.to_str().unwrap().to_string()),
+        user_email: Some(user_id.to_string()),
         min_ts: Some(req.query.start_time),
         max_ts: Some(req.query.end_time),
         cached_ratio: Some(res.cached_ratio),
@@ -1699,14 +1693,14 @@ pub async fn search_partition(
 }
 
 fn merge_response(
-    cache_response: config::meta::search::Response,
-    search_response: &mut config::meta::search::Response,
+    cache_response: &mut config::meta::search::Response,
+    search_response: Vec<config::meta::search::Response>,
 ) {
-    search_response.hits.extend(cache_response.hits);
-    search_response.total += cache_response.total;
-    search_response.size += cache_response.size;
-    search_response.scan_size += cache_response.scan_size;
-    search_response.took += cache_response.took;
-    // search_response.cached_ratio = (search_response.cached_ratio + cache_response.cached_ratio) /
-    // 2;
+    for res in search_response {
+        cache_response.hits.extend(res.hits);
+        cache_response.total += res.total;
+        cache_response.scan_size += res.scan_size;
+        cache_response.took += res.took;
+        cache_response.cached_ratio += res.cached_ratio;
+    }
 }

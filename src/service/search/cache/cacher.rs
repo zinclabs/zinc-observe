@@ -6,18 +6,103 @@ use infra::cache::{
     meta::ResultCacheMeta,
 };
 
-use crate::common::meta::search::{CachedQueryResponse, QueryDelta};
+use crate::{
+    common::meta::search::{CachedQueryResponse, QueryDelta},
+    service::search::sql::{SqlMode, RE_SELECT_FROM},
+};
+
+#[allow(clippy::too_many_arguments)]
+pub async fn check_cache(
+    rpc_req: &mut proto::cluster_rpc::SearchRequest,
+    req: &mut config::meta::search::Request,
+    origin_sql: &mut String,
+    parsed_sql: &config::meta::sql::Sql,
+    query_key: &str,
+    file_path: &str,
+    is_aggregate: bool,
+    should_exec_query: &mut bool,
+) -> CachedQueryResponse {
+    let cfg = get_config();
+
+    // check sql_mode
+    let sql_mode: SqlMode = rpc_req.query.as_ref().unwrap().sql_mode.as_str().into();
+
+    // skip the count queries
+
+    if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
+        return CachedQueryResponse::default();
+    }
+
+    // Hack select for _timestamp
+    if !is_aggregate && parsed_sql.order_by.is_empty() && !origin_sql.contains('*') {
+        let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
+        let cap_str = caps.get(1).unwrap().as_str();
+        if !cap_str.contains(&cfg.common.column_timestamp) {
+            *origin_sql = origin_sql.replace(
+                cap_str,
+                &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
+            );
+        }
+        rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
+    }
+
+    if is_aggregate && sql_mode.eq(&SqlMode::Full) {
+        return CachedQueryResponse::default();
+        //  let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
+        // let cap_str = caps.get(1).unwrap().as_str();
+        // if !cap_str.contains(&cfg.common.column_timestamp) {
+        // origin_sql = origin_sql.replace(
+        // cap_str,
+        // &format!(
+        // "max({}) as {}, {}",
+        // &cfg.common.column_timestamp, &cfg.common.column_timestamp, cap_str
+        // ),
+        // );
+        // }
+        // rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
+    }
+
+    let c_resp = match crate::service::search::cache::cacher::get_cached_results(
+        req.query.start_time,
+        req.query.end_time,
+        is_aggregate,
+        query_key,
+        file_path,
+    )
+    .await
+    {
+        Some(mut cached_resp) => {
+            let search_delta: Vec<QueryDelta> = cached_resp
+                .deltas
+                .iter()
+                .filter(|d| !d.delta_removed_hits)
+                .cloned()
+                .collect();
+            if search_delta.is_empty() {
+                log::info!("cached response found");
+                *should_exec_query = false;
+            };
+            cached_resp.deltas = search_delta;
+            cached_resp
+        }
+        None => {
+            log::debug!("cached response not found");
+            CachedQueryResponse::default()
+        }
+    };
+    c_resp
+}
 
 pub async fn get_cached_results(
     start_time: i64,
     end_time: i64,
     is_aggregate: bool,
-    query_key: String,
-    file_path: String,
+    query_key: &str,
+    file_path: &str,
 ) -> Option<CachedQueryResponse> {
     let cfg = get_config();
     let r = QUERY_RESULT_CACHE.read().await;
-    let is_cached = r.get(&query_key).cloned(); //org_streamy_type_stream_name_query -> 
+    let is_cached = r.get(query_key).cloned(); //org_streamy_type_stream_name_query -> 
     drop(r);
 
     let st = chrono::Utc.timestamp_micros(start_time).unwrap();
@@ -72,7 +157,7 @@ pub async fn get_cached_results(
 
                 let mut deltas = vec![];
                 let has_pre_cache_delta =
-                    calculate_deltas_v1(&matching_cache_meta, start_time, end_time, &mut deltas);
+                    calculate_deltas_v1(matching_cache_meta, start_time, end_time, &mut deltas);
 
                 let remove_hits: Vec<&QueryDelta> =
                     deltas.iter().filter(|d| d.delta_removed_hits).collect();
@@ -90,28 +175,24 @@ pub async fn get_cached_results(
 
                         if !remove_hits.is_empty() {
                             for delta in remove_hits {
-                                cached_response.hits = cached_response
-                                    .hits
-                                    .into_iter()
-                                    .filter(|hit| {
-                                        let hit_ts = hit
-                                            .get(&cfg.common.column_timestamp)
-                                            .unwrap()
-                                            .as_i64()
-                                            .unwrap();
+                                cached_response.hits.retain(|hit| {
+                                    let hit_ts = hit
+                                        .get(&cfg.common.column_timestamp)
+                                        .unwrap()
+                                        .as_i64()
+                                        .unwrap();
 
-                                        !(hit_ts >= delta.delta_start_time
-                                            && hit_ts < delta.delta_end_time)
-                                    })
-                                    .collect();
+                                    !(hit_ts >= delta.delta_start_time
+                                        && hit_ts < delta.delta_end_time)
+                                });
                             }
                         };
 
-                        return Some(CachedQueryResponse {
+                        Some(CachedQueryResponse {
                             cached_response,
                             deltas,
                             has_pre_cache_delta,
-                        });
+                        })
                     }
                     Err(e) => {
                         log::error!("Get results from disk failed for : {:?}", e);

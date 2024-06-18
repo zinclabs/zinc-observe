@@ -360,7 +360,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                             columns[1], columns[2], columns[3], columns[4]
                         );
                         let meta = columns[5].split('_').collect::<Vec<&str>>();
-                        let is_aggregate = if meta[2] == "1" { true } else { false };
+                        let is_aggregate = meta[2] == "1";
                         result_cache.entry(query_key).or_insert_with(Vec::new).push(
                             ResultCacheMeta {
                                 start_time: meta[0].parse().unwrap(),
