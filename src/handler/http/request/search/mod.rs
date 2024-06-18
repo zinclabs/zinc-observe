@@ -275,24 +275,6 @@ pub async fn search(
     )
     .await;
 
-    //  if c_resp.de   len() == 1 {
-    // log::info!(
-    // "original query start_time {} end_time {}",
-    // req.query.start_time,
-    // req.query.end_time
-    // );
-    //
-    // let delta = &search_delta[0];
-    // req.query.start_time = delta.delta_start_time;
-    // req.query.end_time = delta.delta_end_time;
-    //
-    // log::info!(
-    // "new query start_time {} end_time {}",
-    // req.query.start_time,
-    // req.query.end_time
-    // );
-    // }
-
     // Result caching check ends
     let mut res = if should_exec_query {
         let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
