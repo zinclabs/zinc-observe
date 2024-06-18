@@ -1736,6 +1736,14 @@ fn merge_response_v1(
         .unwrap();
 
     for res in search_response {
+        cache_response.total += res.total;
+        cache_response.scan_size += res.scan_size;
+        cache_response.took += res.took;
+        cache_response.cached_ratio += res.cached_ratio;
+
+        if res.hits.is_empty() {
+            continue;
+        }
         let search_ts = res
             .hits
             .first()
@@ -1754,9 +1762,5 @@ fn merge_response_v1(
                 .cloned()
                 .collect();
         }
-        cache_response.total += res.total;
-        cache_response.scan_size += res.scan_size;
-        cache_response.took += res.took;
-        cache_response.cached_ratio += res.cached_ratio;
     }
 }
