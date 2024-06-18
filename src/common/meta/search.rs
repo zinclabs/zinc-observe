@@ -8,6 +8,7 @@ pub struct CachedQueryResponse {
     pub deltas: Vec<QueryDelta>,
     pub has_pre_cache_delta: bool,
     pub has_cached_data: bool,
+    pub cache_query_response: bool,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
 pub struct QueryDelta {

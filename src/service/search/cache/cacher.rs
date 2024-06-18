@@ -61,7 +61,7 @@ pub async fn check_cache(
         rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
     }
 
-    let c_resp = match crate::service::search::cache::cacher::get_cached_results(
+    let mut c_resp = match crate::service::search::cache::cacher::get_cached_results(
         req.query.start_time,
         req.query.end_time,
         is_aggregate,
@@ -89,6 +89,7 @@ pub async fn check_cache(
             CachedQueryResponse::default()
         }
     };
+    c_resp.cache_query_response = true;
     c_resp
 }
 
@@ -101,14 +102,11 @@ pub async fn get_cached_results(
 ) -> Option<CachedQueryResponse> {
     let cfg = get_config();
     let r = QUERY_RESULT_CACHE.read().await;
-    let is_cached = r.get(query_key).cloned(); //org_streamy_type_stream_name_query -> 
+    let is_cached = r.get(query_key).cloned();
     drop(r);
 
     let st = chrono::Utc.timestamp_micros(start_time).unwrap();
-
     let end = chrono::Utc.timestamp_micros(end_time).unwrap();
-
-    log::info!("#################################################");
 
     log::info!("Query start time & end time is {} - {}", st, end);
 
@@ -122,15 +120,6 @@ pub async fn get_cached_results(
                 let cached_duration = cache_meta.end_time - cache_meta.start_time;
                 let query_duration = end_time - start_time;
 
-                let st = chrono::Utc.timestamp_micros(cache_meta.start_time).unwrap();
-
-                let end = chrono::Utc.timestamp_micros(cache_meta.end_time).unwrap();
-
-                log::info!(
-                    "########## Cached start time & end time is {} - {}",
-                    st,
-                    end
-                );
                 cached_duration > query_duration / cfg.limit.query_cache_min_contribution
                     && cache_meta.start_time <= end_time
                     && cache_meta.end_time >= start_time
@@ -139,20 +128,6 @@ pub async fn get_cached_results(
         {
             Some(matching_cache_meta) => {
                 // calculate delta time range to fetch the delta data using search query
-                log::info!("#################################################");
-                let st = chrono::Utc
-                    .timestamp_micros(matching_cache_meta.start_time)
-                    .unwrap();
-
-                let end = chrono::Utc
-                    .timestamp_micros(matching_cache_meta.end_time)
-                    .unwrap();
-
-                log::info!(
-                    "########## Used start time & end time is {} - {} ##########",
-                    st,
-                    end
-                );
 
                 let mut deltas = vec![];
                 let has_pre_cache_delta =
@@ -192,6 +167,7 @@ pub async fn get_cached_results(
                             deltas,
                             has_pre_cache_delta,
                             has_cached_data: true,
+                            cache_query_response: true,
                         })
                     }
                     Err(e) => {

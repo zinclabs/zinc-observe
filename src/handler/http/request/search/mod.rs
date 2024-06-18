@@ -418,7 +418,7 @@ pub async fn search(
             }
         }
         if c_resp.has_cached_data {
-            merge_response(&mut c_resp.cached_response, results);
+            merge_response_v1(&mut c_resp.cached_response, results);
             c_resp.cached_response
         } else {
             results[0].clone()
@@ -486,7 +486,7 @@ pub async fn search(
     .await;
 
     // result cache save changes start
-    if should_exec_query {
+    if should_exec_query && c_resp.cache_query_response {
         let res_cache = json::to_string(&res).unwrap();
         tokio::spawn(async move {
             match SearchService::cache::cacher::cache_results_to_disk(
@@ -1691,7 +1691,7 @@ pub async fn search_partition(
     }
 }
 
-fn merge_response(
+fn _merge_response(
     cache_response: &mut config::meta::search::Response,
     search_response: Vec<config::meta::search::Response>,
 ) {
@@ -1716,4 +1716,47 @@ fn merge_response(
             .unwrap();
         b.cmp(&a)
     });
+}
+
+fn merge_response_v1(
+    cache_response: &mut config::meta::search::Response,
+    search_response: Vec<config::meta::search::Response>,
+) {
+    let cfg = get_config();
+    // based on _timestamp of first record in config::meta::search::Response either add it in start
+    // or end to cache response
+
+    let cache_ts = cache_response
+        .hits
+        .first()
+        .unwrap()
+        .get(&cfg.common.column_timestamp)
+        .unwrap()
+        .as_i64()
+        .unwrap();
+
+    for res in search_response {
+        let search_ts = res
+            .hits
+            .first()
+            .unwrap()
+            .get(&cfg.common.column_timestamp)
+            .unwrap()
+            .as_i64()
+            .unwrap();
+        if search_ts < cache_ts {
+            cache_response.hits.extend(res.hits);
+        } else {
+            cache_response.hits = res
+                .hits
+                .iter()
+                .chain(cache_response.hits.iter())
+                .cloned()
+                .collect();
+        }
+        cache_response.total += res.total;
+        cache_response.scan_size += res.scan_size;
+        cache_response.took += res.took;
+        cache_response.cached_ratio += res.cached_ratio;
+    }
 }
