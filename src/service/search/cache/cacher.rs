@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use chrono::TimeZone;
 use config::{get_config, meta::search::Response, utils::json};
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
@@ -22,30 +21,22 @@ pub async fn check_cache(
     is_aggregate: bool,
     should_exec_query: &mut bool,
 ) -> CachedQueryResponse {
+    let start = std::time::Instant::now();
     let cfg = get_config();
 
     // check sql_mode
     let sql_mode: SqlMode = rpc_req.query.as_ref().unwrap().sql_mode.as_str().into();
 
     // skip the count queries
-
     if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
         return CachedQueryResponse::default();
     }
     if is_aggregate && sql_mode.eq(&SqlMode::Full) {
-        return CachedQueryResponse::default();
-        //  let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
-        // let cap_str = caps.get(1).unwrap().as_str();
-        // if !cap_str.contains(&cfg.common.column_timestamp) {
-        // origin_sql = origin_sql.replace(
-        // cap_str,
-        // &format!(
-        // "max({}) as {}, {}",
-        // &cfg.common.column_timestamp, &cfg.common.column_timestamp, cap_str
-        // ),
-        // );
-        // }
-        // rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
+        let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
+        let cap_str = caps.get(1).unwrap().as_str();
+        if !cap_str.contains(&cfg.common.column_timestamp) {
+            return CachedQueryResponse::default();
+        }
     }
 
     // Hack select for _timestamp
@@ -82,6 +73,7 @@ pub async fn check_cache(
                 *should_exec_query = false;
             };
             cached_resp.deltas = search_delta;
+            cached_resp.cached_response.took = start.elapsed().as_millis() as usize;
             cached_resp
         }
         None => {
@@ -104,11 +96,6 @@ pub async fn get_cached_results(
     let r = QUERY_RESULT_CACHE.read().await;
     let is_cached = r.get(query_key).cloned();
     drop(r);
-
-    let st = chrono::Utc.timestamp_micros(start_time).unwrap();
-    let end = chrono::Utc.timestamp_micros(end_time).unwrap();
-
-    log::info!("Query start time & end time is {} - {}", st, end);
 
     if let Some(cache_metas) = is_cached {
         match cache_metas
@@ -185,80 +172,6 @@ pub async fn get_cached_results(
         None
     }
 }
-
-// pub fn calculate_deltas(
-//     result_meta: &ResultCacheMeta,
-//     start_time: i64,
-//     end_time: i64,
-//     mut deltas: Vec<QueryDelta>,
-// ) -> bool {
-//     let has_post_cache_delta = false;
-//     if start_time == result_meta.start_time && end_time == result_meta.end_time {
-//         // If query start time and end time are the same as cache times, return results from
-// cache         return;
-//     }
-//     // Query Start time > ResultCacheMeta start time & Query End time > ResultCacheMeta End time
-// ->     // typical last x min/hours/days of data
-//     if start_time > result_meta.start_time && end_time > result_meta.end_time {
-//         // q start time : 10:00, q end time : 11:00, r start time : 09:00, r end time : 10:30
-//         // Drop data between Query End time & ResultCacheMeta End time
-//         deltas.push(QueryDelta {
-//             delta_start_time: result_meta.end_time,
-//             delta_end_time: end_time,
-//             delta_removed_hits: false,
-//         });
-//         // Fetch data between ResultCacheMeta Start time & Query start time
-//         deltas.push(QueryDelta {
-//             delta_start_time: result_meta.start_time,
-//             delta_end_time: start_time,
-//             delta_removed_hits: true,
-//         });
-//     }
-//     // Query Start time < ResultCacheMeta start time & Query End time > ResultCacheMeta End time
-//     else if start_time < result_meta.start_time && end_time > result_meta.end_time {
-//         // q start time : 10:00, q end time : 11:00, r start time : 10:30, r end time : 10:45
-//         // If query times are wider than cached times, fetch both ends
-//         deltas.push(QueryDelta {
-//             delta_start_time: result_meta.end_time,
-//             delta_end_time: end_time,
-//             delta_removed_hits: false,
-//         });
-//         deltas.push(QueryDelta {
-//             delta_start_time: start_time,
-//             delta_end_time: result_meta.start_time,
-//             delta_removed_hits: false,
-//         });
-//     }
-//     // Query Start time > ResultCacheMeta start time & Query End time < ResultCacheMeta End time
-//     else if start_time > result_meta.start_time && end_time < result_meta.end_time {
-//         // q start time : 10:00, q end time : 11:00, r start time : 9:30, r end time : 11:15
-//         // Fetch data between ResultCacheMeta Start time & Query start time
-//         deltas.push(QueryDelta {
-//             delta_start_time: result_meta.start_time,
-//             delta_end_time: start_time,
-//             delta_removed_hits: true,
-//         });
-//         deltas.push(QueryDelta {
-//             delta_start_time: end_time,
-//             delta_end_time: result_meta.end_time,
-//             delta_removed_hits: true,
-//         });
-//     } else if start_time < result_meta.start_time && end_time < result_meta.end_time {
-//         // If query starts before and ends before cache ends
-//         // q start time : 10:00, q end time : 11:00, r start time : 10:30, r end time : 11:15
-//         deltas.push(QueryDelta {
-//             delta_start_time: start_time,
-//             delta_end_time: result_meta.start_time,
-//             delta_removed_hits: false,
-//         });
-//         deltas.push(QueryDelta {
-//             delta_start_time: end_time,
-//             delta_end_time: result_meta.end_time,
-//             delta_removed_hits: true,
-//         });
-//     }
-//     has_post_cache_delta
-// }
 
 pub fn calculate_deltas_v1(
     result_meta: &ResultCacheMeta,

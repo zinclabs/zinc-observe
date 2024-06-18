@@ -418,7 +418,7 @@ pub async fn search(
             }
         }
         if c_resp.has_cached_data {
-            merge_response_v1(&mut c_resp.cached_response, results);
+            merge_response(&mut c_resp.cached_response, results);
             c_resp.cached_response
         } else {
             results[0].clone()
@@ -1691,49 +1691,42 @@ pub async fn search_partition(
     }
 }
 
-fn _merge_response(
+// based on _timestamp of first record in config::meta::search::Response either add it in start
+// or end to cache response
+fn merge_response(
     cache_response: &mut config::meta::search::Response,
     search_response: Vec<config::meta::search::Response>,
 ) {
     let cfg = get_config();
-    for res in search_response {
-        cache_response.hits.extend(res.hits);
-        cache_response.total += res.total;
-        cache_response.scan_size += res.scan_size;
-        cache_response.took += res.took;
-        cache_response.cached_ratio += res.cached_ratio;
+
+    if cache_response.hits.is_empty()
+        && search_response.first().unwrap().hits.is_empty()
+        && search_response.last().unwrap().hits.is_empty()
+    {
+        return;
     }
-    cache_response.hits.sort_by(|a, b| {
-        let a = a
+
+    let cache_ts = if cache_response.hits.is_empty() {
+        search_response
+            .first()
+            .unwrap()
+            .hits
+            .first()
+            .unwrap()
             .get(&cfg.common.column_timestamp)
             .unwrap()
             .as_i64()
-            .unwrap();
-        let b = b
+            .unwrap()
+    } else {
+        cache_response
+            .hits
+            .first()
+            .unwrap()
             .get(&cfg.common.column_timestamp)
             .unwrap()
             .as_i64()
-            .unwrap();
-        b.cmp(&a)
-    });
-}
-
-fn merge_response_v1(
-    cache_response: &mut config::meta::search::Response,
-    search_response: Vec<config::meta::search::Response>,
-) {
-    let cfg = get_config();
-    // based on _timestamp of first record in config::meta::search::Response either add it in start
-    // or end to cache response
-
-    let cache_ts = cache_response
-        .hits
-        .first()
-        .unwrap()
-        .get(&cfg.common.column_timestamp)
-        .unwrap()
-        .as_i64()
-        .unwrap();
+            .unwrap()
+    };
 
     for res in search_response {
         cache_response.total += res.total;
