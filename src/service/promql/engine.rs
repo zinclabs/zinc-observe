@@ -22,7 +22,7 @@ use datafusion::{
         datatypes::Schema,
     },
     error::{DataFusionError, Result},
-    prelude::{col, lit, max, SessionContext},
+    prelude::{col, in_subquery, lit, max, SessionContext},
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -964,13 +964,11 @@ async fn selector_load_data_from_datafusion(
         })
         .collect::<Vec<_>>();
 
-    let series = df_group
+    let series_df = df_group
         .clone()
-        .aggregate(vec![col(HASH_LABEL)], label_cols)?
-        .collect()
-        .await?;
+        .aggregate(vec![col(HASH_LABEL)], label_cols)?;
 
-    for batch in series {
+    for batch in series_df.clone().collect().await? {
         let hash_values = batch
             .column_by_name(HASH_LABEL)
             .unwrap()
@@ -996,6 +994,14 @@ async fn selector_load_data_from_datafusion(
     }
 
     let batches = df_group
+        .filter(in_subquery(
+            col(HASH_LABEL),
+            Arc::new(
+                series_df
+                    .select(vec![col(HASH_LABEL)])?
+                    .into_unoptimized_plan(),
+            ),
+        ))?
         .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
