@@ -39,7 +39,11 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse, search::CachedQueryResponse},
+        meta::{
+            self,
+            http::HttpResponse as MetaHttpResponse,
+            search::{CachedQueryResponse, QueryDelta},
+        },
         utils::{
             functions,
             http::{
@@ -275,7 +279,16 @@ pub async fn search(
     )
     .await;
 
+    // No cache data present, add delta for full query
+    if !c_resp.has_cached_data {
+        c_resp.deltas.push(QueryDelta {
+            delta_start_time: req.query.start_time,
+            delta_end_time: req.query.end_time,
+            delta_removed_hits: false,
+        })
+    }
     // Result caching check ends
+
     let mut res = if should_exec_query {
         let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
         if let Some(vrl_function) = &query_fn {
@@ -404,8 +417,12 @@ pub async fn search(
                 }
             }
         }
-        merge_response(&mut c_resp.cached_response, results);
-        c_resp.cached_response
+        if c_resp.has_cached_data {
+            merge_response(&mut c_resp.cached_response, results);
+            c_resp.cached_response
+        } else {
+            results[0].clone()
+        }
     } else {
         c_resp.cached_response
     };
@@ -1678,6 +1695,7 @@ fn merge_response(
     cache_response: &mut config::meta::search::Response,
     search_response: Vec<config::meta::search::Response>,
 ) {
+    let cfg = get_config();
     for res in search_response {
         cache_response.hits.extend(res.hits);
         cache_response.total += res.total;
@@ -1685,4 +1703,17 @@ fn merge_response(
         cache_response.took += res.took;
         cache_response.cached_ratio += res.cached_ratio;
     }
+    cache_response.hits.sort_by(|a, b| {
+        let a = a
+            .get(&cfg.common.column_timestamp)
+            .unwrap()
+            .as_i64()
+            .unwrap();
+        let b = b
+            .get(&cfg.common.column_timestamp)
+            .unwrap()
+            .as_i64()
+            .unwrap();
+        b.cmp(&a)
+    });
 }

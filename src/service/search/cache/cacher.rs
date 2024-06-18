@@ -32,20 +32,6 @@ pub async fn check_cache(
     if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
         return CachedQueryResponse::default();
     }
-
-    // Hack select for _timestamp
-    if !is_aggregate && parsed_sql.order_by.is_empty() && !origin_sql.contains('*') {
-        let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
-        let cap_str = caps.get(1).unwrap().as_str();
-        if !cap_str.contains(&cfg.common.column_timestamp) {
-            *origin_sql = origin_sql.replace(
-                cap_str,
-                &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
-            );
-        }
-        rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
-    }
-
     if is_aggregate && sql_mode.eq(&SqlMode::Full) {
         return CachedQueryResponse::default();
         //  let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
@@ -60,6 +46,19 @@ pub async fn check_cache(
         // );
         // }
         // rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
+    }
+
+    // Hack select for _timestamp
+    if !is_aggregate && parsed_sql.order_by.is_empty() && !origin_sql.contains('*') {
+        let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
+        let cap_str = caps.get(1).unwrap().as_str();
+        if !cap_str.contains(&cfg.common.column_timestamp) {
+            *origin_sql = origin_sql.replace(
+                cap_str,
+                &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
+            );
+        }
+        rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
     }
 
     let c_resp = match crate::service::search::cache::cacher::get_cached_results(
@@ -192,6 +191,7 @@ pub async fn get_cached_results(
                             cached_response,
                             deltas,
                             has_pre_cache_delta,
+                            has_cached_data: true,
                         })
                     }
                     Err(e) => {
@@ -295,6 +295,24 @@ pub fn calculate_deltas_v1(
         // If query start time and end time are the same as cache times, return results from cache
         return has_pre_cache_delta;
     }
+
+    // Query Start time < ResultCacheMeta start time & Query End time > ResultCacheMeta End time
+    if end_time != result_meta.end_time {
+        if end_time > result_meta.end_time {
+            // q end time : 11:00, r end time : 10:45
+            deltas.push(QueryDelta {
+                delta_start_time: result_meta.end_time,
+                delta_end_time: end_time,
+                delta_removed_hits: false,
+            });
+        } else {
+            deltas.push(QueryDelta {
+                delta_start_time: end_time,
+                delta_end_time: result_meta.end_time,
+                delta_removed_hits: true,
+            });
+        }
+    }
     // Query Start time > ResultCacheMeta start time & Query End time > ResultCacheMeta End time ->
     // typical last x min/hours/days of data
     if start_time != result_meta.start_time {
@@ -315,23 +333,6 @@ pub fn calculate_deltas_v1(
             has_pre_cache_delta = true;
         }
     };
-    // Query Start time < ResultCacheMeta start time & Query End time > ResultCacheMeta End time
-    if end_time != result_meta.end_time {
-        if end_time > result_meta.end_time {
-            // q end time : 11:00, r end time : 10:45
-            deltas.push(QueryDelta {
-                delta_start_time: result_meta.end_time,
-                delta_end_time: end_time,
-                delta_removed_hits: false,
-            });
-        } else {
-            deltas.push(QueryDelta {
-                delta_start_time: end_time,
-                delta_end_time: result_meta.end_time,
-                delta_removed_hits: true,
-            });
-        }
-    }
     has_pre_cache_delta
 }
 
