@@ -20,6 +20,7 @@ pub async fn check_cache(
     file_path: &str,
     is_aggregate: bool,
     should_exec_query: &mut bool,
+    trace_id: &str,
 ) -> CachedQueryResponse {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -52,12 +53,13 @@ pub async fn check_cache(
         rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
     }
 
-    let mut c_resp = match crate::service::search::cache::cacher::get_cached_results(
+    let mut c_resp = match crate::service::search::cluster::cacher::get_cached_results(
         req.query.start_time,
         req.query.end_time,
         is_aggregate,
-        query_key,
-        file_path,
+        query_key.to_owned(),
+        file_path.to_owned(),
+        trace_id.to_owned(),
     )
     .await
     {
@@ -155,10 +157,12 @@ pub async fn get_cached_results(
                             has_pre_cache_delta,
                             has_cached_data: true,
                             cache_query_response: true,
+                            response_start_time: matching_cache_meta.start_time,
+                            response_end_time: matching_cache_meta.end_time,
                         })
                     }
                     Err(e) => {
-                        log::error!("Get results from disk failed for : {:?}", e);
+                        log::error!("Get results from disk failed : {:?}", e);
                         None
                     }
                 }

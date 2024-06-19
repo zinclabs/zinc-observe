@@ -276,6 +276,7 @@ pub async fn search(
         &file_path,
         is_aggregate,
         &mut should_exec_query,
+        &trace_id,
     )
     .await;
 

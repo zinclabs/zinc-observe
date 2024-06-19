@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.openobserve.cluster";
+option java_outer_classname = "querycacheProto";
+
+package cluster;
+
+
+message QueryDelta {
+    int64  delta_start_time = 1;
+    int64    delta_end_time = 2;
+    bool delta_removed_hits = 3; 
+}
+
+message QueryResponse {
+    bytes data = 1;
+}
+
+
+message QueryCacheRequest {
+    int64  start_time = 1;
+    int64    end_time = 2;
+    bool is_aggregate = 3; 
+    string  query_key = 4; 
+    string  file_path = 5; 
+}
+
+message QueryCacheRes {
+    QueryResponse cached_response = 1;
+    repeated   QueryDelta deltas  = 2;
+    bool      has_pre_cache_delta = 3;
+    bool          has_cached_data = 4;
+    bool     cache_query_response = 5;
+    int64        cache_start_time = 6;
+    int64          cache_end_time = 7;
+}
+
+message QueryCacheResponse {
+    optional QueryCacheRes response  = 1;   
+}
+
+service QueryCache {
+    rpc GetCachedResult (QueryCacheRequest) returns (QueryCacheResponse) {}
+}

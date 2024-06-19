@@ -48,6 +48,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{common::infra::cluster as infra_cluster, service::file_list};
 
+pub mod cacher;
 pub mod grpc;
 pub mod http;
 #[cfg(feature = "enterprise")]
