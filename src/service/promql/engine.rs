@@ -964,11 +964,17 @@ async fn selector_load_data_from_datafusion(
         })
         .collect::<Vec<_>>();
 
+    let mut timer = std::time::Instant::now();
+
     let series_df = df_group
         .clone()
         .aggregate(vec![col(HASH_LABEL)], label_cols)?;
+    let series = series_df.clone().collect().await?;
 
-    for batch in series_df.clone().collect().await? {
+    log::warn!("step1 took: {} ms", timer.elapsed().as_millis());
+    timer = std::time::Instant::now();
+
+    for batch in series {
         let hash_values = batch
             .column_by_name(HASH_LABEL)
             .unwrap()
@@ -993,6 +999,9 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
+    log::warn!("process1 took: {} ms", timer.elapsed().as_millis());
+    timer = std::time::Instant::now();
+
     let batches = df_group
         .filter(in_subquery(
             col(HASH_LABEL),
@@ -1006,6 +1015,9 @@ async fn selector_load_data_from_datafusion(
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
         .await?;
+
+    log::warn!("step2 took: {} ms", timer.elapsed().as_millis());
+    timer = std::time::Instant::now();
 
     for batch in &batches {
         let hash_values = batch
@@ -1035,5 +1047,6 @@ async fn selector_load_data_from_datafusion(
             });
         }
     }
+    log::warn!("process2 took: {} ms", timer.elapsed().as_millis());
     Ok(metrics)
 }
