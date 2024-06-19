@@ -37,6 +37,7 @@ use openobserve::{
                 file_list::Filelister,
                 logs::LogsServer,
                 metrics::{ingester::Ingester, querier::Querier},
+                query_cache::QueryCacheServerImpl,
                 traces::TraceServer,
                 usage::UsageServerImpl,
             },
@@ -56,7 +57,7 @@ use opentelemetry_proto::tonic::collector::{
 use opentelemetry_sdk::{propagation::TraceContextPropagator, trace as sdktrace, Resource};
 use proto::cluster_rpc::{
     event_server::EventServer, filelist_server::FilelistServer, metrics_server::MetricsServer,
-    search_server::SearchServer, usage_server::UsageServer,
+    query_cache_server::QueryCacheServer, search_server::SearchServer, usage_server::UsageServer,
 };
 #[cfg(feature = "profiling")]
 use pyroscope::PyroscopeAgent;
@@ -310,6 +311,9 @@ fn init_common_grpc_server(
     let trace_svc = TraceServiceServer::new(tracer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip);
+    let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
 
     tokio::task::spawn(async move {
         log::info!("starting gRPC server at {}", gaddr);
@@ -323,6 +327,7 @@ fn init_common_grpc_server(
             .add_service(trace_svc)
             .add_service(usage_svc)
             .add_service(logs_svc)
+            .add_service(query_cache_svc)
             .serve_with_shutdown(gaddr, async {
                 shutdown_rx.await.ok();
                 log::info!("gRPC server starts shutting down");

@@ -21,16 +21,14 @@ pub async fn get_cached_results(
         .unwrap();
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
+    
     nodes.sort_by_key(|x| x.id);
 
     let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE_UUID.as_str()).await;
+    nodes.retain(|node| is_querier(&node.role) && !node.uuid.eq(LOCAL_NODE_UUID.as_str()));  
 
-    let nodes = nodes;
-
-    let querier_num = nodes
-        .iter()
-        .filter(|node| is_querier(&node.role) && !node.uuid.eq(LOCAL_NODE_UUID.as_str()))
-        .count();
+    
+    let querier_num = nodes.len();
     if querier_num == 0 && local_node.is_none() {
         log::error!("no querier node online");
         return None;
