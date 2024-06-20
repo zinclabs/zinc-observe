@@ -905,7 +905,7 @@ async fn selector_load_data_from_datafusion(
     end: i64,
 ) -> Result<HashMap<String, RangeValue>> {
     let table_name = selector.name.as_ref().unwrap();
-    let table = match ctx.table(table_name).await {
+    let mut df_group = match ctx.table(table_name).await {
         Ok(v) => v,
         Err(_) => {
             return Ok(HashMap::default());
@@ -913,11 +913,6 @@ async fn selector_load_data_from_datafusion(
     };
 
     let cfg = config::get_config();
-    let mut df_group = table.filter(
-        col(&cfg.common.column_timestamp)
-            .gt(lit(start))
-            .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
-    )?;
     for mat in selector.matchers.matchers.iter() {
         if mat.name == cfg.common.column_timestamp
             || mat.name == VALUE_LABEL
@@ -949,31 +944,42 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    let mut metrics: HashMap<String, RangeValue> = HashMap::default();
-
+    let mut timer = std::time::Instant::now();
     let label_cols = schema
         .fields()
         .iter()
         .filter_map(|field| {
             let name = field.name().as_str();
-            if name == cfg.common.column_timestamp || name == HASH_LABEL || name == VALUE_LABEL {
+            if name == cfg.common.column_timestamp || name == VALUE_LABEL {
                 None
             } else {
-                Some(max(col(name)).alias(name))
+                Some(col(name))
             }
         })
         .collect::<Vec<_>>();
 
-    let mut timer = std::time::Instant::now();
-
-    let series_df = df_group
+    let sub_df = df_group
         .clone()
-        .aggregate(vec![col(HASH_LABEL)], label_cols)?;
-    let series = series_df.clone().collect().await?;
+        .aggregate(
+            vec![col(HASH_LABEL)],
+            vec![max(col(&cfg.common.column_timestamp)).alias(&cfg.common.column_timestamp)],
+        )?
+        .select_columns(&[&cfg.common.column_timestamp])?;
 
-    log::warn!("step1 took: {} ms", timer.elapsed().as_millis());
+    let series = df_group
+        .clone()
+        .filter(in_subquery(
+            col(&cfg.common.column_timestamp),
+            Arc::new(sub_df.into_optimized_plan()?),
+        ))?
+        .select(label_cols)?
+        .collect()
+        .await?;
+
+    log::debug!("step1 took: {} ms", timer.elapsed().as_millis());
     timer = std::time::Instant::now();
 
+    let mut metrics: HashMap<String, RangeValue> = HashMap::default();
     for batch in series {
         let hash_values = batch
             .column_by_name(HASH_LABEL)
@@ -999,24 +1005,21 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    log::warn!("process1 took: {} ms", timer.elapsed().as_millis());
+    log::debug!("process1 took: {} ms", timer.elapsed().as_millis());
     timer = std::time::Instant::now();
 
     let batches = df_group
-        .filter(in_subquery(
-            col(HASH_LABEL),
-            Arc::new(
-                series_df
-                    .select(vec![col(HASH_LABEL)])?
-                    .into_unoptimized_plan(),
-            ),
-        ))?
+        .filter(
+            col(&cfg.common.column_timestamp)
+                .gt(lit(start))
+                .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
+        )?
         .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
         .await?;
 
-    log::warn!("step2 took: {} ms", timer.elapsed().as_millis());
+    log::debug!("step2 took: {} ms", timer.elapsed().as_millis());
     timer = std::time::Instant::now();
 
     for batch in &batches {
@@ -1047,6 +1050,6 @@ async fn selector_load_data_from_datafusion(
             });
         }
     }
-    log::warn!("process2 took: {} ms", timer.elapsed().as_millis());
+    log::debug!("process2 took: {} ms", timer.elapsed().as_millis());
     Ok(metrics)
 }
