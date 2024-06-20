@@ -64,6 +64,9 @@ static RE_MATCH_ALL_IGNORE_CASE: Lazy<Regex> =
 static RE_MATCH_ALL_INDEXED: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
 
+pub static TS_WITH_ALIAS: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\s*\(\s*_timestamp\s*\)\s*").unwrap());
+
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
     pub origin_sql: String,

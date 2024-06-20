@@ -7,7 +7,7 @@ use infra::cache::{
 
 use crate::{
     common::meta::search::{CachedQueryResponse, QueryDelta},
-    service::search::sql::{SqlMode, RE_SELECT_FROM},
+    service::search::sql::{SqlMode, RE_SELECT_FROM, TS_WITH_ALIAS},
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -32,12 +32,8 @@ pub async fn check_cache(
     if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
         return CachedQueryResponse::default();
     }
-    if is_aggregate && sql_mode.eq(&SqlMode::Full) {
-        let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
-        let cap_str = caps.get(1).unwrap().as_str();
-        if !cap_str.contains(&cfg.common.column_timestamp) {
-            return CachedQueryResponse::default();
-        }
+    if is_aggregate && sql_mode.eq(&SqlMode::Full) && !should_cache_query(parsed_sql, &cfg.common.column_timestamp) {        
+            return CachedQueryResponse::default();        
     }
 
     // Hack select for _timestamp
@@ -251,7 +247,6 @@ pub async fn cache_results_to_disk(
 
 pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<String> {
     let file = format!("results/{}/{}", file_path, file_name);
-    println!("getting file: {:?}", file);
     match disk::get(&file, None).await {
         Some(v) => Ok(String::from_utf8(v.to_vec()).unwrap()),
         None => Err(std::io::Error::new(
@@ -259,4 +254,19 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
             "File not found",
         )),
     }
+}
+
+fn should_cache_query(parsed_sql: &config::meta::sql::Sql, ts_col: &String) -> bool {
+    let non_timestamp_aliases: Vec<_> = parsed_sql
+        .field_alias
+        .iter()
+        .filter(|(original, alias)| TS_WITH_ALIAS.is_match(original) && !alias.eq(ts_col))
+        .collect();
+
+    // Check if 'timestamp' is directly mentioned in the fields and not aliased to another name
+    parsed_sql.fields.iter().any(|field| {
+        field.eq(ts_col) 
+    }) && non_timestamp_aliases.is_empty() ||
+    // Check for any aliases that might represent a timestamp column
+    parsed_sql.field_alias.iter().any(|(_, alias)| alias.eq(ts_col))
 }
