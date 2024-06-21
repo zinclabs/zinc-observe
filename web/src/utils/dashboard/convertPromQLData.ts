@@ -71,6 +71,44 @@ export const convertPromQLData = async (
     panelSchema?.config?.legends_position
   );
 
+  // calculate response interval
+  let responeInterval = Infinity;
+
+  // add all series timestamp
+  searchQueryData.forEach((queryData: any) =>
+    queryData.result.forEach((result: any) => {
+      for (let i = 0; i < result.values.length; i++) {
+        // xAxisData.add(result.values[i][0]);
+        if (
+          i != 0 &&
+          result.values[i][0] - result.values[i - 1][0] < responeInterval
+        ) {
+          responeInterval = result.values[i][0] - result.values[i - 1][0];
+        }
+      }
+    })
+  );
+
+  // fill missing value
+  searchQueryData.forEach((queryData: any) => {
+    queryData.result.forEach((result: any) => {
+      for (let i = 0; i < result.values.length; i++) {
+        if (i != 0) {
+          while (
+            result.values[i][0] - result.values[i - 1][0] >
+            responeInterval
+          ) {
+            result.values.splice(i, 0, [
+              result.values[i - 1][0] + responeInterval,
+              "",
+            ]);
+            i++;
+          }
+        }
+      }
+    });
+  });
+
   // get the x axis key which will be timestamp
   let xAxisData: any = new Set();
 
@@ -82,7 +120,7 @@ export const convertPromQLData = async (
   );
 
   // sort the timestamp and make an array
-  xAxisData = Array.from(xAxisData).sort();
+  xAxisData = Array.from(xAxisData).sort((a: any, b: any) => a - b);
 
   // convert timestamp to specified timezone time
   xAxisData.forEach((value: number, index: number) => {
@@ -352,7 +390,80 @@ export const convertPromQLData = async (
       case "bar":
       case "line":
       case "area":
-      case "scatter":
+      case "scatter": {
+        switch (it?.resultType) {
+          case "matrix": {
+            const seriesObj = it?.result?.map((metric: any) => {
+              // Now, we are using xaxisData which will be sorted by the timestamp
+              // const values = metric.values.sort(
+              //   (a: any, b: any) => a[0] - b[0]
+              // );
+
+              // object, which will have timestamp as key and value as value
+              // const seriesDataObj: any = {};
+              // metric.values.forEach((value: any) => {
+              //   seriesDataObj[value[0]] = value[1];
+              // });
+              // console.log(seriesDataObj);
+
+              // console.log(xAxisData);
+              // const data = [];
+              // for (let i = 0; i < xAxisData.length; i++) {
+              //   const value = xAxisData[i];
+              //   data.push([
+              //     // value will be an array [milliseconds, date object or date string]
+              //     value[1],
+              //     seriesDataObj[value[0]] ?? 0,
+              //   ]);
+
+              //   const nextValue = value[0] + responeInterval;
+
+              //   data.push([
+              //     store.state.timezone != "UTC"
+              //       ? utcToZonedTime(nextValue * 1000, store.state.timezone)
+              //       : new Date(nextValue * 1000).toISOString().slice(0, -1),
+              //     null,
+              //   ]);
+              // }
+
+              return {
+                name: getPromqlLegendName(
+                  metric.metric,
+                  panelSchema.queries[index].config.promql_legend
+                ),
+                // if utc then simply return the values by removing z from string
+                // else convert time from utc to zoned
+                // used slice to remove Z from isostring to pass as a utc
+                data: metric?.values?.map((value: any) => [
+                  // value will be an array [milliseconds, date object or date string]
+                  store.state.timezone != "UTC"
+                    ? utcToZonedTime(value[0] * 1000, store.state.timezone)
+                    : new Date(value[0] * 1000).toISOString().slice(0, -1),
+                  value[1] ?? null,
+                ]),
+                ...seriesPropsBasedOnChartType,
+                connectNulls: panelSchema.config?.connect_nulls ?? false,
+              };
+            });
+
+            return seriesObj;
+          }
+          case "vector": {
+            const traces = it?.result?.map((metric: any) => {
+              const values = [metric.value];
+              return {
+                name: JSON.stringify(metric.metric),
+                x: values.map((value: any) =>
+                  moment(value[0] * 1000).toISOString(true)
+                ),
+                y: values.map((value: any) => value[1]),
+              };
+            });
+            return traces;
+          }
+        }
+        break;
+      }
       case "area-stacked": {
         switch (it?.resultType) {
           case "matrix": {
@@ -368,6 +479,26 @@ export const convertPromQLData = async (
                 seriesDataObj[value[0]] = value[1];
               });
 
+              // console.log(xAxisData);
+              // const data = [];
+              // for (let i = 0; i < xAxisData.length; i++) {
+              //   const value = xAxisData[i];
+              //   data.push([
+              //     // value will be an array [milliseconds, date object or date string]
+              //     value[1],
+              //     seriesDataObj[value[0]] ?? 0,
+              //   ]);
+
+              //   const nextValue = value[0] + responeInterval;
+
+              //   data.push([
+              //     store.state.timezone != "UTC"
+              //       ? utcToZonedTime(nextValue * 1000, store.state.timezone)
+              //       : new Date(nextValue * 1000).toISOString().slice(0, -1),
+              //     null,
+              //   ]);
+              // }
+
               return {
                 name: getPromqlLegendName(
                   metric.metric,
@@ -379,7 +510,7 @@ export const convertPromQLData = async (
                 data: xAxisData.map((value: any) => [
                   // value will be an array [milliseconds, date object or date string]
                   value[1],
-                  seriesDataObj[value[0]] ?? null,
+                  seriesDataObj[value[0]] ?? 0,
                 ]),
                 ...seriesPropsBasedOnChartType,
                 connectNulls: panelSchema.config?.connect_nulls ?? false,
@@ -753,7 +884,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "line",
         emphasis: { focus: "series" },
-        smooth: true,
+        // smooth: true,
         showSymbol: false,
         lineStyle: { width: 1.5 },
       };
@@ -786,7 +917,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
       return {
         type: "line",
         emphasis: { focus: "series" },
-        smooth: true,
+        // smooth: true,
         areaStyle: {},
         showSymbol: false,
         lineStyle: { width: 1.5 },
@@ -800,7 +931,7 @@ const getPropsByChartTypeForSeries = (type: string) => {
     case "area-stacked":
       return {
         type: "line",
-        smooth: true,
+        // smooth: true,
         stack: "Total",
         areaStyle: {},
         showSymbol: false,
