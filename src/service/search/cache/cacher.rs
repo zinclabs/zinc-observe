@@ -32,8 +32,9 @@ pub async fn check_cache(
     if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
         return CachedQueryResponse::default();
     }
-    if is_aggregate && sql_mode.eq(&SqlMode::Full) && !should_cache_query(parsed_sql, &cfg.common.column_timestamp) {        
-            return CachedQueryResponse::default();        
+    let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp);
+    if is_aggregate && sql_mode.eq(&SqlMode::Full) && result_ts_col.is_none() {
+        return CachedQueryResponse::default();
     }
 
     // Hack select for _timestamp
@@ -47,6 +48,7 @@ pub async fn check_cache(
             );
         }
         rpc_req.query.as_mut().unwrap().sql = origin_sql.clone();
+        result_ts_col = Some(cfg.common.column_timestamp.clone());
     }
 
     let mut c_resp = match crate::service::search::cluster::cacher::get_cached_results(
@@ -56,6 +58,7 @@ pub async fn check_cache(
         query_key.to_owned(),
         file_path.to_owned(),
         trace_id.to_owned(),
+        result_ts_col.unwrap(),
     )
     .await
     {
@@ -89,6 +92,7 @@ pub async fn get_cached_results(
     is_aggregate: bool,
     query_key: &str,
     file_path: &str,
+    result_ts_column: String,
 ) -> Option<CachedQueryResponse> {
     let cfg = get_config();
     let r = QUERY_RESULT_CACHE.read().await;
@@ -155,6 +159,7 @@ pub async fn get_cached_results(
                             cache_query_response: true,
                             response_start_time: matching_cache_meta.start_time,
                             response_end_time: matching_cache_meta.end_time,
+                            file_path: format!("{}_{}", file_path, result_ts_column),
                         })
                     }
                     Err(e) => {
@@ -256,7 +261,8 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
     }
 }
 
-fn should_cache_query(parsed_sql: &config::meta::sql::Sql, ts_col: &String) -> bool {
+fn get_ts_col(parsed_sql: &config::meta::sql::Sql, ts_col: &String) -> Option<String> {
+    let mut result_ts_col: Option<String> = None;
     let non_timestamp_aliases: Vec<_> = parsed_sql
         .field_alias
         .iter()
@@ -264,9 +270,17 @@ fn should_cache_query(parsed_sql: &config::meta::sql::Sql, ts_col: &String) -> b
         .collect();
 
     // Check if 'timestamp' is directly mentioned in the fields and not aliased to another name
-    parsed_sql.fields.iter().any(|field| {
-        field.eq(ts_col) 
-    }) && non_timestamp_aliases.is_empty() ||
-    // Check for any aliases that might represent a timestamp column
-    parsed_sql.field_alias.iter().any(|(_, alias)| alias.eq(ts_col))
+    if parsed_sql.fields.iter().any(|field| field.eq(ts_col)) && non_timestamp_aliases.is_empty() {
+        result_ts_col = Some(ts_col.clone());
+    } else {
+        // Check for any aliases that might represent a timestamp column
+        for (_, alias) in parsed_sql.field_alias.iter() {
+            if alias.eq(ts_col) {
+                result_ts_col = Some(alias.clone());
+                break;
+            }
+        }
+    }
+
+    result_ts_col
 }

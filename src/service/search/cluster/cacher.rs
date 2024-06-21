@@ -13,6 +13,7 @@ pub async fn get_cached_results(
     query_key: String,
     file_path: String,
     trace_id: String,
+    result_ts_column: String,
 ) -> Option<CachedQueryResponse> {
     let start = std::time::Instant::now();
     // get nodes from cluster
@@ -169,6 +170,7 @@ pub async fn get_cached_results(
                                 cache_query_response: res.cache_query_response,
                                 response_start_time: res.cache_start_time,
                                 response_end_time: res.cache_end_time,
+                                file_path: format!("{}_{}",file_path,result_ts_column),
                             },
                         ));
                     }
@@ -199,6 +201,7 @@ pub async fn get_cached_results(
         is_aggregate,
         &query_key,
         &file_path,
+        result_ts_column,
     )
     .await
     {
