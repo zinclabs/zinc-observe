@@ -1,5 +1,9 @@
 use bytes::Bytes;
-use config::{get_config, meta::search::Response, utils::json};
+use config::{
+    get_config,
+    meta::search::Response,
+    utils::{json, time::parse_str_to_timestamp_micros_as_option},
+};
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
     meta::ResultCacheMeta,
@@ -135,22 +139,35 @@ pub async fn get_cached_results(
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
                         // remove hits if time range is lesser than cached time range
+                        let mut to_retain = Vec::new();
 
                         if !remove_hits.is_empty() {
                             for delta in remove_hits {
-                                cached_response.hits.retain(|hit| {
-                                    let hit_ts = hit
-                                        .get(&cfg.common.column_timestamp)
-                                        .unwrap()
-                                        .as_i64()
-                                        .unwrap();
+                                for hit in &cached_response.hits {
+                                    let hit_ts = match hit.get(result_ts_column.clone()) {
+                                        Some(serde_json::Value::String(ts)) => {
+                                            parse_str_to_timestamp_micros_as_option(ts.as_str())
+                                        }
+                                        Some(serde_json::Value::Number(ts)) => ts.as_i64(),
+                                        _ => {
+                                            return None;
+                                        }
+                                    };
 
-                                    !(hit_ts >= delta.delta_start_time
-                                        && hit_ts < delta.delta_end_time)
-                                });
+                                    match hit_ts {
+                                        Some(hit_ts) => {
+                                            if !(hit_ts >= delta.delta_start_time
+                                                && hit_ts < delta.delta_end_time)
+                                            {
+                                                to_retain.push(hit.clone());
+                                            }
+                                        }
+                                        None => return None,
+                                    }
+                                }
                             }
                         };
-
+                        cached_response.hits = to_retain;
                         Some(CachedQueryResponse {
                             cached_response,
                             deltas,
@@ -262,25 +279,18 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
 }
 
 fn get_ts_col(parsed_sql: &config::meta::sql::Sql, ts_col: &String) -> Option<String> {
-    let mut result_ts_col: Option<String> = None;
-    let non_timestamp_aliases: Vec<_> = parsed_sql
+    let mut result_ts_col = None;
+    parsed_sql
         .field_alias
-        .iter()
-        .filter(|(original, alias)| TS_WITH_ALIAS.is_match(original) && !alias.eq(ts_col))
-        .collect();
-
-    // Check if 'timestamp' is directly mentioned in the fields and not aliased to another name
-    if parsed_sql.fields.iter().any(|field| field.eq(ts_col)) && non_timestamp_aliases.is_empty() {
-        result_ts_col = Some(ts_col.clone());
-    } else {
-        // Check for any aliases that might represent a timestamp column
-        for (_, alias) in parsed_sql.field_alias.iter() {
-            if alias.eq(ts_col) {
-                result_ts_col = Some(alias.clone());
-                break;
+        .iter(|(original, alias)| {
+            if TS_WITH_ALIAS.is_match(original) {
+                if alias.eq(&ts_col) {
+                    result_ts_col = Some(ts_col);
+                }
+                if original.contains("histogram") {
+                    result_ts_col = Some(alias);
+                }
             }
-        }
-    }
-
-    result_ts_col
+        })
+        .next();
 }

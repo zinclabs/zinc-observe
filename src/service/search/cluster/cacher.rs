@@ -22,13 +22,12 @@ pub async fn get_cached_results(
         .unwrap();
     nodes.sort_by(|a, b| a.grpc_addr.cmp(&b.grpc_addr));
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
-    
+
     nodes.sort_by_key(|x| x.id);
 
     let local_node = infra_cluster::get_node_by_uuid(LOCAL_NODE_UUID.as_str()).await;
-    nodes.retain(|node| is_querier(&node.role) && !node.uuid.eq(LOCAL_NODE_UUID.as_str()));  
+    nodes.retain(|node| is_querier(&node.role) && !node.uuid.eq(LOCAL_NODE_UUID.as_str()));
 
-    
     let querier_num = nodes.len();
     if querier_num == 0 && local_node.is_none() {
         log::error!("no querier node online");
@@ -97,8 +96,6 @@ pub async fn get_cached_results(
                     .accept_compressed(CompressionEncoding::Gzip)
                     .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-                
-
                 let response = match client.get_cached_result(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
@@ -138,9 +135,9 @@ pub async fn get_cached_results(
                                 delta_removed_hits: d.delta_removed_hits,
                             })
                             .collect();
-                        let cached_res:config::meta::search::Response  =  match res.cached_response {
+                        let cached_res: config::meta::search::Response = match res.cached_response {
                             Some(cached_response) => {
-                                match serde_json::from_slice(&cached_response.data){
+                                match serde_json::from_slice(&cached_response.data) {
                                     Ok(v) => v,
                                     Err(e) => {
                                         log::error!(
@@ -149,10 +146,9 @@ pub async fn get_cached_results(
                                             e
                                         );
                                         config::meta::search::Response::default()
+                                    }
                                 }
-                                    
                             }
-                        },
                             None => {
                                 log::error!(
                                     "[trace_id {trace_id}] get_cached_results->grpc: node: {}, no cached_response",
@@ -172,7 +168,7 @@ pub async fn get_cached_results(
                                 cache_query_response: res.cache_query_response,
                                 response_start_time: res.cache_start_time,
                                 response_end_time: res.cache_end_time,
-                                file_path: format!("{}_{}",file_path,result_ts_column),
+                                file_path: format!("{}_{}", file_path, result_ts_column),
                             },
                         ));
                     }

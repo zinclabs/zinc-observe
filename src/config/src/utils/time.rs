@@ -202,6 +202,17 @@ pub fn parse_timezone_to_offset(offset: &str) -> i64 {
     sign * seconds
 }
 
+#[inline(always)]
+pub fn parse_str_to_timestamp_micros_as_option(v: &str) -> Option<i64> {
+    match v.parse() {
+        Ok(i) => Some(parse_i64_to_timestamp_micros(i)),
+        Err(_) => match parse_str_to_time(v) {
+            Ok(v) => Some(v.timestamp_micros()),
+            Err(_) => None,
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
