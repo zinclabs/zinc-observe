@@ -24,6 +24,7 @@ message QueryCacheRequest {
     bool is_aggregate = 3; 
     string  query_key = 4; 
     string  file_path = 5; 
+    string  timestamp_col = 6; 
 }
 
 message QueryCacheRes {

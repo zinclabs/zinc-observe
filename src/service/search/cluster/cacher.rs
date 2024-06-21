@@ -48,6 +48,7 @@ pub async fn get_cached_results(
         let query_key = query_key.clone();
         let file_path = file_path.clone();
         let trace_id = trace_id.clone();
+        let result_ts_column = result_ts_column.clone();
         let task = tokio::task::spawn(
             async move {
                 let req = QueryCacheRequest {
@@ -56,6 +57,7 @@ pub async fn get_cached_results(
                     is_aggregate,
                     query_key,
                     file_path,
+                    timestamp_col: result_ts_column,
                 };
 
                 let request = tonic::Request::new(req);
