@@ -152,7 +152,15 @@ impl Engine {
                 );
                 Ok(())
             }
-            PromExpr::Call(Call { func: _, args }) => {
+            PromExpr::Call(Call { func, args }) => {
+                if func.name == "label_replace" {
+                    // only the col at args[1] should be selected, which is a StringLiteral
+                    if let Some(PromExpr::StringLiteral(column)) =
+                        args.args.get(1).and_then(|expr| Some(expr.as_ref()))
+                    {
+                        self.col_filters.0.insert(column.val.clone());
+                    }
+                }
                 _ = args
                     .args
                     .iter()
@@ -1042,15 +1050,19 @@ async fn selector_load_data_from_datafusion(
     end: i64,
     col_filters: &(HashSet<String>, HashSet<String>),
 ) -> Result<HashMap<String, RangeValue>> {
+    let cfg = config::get_config();
     let table_name = selector.name.as_ref().unwrap();
     let mut df_group = match ctx.table(table_name).await {
-        Ok(v) => v,
+        Ok(v) => v.filter(
+            col(&cfg.common.column_timestamp)
+                .gt(lit(start))
+                .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
+        )?,
         Err(_) => {
             return Ok(HashMap::default());
         }
     };
 
-    let cfg = config::get_config();
     for mat in selector.matchers.matchers.iter() {
         if mat.name == cfg.common.column_timestamp
             || mat.name == VALUE_LABEL
@@ -1082,46 +1094,43 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    // Can filter necessary columns when either is not empty
-    if !col_filters.0.is_empty() ^ !col_filters.1.is_empty() {
-        let selected_cols: Vec<_> = {
-            if !col_filters.0.is_empty() {
-                // include only found columns and required hash, _timestamp, & value cols
-                col_filters
-                    .0
-                    .iter()
-                    .chain(
-                        [
-                            HASH_LABEL.to_string(),
-                            cfg.common.column_timestamp.clone(),
-                            VALUE_LABEL.to_string(),
-                        ]
-                        .iter(),
-                    )
-                    .filter_map(|incl| {
-                        if schema.column_with_name(incl).is_some() {
-                            Some(col(incl))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            } else {
-                // exclude found columns from schema
-                schema
-                    .fields()
-                    .iter()
-                    .filter_map(|field| {
-                        if col_filters.1.contains(field.name()) {
-                            None
-                        } else {
-                            Some(col(field.name()))
-                        }
-                    })
-                    .collect()
-            }
-        };
-
+    // For two filters (col_filters.0 include, col_filters.1 exclude),
+    // a column could have 4 scenarios
+    //  1. in col_filters.0 only
+    //  2. in both col_filters.0 & col_filters.1
+    //  3. in col_filters.1 only
+    //  4. neither in col_filters.0 nor col_filters.1
+    // special cols (hash, timestamp, value) always to be selected
+    if !col_filters.0.is_empty() || !col_filters.1.is_empty() {
+        // sum without(job) (demo_memory_usage_bytes) / on(instance, type) group_left(job)
+        // demo_memory_usage_bytes
+        let selected_cols: Vec<_> = schema
+            .fields()
+            .iter()
+            .filter_map(|field| {
+                let name = field.name();
+                if name == HASH_LABEL
+                    || name == &cfg.common.column_timestamp
+                    || name == VALUE_LABEL
+                    || col_filters.0.contains(name)
+                {
+                    // scenario 1 & 2, special cols
+                    Some(col(name)) // select
+                } else if col_filters.1.contains(name) {
+                    // scenario 3
+                    None // skip
+                } else {
+                    // scenario 4
+                    if !col_filters.0.is_empty() {
+                        // if we are selecting cols to select
+                        None // skip
+                    } else {
+                        // if we are selecting cols to skip
+                        Some(col(name)) // select
+                    }
+                }
+            })
+            .collect();
         df_group = match df_group.select(selected_cols) {
             Ok(df) => df,
             Err(e) => {
@@ -1136,10 +1145,9 @@ async fn selector_load_data_from_datafusion(
         .fields()
         .iter()
         .filter_map(|field| {
-            let name = field.name().as_str();
-            if name == cfg.common.column_timestamp
-                || name == VALUE_LABEL
-                || schema.field_with_name(name).is_err()
+            let name = field.name();
+            if name == &cfg.common.column_timestamp || name == VALUE_LABEL
+            // || schema.field_with_name(name).is_err()
             {
                 None
             } else {
@@ -1157,7 +1165,7 @@ async fn selector_load_data_from_datafusion(
         .collect()
         .await?;
 
-    let (timestamp_values, hash_values): (Vec<_>, Vec<_>) = sub_batch
+    let (timestamp_values, hash_value_set): (Vec<_>, HashSet<_>) = sub_batch
         .iter()
         .flat_map(|batch| {
             let ts = batch
@@ -1174,14 +1182,13 @@ async fn selector_load_data_from_datafusion(
                 .unwrap();
             ts.iter()
                 .zip(hash.iter())
-                .map(|(t, h)| (lit(t.unwrap()), lit(h.unwrap())))
+                .map(|(t, h)| (lit(t.unwrap()), h.unwrap().to_string()))
         })
         .unzip();
 
     let series = df_group
         .clone()
         .filter(col(&cfg.common.column_timestamp).in_list(timestamp_values, false))?
-        .filter(col(HASH_LABEL).in_list(hash_values, false))?
         .select(label_cols)?
         .collect()
         .await?;
@@ -1195,6 +1202,10 @@ async fn selector_load_data_from_datafusion(
             .downcast_ref::<StringArray>()
             .unwrap();
         for i in 0..batch.num_rows() {
+            let hash = hash_values.value(i);
+            if !hash_value_set.contains(hash) {
+                continue;
+            }
             let mut labels = Vec::with_capacity(batch.num_columns());
             for (k, v) in batch.schema().fields().iter().zip(batch.columns()) {
                 let name = k.name();
@@ -1209,18 +1220,13 @@ async fn selector_load_data_from_datafusion(
             }
             labels.sort_by(|a, b| a.name.cmp(&b.name));
             metrics.insert(
-                hash_values.value(i).to_string(),
+                hash.to_string(),
                 RangeValue::new(labels, Vec::with_capacity(20)),
             );
         }
     }
 
     let batches = df_group
-        .filter(
-            col(&cfg.common.column_timestamp)
-                .gt(lit(start))
-                .and(col(&cfg.common.column_timestamp).lt_eq(lit(end))),
-        )?
         .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
@@ -1247,11 +1253,11 @@ async fn selector_load_data_from_datafusion(
             .unwrap();
         for i in 0..batch.num_rows() {
             let hash = hash_values.value(i);
-            metrics
-                .get_mut(hash)
-                .unwrap() // should be guaranteed to have the hash_value
-                .samples
-                .push(Sample::new(time_values.value(i), value_values.value(i)));
+            if let Some(range_val) = metrics.get_mut(hash) {
+                range_val
+                    .samples
+                    .push(Sample::new(time_values.value(i), value_values.value(i)));
+            }
         }
     }
     Ok(metrics)
