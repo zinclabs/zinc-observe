@@ -1102,8 +1102,6 @@ async fn selector_load_data_from_datafusion(
     //  4. neither in col_filters.0 nor col_filters.1
     // special cols (hash, timestamp, value) always to be selected
     if !col_filters.0.is_empty() || !col_filters.1.is_empty() {
-        // sum without(job) (demo_memory_usage_bytes) / on(instance, type) group_left(job)
-        // demo_memory_usage_bytes
         let selected_cols: Vec<_> = schema
             .fields()
             .iter()
@@ -1146,9 +1144,7 @@ async fn selector_load_data_from_datafusion(
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == &cfg.common.column_timestamp || name == VALUE_LABEL
-            // || schema.field_with_name(name).is_err()
-            {
+            if name == &cfg.common.column_timestamp || name == VALUE_LABEL {
                 None
             } else {
                 Some(col(name))
