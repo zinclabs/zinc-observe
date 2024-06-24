@@ -326,11 +326,11 @@ pub async fn search(
         let search_tracing = !cfg.common.tracing_enabled && cfg.common.tracing_search_enabled;
         let mut tasks = Vec::new();
 
-        for delta in c_resp.deltas {
+        for (i, delta) in c_resp.deltas.into_iter().enumerate() {
             let http_span_local = http_span.clone();
             let mut req = req.clone();
             let org_id = org_id.clone();
-            let trace_id = trace_id.clone();
+            let trace_id = format!("{}-{:?}", trace_id.clone(), i);
             let user_id = user_id.clone();
 
             let task = tokio::task::spawn(async move {
@@ -493,6 +493,8 @@ pub async fn search(
         let res_cache = json::to_string(&res).unwrap();
         tokio::spawn(async move {
             let file_path = format!("{}_{}", file_path, c_resp.ts_column);
+            let query_key = format!("{}_{}", query_key, c_resp.ts_column);
+
             match SearchService::cache::cacher::cache_results_to_disk(
                 &trace_id, &file_path, &file_name, res_cache,
             )
@@ -1715,29 +1717,12 @@ fn merge_response(
     }
 
     let cache_ts = if cache_response.hits.is_empty() {
-        match search_response
-            .first()
-            .unwrap()
-            .hits
-            .first()
-            .unwrap()
-            .get(ts_column)
-            .unwrap()
-        {
-            serde_json::Value::String(ts) => {
-                parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
-            }
-            serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
-            _ => 0_i64,
-        }
+        get_ts_value(
+            ts_column,
+            search_response.first().unwrap().hits.first().unwrap(),
+        )
     } else {
-        match cache_response.hits.first().unwrap().get(ts_column).unwrap() {
-            serde_json::Value::String(ts) => {
-                parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
-            }
-            serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
-            _ => 0_i64,
-        }
+        get_ts_value(ts_column, cache_response.hits.first().unwrap())
     };
 
     for res in search_response {
@@ -1749,14 +1734,7 @@ fn merge_response(
         if res.hits.is_empty() {
             continue;
         }
-        let search_ts = res
-            .hits
-            .first()
-            .unwrap()
-            .get(ts_column)
-            .unwrap()
-            .as_i64()
-            .unwrap();
+        let search_ts = get_ts_value(ts_column, res.hits.first().unwrap());
         if search_ts < cache_ts {
             cache_response.hits.extend(res.hits.clone());
         } else {
@@ -1767,5 +1745,15 @@ fn merge_response(
                 .cloned()
                 .collect();
         }
+    }
+}
+
+fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
+    match record.get(ts_column).unwrap() {
+        serde_json::Value::String(ts) => {
+            parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
+        }
+        serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
+        _ => 0_i64,
     }
 }

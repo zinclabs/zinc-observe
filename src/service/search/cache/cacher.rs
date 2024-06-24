@@ -171,8 +171,10 @@ pub async fn get_cached_results(
                                     }
                                 }
                             }
+                            cached_response.hits = to_retain;
                         };
-                        cached_response.hits = to_retain;
+
+                        log::info!("Get results from disk success for query key: {}", query_key);
                         Some(CachedQueryResponse {
                             cached_response,
                             deltas,
