@@ -38,7 +38,7 @@ impl QueryCache for QueryCacheServerImpl {
             req.is_aggregate,
             &req.query_key,
             &req.file_path,
-            req.timestamp_col,
+            &req.timestamp_col,
         )
         .await
         {

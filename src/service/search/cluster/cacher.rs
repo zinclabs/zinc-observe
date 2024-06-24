@@ -199,7 +199,7 @@ pub async fn get_cached_results(
         is_aggregate,
         &query_key,
         &file_path,
-        result_ts_column,
+        result_ts_column.as_str(),
     )
     .await
     {

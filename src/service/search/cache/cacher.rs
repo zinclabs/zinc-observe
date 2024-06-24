@@ -99,11 +99,12 @@ pub async fn get_cached_results(
     is_aggregate: bool,
     query_key: &str,
     file_path: &str,
-    result_ts_column: String,
+    result_ts_column: &str,
 ) -> Option<CachedQueryResponse> {
     let cfg = get_config();
     let r = QUERY_RESULT_CACHE.read().await;
-    let is_cached = r.get(query_key).cloned();
+    let query_key = format!("{}_{}", query_key, result_ts_column);
+    let is_cached = r.get(&query_key).cloned();
     drop(r);
 
     if let Some(cache_metas) = is_cached {
@@ -148,7 +149,7 @@ pub async fn get_cached_results(
                         if !remove_hits.is_empty() {
                             for delta in remove_hits {
                                 for hit in &cached_response.hits {
-                                    let hit_ts = match hit.get(result_ts_column.clone()) {
+                                    let hit_ts = match hit.get(result_ts_column) {
                                         Some(serde_json::Value::String(ts)) => {
                                             parse_str_to_timestamp_micros_as_option(ts.as_str())
                                         }
@@ -180,7 +181,7 @@ pub async fn get_cached_results(
                             cache_query_response: true,
                             response_start_time: matching_cache_meta.start_time,
                             response_end_time: matching_cache_meta.end_time,
-                            ts_column: result_ts_column,
+                            ts_column: result_ts_column.to_string(),
                         })
                     }
                     Err(e) => {

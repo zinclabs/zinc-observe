@@ -25,7 +25,7 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, hash::Sum64, json},
+    utils::{base64, hash::Sum64, json, time::parse_str_to_timestamp_micros_as_option},
     DISTINCT_FIELDS,
 };
 use infra::{
@@ -1715,7 +1715,7 @@ fn merge_response(
     }
 
     let cache_ts = if cache_response.hits.is_empty() {
-        search_response
+        match search_response
             .first()
             .unwrap()
             .hits
@@ -1723,17 +1723,21 @@ fn merge_response(
             .unwrap()
             .get(ts_column)
             .unwrap()
-            .as_i64()
-            .unwrap()
+        {
+            serde_json::Value::String(ts) => {
+                parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
+            }
+            serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
+            _ => 0 as i64,
+        }
     } else {
-        cache_response
-            .hits
-            .first()
-            .unwrap()
-            .get(ts_column)
-            .unwrap()
-            .as_i64()
-            .unwrap()
+        match cache_response.hits.first().unwrap().get(ts_column).unwrap() {
+            serde_json::Value::String(ts) => {
+                parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
+            }
+            serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
+            _ => 0 as i64,
+        }
     };
 
     for res in search_response {
