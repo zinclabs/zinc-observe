@@ -345,7 +345,7 @@ pub async fn search(
         work_group
             .as_ref()
             .unwrap()
-            .done(&trace_id, user_id)
+            .done(trace_id, user_id)
             .await
             .map_err(|e| Error::Message(e.to_string()))?;
         return Err(e);

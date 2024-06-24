@@ -478,7 +478,7 @@ pub async fn search(
     report_request_usage_stats(
         req_stats,
         &org_id,
-        &stream_name,
+        stream_name,
         StreamType::Logs,
         UsageType::Search,
         num_fn,
@@ -1728,7 +1728,7 @@ fn merge_response(
                 parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
             }
             serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
-            _ => 0 as i64,
+            _ => 0_i64,
         }
     } else {
         match cache_response.hits.first().unwrap().get(ts_column).unwrap() {
@@ -1736,7 +1736,7 @@ fn merge_response(
                 parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
             }
             serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
-            _ => 0 as i64,
+            _ => 0_i64,
         }
     };
 
