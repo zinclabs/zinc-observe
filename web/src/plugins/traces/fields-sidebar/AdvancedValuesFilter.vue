@@ -1,11 +1,10 @@
-
 <template>
   <q-expansion-item
     class="field-expansion-item"
     dense
     switch-toggle-side
     :label="row.name"
-    v-model:model-value="_isOpen"
+    v-model="filterData.isOpen"
     expand-icon-class="field-expansion-icon"
     expand-icon="expand_more"
     @before-show="(event: any) => openFilterCreator()"
@@ -25,21 +24,21 @@
       <q-card-section class="q-pl-md q-pr-xs q-py-xs">
         <div class="q-mr-sm q-ml-sm">
           <input
-            v-model="searchValue"
+            v-model="filterData.searchKeyword"
             class="full-width"
-            :disabled="filter.isLoading"
+            :disabled="filterData.isLoading"
             placeholder="Search"
             @input="onSearchValue()"
           />
         </div>
         <div class="filter-values-container q-mt-sm">
           <div
-            v-show="!values?.length && !filter.isLoading"
+            v-show="!filterData.values?.length && !filterData.isLoading"
             class="q-py-xs text-grey-9 text-center"
           >
             No values found
           </div>
-          <div v-for="value in (values as any[])" :key="value.key">
+          <div v-for="value in (filterData.values as any[])" :key="value.key">
             <q-list dense>
               <q-item tag="label" class="q-pr-none">
                 <div
@@ -48,10 +47,9 @@
                 >
                   <q-checkbox
                     size="xs"
-                    v-model="_selectedValues"
+                    v-model="filterData.selectedValues"
                     :val="value.key.toString()"
                     class="filter-check-box cursor-pointer"
-                    @update:model-value="processValues()"
                   />
                   <div
                     :title="value.key"
@@ -72,19 +70,19 @@
             </q-list>
           </div>
           <div
-            v-show="filter.isLoading"
+            v-show="filterData.isLoading"
             class="q-pl-md q-mb-xs q-mt-md"
             style="height: 60px; position: relative"
           >
             <q-inner-loading
               size="xs"
-              :showing="filter.isLoading"
+              :showing="filterData.isLoading"
               label="Fetching values..."
               label-style="font-size: 1.1em"
             />
           </div>
           <div
-            v-show="values.length === filter.size"
+            v-show="filterData.values.length === filterData.size"
             class="text-right flex items-center justify-end q-pt-xs"
           >
             <div
@@ -104,19 +102,17 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, defineEmits } from "vue";
+import { ref, defineEmits, computed, watch } from "vue";
 import { debounce } from "quasar";
-import { watch } from "vue";
-import { cloneDeep } from "lodash-es";
 
 const props = defineProps({
+  modelValue: {
+    type: Object,
+    default: () => ({}),
+  },
   row: {
     type: Object,
     default: () => null,
-  },
-  filter: {
-    type: Object,
-    default: () => {},
   },
   values: {
     type: Array,
@@ -132,54 +128,41 @@ const props = defineProps({
   },
 });
 
-watch(
-  () => props.selectedValues,
-  () => {
-    if (
-      JSON.stringify(props.selectedValues) !==
-      JSON.stringify(_selectedValues.value)
-    ) {
-      _selectedValues.value = props.selectedValues;
-    }
-  },
-  {
-    deep: true,
-  }
-);
-
-const searchValue = ref("");
-
-const _selectedValues = ref(props.selectedValues);
-
-const _isOpen = ref(props.filter.isOpen);
-
 const valuesSize = ref(4);
 
+const filterData = computed({
+  get: () => props.modelValue,
+  set: (value) => {
+    console.log("value", value);
+    emits("update:modelValue", value);
+  },
+});
+
 const emits = defineEmits([
-  "update:selectedValues",
-  "update:isOpen",
+  "update:modelValue",
   "update:searchKeyword",
+  "update:isOpen",
+  "update:selectedValues",
 ]);
+
+watch(
+  () => filterData.value.selectedValues,
+  (values, oldValues) => {
+    emits("update:selectedValues", values, oldValues);
+  }
+);
 
 const onSearchValue = () => {
   debouncedOpenFilterCreator();
 };
 
 const debouncedOpenFilterCreator = debounce(() => {
-  emits("update:searchKeyword", searchValue);
+  emits("update:searchKeyword", filterData.value.searchKeyword);
 }, 400);
 
 const fetchMoreValues = () => {
   valuesSize.value = valuesSize.value * 2;
   openFilterCreator();
-};
-
-const processValues = () => {
-  emits(
-    "update:selectedValues",
-    _selectedValues.value,
-    cloneDeep(props.selectedValues)
-  );
 };
 
 const closeFilterCreator = () => {
