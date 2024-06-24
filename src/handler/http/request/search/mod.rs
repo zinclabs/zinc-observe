@@ -188,6 +188,8 @@ pub async fn search(
         }
     };
 
+    let stream_name = &parsed_sql.source;
+
     let r = STREAM_SCHEMAS_LATEST.read().await;
     let stream_schema = r.get(format!("{}/{}/{}", org_id, stream_type, stream_name).as_str());
     if let Some(det) = stream_schema {
@@ -206,7 +208,6 @@ pub async fn search(
             }
         }
     }
-    let stream_name = parsed_sql.source;
 
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
@@ -417,7 +418,7 @@ pub async fn search(
             }
         }
         if c_resp.has_cached_data {
-            merge_response(&mut c_resp.cached_response, &results);
+            merge_response(&mut c_resp.cached_response, &results, &c_resp.ts_column);
             c_resp.cached_response
         } else {
             results[0].clone()
@@ -448,7 +449,7 @@ pub async fn search(
         ])
         .inc();
     res.set_trace_id(trace_id.clone());
-    res.set_local_took(start.elapsed().as_millis() as usize, took_wait);
+    res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
     if !range_error.is_empty() {
         res.is_partial = true;
         res.function_error = if res.function_error.is_empty() {
@@ -491,6 +492,7 @@ pub async fn search(
     {
         let res_cache = json::to_string(&res).unwrap();
         tokio::spawn(async move {
+            let file_path = format!("{}_{}", file_path, c_resp.ts_column);
             match SearchService::cache::cacher::cache_results_to_disk(
                 &trace_id, &file_path, &file_name, res_cache,
             )
@@ -1698,9 +1700,8 @@ pub async fn search_partition(
 fn merge_response(
     cache_response: &mut config::meta::search::Response,
     search_response: &Vec<config::meta::search::Response>,
+    ts_column: &str,
 ) {
-    let cfg = get_config();
-
     if cache_response.hits.is_empty()
         && search_response.first().unwrap().hits.is_empty()
         && search_response.last().unwrap().hits.is_empty()
@@ -1720,7 +1721,7 @@ fn merge_response(
             .hits
             .first()
             .unwrap()
-            .get(&cfg.common.column_timestamp)
+            .get(ts_column)
             .unwrap()
             .as_i64()
             .unwrap()
@@ -1729,7 +1730,7 @@ fn merge_response(
             .hits
             .first()
             .unwrap()
-            .get(&cfg.common.column_timestamp)
+            .get(ts_column)
             .unwrap()
             .as_i64()
             .unwrap()
@@ -1748,7 +1749,7 @@ fn merge_response(
             .hits
             .first()
             .unwrap()
-            .get(&cfg.common.column_timestamp)
+            .get(ts_column)
             .unwrap()
             .as_i64()
             .unwrap();

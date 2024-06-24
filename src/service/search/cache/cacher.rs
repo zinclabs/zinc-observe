@@ -55,6 +55,8 @@ pub async fn check_cache(
         result_ts_col = Some(cfg.common.column_timestamp.clone());
     }
 
+    let result_ts_col = result_ts_col.unwrap();
+
     let mut c_resp = match crate::service::search::cluster::cacher::get_cached_results(
         req.query.start_time,
         req.query.end_time,
@@ -62,7 +64,7 @@ pub async fn check_cache(
         query_key.to_owned(),
         file_path.to_owned(),
         trace_id.to_owned(),
-        result_ts_col.unwrap(),
+        result_ts_col.clone(),
     )
     .await
     {
@@ -87,6 +89,7 @@ pub async fn check_cache(
         }
     };
     c_resp.cache_query_response = true;
+    c_resp.ts_column = result_ts_col;
     c_resp
 }
 
@@ -135,7 +138,8 @@ pub async fn get_cached_results(
                     matching_cache_meta.end_time,
                     if is_aggregate { 1 } else { 0 }
                 );
-                match get_results(file_path, &file_name).await {
+                let file_path = format!("{}_{}", file_path, result_ts_column);
+                match get_results(&file_path, &file_name).await {
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
                         // remove hits if time range is lesser than cached time range
@@ -176,7 +180,7 @@ pub async fn get_cached_results(
                             cache_query_response: true,
                             response_start_time: matching_cache_meta.start_time,
                             response_end_time: matching_cache_meta.end_time,
-                            file_path: format!("{}_{}", file_path, result_ts_column),
+                            ts_column: result_ts_column,
                         })
                     }
                     Err(e) => {
@@ -278,19 +282,19 @@ pub async fn get_results(file_path: &str, file_name: &str) -> std::io::Result<St
     }
 }
 
-fn get_ts_col(parsed_sql: &config::meta::sql::Sql, ts_col: &String) -> Option<String> {
+fn get_ts_col(parsed_sql: &config::meta::sql::Sql, ts_col: &str) -> Option<String> {
     let mut result_ts_col = None;
-    parsed_sql
-        .field_alias
-        .iter(|(original, alias)| {
-            if TS_WITH_ALIAS.is_match(original) {
-                if alias.eq(&ts_col) {
-                    result_ts_col = Some(ts_col);
-                }
-                if original.contains("histogram") {
-                    result_ts_col = Some(alias);
-                }
+
+    for (original, alias) in &parsed_sql.field_alias {
+        if TS_WITH_ALIAS.is_match(original) {
+            if alias == ts_col {
+                result_ts_col = Some(ts_col.to_string());
             }
-        })
-        .next();
+            if original.contains("histogram") {
+                result_ts_col = Some(alias.clone());
+            }
+        }
+    }
+
+    result_ts_col
 }

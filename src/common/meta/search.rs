@@ -11,7 +11,7 @@ pub struct CachedQueryResponse {
     pub cache_query_response: bool,
     pub response_start_time: i64,
     pub response_end_time: i64,
-    pub file_path: String,
+    pub ts_column: String,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
 pub struct QueryDelta {

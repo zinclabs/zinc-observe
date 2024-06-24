@@ -47,7 +47,7 @@ pub async fn get_cached_results(
         let query_key = query_key.clone();
         let file_path = file_path.clone();
         let trace_id = trace_id.clone();
-        let result_ts_column = result_ts_column.clone();
+        let result_ts_column = result_ts_column.to_string();
         let task = tokio::task::spawn(
             async move {
                 let req = QueryCacheRequest {
@@ -168,7 +168,7 @@ pub async fn get_cached_results(
                                 cache_query_response: res.cache_query_response,
                                 response_start_time: res.cache_start_time,
                                 response_end_time: res.cache_end_time,
-                                file_path: format!("{}_{}", file_path, result_ts_column),
+                                ts_column: result_ts_column.to_string(),
                             },
                         ));
                     }
