@@ -19,3 +19,20 @@ pub struct QueryDelta {
     pub delta_end_time: i64,
     pub delta_removed_hits: bool,
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
+pub struct CacheResponse {
+    pub cached_response: Vec<RangeCacheResponse>,
+    pub deltas: Vec<QueryDelta>,
+    pub has_pre_cache_delta: bool,
+    pub cache_query_response: bool,
+    pub ts_column: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
+pub struct RangeCacheResponse {
+    pub cached_response: Response,
+    pub has_cached_data: bool,
+    pub response_start_time: i64,
+    pub response_end_time: i64,
+}

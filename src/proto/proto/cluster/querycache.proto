@@ -13,8 +13,11 @@ message QueryDelta {
     bool delta_removed_hits = 3; 
 }
 
-message QueryResponse {
-    bytes data = 1;
+message RangeCacheResponse {
+    bytes             data = 1;
+    int64 cache_start_time = 2;
+    int64   cache_end_time = 3;
+    bool   has_cached_data = 4;
 }
 
 
@@ -27,18 +30,17 @@ message QueryCacheRequest {
     string  timestamp_col = 6; 
 }
 
-message QueryCacheRes {
-    QueryResponse cached_response = 1;
-    repeated   QueryDelta deltas  = 2;
-    bool      has_pre_cache_delta = 3;
-    bool          has_cached_data = 4;
-    bool     cache_query_response = 5;
-    int64        cache_start_time = 6;
-    int64          cache_end_time = 7;
+message CacheResponse {
+    repeated RangeCacheResponse cached_response = 1;
+    repeated                 QueryDelta deltas  = 2;
+    bool                    has_pre_cache_delta = 3;
+    bool                   cache_query_response = 4;
+    string                            ts_column = 5; 
+ 
 }
 
 message QueryCacheResponse {
-    optional QueryCacheRes response  = 1;   
+    optional CacheResponse response  = 1;   
 }
 
 service QueryCache {

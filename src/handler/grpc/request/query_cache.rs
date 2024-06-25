@@ -15,8 +15,7 @@
 
 use async_trait::async_trait;
 use proto::cluster_rpc::{
-    query_cache_server::QueryCache, QueryCacheRequest, QueryCacheRes, QueryCacheResponse,
-    QueryDelta, QueryResponse,
+    query_cache_server::QueryCache, QueryCacheRequest, QueryCacheResponse, QueryDelta,
 };
 use tonic::{Request, Response, Status};
 
@@ -52,16 +51,23 @@ impl QueryCache for QueryCacheServerImpl {
                     })
                     .collect();
 
-                let res = QueryCacheRes {
-                    cached_response: Some(QueryResponse {
-                        data: serde_json::to_vec(&res.cached_response).unwrap(),
-                    }),
+                let response: Vec<proto::cluster_rpc::RangeCacheResponse> = res
+                    .cached_response
+                    .iter()
+                    .map(|r| proto::cluster_rpc::RangeCacheResponse {
+                        data: serde_json::to_vec(&r.cached_response).unwrap(),
+                        has_cached_data: r.has_cached_data,
+                        cache_start_time: r.response_start_time,
+                        cache_end_time: r.response_end_time,
+                    })
+                    .collect();
+
+                let res = proto::cluster_rpc::CacheResponse {
+                    cached_response: response,
                     deltas,
                     has_pre_cache_delta: res.has_pre_cache_delta,
-                    has_cached_data: res.has_cached_data,
                     cache_query_response: res.cache_query_response,
-                    cache_start_time: res.response_start_time,
-                    cache_end_time: res.response_end_time,
+                    ts_column: res.ts_column,
                 };
 
                 Ok(Response::new(QueryCacheResponse {
@@ -69,6 +75,40 @@ impl QueryCache for QueryCacheServerImpl {
                 }))
             }
             None => Ok(Response::new(QueryCacheResponse { response: None })),
+        }
+    }
+}
+
+// converter for CacheResponse to proto::cluster_rpc::CacheResponse
+impl From<crate::common::meta::search::CacheResponse> for proto::cluster_rpc::CacheResponse {
+    fn from(res: crate::common::meta::search::CacheResponse) -> Self {
+        let deltas = res
+            .deltas
+            .iter()
+            .map(|d| QueryDelta {
+                delta_start_time: d.delta_start_time,
+                delta_end_time: d.delta_end_time,
+                delta_removed_hits: d.delta_removed_hits,
+            })
+            .collect();
+
+        let response: Vec<proto::cluster_rpc::RangeCacheResponse> = res
+            .cached_response
+            .iter()
+            .map(|r| proto::cluster_rpc::RangeCacheResponse {
+                data: serde_json::to_vec(&r.cached_response).unwrap(),
+                has_cached_data: r.has_cached_data,
+                cache_start_time: r.response_start_time,
+                cache_end_time: r.response_end_time,
+            })
+            .collect();
+
+        proto::cluster_rpc::CacheResponse {
+            cached_response: response,
+            deltas,
+            has_pre_cache_delta: res.has_pre_cache_delta,
+            cache_query_response: res.cache_query_response,
+            ts_column: res.ts_column,
         }
     }
 }

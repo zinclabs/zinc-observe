@@ -4,7 +4,7 @@ use proto::cluster_rpc::{self, QueryCacheRequest};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
 use tracing::{info_span, Instrument};
 
-use crate::{common::meta::search::CachedQueryResponse, service::search::infra_cluster};
+use crate::{common::meta::search::CacheResponse, service::search::infra_cluster};
 
 pub async fn get_cached_results(
     start_time: i64,
@@ -14,7 +14,7 @@ pub async fn get_cached_results(
     file_path: String,
     trace_id: String,
     result_ts_column: String,
-) -> Option<CachedQueryResponse> {
+) -> Option<CacheResponse> {
     let start = std::time::Instant::now();
     // get nodes from cluster
     let mut nodes = infra_cluster::get_cached_online_query_nodes()
@@ -135,40 +135,26 @@ pub async fn get_cached_results(
                                 delta_removed_hits: d.delta_removed_hits,
                             })
                             .collect();
-                        let cached_res: config::meta::search::Response = match res.cached_response {
-                            Some(cached_response) => {
-                                match serde_json::from_slice(&cached_response.data) {
-                                    Ok(v) => v,
-                                    Err(e) => {
-                                        log::error!(
-                                            "[trace_id {trace_id}] get_cached_results->grpc: node: {}, cached_response parse error: {:?}",
-                                            &node.grpc_addr,
-                                            e
-                                        );
-                                        config::meta::search::Response::default()
-                                    }
-                                }
-                            }
-                            None => {
-                                log::error!(
-                                    "[trace_id {trace_id}] get_cached_results->grpc: node: {}, no cached_response",
-                                    &node.grpc_addr
-                                );
-                                config::meta::search::Response::default()
-                            }
-                        };
+
+                        let cached_res = res
+                            .cached_response
+                            .iter()
+                            .map(|r| crate::common::meta::search::RangeCacheResponse {
+                                cached_response: serde_json::from_slice(&r.data).unwrap(),
+                                has_cached_data: r.has_cached_data,
+                                response_start_time: r.cache_start_time,
+                                response_end_time: r.cache_end_time,
+                            })
+                            .collect();
 
                         results.push((
                             node,
-                            CachedQueryResponse {
+                            CacheResponse {
                                 cached_response: cached_res,
                                 deltas,
                                 has_pre_cache_delta: res.has_pre_cache_delta,
-                                has_cached_data: res.has_cached_data,
                                 cache_query_response: res.cache_query_response,
-                                response_start_time: res.cache_start_time,
-                                response_end_time: res.cache_end_time,
-                                ts_column: result_ts_column.to_string(),
+                                ts_column: res.ts_column,
                             },
                         ));
                     }

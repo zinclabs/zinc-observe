@@ -42,7 +42,7 @@ use crate::{
         meta::{
             self,
             http::HttpResponse as MetaHttpResponse,
-            search::{CachedQueryResponse, QueryDelta},
+            search::{CacheResponse, QueryDelta},
         },
         utils::{
             functions,
@@ -265,7 +265,7 @@ pub async fn search(
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
 
-    let mut c_resp: CachedQueryResponse = if use_cache {
+    let mut c_resp: CacheResponse = if use_cache {
         check_cache(
             &mut rpc_req,
             &mut req,
@@ -278,11 +278,11 @@ pub async fn search(
         )
         .await
     } else {
-        CachedQueryResponse::default()
+        CacheResponse::default()
     };
 
     // No cache data present, add delta for full query
-    if !c_resp.has_cached_data {
+    if c_resp.cached_response.is_empty() {
         c_resp.deltas.push(QueryDelta {
             delta_start_time: req.query.start_time,
             delta_end_time: req.query.end_time,
@@ -417,7 +417,7 @@ pub async fn search(
                 }
             }
         }
-        if c_resp.has_cached_data {
+        if !c_resp.cached_response.is_empty() {
             merge_response(&mut c_resp.cached_response, &results, &c_resp.ts_column);
             c_resp.cached_response
         } else {
@@ -1699,7 +1699,7 @@ pub async fn search_partition(
 // based on _timestamp of first record in config::meta::search::Response either add it in start
 // or end to cache response
 fn merge_response(
-    cache_response: &mut config::meta::search::Response,
+    cache_response: &Vec<RangeCacheResponse>,
     search_response: &Vec<config::meta::search::Response>,
     ts_column: &str,
 ) {

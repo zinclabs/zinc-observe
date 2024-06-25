@@ -10,7 +10,7 @@ use infra::cache::{
 };
 
 use crate::{
-    common::meta::search::{CachedQueryResponse, QueryDelta},
+    common::meta::search::{CacheResponse, QueryDelta, RangeCacheResponse},
     service::search::sql::{SqlMode, RE_SELECT_FROM, TS_WITH_ALIAS},
 };
 
@@ -24,7 +24,7 @@ pub async fn check_cache(
     is_aggregate: bool,
     should_exec_query: &mut bool,
     trace_id: &str,
-) -> CachedQueryResponse {
+) -> CacheResponse {
     let start = std::time::Instant::now();
     let cfg = get_config();
     // check sql_mode
@@ -33,18 +33,18 @@ pub async fn check_cache(
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);
-            return CachedQueryResponse::default();
+            return CacheResponse::default();
         }
     };
     let sql_mode: SqlMode = meta.sql_mode;
 
     // skip the count queries
     if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
-        return CachedQueryResponse::default();
+        return CacheResponse::default();
     }
     let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp);
     if is_aggregate && sql_mode.eq(&SqlMode::Full) && result_ts_col.is_none() {
-        return CachedQueryResponse::default();
+        return CacheResponse::default();
     }
 
     // Hack select for _timestamp
@@ -90,12 +90,12 @@ pub async fn check_cache(
                 *should_exec_query = false;
             };
             cached_resp.deltas = search_delta;
-            cached_resp.cached_response.took = start.elapsed().as_millis() as usize;
+            // cached_resp.cached_response.took = start.elapsed().as_millis() as usize;
             cached_resp
         }
         None => {
             log::debug!("cached response not found");
-            CachedQueryResponse::default()
+            CacheResponse::default()
         }
     };
     c_resp.cache_query_response = true;
@@ -109,7 +109,8 @@ pub async fn get_cached_results(
     is_aggregate: bool,
     file_path: &str,
     result_ts_column: &str,
-) -> Option<CachedQueryResponse> {
+) -> Option<CacheResponse> {
+    let mut resp = CacheResponse::default();
     let cfg = get_config();
     let r = QUERY_RESULT_CACHE.read().await;
     let query_key = file_path.replace('/', "_");
@@ -117,93 +118,76 @@ pub async fn get_cached_results(
     drop(r);
 
     if let Some(cache_metas) = is_cached {
-        match cache_metas
-            .iter()
-            .filter(|cache_meta| {
-                // to make sure there is overlap between cache time range and query time range &
-                // cache can at least serve query_cache_min_contribution
+        let metas = process_metas(&cache_metas, start_time, end_time);
+        for meta in metas {
+            // calculate delta time range to fetch the delta data using search query
 
-                let cached_duration = cache_meta.end_time - cache_meta.start_time;
-                let query_duration = end_time - start_time;
+            let mut deltas = vec![];
+            let has_pre_cache_delta = calculate_deltas_v1(&meta, start_time, end_time, &mut deltas);
 
-                cached_duration > query_duration / cfg.limit.query_cache_min_contribution
-                    && cache_meta.start_time <= end_time
-                    && cache_meta.end_time >= start_time
-            })
-            .max_by_key(|result| result.end_time.min(end_time) - result.start_time.max(start_time))
-        {
-            Some(matching_cache_meta) => {
-                // calculate delta time range to fetch the delta data using search query
+            let remove_hits: Vec<&QueryDelta> =
+                deltas.iter().filter(|d| d.delta_removed_hits).collect();
 
-                let mut deltas = vec![];
-                let has_pre_cache_delta =
-                    calculate_deltas_v1(matching_cache_meta, start_time, end_time, &mut deltas);
+            let file_name = format!(
+                "{}_{}_{}.json",
+                meta.start_time,
+                meta.end_time,
+                if is_aggregate { 1 } else { 0 }
+            );
+            match get_results(file_path, &file_name).await {
+                Ok(v) => {
+                    let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
+                    // remove hits if time range is lesser than cached time range
+                    let mut to_retain = Vec::new();
 
-                let remove_hits: Vec<&QueryDelta> =
-                    deltas.iter().filter(|d| d.delta_removed_hits).collect();
-
-                let file_name = format!(
-                    "{}_{}_{}.json",
-                    matching_cache_meta.start_time,
-                    matching_cache_meta.end_time,
-                    if is_aggregate { 1 } else { 0 }
-                );
-                match get_results(file_path, &file_name).await {
-                    Ok(v) => {
-                        let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
-                        // remove hits if time range is lesser than cached time range
-                        let mut to_retain = Vec::new();
-
-                        if !remove_hits.is_empty() {
-                            for delta in remove_hits {
-                                for hit in &cached_response.hits {
-                                    let hit_ts = match hit.get(result_ts_column) {
-                                        Some(serde_json::Value::String(ts)) => {
-                                            parse_str_to_timestamp_micros_as_option(ts.as_str())
-                                        }
-                                        Some(serde_json::Value::Number(ts)) => ts.as_i64(),
-                                        _ => {
-                                            return None;
-                                        }
-                                    };
-
-                                    match hit_ts {
-                                        Some(hit_ts) => {
-                                            if !(hit_ts >= delta.delta_start_time
-                                                && hit_ts < delta.delta_end_time)
-                                            {
-                                                to_retain.push(hit.clone());
-                                            }
-                                        }
-                                        None => return None,
+                    if !remove_hits.is_empty() {
+                        for delta in remove_hits {
+                            for hit in &cached_response.hits {
+                                let hit_ts = match hit.get(result_ts_column) {
+                                    Some(serde_json::Value::String(ts)) => {
+                                        parse_str_to_timestamp_micros_as_option(ts.as_str())
                                     }
+                                    Some(serde_json::Value::Number(ts)) => ts.as_i64(),
+                                    _ => {
+                                        return None;
+                                    }
+                                };
+
+                                match hit_ts {
+                                    Some(hit_ts) => {
+                                        if !(hit_ts >= delta.delta_start_time
+                                            && hit_ts < delta.delta_end_time)
+                                        {
+                                            to_retain.push(hit.clone());
+                                        }
+                                    }
+                                    None => return None,
                                 }
                             }
-                            cached_response.hits = to_retain;
-                        };
+                        }
+                        cached_response.hits = to_retain;
+                    };
 
-                        log::info!("Get results from disk success for query key: {}", query_key);
-                        Some(CachedQueryResponse {
-                            cached_response,
-                            deltas,
-                            has_pre_cache_delta,
-                            has_cached_data: true,
-                            cache_query_response: true,
-                            response_start_time: matching_cache_meta.start_time,
-                            response_end_time: matching_cache_meta.end_time,
-                            ts_column: result_ts_column.to_string(),
-                        })
-                    }
-                    Err(e) => {
-                        log::error!("Get results from disk failed : {:?}", e);
-                        None
-                    }
+                    log::info!("Get results from disk success for query key: {}", query_key);
+
+                    resp.deltas.extend(deltas);
+                    resp.cached_response.push(RangeCacheResponse {
+                        cached_response,
+                        has_cached_data: true,
+                        response_start_time: meta.start_time,
+                        response_end_time: meta.end_time,
+                    });
+                }
+                Err(e) => {
+                    log::error!("Get results from disk failed : {:?}", e);
                 }
             }
-            None => {
-                log::debug!("No matching cache found for query key: {}", query_key);
-                None
-            }
+            resp.ts_column = result_ts_column.to_string();
+        }
+        if resp.cached_response.is_empty() {
+            None
+        } else {
+            Some(resp)
         }
     } else {
         None
@@ -308,4 +292,44 @@ fn get_ts_col(parsed_sql: &config::meta::sql::Sql, ts_col: &str) -> Option<Strin
     }
 
     result_ts_col
+}
+
+fn process_metas(
+    cache_metas: &[ResultCacheMeta],
+    start_time: i64,
+    end_time: i64,
+) -> Vec<&ResultCacheMeta> {
+    let mut results: Vec<&ResultCacheMeta> = Vec::new();
+
+    // Filter relevant metas that are within the overall query range
+    let mut relevant_metas: Vec<_> = cache_metas
+        .iter()
+        .filter(|m| m.start_time < end_time && m.end_time > start_time)
+        .collect();
+
+    // Sort by start time to process them in sequence
+    relevant_metas.sort_by_key(|m| m.start_time);
+
+    // Find the largest overlapping meta within the query time range
+    if let Some(largest_meta) = relevant_metas
+        .iter()
+        .max_by_key(|meta| meta.end_time.min(end_time) - meta.start_time.max(start_time))
+    {
+        results.push(*largest_meta);
+
+        // Include all non-overlapping metas before and after the largest_meta
+        for meta in relevant_metas.iter() {
+            if (meta.end_time <= largest_meta.start_time
+                || meta.start_time >= largest_meta.end_time)
+                && meta.start_time < end_time
+                && meta.end_time > start_time
+            {
+                results.push(*meta);
+            }
+        }
+    }
+
+    results.retain(|meta| meta.start_time < end_time && meta.end_time > start_time);
+
+    results
 }
