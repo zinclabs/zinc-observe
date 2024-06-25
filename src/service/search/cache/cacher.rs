@@ -27,9 +27,7 @@ pub async fn check_cache(
 ) -> CachedQueryResponse {
     let start = std::time::Instant::now();
     let cfg = get_config();
-
     // check sql_mode
-    let sql_mode: SqlMode = rpc_req.query.as_ref().unwrap().sql_mode.as_str().into();
 
     let meta: super::super::sql::Sql = match super::super::sql::Sql::new(rpc_req).await {
         Ok(v) => v,
@@ -38,6 +36,7 @@ pub async fn check_cache(
             return CachedQueryResponse::default();
         }
     };
+    let sql_mode: SqlMode = meta.sql_mode;
 
     // skip the count queries
     if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
@@ -87,7 +86,7 @@ pub async fn check_cache(
                 .cloned()
                 .collect();
             if search_delta.is_empty() {
-                log::info!("cached response found");
+                log::debug!("cached response found");
                 *should_exec_query = false;
             };
             cached_resp.deltas = search_delta;
