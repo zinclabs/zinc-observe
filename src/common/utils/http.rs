@@ -74,6 +74,18 @@ pub(crate) fn get_search_type_from_request(
 }
 
 #[inline(always)]
+pub(crate) fn get_use_cache_from_request(query: &Query<HashMap<String, String>>) -> bool {
+    match query.get("use_cache") {
+        Some(s) => match s.to_lowercase().as_str() {
+            "true" => true,
+            "false" => false,
+            _ => true,
+        },
+        None => true,
+    }
+}
+
+#[inline(always)]
 pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
     match query.get("folder") {
         Some(s) => s.to_string(),

@@ -47,7 +47,8 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_search_type_from_request, get_stream_type_from_request, RequestHeaderExtractor,
+                get_search_type_from_request, get_stream_type_from_request,
+                get_use_cache_from_request, RequestHeaderExtractor,
             },
         },
     },
@@ -164,6 +165,7 @@ pub async fn search(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
+    let use_cache = get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -268,18 +270,22 @@ pub async fn search(
         org_id, stream_type, stream_name, hashed_query
     );
 
-    let mut c_resp: CachedQueryResponse = check_cache(
-        &mut rpc_req,
-        &mut req,
-        &mut origin_sql,
-        &parsed_sql,
-        &query_key,
-        &file_path,
-        is_aggregate,
-        &mut should_exec_query,
-        &trace_id,
-    )
-    .await;
+    let mut c_resp: CachedQueryResponse = if use_cache {
+        check_cache(
+            &mut rpc_req,
+            &mut req,
+            &mut origin_sql,
+            &parsed_sql,
+            &query_key,
+            &file_path,
+            is_aggregate,
+            &mut should_exec_query,
+            &trace_id,
+        )
+        .await
+    } else {
+        CachedQueryResponse::default()
+    };
 
     // No cache data present, add delta for full query
     if !c_resp.has_cached_data {
