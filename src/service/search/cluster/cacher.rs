@@ -197,7 +197,6 @@ pub async fn get_cached_results(
         start_time,
         end_time,
         is_aggregate,
-        &query_key,
         &file_path,
         result_ts_column.as_str(),
     )

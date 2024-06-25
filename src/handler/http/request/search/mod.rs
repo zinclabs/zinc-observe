@@ -251,7 +251,7 @@ pub async fn search(
 
     let mut h = config::utils::hash::gxhash::new();
     let hashed_query = h.sum64(&origin_sql);
-    let file_path = format!(
+    let mut file_path = format!(
         "{}/{}/{}/{}",
         org_id, stream_type, stream_name, hashed_query
     );
@@ -265,19 +265,13 @@ pub async fn search(
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
 
-    let query_key = format!(
-        "{}_{}_{}_{}",
-        org_id, stream_type, stream_name, hashed_query
-    );
-
     let mut c_resp: CachedQueryResponse = if use_cache {
         check_cache(
             &mut rpc_req,
             &mut req,
             &mut origin_sql,
             &parsed_sql,
-            &query_key,
-            &file_path,
+            &mut file_path,
             is_aggregate,
             &mut should_exec_query,
             &trace_id,
@@ -498,8 +492,7 @@ pub async fn search(
     {
         let res_cache = json::to_string(&res).unwrap();
         tokio::spawn(async move {
-            let file_path = format!("{}_{}", file_path, c_resp.ts_column);
-            let query_key = format!("{}_{}", query_key, c_resp.ts_column);
+            let query_key = file_path.replace('/', "_");
 
             match SearchService::cache::cacher::cache_results_to_disk(
                 &trace_id, &file_path, &file_name, res_cache,

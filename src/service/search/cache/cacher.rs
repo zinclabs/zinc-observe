@@ -20,8 +20,7 @@ pub async fn check_cache(
     req: &mut config::meta::search::Request,
     origin_sql: &mut String,
     parsed_sql: &config::meta::sql::Sql,
-    query_key: &str,
-    file_path: &str,
+    file_path: &mut String,
     is_aggregate: bool,
     should_exec_query: &mut bool,
     trace_id: &str,
@@ -31,6 +30,14 @@ pub async fn check_cache(
 
     // check sql_mode
     let sql_mode: SqlMode = rpc_req.query.as_ref().unwrap().sql_mode.as_str().into();
+
+    let meta: super::super::sql::Sql = match super::super::sql::Sql::new(rpc_req).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Error parsing sql: {:?}", e);
+            return CachedQueryResponse::default();
+        }
+    };
 
     // skip the count queries
     if sql_mode.eq(&SqlMode::Full) && req.query.track_total_hits {
@@ -56,13 +63,17 @@ pub async fn check_cache(
     }
 
     let result_ts_col = result_ts_col.unwrap();
+    if let Some(interval) = meta.histogram_interval {
+        *file_path = format!("{}_{}_{}", file_path, interval, result_ts_col);
+    };
+    let query_key = file_path.replace('/', "_");
 
     let mut c_resp = match crate::service::search::cluster::cacher::get_cached_results(
         req.query.start_time,
         req.query.end_time,
         is_aggregate,
         query_key.to_owned(),
-        file_path.to_owned(),
+        file_path.to_string(),
         trace_id.to_owned(),
         result_ts_col.clone(),
     )
@@ -97,13 +108,12 @@ pub async fn get_cached_results(
     start_time: i64,
     end_time: i64,
     is_aggregate: bool,
-    query_key: &str,
     file_path: &str,
     result_ts_column: &str,
 ) -> Option<CachedQueryResponse> {
     let cfg = get_config();
     let r = QUERY_RESULT_CACHE.read().await;
-    let query_key = format!("{}_{}", query_key, result_ts_column);
+    let query_key = file_path.replace('/', "_");
     let is_cached = r.get(&query_key).cloned();
     drop(r);
 
@@ -139,8 +149,7 @@ pub async fn get_cached_results(
                     matching_cache_meta.end_time,
                     if is_aggregate { 1 } else { 0 }
                 );
-                let file_path = format!("{}_{}", file_path, result_ts_column);
-                match get_results(&file_path, &file_name).await {
+                match get_results(file_path, &file_name).await {
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
                         // remove hits if time range is lesser than cached time range
