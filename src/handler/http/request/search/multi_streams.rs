@@ -18,7 +18,7 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use chrono::{Duration, Utc};
 use config::{
-    get_config, ider,
+    get_config,
     meta::{
         search,
         stream::StreamType,
@@ -28,9 +28,7 @@ use config::{
     utils::{base64, json},
 };
 use infra::errors;
-use opentelemetry::{global, trace::TraceContextExt};
 use tracing::Instrument;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
@@ -38,7 +36,7 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_search_type_from_request, get_stream_type_from_request, RequestHeaderExtractor,
+                get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
             },
         },
     },
@@ -120,21 +118,8 @@ pub async fn search_multi(
     let org_id = org_id.into_inner();
     let cfg = get_config();
     let started_at = Utc::now().timestamp_micros();
-
-    let mut http_span = None;
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!("/api/{org_id}/_search_multi", org_id = org_id.clone());
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
+    let (trace_id, http_span) =
+        get_or_create_trace_id(in_req.headers(), format!("/api/{org_id}/_search_multi"));
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -418,21 +403,9 @@ pub async fn _search_partition_multi(
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
-    let mut http_span = None;
     let cfg = get_config();
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone());
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
+    let (trace_id, http_span) =
+        get_or_create_trace_id(in_req.headers(), format!("/api/{org_id}/_search_partition"));
 
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -565,24 +538,10 @@ pub async fn around_multi(
     let (org_id, stream_names) = path.into_inner();
     let cfg = get_config();
 
-    let mut http_span = None;
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!(
-            "/api/{org_id}/{stream_names}/_around_multi",
-            org_id = org_id.clone(),
-            stream_names = stream_names.clone()
-        );
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
+    let (trace_id, http_span) = get_or_create_trace_id(
+        in_req.headers(),
+        format!("/api/{org_id}/{stream_names}/_around_multi"),
+    );
 
     let stream_names = base64::decode_url(&stream_names)?;
     let mut uses_fn = false;

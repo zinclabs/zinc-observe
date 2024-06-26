@@ -16,17 +16,15 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
-use config::{get_config, ider, meta::stream::StreamType, metrics, utils::json};
+use config::{get_config, meta::stream::StreamType, metrics, utils::json};
 use infra::errors;
-use opentelemetry::{global, trace::TraceContextExt};
 use serde::Serialize;
 use tracing::Instrument;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::http::RequestHeaderExtractor,
+        utils::http::get_or_create_trace_id,
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{search as SearchService, traces::otlp_http},
@@ -133,25 +131,10 @@ pub async fn get_latest_traces(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let (org_id, stream_name) = path.into_inner();
-    let cfg = get_config();
-    let mut http_span = None;
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!(
-            "/api/{org_id}/{stream_name}/traces/latest",
-            org_id = org_id.clone(),
-            stream_name = stream_name.clone()
-        );
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
+    let (trace_id, http_span) = get_or_create_trace_id(
+        in_req.headers(),
+        format!("/api/{org_id}/{stream_name}/traces/latest"),
+    );
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 

@@ -21,7 +21,8 @@ use std::{
 use actix_web::web::Query;
 use awc::http::header::HeaderMap;
 use config::meta::{search::SearchEventType, stream::StreamType};
-use opentelemetry::propagation::Extractor;
+use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[inline(always)]
 pub(crate) fn get_stream_type_from_request(
@@ -78,6 +79,27 @@ pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
     match query.get("folder") {
         Some(s) => s.to_string(),
         None => crate::common::meta::dashboards::DEFAULT_FOLDER.to_owned(),
+    }
+}
+
+#[inline(always)]
+pub(crate) fn get_or_create_trace_id(
+    headers: &HeaderMap,
+    ep: String,
+) -> (String, Option<tracing::Span>) {
+    let cfg = config::get_config();
+    if headers.contains_key("traceparent") || cfg.common.tracing_enabled {
+        let ctx = global::get_text_map_propagator(|propagator| {
+            propagator.extract(&RequestHeaderExtractor::new(headers))
+        });
+        let trace_id = ctx.span().span_context().trace_id().to_string();
+        (trace_id, None)
+    } else if cfg.common.tracing_search_enabled {
+        let span = tracing::info_span!("{ep}", ep = ep);
+        let trace_id = span.context().span().span_context().trace_id().to_string();
+        (trace_id, Some(span))
+    } else {
+        (config::ider::uuid(), None)
     }
 }
 
