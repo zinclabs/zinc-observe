@@ -19,6 +19,7 @@ import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
+import { tracer } from "@/utils/opentelemetry";
 
 import {
   useLocalLogFilterField,
@@ -33,6 +34,7 @@ import {
   useLocalSavedView,
   convertToCamelCase,
   getFunctionErrorMessage,
+  getUUID,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -486,7 +488,7 @@ const useLogs = () => {
       } else {
         query["period"] = date.relativeTimePeriod;
       }
-    } else if(date.type == "absolute") {
+    } else if (date.type == "absolute") {
       query["from"] = date.startTime;
       query["to"] = date.endTime;
     }
@@ -1101,6 +1103,7 @@ const useLogs = () => {
               org_identifier: searchObj.organizationIdetifier,
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
+              traceparent: getTraceParentHeader(),
             })
             .then(async (res) => {
               searchObj.data.queryResults.partitionDetail = {
@@ -1749,6 +1752,7 @@ const useLogs = () => {
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
+            traceparent: getTraceParentHeader(),
           },
           "UI"
         )
@@ -1855,21 +1859,37 @@ const useLogs = () => {
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
+            traceparent: getTraceParentHeader(),
           },
           "UI"
         )
         .then(async (res) => {
-          if(res.data.hasOwnProperty("function_error") && res.data.function_error != "" && res.data.hasOwnProperty("new_start_time") && res.data.hasOwnProperty("new_end_time")) {
-            res.data.function_error = getFunctionErrorMessage(res.data.function_error, res.data.new_start_time, res.data.new_end_time, store.state.timezone);
+          if (
+            res.data.hasOwnProperty("function_error") &&
+            res.data.function_error != "" &&
+            res.data.hasOwnProperty("new_start_time") &&
+            res.data.hasOwnProperty("new_end_time")
+          ) {
+            res.data.function_error = getFunctionErrorMessage(
+              res.data.function_error,
+              res.data.new_start_time,
+              res.data.new_end_time,
+              store.state.timezone
+            );
             searchObj.data.datetime.startTime = res.data.new_start_time;
             searchObj.data.datetime.endTime = res.data.new_end_time;
             searchObj.data.datetime.type = "absolute";
             queryReq.query.start_time = res.data.new_start_time;
             queryReq.query.end_time = res.data.new_end_time;
-            searchObj.data.histogramQuery.query.start_time = res.data.new_start_time;
-            searchObj.data.histogramQuery.query.end_time = res.data.new_end_time;
-            if(searchObj.data.queryResults.partitionDetail.partitions.length == 1) {
-              searchObj.data.queryResults.partitionDetail.partitions[0].start_time = res.data.new_start_time;
+            searchObj.data.histogramQuery.query.start_time =
+              res.data.new_start_time;
+            searchObj.data.histogramQuery.query.end_time =
+              res.data.new_end_time;
+            if (
+              searchObj.data.queryResults.partitionDetail.partitions.length == 1
+            ) {
+              searchObj.data.queryResults.partitionDetail.partitions[0].start_time =
+                res.data.new_start_time;
             }
             updateUrlQueryParams();
           }
@@ -2115,6 +2135,7 @@ const useLogs = () => {
                 org_identifier: searchObj.organizationIdetifier,
                 query: queryReq,
                 page_type: searchObj.data.stream.streamType,
+                traceparent: getTraceParentHeader(),
               },
               "UI"
             )
@@ -2320,9 +2341,27 @@ const useLogs = () => {
               stream.schema = streamSchema;
             }
 
-            if(stream.settings.max_query_range > 0 && (searchObj.data.datetime.queryRangeRestrictionInHour > stream.settings.max_query_range || stream.settings.max_query_range == 0 || searchObj.data.datetime.queryRangeRestrictionInHour == -1) && searchObj.data.datetime.queryRangeRestrictionInHour != 0) {
-              searchObj.data.datetime.queryRangeRestrictionInHour = stream.settings.max_query_range;
-              searchObj.data.datetime.queryRangeRestrictionMsg = t("search.queryRangeRestrictionMsg", {range: searchObj.data.datetime.queryRangeRestrictionInHour > 1 ? searchObj.data.datetime.queryRangeRestrictionInHour + " hours" : searchObj.data.datetime.queryRangeRestrictionInHour + " hour"});
+            if (
+              stream.settings.max_query_range > 0 &&
+              (searchObj.data.datetime.queryRangeRestrictionInHour >
+                stream.settings.max_query_range ||
+                stream.settings.max_query_range == 0 ||
+                searchObj.data.datetime.queryRangeRestrictionInHour == -1) &&
+              searchObj.data.datetime.queryRangeRestrictionInHour != 0
+            ) {
+              searchObj.data.datetime.queryRangeRestrictionInHour =
+                stream.settings.max_query_range;
+              searchObj.data.datetime.queryRangeRestrictionMsg = t(
+                "search.queryRangeRestrictionMsg",
+                {
+                  range:
+                    searchObj.data.datetime.queryRangeRestrictionInHour > 1
+                      ? searchObj.data.datetime.queryRangeRestrictionInHour +
+                        " hours"
+                      : searchObj.data.datetime.queryRangeRestrictionInHour +
+                        " hour",
+                }
+              );
             }
 
             let environmentInterestingFields = [];
@@ -2374,7 +2413,9 @@ const useLogs = () => {
               ...streamInterestingFieldsLocal
             );
 
-            let intField = new Set(searchObj.data.stream.interestingFieldList);
+            const intField = new Set(
+              searchObj.data.stream.interestingFieldList
+            );
             searchObj.data.stream.interestingFieldList = [...intField];
 
             // create a schema field mapping based on field name to avoid iteration over object.
@@ -2989,6 +3030,7 @@ const useLogs = () => {
             : "",
           is_multistream:
             searchObj.data.stream.selectedStream.length > 1 ? true : false,
+          traceparent: getTraceParentHeader(),
         })
         .then((res) => {
           searchObj.loading = false;
@@ -3520,6 +3562,12 @@ const useLogs = () => {
 
       store.dispatch("setRegionInfo", clusterData);
     });
+  };
+
+  const getTraceParentHeader = () => {
+    return `00-${getUUID().replace(/-/g, "")}-${getUUID()
+      .replace(/-/g, "")
+      .slice(0, 16)}-01`;
   };
 
   return {
