@@ -44,7 +44,6 @@ use super::{
     request::*,
 };
 use crate::common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL};
-use actix_http::header::HeaderName;
 
 pub mod openapi;
 pub mod ui;
