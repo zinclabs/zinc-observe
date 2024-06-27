@@ -297,7 +297,7 @@ pub async fn search(
     if let Err(e) = work_group
         .as_ref()
         .unwrap()
-        .process(trace_id, user_id)
+        .process(trace_id, user_id) //TODO(ansrivas): Check once the enqueued query has been started
         .await
     {
         dist_lock::unlock(&locker).await?;
