@@ -18,7 +18,7 @@ import { useI18n } from "vue-i18n";
 import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, remove } from "lodash-es";
 import { tracer } from "@/utils/opentelemetry";
 
 import {
@@ -198,6 +198,7 @@ const defaultObject = {
     savedViews: <any>[],
     customDownloadQueryObj: <any>{},
     functionError: "",
+    searchRequestTraceIds: <string[]>[],
   },
 };
 
@@ -1098,14 +1099,19 @@ const useLogs = () => {
             searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
           }
         } else {
+          const { traceparent, traceId } = generateTraceContext();
+
+          addTraceId(traceId);
+
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdetifier,
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
-              traceparent: getTraceParentHeader(),
+              traceparent,
             })
             .then(async (res) => {
+              removeTraceId(traceId);
               searchObj.data.queryResults.partitionDetail = {
                 partitions: [],
                 partitionTotal: [],
@@ -1746,13 +1752,17 @@ const useLogs = () => {
       queryReq.query["sql_mode"] = "full";
 
       queryReq.query.track_total_hits = true;
+
+      const { traceparent, traceId } = generateTraceContext();
+      addTraceId(traceId);
+
       searchService
         .search(
           {
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
-            traceparent: getTraceParentHeader(),
+            traceparent,
           },
           "UI"
         )
@@ -1760,6 +1770,7 @@ const useLogs = () => {
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
+          removeTraceId(traceId);
           searchObj.data.queryResults.scan_size = res.data.scan_size;
           searchObj.data.queryResults.took += res.data.took;
           for (const [
@@ -1853,17 +1864,21 @@ const useLogs = () => {
         // }
       }
 
+      const { traceparent, traceId } = generateTraceContext();
+      addTraceId(traceId);
+
       searchService
         .search(
           {
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
-            traceparent: getTraceParentHeader(),
+            traceparent,
           },
           "UI"
         )
         .then(async (res) => {
+          removeTraceId(traceId);
           if (
             res.data.hasOwnProperty("function_error") &&
             res.data.function_error != "" &&
@@ -2129,17 +2144,21 @@ const useLogs = () => {
           //   }
           // }
 
+          const { traceparent, traceId } = generateTraceContext();
+          addTraceId(traceId);
+
           searchService
             .search(
               {
                 org_identifier: searchObj.organizationIdetifier,
                 query: queryReq,
                 page_type: searchObj.data.stream.streamType,
-                traceparent: getTraceParentHeader(),
+                traceparent,
               },
               "UI"
             )
             .then(async (res) => {
+              removeTraceId(traceId);
               searchObjDebug["histogramProcessingStartTime"] =
                 performance.now();
               searchObj.loading = false;
@@ -3013,6 +3032,10 @@ const useLogs = () => {
       } else {
         streamName = searchObj.data.stream.selectedStream[0];
       }
+
+      const { traceparent, traceId } = generateTraceContext();
+      addTraceId(traceId);
+
       searchService
         .search_around({
           org_identifier: searchObj.organizationIdetifier,
@@ -3030,9 +3053,11 @@ const useLogs = () => {
             : "",
           is_multistream:
             searchObj.data.stream.selectedStream.length > 1 ? true : false,
-          traceparent: getTraceParentHeader(),
+          traceparent,
         })
         .then((res) => {
+          removeTraceId(traceId);
+
           searchObj.loading = false;
           searchObj.data.histogram.chartParams.title = "";
           if (res.data.from > 0) {
@@ -3564,10 +3589,59 @@ const useLogs = () => {
     });
   };
 
-  const getTraceParentHeader = () => {
-    return `00-${getUUID().replace(/-/g, "")}-${getUUID()
-      .replace(/-/g, "")
-      .slice(0, 16)}-01`;
+  const generateTraceContext = () => {
+    const traceId = getUUID().replace(/-/g, "");
+    const spanId = getUUID().replace(/-/g, "").slice(0, 16);
+
+    return {
+      traceparent: `00-${traceId}-${spanId}-01`,
+      traceId,
+      spanId,
+    };
+  };
+
+  const addTraceId = (traceId: string) => {
+    if (searchObj.data.searchRequestTraceIds.includes(traceId)) {
+      return;
+    }
+
+    searchObj.data.searchRequestTraceIds.push(traceId);
+  };
+
+  const removeTraceId = (traceId: string) => {
+    searchObj.data.searchRequestTraceIds =
+      searchObj.data.searchRequestTraceIds.filter(
+        (id: string) => id !== traceId
+      );
+  };
+
+  const cancelQuery = () => {
+    searchService
+      .delete_running_queries(
+        store.state.selectedOrganization.identifier,
+        searchObj.data.searchRequestTraceIds
+      )
+      .then(() => {
+        $q.notify({
+          message: "Running query deleted successfully",
+          color: "positive",
+          position: "bottom",
+          timeout: 1500,
+        });
+      })
+      .catch((error: any) => {
+        $q.notify({
+          message:
+            error.response?.data?.message || "Failed to delete running query",
+          color: "negative",
+          position: "bottom",
+          timeout: 1500,
+        });
+      })
+      .finally(() => {
+        if (searchObj.loading) searchObj.loading = false;
+        if (searchObj.loadingHistogram) searchObj.loadingHistogram = false;
+      });
   };
 
   return {
@@ -3606,6 +3680,7 @@ const useLogs = () => {
     addOrderByToQuery,
     getRegionInfo,
     validateFilterForMultiStream,
+    cancelQuery,
   };
 };
 
