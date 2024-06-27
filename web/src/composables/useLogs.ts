@@ -18,8 +18,7 @@ import { useI18n } from "vue-i18n";
 import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep } from "lodash-es";
-import { tracer } from "@/utils/opentelemetry";
+import { cloneDeep, remove } from "lodash-es";
 
 import {
   useLocalLogFilterField,
@@ -1079,6 +1078,7 @@ const useLogs = () => {
           }
         }
 
+        
         if (parsedSQL != undefined && hasAggregation(parsedSQL?.columns)) {
           searchObj.data.queryResults.partitionDetail = {
             partitions: [],
@@ -1119,12 +1119,14 @@ const useLogs = () => {
               },
             })
           );
+
+
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdetifier,
               query: partitionQueryReq,
               page_type: searchObj.data.stream.streamType,
-              traceparent: getTraceParentHeader(),
+              traceparent,
             })
             .then(async (res) => {
               removeTraceId(traceId);
@@ -1788,7 +1790,7 @@ const useLogs = () => {
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
-            traceparent: getTraceParentHeader(),
+            traceparent,
           },
           "UI"
         )
@@ -1927,7 +1929,7 @@ const useLogs = () => {
             org_identifier: searchObj.organizationIdetifier,
             query: queryReq,
             page_type: searchObj.data.stream.streamType,
-            traceparent: getTraceParentHeader(),
+            traceparent,
           },
           "UI"
         )
@@ -2212,7 +2214,7 @@ const useLogs = () => {
                 org_identifier: searchObj.organizationIdetifier,
                 query: queryReq,
                 page_type: searchObj.data.stream.streamType,
-                traceparent: getTraceParentHeader(),
+                traceparent,
               },
               "UI"
             )
@@ -3126,7 +3128,7 @@ const useLogs = () => {
             : "",
           is_multistream:
             searchObj.data.stream.selectedStream.length > 1 ? true : false,
-          traceparent: getTraceParentHeader(),
+          traceparent,
         })
         .then((res) => {
           removeTraceId(traceId);
