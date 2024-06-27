@@ -26,7 +26,7 @@ pub enum WebSocketMessageType {
 #[derive(Serialize, Deserialize, Clone, Debug, Hash)]
 pub struct WebSocketMessage {
     pub user_id: String,
-    pub content: WebSocketMessageType,
+    pub payload: WebSocketMessageType,
 }
 
 /// A lazy-initialized global channel for broadcasting WebSocket messages.
