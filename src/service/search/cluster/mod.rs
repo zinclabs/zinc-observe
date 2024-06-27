@@ -46,7 +46,13 @@ use tonic::{
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{common::infra::cluster as infra_cluster, service::file_list};
+use crate::{
+    common::infra::cluster as infra_cluster,
+    handler::http::request::websocket::ws_utils::{
+        WebSocketMessage, WebSocketMessageType, WEBSOCKET_MSG_CHAN,
+    },
+    service::file_list,
+};
 
 pub mod grpc;
 pub mod http;
@@ -297,9 +303,16 @@ pub async fn search(
     if let Err(e) = work_group
         .as_ref()
         .unwrap()
-        .process(trace_id, user_id) //TODO(ansrivas): Check once the enqueued query has been started
+        .process(trace_id, user_id)
         .await
     {
+        let _ = WEBSOCKET_MSG_CHAN.0.send(WebSocketMessage {
+            user_id: user_id.unwrap().to_string(),
+            content: WebSocketMessageType::QueryEnqueued {
+                trace_id: trace_id.to_string(),
+            },
+        });
+
         dist_lock::unlock(&locker).await?;
         return Err(Error::Message(e.to_string()));
     }

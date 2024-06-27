@@ -521,6 +521,7 @@ pub fn extract_auth_str(req: &HttpRequest) -> String {
     } else if let Some(cookie) = req.cookie("auth_ext") {
         cookie.value().to_string()
     } else if let Some(auth_header) = req.headers().get("Authorization") {
+        log::info!("auth_header found: {:?}", auth_header);
         if let Ok(auth_str) = auth_header.to_str() {
             auth_str.to_owned()
         } else {
