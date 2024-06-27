@@ -142,7 +142,7 @@ pub async fn healthz() -> Result<HttpResponse, Error> {
     };
     let _ = WEBSOCKET_MSG_CHAN.0.send(WebSocketMessage {
         user_id: "root@example.com".to_string(),
-        content: WebSocketMessageType::QueryEnqueued {
+        payload: WebSocketMessageType::QueryEnqueued {
             trace_id: "query-id".to_string(),
         },
     });

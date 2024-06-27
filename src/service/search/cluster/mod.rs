@@ -308,7 +308,7 @@ pub async fn search(
     {
         let _ = WEBSOCKET_MSG_CHAN.0.send(WebSocketMessage {
             user_id: user_id.unwrap().to_string(),
-            content: WebSocketMessageType::QueryEnqueued {
+            payload: WebSocketMessageType::QueryEnqueued {
                 trace_id: trace_id.to_string(),
             },
         });
