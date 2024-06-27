@@ -64,8 +64,6 @@ pub struct ViewsWithoutData {
 pub struct DeleteViewResponse {
     pub org_id: String,
     pub view_id: String,
-    // TODO(ansrivas): Check if we have access to view_name
-    // pub view_name: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]

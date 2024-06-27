@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -18,17 +19,17 @@ use tokio::sync::{broadcast, Mutex};
 ///   fields providing additional context.
 /// - `QueryCanceled`: Indicates that a query has been canceled, with the `user_id` and `trace_id`
 ///   fields providing additional context.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
 #[serde(tag = "t", content = "c")]
-pub enum WebSocketMessage {
-    QueryEnqueued {
-        user_id: String,
-        trace_id: String,
-    },
-    QueryCanceled {
-        user_id: String,
-        trace_ids: Vec<String>,
-    },
+pub enum WebSocketMessageType {
+    QueryEnqueued { trace_id: String },
+    QueryCanceled { trace_id: String },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
+pub struct WebSocketMessage {
+    user_id: String,
+    content: WebSocketMessageType,
 }
 
 /// A lazy-initialized global channel for broadcasting WebSocket messages.
@@ -44,6 +45,17 @@ pub static WEBSOCKET_MSG_CHAN: Lazy<(
     (tx, rx)
 });
 
+static WS_SESSIONS: Lazy<Mutex<HashMap<String, actix_ws::Session>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+pub async fn remove_from_ws_session(user_id: String) {
+    WS_SESSIONS.lock().await.remove(&user_id);
+}
+
+pub async fn insert_in_ws_session(user_id: String, session: actix_ws::Session) {
+    WS_SESSIONS.lock().await.insert(user_id, session);
+}
+
 /// Spawns a background task that periodically checks the aliveness of the WebSocket session.
 ///
 /// The task will ping the session every 5 seconds. If the session does not respond with a pong
@@ -51,19 +63,24 @@ pub static WEBSOCKET_MSG_CHAN: Lazy<(
 ///
 /// The `alive` parameter is a shared mutex that tracks the last time a pong was received from the
 /// client. This is used to determine if the client is still responsive.
-async fn aliveness_check(mut session: Session, alive: Arc<Mutex<Instant>>) {
+async fn aliveness_check(user_id: String, mut session: Session, alive: Arc<Mutex<Instant>>) {
     actix_web::rt::spawn(async move {
         let mut interval = actix_web::rt::time::interval(Duration::from_secs(5));
 
         loop {
             interval.tick().await;
             if session.ping(b"").await.is_err() {
+                remove_from_ws_session(user_id).await;
                 break;
             }
 
-            if Instant::now().duration_since(*alive.lock().await) > Duration::from_secs(10) {
-                log::info!("Client is not responding, closing connection");
+            let client_timedout =
+                Instant::now().duration_since(*alive.lock().await) > Duration::from_secs(10);
+            if client_timedout {
+                log::info!("{user_id} is not responding, closing connection");
                 let _ = session.close(None).await;
+                remove_from_ws_session(user_id).await;
+
                 break;
             }
         }
@@ -126,14 +143,24 @@ async fn websocket_handler(
     let _ = session.close(None).await;
 }
 
-#[get("/ws")]
-pub async fn websocket(req: HttpRequest, stream: web::Payload) -> Result<HttpResponse, Error> {
+#[get("/ws/{user_id}")]
+pub async fn websocket(
+    user_id: web::Path<String>,
+    req: HttpRequest,
+    stream: web::Payload,
+) -> Result<HttpResponse, Error> {
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
+    let user_id = user_id.into_inner();
+    insert_in_ws_session(user_id.clone(), session.clone()).await;
+
+    for (id, _sess) in WS_SESSIONS.lock().await.iter() {
+        log::info!("User id: {id}, session found");
+    }
     let alive = Arc::new(Mutex::new(Instant::now()));
     let alive1 = alive.clone();
     let session1 = session.clone();
-    actix_web::rt::spawn(async move { aliveness_check(session1, alive1).await });
+    actix_web::rt::spawn(async move { aliveness_check(user_id, session1, alive1).await });
 
     // Spawn the handler
     actix_web::rt::spawn(websocket_handler(
