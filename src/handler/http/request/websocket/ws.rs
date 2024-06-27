@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -7,54 +6,11 @@ use std::{
 use actix_web::{get, web, Error, HttpRequest, HttpResponse};
 use actix_ws::{Message, Session};
 use futures::stream::StreamExt;
-use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::Mutex;
 
-/// Represents different types of WebSocket messages that can be sent between the client and server.
-///
-/// The `t` field indicates the type of the message, and the `c` field contains the message content.
-///
-/// - `QueryEnqueued`: Indicates that a query has been enqueued, with the `user_id` and `trace_id`
-///   fields providing additional context.
-/// - `QueryCanceled`: Indicates that a query has been canceled, with the `user_id` and `trace_id`
-///   fields providing additional context.
-#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
-#[serde(tag = "t", content = "c")]
-pub enum WebSocketMessageType {
-    QueryEnqueued { trace_id: String },
-    QueryCanceled { trace_id: String },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
-pub struct WebSocketMessage {
-    user_id: String,
-    content: WebSocketMessageType,
-}
-
-/// A lazy-initialized global channel for broadcasting WebSocket messages.
-///
-/// The channel has a capacity of 100 messages. The `WEBSOCKET_MSG_CHAN` static variable
-/// contains the sender and receiver ends of the channel, which can be used to send and
-/// receive WebSocket messages throughout the application.
-pub static WEBSOCKET_MSG_CHAN: Lazy<(
-    broadcast::Sender<WebSocketMessage>,
-    broadcast::Receiver<WebSocketMessage>,
-)> = Lazy::new(|| {
-    let (tx, rx) = broadcast::channel(100);
-    (tx, rx)
-});
-
-static WS_SESSIONS: Lazy<Mutex<HashMap<String, actix_ws::Session>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
-
-pub async fn remove_from_ws_session(user_id: String) {
-    WS_SESSIONS.lock().await.remove(&user_id);
-}
-
-pub async fn insert_in_ws_session(user_id: String, session: actix_ws::Session) {
-    WS_SESSIONS.lock().await.insert(user_id, session);
-}
+use super::ws_utils::{
+    get_ws_session, insert_in_ws_session, remove_from_ws_session, WEBSOCKET_MSG_CHAN,
+};
 
 /// Spawns a background task that periodically checks the aliveness of the WebSocket session.
 ///
@@ -126,10 +82,14 @@ async fn websocket_handler(
                 };
             }
             Ok(ws_msg) = receiver.recv() => {
-                let payload = serde_json::to_string(&ws_msg).unwrap();
-                if let Err(e) = session.text(payload).await {
-                    log::error!("Error sending message: {}", e);
-                    break;
+                if let Some(mut session) = get_ws_session(&ws_msg.user_id).await{
+                    let payload = serde_json::to_string(&ws_msg).unwrap();
+                    if let Err(e) = session.text(payload).await {
+                        log::error!("Error sending message: {}", e);
+                        break;
+                    }
+                }else{
+                    log::info!("No websocket session found for user_id: {}", ws_msg.user_id);
                 }
             }
             else =>{
@@ -154,9 +114,6 @@ pub async fn websocket(
     let user_id = user_id.into_inner();
     insert_in_ws_session(user_id.clone(), session.clone()).await;
 
-    for (id, _sess) in WS_SESSIONS.lock().await.iter() {
-        log::info!("User id: {id}, session found");
-    }
     let alive = Arc::new(Mutex::new(Instant::now()));
     let alive1 = alive.clone();
     let session1 = session.clone();
