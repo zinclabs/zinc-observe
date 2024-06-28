@@ -48,7 +48,7 @@ pub struct WebSocketMessage {
 #[serde(
     tag = "type",
     content = "content",
-    rename_all(serialize = "snake_case")
+    rename_all(serialize = "snake_case", deserialize="snake_case")
 )]
 pub enum WSClientMessage {
     Search { trace_id: String, query: String },
