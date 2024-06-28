@@ -447,10 +447,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               dense
-              color="negative"
               flat
               :title="t('search.cancel')"
-              class="q-pa-none search-button"
+              class="q-pa-none search-button cancel-search-button"
               @click="cancelQuery"
               >{{ t("search.cancel") }}</q-btn
             >
@@ -2777,6 +2776,12 @@ export default defineComponent({
         font-size: 15px;
         color: #ffffff;
       }
+    }
+  }
+
+  .cance-search-button {
+    .q-btn__content {
+      background: $negative !important;
     }
   }
 
