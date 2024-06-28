@@ -21,6 +21,7 @@ use tokio::sync::{broadcast, Mutex};
 pub enum WebSocketMessageType {
     QueryEnqueued { trace_id: String },
     QueryCanceled { trace_id: String },
+    QueryProcessingStarted { trace_id: String },
 }
 
 impl WebSocketMessage {
@@ -28,6 +29,7 @@ impl WebSocketMessage {
         match &self.payload {
             WebSocketMessageType::QueryEnqueued { trace_id } => trace_id,
             WebSocketMessageType::QueryCanceled { trace_id } => trace_id,
+            WebSocketMessageType::QueryProcessingStarted { trace_id } => trace_id,
         }
     }
 }
@@ -48,7 +50,7 @@ pub struct WebSocketMessage {
 #[serde(
     tag = "type",
     content = "content",
-    rename_all(serialize = "snake_case", deserialize="snake_case")
+    rename_all(serialize = "snake_case", deserialize = "snake_case")
 )]
 pub enum WSClientMessage {
     Search { trace_id: String, query: String },
@@ -93,6 +95,13 @@ pub async fn insert_trace_id_to_req_id(trace_id: String, request_id: String) {
         .insert(trace_id, request_id);
 }
 
+pub async fn print_req_id_to_trace_id() {
+    println!("Request ID to trace ID:");
+    for (trace_id, req_id) in WS_REQ_ID_TO_TRACE_ID.lock().await.iter() {
+        println!("{} -> {}", trace_id, req_id);
+    }
+}
+
 pub async fn get_req_id_from_trace_id(trace_id: &str) -> Option<String> {
     WS_REQ_ID_TO_TRACE_ID.lock().await.get(trace_id).cloned()
 }
@@ -123,6 +132,13 @@ pub async fn insert_in_ws_session_by_req_id(request_id: String, session: actix_w
 
 pub async fn get_ws_session_by_req_id(request_id: &str) -> Option<actix_ws::Session> {
     WS_SESSIONS_BY_REQ_ID.lock().await.get(request_id).cloned()
+}
+
+pub async fn print_sessions() {
+    println!("Sessions:");
+    for (req_id, _session) in WS_SESSIONS_BY_REQ_ID.lock().await.iter() {
+        println!("Request id found {}", req_id);
+    }
 }
 
 #[cfg(test)]
