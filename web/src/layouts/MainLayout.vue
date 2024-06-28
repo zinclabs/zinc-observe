@@ -107,7 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <ThemeSwitcher></ThemeSwitcher>
-        <template v-if="config.isCloud !== 'true' && !store.state.zoConfig?.custom_hide_menus?.split(',')?.includes('openapi')">
+        <template
+          v-if="
+            config.isCloud !== 'true' &&
+            !store.state.zoConfig?.custom_hide_menus
+              ?.split(',')
+              ?.includes('openapi')
+          "
+        >
           <q-btn
             class="q-ml-xs no-border"
             size="13px"
@@ -310,6 +317,7 @@ import {
   getImageURL,
   invlidateLoginData,
   getLogoutURL,
+  getUUID,
 } from "../utils/zincutils";
 
 import {
@@ -614,6 +622,9 @@ export default defineComponent({
     ];
 
     onMounted(async () => {
+      generateSessionId();
+      setWebSocketUrl();
+
       miniMode.value = true;
       filterMenus();
 
@@ -640,6 +651,21 @@ export default defineComponent({
 
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
+
+    const generateSessionId = () => {
+      store.dispatch(
+        "setSessionId",
+        `session_${getUUID().replace(/-/g, "").slice(0, 16)}`
+      );
+    };
+
+    const setWebSocketUrl = () => {
+      let url = `ws://${store.state.API_ENDPOINT.split("//")[1]}/api/ws/${
+        store.state.userInfo.email
+      }?request_id=${store.state.sessionId}`;
+
+      store.dispatch("setWebSocketUrl", url);
+    };
 
     const filterMenus = () => {
       const disableMenus = new Set(

@@ -33,6 +33,7 @@ import {
   useLocalSavedView,
   convertToCamelCase,
   getFunctionErrorMessage,
+  getUUID,
 } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
@@ -52,6 +53,7 @@ import searchService from "@/services/search";
 import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
+import useWebSocket from "./useWebSocket";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -239,6 +241,8 @@ const useLogs = () => {
   const fieldValues = ref();
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
   const notificationMsg = ref("");
+
+  const { sendMessage } = useWebSocket(store.state.webSocketUrl);
 
   const { updateFieldKeywords } = useSqlSuggestions();
 
@@ -486,7 +490,7 @@ const useLogs = () => {
       } else {
         query["period"] = date.relativeTimePeriod;
       }
-    } else if(date.type == "absolute") {
+    } else if (date.type == "absolute") {
       query["from"] = date.startTime;
       query["to"] = date.endTime;
     }
@@ -1096,6 +1100,16 @@ const useLogs = () => {
             searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
           }
         } else {
+          sendMessage(
+            JSON.stringify({
+              type: "search",
+              content: {
+                type: "partition",
+                trace_id: getUUID().replace(/-/g, ""),
+                query: partitionQueryReq,
+              },
+            })
+          );
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdetifier,
@@ -1743,6 +1757,7 @@ const useLogs = () => {
       queryReq.query["sql_mode"] = "full";
 
       queryReq.query.track_total_hits = true;
+
       searchService
         .search(
           {
@@ -1849,6 +1864,17 @@ const useLogs = () => {
         // }
       }
 
+      sendMessage(
+        JSON.stringify({
+          type: "search",
+          content: {
+            type: "search_logs",
+            trace_id: getUUID().replace(/-/g, ""),
+            query: queryReq,
+          },
+        })
+      );
+
       searchService
         .search(
           {
@@ -1859,17 +1885,32 @@ const useLogs = () => {
           "UI"
         )
         .then(async (res) => {
-          if(res.data.hasOwnProperty("function_error") && res.data.function_error != "" && res.data.hasOwnProperty("new_start_time") && res.data.hasOwnProperty("new_end_time")) {
-            res.data.function_error = getFunctionErrorMessage(res.data.function_error, res.data.new_start_time, res.data.new_end_time, store.state.timezone);
+          if (
+            res.data.hasOwnProperty("function_error") &&
+            res.data.function_error != "" &&
+            res.data.hasOwnProperty("new_start_time") &&
+            res.data.hasOwnProperty("new_end_time")
+          ) {
+            res.data.function_error = getFunctionErrorMessage(
+              res.data.function_error,
+              res.data.new_start_time,
+              res.data.new_end_time,
+              store.state.timezone
+            );
             searchObj.data.datetime.startTime = res.data.new_start_time;
             searchObj.data.datetime.endTime = res.data.new_end_time;
             searchObj.data.datetime.type = "absolute";
             queryReq.query.start_time = res.data.new_start_time;
             queryReq.query.end_time = res.data.new_end_time;
-            searchObj.data.histogramQuery.query.start_time = res.data.new_start_time;
-            searchObj.data.histogramQuery.query.end_time = res.data.new_end_time;
-            if(searchObj.data.queryResults.partitionDetail.partitions.length == 1) {
-              searchObj.data.queryResults.partitionDetail.partitions[0].start_time = res.data.new_start_time;
+            searchObj.data.histogramQuery.query.start_time =
+              res.data.new_start_time;
+            searchObj.data.histogramQuery.query.end_time =
+              res.data.new_end_time;
+            if (
+              searchObj.data.queryResults.partitionDetail.partitions.length == 1
+            ) {
+              searchObj.data.queryResults.partitionDetail.partitions[0].start_time =
+                res.data.new_start_time;
             }
             updateUrlQueryParams();
           }
@@ -2109,6 +2150,17 @@ const useLogs = () => {
           //   }
           // }
 
+          sendMessage(
+            JSON.stringify({
+              type: "search",
+              content: {
+                type: "search_logs_histogram",
+                trace_id: getUUID().replace(/-/g, ""),
+                query: queryReq,
+              },
+            })
+          );
+
           searchService
             .search(
               {
@@ -2320,9 +2372,27 @@ const useLogs = () => {
               stream.schema = streamSchema;
             }
 
-            if(stream.settings.max_query_range > 0 && (searchObj.data.datetime.queryRangeRestrictionInHour > stream.settings.max_query_range || stream.settings.max_query_range == 0 || searchObj.data.datetime.queryRangeRestrictionInHour == -1) && searchObj.data.datetime.queryRangeRestrictionInHour != 0) {
-              searchObj.data.datetime.queryRangeRestrictionInHour = stream.settings.max_query_range;
-              searchObj.data.datetime.queryRangeRestrictionMsg = t("search.queryRangeRestrictionMsg", {range: searchObj.data.datetime.queryRangeRestrictionInHour > 1 ? searchObj.data.datetime.queryRangeRestrictionInHour + " hours" : searchObj.data.datetime.queryRangeRestrictionInHour + " hour"});
+            if (
+              stream.settings.max_query_range > 0 &&
+              (searchObj.data.datetime.queryRangeRestrictionInHour >
+                stream.settings.max_query_range ||
+                stream.settings.max_query_range == 0 ||
+                searchObj.data.datetime.queryRangeRestrictionInHour == -1) &&
+              searchObj.data.datetime.queryRangeRestrictionInHour != 0
+            ) {
+              searchObj.data.datetime.queryRangeRestrictionInHour =
+                stream.settings.max_query_range;
+              searchObj.data.datetime.queryRangeRestrictionMsg = t(
+                "search.queryRangeRestrictionMsg",
+                {
+                  range:
+                    searchObj.data.datetime.queryRangeRestrictionInHour > 1
+                      ? searchObj.data.datetime.queryRangeRestrictionInHour +
+                        " hours"
+                      : searchObj.data.datetime.queryRangeRestrictionInHour +
+                        " hour",
+                }
+              );
             }
 
             let environmentInterestingFields = [];
@@ -2374,7 +2444,9 @@ const useLogs = () => {
               ...streamInterestingFieldsLocal
             );
 
-            let intField = new Set(searchObj.data.stream.interestingFieldList);
+            const intField = new Set(
+              searchObj.data.stream.interestingFieldList
+            );
             searchObj.data.stream.interestingFieldList = [...intField];
 
             // create a schema field mapping based on field name to avoid iteration over object.
