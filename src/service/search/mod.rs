@@ -93,7 +93,7 @@ pub async fn search(
         let start_time = Some(in_req.query.start_time);
         let end_time = Some(in_req.query.end_time);
         // set search task
-        SEARCH_SERVER
+        SEARCH_SERVER // TODO(ansrivas): add notification to the websocket
             .insert(
                 trace_id.clone(),
                 TaskStatus::new(

@@ -303,7 +303,7 @@ pub async fn search(
     if let Err(e) = work_group
         .as_ref()
         .unwrap()
-        .process(trace_id, user_id)
+        .process(trace_id, user_id,) //TODO(ansrivas): Query started processing
         .await
     {
         let _ = WEBSOCKET_MSG_CHAN.0.send(WebSocketMessage {
