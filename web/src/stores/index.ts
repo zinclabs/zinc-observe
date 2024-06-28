@@ -71,6 +71,8 @@ export default createStore({
     savedViewFlag: false,
     savedFunctionDialog: false,
     regionInfo: [],
+    sessionId: "",
+    webSocketUrl: "",
   },
   mutations: {
     login(state, payload) {
@@ -179,6 +181,12 @@ export default createStore({
     setRegionInfo(state, payload) {
       state.regionInfo = payload;
     },
+    setSessionId(state, payload) {
+      state.sessionId = payload;
+    },
+    setWebSocketUrl(state, payload) {
+      state.webSocketUrl = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -279,6 +287,12 @@ export default createStore({
     },
     setRegionInfo(context, payload) {
       context.commit("setRegionInfo", payload);
+    },
+    setSessionId(context, payload) {
+      context.commit("setSessionId", payload);
+    },
+    setWebSocketUrl(context, payload) {
+      context.commit("setWebSocketUrl", payload);
     },
   },
   modules: {},
