@@ -14,7 +14,9 @@ use super::ws_utils::{
     insert_trace_id_to_req_id, remove_from_ws_session_by_req_id, remove_trace_id_from_cache,
     WSClientMessage, WEBSOCKET_MSG_CHAN,
 };
-use crate::handler::grpc::request;
+use crate::handler::http::request::websocket::ws_utils::{
+    print_req_id_to_trace_id, print_sessions,
+};
 
 /// Spawns a background task that periodically checks the aliveness of the WebSocket session.
 ///
@@ -69,9 +71,13 @@ async fn websocket_handler(
                         }
                     }
                     Ok(Message::Text(msg)) => {
-                        let client_msg:WSClientMessage = serde_json::from_str(&msg).unwrap();
-                        log::info!("Received trace_registration msg: {:?}", client_msg);
-                        insert_trace_id_to_req_id(client_msg.trace_id().to_string(), request_id.clone()).await;
+                        if let Ok(client_msg) = serde_json::from_str::<WSClientMessage>(&msg){
+                            log::info!("Received trace_registration msg: {:?}", client_msg);
+                            insert_trace_id_to_req_id(client_msg.trace_id().to_string(), request_id.clone()).await;
+                            print_req_id_to_trace_id().await;
+                        }else{
+                            log::error!("Failed to parse message incoming message from ws client: {:?}", msg);
+                        }
                     }
                     Ok(Message::Close(reason)) => {
                         let _ = session.close(reason).await;
@@ -90,16 +96,27 @@ async fn websocket_handler(
                 };
             }
             Ok(ws_msg) = receiver.recv() => {
+                print_req_id_to_trace_id().await;
+                print_sessions().await;
+
                 let trace_id = ws_msg.trace_id();
-                let request_id = get_req_id_from_trace_id(trace_id.clone()).await;
+                log::info!("Received ws message: {:?}", ws_msg);
+                let request_id = get_req_id_from_trace_id(trace_id).await;
+                log::info!("request_id: {:?} trace_id: {}", request_id, trace_id);
                 if let Some(req_id) = request_id{
+                    log::info!("Inside req_id: {}", req_id);
                     let ws_session = get_ws_session_by_req_id(&req_id).await;
+                    log::info!("Inside get_ws_session_by_req_id");
+
                     if let Some(mut ws_session) = ws_session {
+                        log::info!("Found websocket session for user_id: {} trace_id: {}", ws_msg.user_id, trace_id);
                         let payload = serde_json::to_string(&ws_msg).unwrap();
                         if let Err(e) = ws_session.text(payload).await {
                             log::error!("Error sending message: {}", e);
                             break;
                         }
+                        log::info!("Sent message to the user, removing this trace_id from cache");
+                        let _ = remove_trace_id_from_cache(trace_id).await;
                     }
                 }
                 log::info!("No websocket session found for user_id: {} trace_id: {}", ws_msg.user_id, trace_id);
