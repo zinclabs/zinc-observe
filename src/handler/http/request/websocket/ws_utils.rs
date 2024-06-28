@@ -53,8 +53,15 @@ pub struct WebSocketMessage {
     rename_all(serialize = "snake_case", deserialize = "snake_case")
 )]
 pub enum WSClientMessage {
-    Search { trace_id: String, query: String },
-    Cancel { trace_id: String },
+    Search {
+        trace_id: String,
+        // query: String,
+        // #[serde(rename = "type")]
+        // query_type: String,
+    },
+    Cancel {
+        trace_id: String,
+    },
 }
 
 impl WSClientMessage {
@@ -96,7 +103,7 @@ pub async fn insert_trace_id_to_req_id(trace_id: String, request_id: String) {
 }
 
 pub async fn print_req_id_to_trace_id() {
-    println!("Request ID to trace ID:");
+    println!("Traceid -> request_id");
     for (trace_id, req_id) in WS_REQ_ID_TO_TRACE_ID.lock().await.iter() {
         println!("{} -> {}", trace_id, req_id);
     }
@@ -148,13 +155,12 @@ mod tests {
     #[test]
     fn test_search_message_serialization() {
         let trace_id = "abc123".to_string();
-        let query = "test query".to_string();
-        let message = WSClientMessage::Search { trace_id, query };
+        let message = WSClientMessage::Search { trace_id };
 
         let serialized = serde_json::to_string(&message).unwrap();
         assert_eq!(
             serialized,
-            r#"{"type":"search","content":{"trace_id":"abc123","query":"test query"}}"#
+            r#"{"type":"search","content":{"trace_id":"abc123"}}"#
         );
     }
 
@@ -172,12 +178,11 @@ mod tests {
 
     #[test]
     fn test_search_message_deserialization() {
-        let json = r#"{"type":"search","content":{"trace_id":"abc123","query":"test query"}}"#;
+        let json = r#"{"type":"search","content":{"trace_id":"abc123"}}"#;
         let message: WSClientMessage = serde_json::from_str(json).unwrap();
 
-        if let WSClientMessage::Search { trace_id, query } = message {
+        if let WSClientMessage::Search { trace_id } = message {
             assert_eq!(trace_id, "abc123");
-            assert_eq!(query, "test query");
         } else {
             panic!("Unexpected message type");
         }
