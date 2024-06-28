@@ -55,6 +55,7 @@ import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
 import { fr } from "date-fns/locale";
+import useWebSocket from "./useWebSocket";
 
 const defaultObject = {
   organizationIdetifier: "",
@@ -243,6 +244,8 @@ const useLogs = () => {
   const fieldValues = ref();
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
   const notificationMsg = ref("");
+
+  const { sendMessage } = useWebSocket(store.state.webSocketUrl);
 
   const { updateFieldKeywords } = useSqlSuggestions();
 
@@ -1105,6 +1108,16 @@ const useLogs = () => {
 
           addTraceId(traceId);
 
+          sendMessage(
+            JSON.stringify({
+              type: "search",
+              content: {
+                type: "partition",
+                trace_id: traceId,
+                query: partitionQueryReq,
+              },
+            })
+          );
           await searchService
             .partition({
               org_identifier: searchObj.organizationIdetifier,
@@ -1767,6 +1780,7 @@ const useLogs = () => {
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
 
+
       searchService
         .search(
           {
@@ -1894,6 +1908,17 @@ const useLogs = () => {
 
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
+
+      sendMessage(
+        JSON.stringify({
+          type: "search",
+          content: {
+            type: "search_logs",
+            trace_id: traceId,
+            query: queryReq,
+          },
+        })
+      );
 
       searchService
         .search(
@@ -2168,6 +2193,17 @@ const useLogs = () => {
 
           const { traceparent, traceId } = generateTraceContext();
           addTraceId(traceId);
+
+          sendMessage(
+            JSON.stringify({
+              type: "search",
+              content: {
+                type: "search_logs_histogram",
+                trace_id: traceId,
+                query: queryReq,
+              },
+            })
+          );
 
           searchService
             .search(
