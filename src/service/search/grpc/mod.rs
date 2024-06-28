@@ -220,6 +220,7 @@ pub async fn search(
                 &batches,
                 &select_fields,
                 false,
+                sql.meta.subquery.is_some()
             ) => {
                 match result {
                     Ok(res) => merge_batches = res,

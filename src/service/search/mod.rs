@@ -166,7 +166,7 @@ pub async fn search(
                 let stream_name = match config::meta::sql::Sql::new(&req_query.sql) {
                     Ok(v) => v.source.to_string(),
                     Err(e) => {
-                        log::error!("parse sql error: {:?}", e);
+                        log::error!("report_usage: parse sql error: {:?}", e);
                         "".to_string()
                     }
                 };

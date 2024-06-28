@@ -19,8 +19,8 @@ use serde::Serialize;
 use sqlparser::{
     ast::{
         BinaryOperator, Expr as SqlExpr, Function, FunctionArg, FunctionArgExpr, FunctionArguments,
-        GroupByExpr, Offset as SqlOffset, OrderByExpr, Select, SelectItem, SetExpr, Statement,
-        TableFactor, TableWithJoins, Value,
+        GroupByExpr, Offset as SqlOffset, OrderByExpr, Query, Select, SelectItem, SetExpr,
+        Statement, TableFactor, TableWithJoins, Value,
     },
     parser::Parser,
 };
@@ -44,6 +44,7 @@ pub struct Sql {
     pub time_range: Option<(i64, i64)>,
     pub quick_text: Vec<(String, String, SqlOperator)>, // use text line quick filter
     pub field_alias: Vec<(String, String)>,             // alias for select field
+    pub subquery: Option<String>,                       // subquery in data source
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -126,7 +127,7 @@ impl TryFrom<&Statement> for Sql {
                     }
                 };
 
-                let source = Source(table_with_joins).try_into()?;
+                let (source, subquery) = Source(table_with_joins).try_into()?;
 
                 let mut order_by = Vec::new();
                 for expr in orders {
@@ -153,9 +154,17 @@ impl TryFrom<&Statement> for Sql {
                     Quicktext(&selection).try_into()?;
                 let where_fields: Vec<String> = Where(&selection).try_into()?;
 
+                if subquery.is_some() {
+                    fields.extend(
+                        get_field_name_from_query(subquery.as_ref().unwrap())?.unwrap_or_default(),
+                    );
+                }
+
                 fields.extend(where_fields);
                 fields.sort();
                 fields.dedup();
+
+                let subquery = subquery.map(|subquery| subquery.to_string());
 
                 Ok(Sql {
                     fields,
@@ -169,6 +178,7 @@ impl TryFrom<&Statement> for Sql {
                     time_range,
                     quick_text,
                     field_alias,
+                    subquery,
                 })
             }
             _ => Err(anyhow::anyhow!("We only support Query at the moment")),
@@ -218,7 +228,7 @@ impl<'a> From<Limit<'a>> for i64 {
     }
 }
 
-impl<'a> TryFrom<Source<'a>> for String {
+impl<'a> TryFrom<Source<'a>> for (String, Option<Query>) {
     type Error = anyhow::Error;
 
     fn try_from(source: Source<'a>) -> Result<Self, Self::Error> {
@@ -236,7 +246,44 @@ impl<'a> TryFrom<Source<'a>> for String {
         }
 
         match &table.relation {
-            TableFactor::Table { name, .. } => Ok(name.0.first().unwrap().value.clone()),
+            TableFactor::Table { name, .. } => Ok((name.0.first().unwrap().value.clone(), None)),
+            TableFactor::Derived {
+                lateral: _,
+                subquery,
+                alias: _,
+            } => {
+                let Select {
+                    from: table_with_joins,
+                    ..
+                } = match &subquery.body.as_ref() {
+                    SetExpr::Select(statement) => statement.as_ref(),
+                    _ => {
+                        return Err(anyhow::anyhow!(
+                            "We only support Select Query at the moment"
+                        ));
+                    }
+                };
+
+                if table_with_joins.len() != 1 {
+                    return Err(anyhow::anyhow!(
+                        "We only support single data source at the moment"
+                    ));
+                }
+
+                let table = &table_with_joins[0];
+                if !table.joins.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "We do not support joint data source at the moment"
+                    ));
+                }
+
+                let source = match &table.relation {
+                    TableFactor::Table { name, .. } => Ok(name.0.first().unwrap().value.clone()),
+                    _ => Err(anyhow::anyhow!("We only support table")),
+                };
+
+                Ok((source?, Some(subquery.as_ref().clone())))
+            }
             _ => Err(anyhow::anyhow!("We only support table")),
         }
     }
@@ -275,8 +322,8 @@ impl<'a> TryFrom<Projection<'a>> for Vec<String> {
         let mut fields = Vec::new();
         for item in projection.0 {
             let field = match item {
-                SelectItem::UnnamedExpr(expr) => get_field_name_from_expr(expr),
-                SelectItem::ExprWithAlias { expr, alias: _ } => get_field_name_from_expr(expr),
+                SelectItem::UnnamedExpr(expr) => get_field_name_from_expr(expr)?,
+                SelectItem::ExprWithAlias { expr, alias: _ } => get_field_name_from_expr(expr)?,
                 _ => None,
             };
             if let Some(field) = field {
@@ -401,7 +448,7 @@ impl<'a> TryFrom<Where<'a>> for Vec<String> {
     fn try_from(selection: Where<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
         match selection.0 {
-            Some(expr) => fields.extend(get_field_name_from_expr(expr).unwrap_or_default()),
+            Some(expr) => fields.extend(get_field_name_from_expr(expr)?.unwrap_or_default()),
             None => {}
         }
         Ok(fields)
@@ -466,6 +513,9 @@ fn parse_expr_for_field(
                 let eq = parse_expr_check_field_name(&ident.value, field);
                 if ident.value == field || (eq && next_op == SqlOperator::Eq) {
                     let val = get_value_from_expr(right);
+                    if matches!(right.as_ref(), SqlExpr::Subquery(_)) {
+                        return Ok(());
+                    }
                     if val.is_none() {
                         return Err(anyhow::anyhow!(
                             "SqlExpr::Identifier: We only support Identifier at the moment"
@@ -662,7 +712,10 @@ fn parse_expr_function(
 
     let args = match &f.args {
         FunctionArguments::None => return Ok(()),
-        FunctionArguments::Subquery(_) => return Ok(()),
+        FunctionArguments::Subquery(_) => {
+            log::error!("We do not support subquery at the moment");
+            return Ok(());
+        }
         FunctionArguments::List(args) => &args.args,
     };
     if args.len() < 2 {
@@ -795,23 +848,23 @@ fn get_value_from_expr(expr: &SqlExpr) -> Option<SqlValue> {
     }
 }
 
-fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
+fn get_field_name_from_expr(expr: &SqlExpr) -> Result<Option<Vec<String>>, anyhow::Error> {
     match expr {
-        SqlExpr::Identifier(ident) => Some(vec![ident.value.to_string()]),
+        SqlExpr::Identifier(ident) => Ok(Some(vec![ident.value.to_string()])),
         SqlExpr::BinaryOp { left, op: _, right } => {
             let mut fields = Vec::new();
-            if let Some(v) = get_field_name_from_expr(left) {
+            if let Some(v) = get_field_name_from_expr(left)? {
                 fields.extend(v);
             }
-            if let Some(v) = get_field_name_from_expr(right) {
+            if let Some(v) = get_field_name_from_expr(right)? {
                 fields.extend(v);
             }
-            (!fields.is_empty()).then_some(fields)
+            Ok((!fields.is_empty()).then_some(fields))
         }
         SqlExpr::Function(f) => {
             let args = match &f.args {
-                FunctionArguments::None => return None,
-                FunctionArguments::Subquery(_) => return None,
+                FunctionArguments::None => return Ok(None),
+                FunctionArguments::Subquery(_) => return Ok(None),
                 FunctionArguments::List(args) => &args.args,
             };
             let mut fields = Vec::with_capacity(args.len());
@@ -822,19 +875,19 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
                         arg: FunctionArgExpr::Expr(expr),
                         operator: _operator,
                     } => {
-                        if let Some(v) = get_field_name_from_expr(expr) {
+                        if let Some(v) = get_field_name_from_expr(expr)? {
                             fields.extend(v);
                         }
                     }
                     FunctionArg::Unnamed(FunctionArgExpr::Expr(expr)) => {
-                        if let Some(v) = get_field_name_from_expr(expr) {
+                        if let Some(v) = get_field_name_from_expr(expr)? {
                             fields.extend(v);
                         }
                     }
                     _ => {}
                 }
             }
-            (!fields.is_empty()).then_some(fields)
+            Ok((!fields.is_empty()).then_some(fields))
         }
         SqlExpr::Nested(expr) => get_field_name_from_expr(expr),
         SqlExpr::IsFalse(expr) => get_field_name_from_expr(expr),
@@ -845,17 +898,28 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
         SqlExpr::IsNotNull(expr) => get_field_name_from_expr(expr),
         SqlExpr::IsUnknown(expr) => get_field_name_from_expr(expr),
         SqlExpr::IsNotUnknown(expr) => get_field_name_from_expr(expr),
-        SqlExpr::InList { expr, .. } => get_field_name_from_expr(expr),
+        SqlExpr::InList { expr, list, .. } => {
+            let mut fields = Vec::new();
+            if let Some(v) = get_field_name_from_expr(expr)? {
+                fields.extend(v);
+            }
+            for expr in list.iter() {
+                if let Some(v) = get_field_name_from_expr(expr)? {
+                    fields.extend(v);
+                }
+            }
+            Ok((!fields.is_empty()).then_some(fields))
+        }
         SqlExpr::Between { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::Like { expr, pattern, .. } | SqlExpr::ILike { expr, pattern, .. } => {
             let mut fields = Vec::new();
-            if let Some(expr) = get_field_name_from_expr(expr) {
+            if let Some(expr) = get_field_name_from_expr(expr)? {
                 fields.extend(expr);
             }
-            if let Some(pattern) = get_field_name_from_expr(pattern) {
+            if let Some(pattern) = get_field_name_from_expr(pattern)? {
                 fields.extend(pattern);
             }
-            (!fields.is_empty()).then_some(fields)
+            Ok((!fields.is_empty()).then_some(fields))
         }
         SqlExpr::Cast { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::Case {
@@ -866,19 +930,54 @@ fn get_field_name_from_expr(expr: &SqlExpr) -> Option<Vec<String>> {
         } => {
             let mut fields = Vec::new();
             for expr in conditions.iter() {
-                if let Some(v) = get_field_name_from_expr(expr) {
+                if let Some(v) = get_field_name_from_expr(expr)? {
                     fields.extend(v);
                 }
             }
-            (!fields.is_empty()).then_some(fields)
+            Ok((!fields.is_empty()).then_some(fields))
         }
         SqlExpr::AtTimeZone { timestamp, .. } => get_field_name_from_expr(timestamp),
         SqlExpr::Extract { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::MapAccess { column, .. } => get_field_name_from_expr(column),
         SqlExpr::CompositeAccess { expr, .. } => get_field_name_from_expr(expr),
         SqlExpr::Subscript { expr, .. } => get_field_name_from_expr(expr),
-        _ => None,
+        SqlExpr::Subquery(subquery) => get_field_name_from_query(subquery),
+        SqlExpr::InSubquery { expr, subquery, .. } => {
+            let mut fields = Vec::new();
+            if let Some(v) = get_field_name_from_expr(expr)? {
+                fields.extend(v);
+            }
+            if let Some(v) = get_field_name_from_query(subquery)? {
+                fields.extend(v);
+            }
+            Ok((!fields.is_empty()).then_some(fields))
+        }
+        _ => Ok(None),
     }
+}
+
+fn get_field_name_from_query(query: &Query) -> Result<Option<Vec<String>>, anyhow::Error> {
+    let Select {
+        from: _table_with_joins,
+        selection,
+        projection,
+        group_by: _groups,
+        having: _,
+        ..
+    } = match &query.body.as_ref() {
+        SetExpr::Select(statement) => statement.as_ref(),
+        _ => return Ok(None),
+    };
+
+    let mut fields: Vec<String> = Projection(projection).try_into()?;
+    let selection = selection.as_ref().cloned();
+    let where_fields: Vec<String> = Where(&selection).try_into()?;
+
+    fields.extend(where_fields);
+    fields.sort();
+    fields.dedup();
+
+    Ok(Some(fields))
 }
 
 impl TryFrom<&BinaryOperator> for SqlOperator {

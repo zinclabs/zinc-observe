@@ -21,7 +21,10 @@ use config::FxIndexSet;
 use datafusion::error::Result;
 use itertools::Itertools;
 use sqlparser::{
-    ast::{Expr, Function, FunctionArguments, GroupByExpr, Ident, Query, VisitMut, VisitorMut},
+    ast::{
+        Expr, Function, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, TableFactor,
+        TableWithJoins, VisitMut, VisitorMut,
+    },
     dialect::GenericDialect,
     parser::Parser,
 };
@@ -362,6 +365,37 @@ impl VisitorMut for AddGroupByOrderBy {
 
 fn trim_quotes(input: String) -> String {
     input.trim_matches(|v| v == '\'' || v == '"').to_string()
+}
+
+pub fn replace_data_source_to_tbl(sql: &str) -> Result<String> {
+    let mut statements = Parser::parse_sql(&GenericDialect {}, sql)?;
+    statements.visit(&mut ReplaceDataSource);
+    Ok(statements[0].to_string())
+}
+
+struct ReplaceDataSource;
+
+impl VisitorMut for ReplaceDataSource {
+    type Break = ();
+
+    /// Invoked for any queries that appear in the AST before visiting children
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(ref mut select) = *query.body {
+            let source = TableWithJoins {
+                relation: TableFactor::Table {
+                    name: ObjectName(vec![Ident::new("tbl")]),
+                    alias: None,
+                    args: None,
+                    with_hints: vec![],
+                    version: None,
+                    partitions: vec![],
+                },
+                joins: vec![],
+            };
+            select.from = vec![source];
+        }
+        ControlFlow::Continue(())
+    }
 }
 
 #[cfg(test)]

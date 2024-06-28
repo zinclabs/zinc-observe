@@ -234,17 +234,13 @@ await page.waitForTimeout(1000);
     
   });
 
-  test('should display search around in histogram mode', async ({ page }) => {
-    await multistreamselect(page);
-    await page.waitForTimeout(1000);
-    await page.locator('[data-test="log-table-column-0-source"]').click();
-    await page.locator('[data-test="logs-detail-table-search-around-btn"]').click();
-    await page.waitForTimeout(2000);
-    const element = await page.locator('[data-test="log-table-column-0-source"]');
-    const isVisible = await element.isVisible();
-    expect(isVisible).toBeTruthy();
-    
-  });
+  // test('should display search around in histogram mode', async ({ page }) => {
+  //   await multistreamselect(page);
+  //   await page.waitForTimeout(1000);
+  //   await page.locator('[data-test="log-table-column-0-source"]').click();
+  //   const isDisabled = await page.locator('[data-test="logs-detail-table-search-around-btn"]').isDisabled();
+  //   expect(isDisabled).toBe(true);
+  // });
   
 
 })

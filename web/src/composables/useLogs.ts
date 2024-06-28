@@ -2600,6 +2600,7 @@ const useLogs = () => {
             if (
               searchObj.data.queryResults.hasOwnProperty("hits") &&
               searchObj.data.queryResults?.hits.length > 0 &&
+              searchObj.data.stream.selectedStream.length == 1 &&
               (!store.state.zoConfig.user_defined_schemas_enabled ||
                 !searchObj.meta.hasUserDefinedSchemas)
             ) {

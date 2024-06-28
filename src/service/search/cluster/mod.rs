@@ -808,6 +808,7 @@ async fn merge_grpc_result(
                 &batch,
                 &select_fields,
                 is_final_phase,
+                sql.meta.subquery.is_some()
             ) => {
                 match res {
                     Ok(res) => merge_batch = res,

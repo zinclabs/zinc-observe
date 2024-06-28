@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div
-          v-show="streamType !== 'enrichment_tables'"
+          v-show="streamType !== 'enrichment_tables' && searchObj.data.stream.selectedStream.length <= 1"
           class="col-8 row justify-center align-center q-gutter-sm"
         >
           <div style="line-height: 40px; font-weight: bold">
