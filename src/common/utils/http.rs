@@ -18,6 +18,7 @@ use std::{
     io::{Error, ErrorKind},
 };
 
+use actix_http::header::HeaderName;
 use actix_web::web::Query;
 use awc::http::header::HeaderMap;
 use config::meta::{search::SearchEventType, stream::StreamType};
@@ -88,16 +89,19 @@ pub(crate) fn get_or_create_trace_id(
     ep: String,
 ) -> (String, Option<tracing::Span>) {
     let cfg = config::get_config();
-    if headers.contains_key("traceparent") || cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(headers))
-        });
-        let trace_id = ctx.span().span_context().trace_id().to_string();
-        (trace_id, None)
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!("{ep}", ep = ep);
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        (trace_id, Some(span))
+    if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+        // OpenTelemetry is initialized -> can use propagator to get traceparent
+        if headers.contains_key("traceparent") {
+            let ctx = global::get_text_map_propagator(|propagator| {
+                propagator.extract(&RequestHeaderExtractor::new(headers))
+            });
+            let trace_id = ctx.span().span_context().trace_id().to_string();
+            (trace_id, None)
+        } else {
+            let span = tracing::info_span!("{ep}", ep = ep);
+            let trace_id = span.context().span().span_context().trace_id().to_string();
+            (trace_id, Some(span))
+        }
     } else {
         (config::ider::uuid(), None)
     }
@@ -116,7 +120,11 @@ impl<'a> RequestHeaderExtractor<'a> {
 
 impl<'a> Extractor for RequestHeaderExtractor<'a> {
     fn get(&self, key: &str) -> Option<&str> {
-        self.headers.get(key).and_then(|v| v.to_str().ok())
+        // Convert the key to a HeaderName, ignoring case
+        HeaderName::try_from(key)
+            .ok()
+            .and_then(|header_name| self.headers.get(header_name))
+            .and_then(|v| v.to_str().ok())
     }
 
     fn keys(&self) -> Vec<&str> {
