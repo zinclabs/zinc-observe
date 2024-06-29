@@ -37,7 +37,8 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
+                get_or_create_trace_id_and_span, get_search_type_from_request,
+                get_stream_type_from_request,
             },
         },
     },
@@ -127,9 +128,10 @@ pub async fn search(
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
     let (trace_id, http_span) =
-        get_or_create_trace_id(in_req.headers(), format!("api/{org_id}/_search"));
+        get_or_create_trace_id_and_span(in_req.headers(), format!("api/{org_id}/_search"));
 
     log::debug!("received trace_id: {trace_id}");
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -794,7 +796,7 @@ pub async fn values(
         Some(v) => v.to_str().unwrap(),
         None => "",
     };
-    let (trace_id, http_span) = get_or_create_trace_id(
+    let (trace_id, http_span) = get_or_create_trace_id_and_span(
         in_req.headers(),
         format!("/api/{org_id}/{stream_name}/_values"),
     );
@@ -1425,7 +1427,7 @@ pub async fn search_partition(
     let start = std::time::Instant::now();
     let cfg = get_config();
     let (trace_id, http_span) =
-        get_or_create_trace_id(in_req.headers(), format!("/api/{org_id}/_search_partition"));
+        get_or_create_trace_id_and_span(in_req.headers(), format!("/api/{org_id}/_search_partition"));
 
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
