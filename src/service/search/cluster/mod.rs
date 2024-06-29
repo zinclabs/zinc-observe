@@ -627,8 +627,7 @@ pub async fn search(
             }
         };
     log::info!("[trace_id {trace_id}] final merge task finish");
-    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-    
+
     // search done, release lock
     #[cfg(not(feature = "enterprise"))]
     dist_lock::unlock(&locker).await?;

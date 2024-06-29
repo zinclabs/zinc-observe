@@ -36,7 +36,8 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_or_create_trace_id, get_search_type_from_request, get_stream_type_from_request,
+                get_or_create_trace_id_and_span, get_search_type_from_request,
+                get_stream_type_from_request,
             },
         },
     },
@@ -119,7 +120,7 @@ pub async fn search_multi(
     let cfg = get_config();
     let started_at = Utc::now().timestamp_micros();
     let (trace_id, http_span) =
-        get_or_create_trace_id(in_req.headers(), format!("/api/{org_id}/_search_multi"));
+        get_or_create_trace_id_and_span(in_req.headers(), format!("/api/{org_id}/_search_multi"));
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -404,8 +405,10 @@ pub async fn _search_partition_multi(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    let (trace_id, http_span) =
-        get_or_create_trace_id(in_req.headers(), format!("/api/{org_id}/_search_partition"));
+    let (trace_id, http_span) = get_or_create_trace_id_and_span(
+        in_req.headers(),
+        format!("/api/{org_id}/_search_partition"),
+    );
 
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -538,7 +541,7 @@ pub async fn around_multi(
     let (org_id, stream_names) = path.into_inner();
     let cfg = get_config();
 
-    let (trace_id, http_span) = get_or_create_trace_id(
+    let (trace_id, http_span) = get_or_create_trace_id_and_span(
         in_req.headers(),
         format!("/api/{org_id}/{stream_names}/_around_multi"),
     );

@@ -24,7 +24,7 @@ use tracing::Instrument;
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
-        utils::http::get_or_create_trace_id,
+        utils::http::get_or_create_trace_id_and_span,
     },
     handler::http::request::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     service::{search as SearchService, traces::otlp_http},
@@ -131,7 +131,7 @@ pub async fn get_latest_traces(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let (org_id, stream_name) = path.into_inner();
-    let (trace_id, http_span) = get_or_create_trace_id(
+    let (trace_id, http_span) = get_or_create_trace_id_and_span(
         in_req.headers(),
         format!("/api/{org_id}/{stream_name}/traces/latest"),
     );
