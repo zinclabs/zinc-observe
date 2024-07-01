@@ -2779,7 +2779,7 @@ export default defineComponent({
     }
   }
 
-  .cance-search-button {
+  .cancel-search-button {
     .q-btn__content {
       background: $negative !important;
     }
