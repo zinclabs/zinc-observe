@@ -71,12 +71,15 @@ async fn websocket_handler(
                         }
                     }
                     Ok(Message::Text(msg)) => {
-                        if let Ok(client_msg) = serde_json::from_str::<WSClientMessage>(&msg){
-                            log::info!("Received trace_registration msg: {:?}", client_msg);
-                            insert_trace_id_to_req_id(client_msg.trace_id().to_string(), request_id.clone()).await;
-                            print_req_id_to_trace_id().await;
-                        }else{
-                            log::error!("Failed to parse message incoming message from ws client: {:?}", msg);
+                        match serde_json::from_str::<WSClientMessage>(&msg){
+                            Ok(client_msg) => {
+                                log::info!("Received trace_registration msg: {:?}", client_msg);
+                                insert_trace_id_to_req_id(client_msg.trace_id().to_string(), request_id.clone()).await;
+                                print_req_id_to_trace_id().await;
+                            }
+                            Err(e) => {
+                                log::error!("Failed to parse message incoming message from ws client: {:?} {:?}", msg, e);
+                            }
                         }
                     }
                     Ok(Message::Close(reason)) => {

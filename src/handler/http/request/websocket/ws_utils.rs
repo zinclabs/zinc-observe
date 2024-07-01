@@ -69,8 +69,6 @@ pub struct WSQueryPayload {
     pub sql: String,
     pub start_time: i64,
     pub end_time: i64,
-    pub size: i64,
-    pub sql_mode: String,
 }
 
 impl WSClientMessage {
@@ -169,8 +167,6 @@ mod tests {
             sql: "SELECT * FROM table".to_string(),
             start_time: 1234567890,
             end_time: 1234567900,
-            size: 100,
-            sql_mode: "mode".to_string(),
         };
         let query_type = "search".to_string();
 
@@ -199,21 +195,36 @@ mod tests {
         let sql = "SELECT * FROM table".to_string();
         let start_time = 1234567890;
         let end_time = 1234567900;
-        let size = 100;
-        let sql_mode = "mode".to_string();
 
         let payload = WSQueryPayload {
             sql: sql.clone(),
             start_time,
             end_time,
-            size,
-            sql_mode: sql_mode.clone(),
         };
 
         assert_eq!(payload.sql, sql);
         assert_eq!(payload.start_time, start_time);
         assert_eq!(payload.end_time, end_time);
-        assert_eq!(payload.size, size);
-        assert_eq!(payload.sql_mode, sql_mode);
+    }
+
+    #[test]
+    fn test_query_deserialization() {
+        let json_payload = r#"{
+            "type": "search",
+            "content": {
+                "type": "search_logs_histogram",
+                "trace_id": "0ec50ae6ecad4483b7502103cdaa764d",
+                "query":  {
+                    "sql": "select histogram(_timestamp, '1 hour') AS zo_sql_key, count(*) AS zo_sql_num from \"e2e_automate\"  GROUP BY zo_sql_key ORDER BY zo_sql_key",
+                    "start_time": 1718630409649000,
+                    "end_time": 1719840009649000,
+                    "size": -1,
+                    "sql_mode": "full"
+                }
+            }
+            }"#;
+
+        let _payload: WSClientMessage = serde_json::from_str(json_payload).unwrap();
+        assert!(true);
     }
 }
