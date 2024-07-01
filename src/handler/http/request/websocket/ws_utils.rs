@@ -4,63 +4,57 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, Mutex};
 
-/// Represents different types of WebSocket messages that can be sent between the client and server.
-///
-/// The `t` field indicates the type of the message, and the `c` field contains the message content.
-///
-/// - `QueryEnqueued`: Indicates that a query has been enqueued, with the `user_id` and `trace_id`
-///   fields providing additional context.
-/// - `QueryCanceled`: Indicates that a query has been canceled, with the `user_id` and `trace_id`
-///   fields providing additional context.
 #[derive(Serialize, Deserialize, Clone, Debug, Hash)]
 #[serde(
     tag = "type",
     content = "content",
     rename_all(serialize = "snake_case")
 )]
-pub enum WebSocketMessageType {
-    QueryEnqueued {
-        trace_id: String,
-        query: WSQueryPayload,
-    },
-    QueryCanceled {
-        trace_id: String,
-    },
-    QueryProcessingStarted {
-        trace_id: String,
-    },
+pub enum WSMessageType {
+    QueryEnqueued { trace_id: String },
+    QueryCanceled { trace_id: String },
+    QueryProcessingStarted { trace_id: String },
 }
 
-impl WebSocketMessage {
+impl WSInternalMessage {
     pub fn trace_id(&self) -> &str {
         match &self.payload {
-            WebSocketMessageType::QueryEnqueued { trace_id, .. } => trace_id,
-            WebSocketMessageType::QueryCanceled { trace_id } => trace_id,
-            WebSocketMessageType::QueryProcessingStarted { trace_id } => trace_id,
-        }
-    }
-
-    pub fn update_payload(&mut self, updated_payload: WSQueryPayload) {
-        match &mut self.payload {
-            WebSocketMessageType::QueryEnqueued { query, .. } => *query = updated_payload.clone(),
-            WebSocketMessageType::QueryCanceled { .. } => {}
-            WebSocketMessageType::QueryProcessingStarted { .. } => {}
+            WSMessageType::QueryEnqueued { trace_id, .. } => trace_id,
+            WSMessageType::QueryCanceled { trace_id } => trace_id,
+            WSMessageType::QueryProcessingStarted { trace_id } => trace_id,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
-pub struct WebSocketMessage {
-    pub user_id: String,
-    pub payload: WebSocketMessageType,
-}
-
-/// Represents different types of WebSocket messages that can be sent from the client to the server.
+/// Represents an internal WebSocket message that can be sent between the different jobs on backend.
 ///
-/// - `Search`: Indicates a search query, with the `trace_id` and `query` fields providing
-///   additional context.
-/// - `Cancel`: Indicates a request to cancel a query, with the `trace_id` field providing
-///   additional context.
+/// The `WSInternalMessage` struct contains two fields:
+///
+/// - `user_id`: A string representing the ID of the user associated with the message.
+/// - `payload`: The actual content of the message, represented by the `WSMessageType` enum.
+///
+/// This struct is used internally within the application to represent and transmit WebSocket
+/// messages between different components.
+#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
+pub struct WSInternalMessage {
+    pub user_id: String,
+    pub payload: WSMessageType,
+}
+
+/// Represents the different types of WebSocket client messages that can be sent.
+///
+/// The `WSClientMessage` enum is used to represent the different types of messages that can be sent
+/// from a WebSocket client to the server. It includes two variants:
+///
+/// - `Search`: Represents a request to search for data, containing a trace ID, a query payload, and
+///   a query type.
+/// - `Cancel`: Represents a request to cancel a previous search, containing a trace ID.
+///
+/// The `WSQueryPayload` struct is used to encapsulate the details of a search query, including the
+/// SQL query, start time, and end time.
+///
+/// This enum is serialized and deserialized using the `serde` crate, with the `type` field
+/// indicating the variant and the `content` field containing the associated data.
 #[derive(Serialize, Deserialize, Clone, Debug, Hash)]
 #[serde(
     tag = "type",
@@ -79,6 +73,11 @@ pub enum WSClientMessage {
     },
 }
 
+/// Represents the payload for a WebSocket query, containing the SQL query, start time, and end
+/// time.
+///
+/// This struct is used to encapsulate the details of a search query that can be sent from a
+/// WebSocket client to the server.
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, Default)]
 pub struct WSQueryPayload {
     pub sql: String,
@@ -95,14 +94,40 @@ impl WSClientMessage {
     }
 }
 
+/// Represents a WebSocket server response message, which can be either a "QueryEnqueued" or
+/// "QueryCanceled" variant.
+///
+/// The "QueryEnqueued" variant contains the trace ID, the query payload, and the query type.
+/// The "QueryCanceled" variant contains the trace ID of the canceled query.
+///
+/// These messages are serialized and deserialized using the `serde` crate, with the `type` field
+/// indicating the variant and the `content` field containing the associated data.
+#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
+#[serde(
+    tag = "type",
+    content = "content",
+    rename_all(serialize = "snake_case", deserialize = "snake_case")
+)]
+pub enum WSServerResponseMessage {
+    QueryEnqueued {
+        trace_id: String,
+        query: WSQueryPayload,
+        #[serde(rename = "type")]
+        query_type: String,
+    },
+    QueryCanceled {
+        trace_id: String,
+    },
+}
+
 /// A lazy-initialized global channel for broadcasting WebSocket messages.
 ///
 /// The channel has a capacity of 100 messages. The `WEBSOCKET_MSG_CHAN` static variable
 /// contains the sender and receiver ends of the channel, which can be used to send and
 /// receive WebSocket messages throughout the application.
 pub static WEBSOCKET_MSG_CHAN: Lazy<(
-    broadcast::Sender<WebSocketMessage>,
-    broadcast::Receiver<WebSocketMessage>,
+    broadcast::Sender<WSInternalMessage>,
+    broadcast::Receiver<WSInternalMessage>,
 )> = Lazy::new(|| {
     let (tx, rx) = broadcast::channel(100);
     (tx, rx)
@@ -171,23 +196,17 @@ pub async fn print_sessions() {
     }
 }
 
-/// A lazy-initialized global HashMap that maps WebSocket trace IDs to their corresponding
-/// WebSocket query payloads.
-///
-/// This HashMap is used to store and retrieve WebSocket query payloads based on the trace ID.
-/// The `WS_TRACE_ID_QUERY_OBJECT` static variable contains the HashMap, which can be used to
-/// manage WebSocket query payloads throughout the application.
-static WS_TRACE_ID_QUERY_OBJECT: Lazy<Mutex<HashMap<String, WSQueryPayload>>> =
+static WS_TRACE_ID_QUERY_OBJECT: Lazy<Mutex<HashMap<String, WSClientMessage>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-pub async fn insert_in_ws_trace_id_query_object(trace_id: String, query_object: WSQueryPayload) {
+pub async fn insert_in_ws_trace_id_query_object(trace_id: String, query_object: WSClientMessage) {
     WS_TRACE_ID_QUERY_OBJECT
         .lock()
         .await
         .insert(trace_id, query_object);
 }
 
-pub async fn get_ws_trace_id_query_object(trace_id: &str) -> Option<WSQueryPayload> {
+pub async fn get_ws_trace_id_query_object(trace_id: &str) -> Option<WSClientMessage> {
     WS_TRACE_ID_QUERY_OBJECT.lock().await.get(trace_id).cloned()
 }
 

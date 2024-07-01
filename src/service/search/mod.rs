@@ -51,7 +51,7 @@ use crate::{
     handler::grpc::request::search::Searcher,
     handler::{
         http::request::websocket::ws_utils::{
-            WebSocketMessage, WebSocketMessageType, WEBSOCKET_MSG_CHAN,
+            WSInternalMessage, WSMessageType, WEBSOCKET_MSG_CHAN,
         },
     },
     service::format_partition_key,
@@ -115,11 +115,10 @@ pub async fn search(
                 ),
             )
             .await;
-        let _ = WEBSOCKET_MSG_CHAN.0.send(WebSocketMessage {
+        let _ = WEBSOCKET_MSG_CHAN.0.send(WSInternalMessage {
             user_id: user_id.clone().unwrap_or_default(),
-            payload: WebSocketMessageType::QueryEnqueued {
+            payload: WSMessageType::QueryEnqueued {
                 trace_id: trace_id.clone(),
-                query: Default::default(),
             },
         });
     }
