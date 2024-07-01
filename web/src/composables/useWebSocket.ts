@@ -1,6 +1,6 @@
 // useWebSocket.ts
 
-import { onUnmounted } from "vue";
+import { onMounted, onUnmounted } from "vue";
 
 type MessageHandler = (event: MessageEvent) => void;
 type OpenHandler = (event: Event) => void;
@@ -121,6 +121,12 @@ const useWebSocket = (
   if (!socket) {
     connect(url, interval, maxAttempts);
   }
+
+  onMounted(() => {
+    if (!socket) {
+      connect(url, interval, maxAttempts);
+    }
+  });
 
   onUnmounted(() => {
     if (socket) {
