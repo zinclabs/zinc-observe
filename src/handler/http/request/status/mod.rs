@@ -137,15 +137,6 @@ struct Rum {
 )]
 #[get("/healthz")]
 pub async fn healthz() -> Result<HttpResponse, Error> {
-    use crate::handler::http::request::websocket::ws_utils::{
-        WebSocketMessage, WebSocketMessageType, WEBSOCKET_MSG_CHAN,
-    };
-    let _ = WEBSOCKET_MSG_CHAN.0.send(WebSocketMessage {
-        user_id: "root@example.com".to_string(),
-        payload: WebSocketMessageType::QueryEnqueued {
-            trace_id: "query-id".to_string(),
-        },
-    });
     Ok(HttpResponse::Ok().json(HealthzResponse {
         status: "ok".to_string(),
     }))

@@ -10,12 +10,13 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
 use super::ws_utils::{
-    get_req_id_from_trace_id, get_ws_session_by_req_id, insert_in_ws_session_by_req_id,
-    insert_trace_id_to_req_id, remove_from_ws_session_by_req_id, remove_trace_id_from_cache,
-    WSClientMessage, WEBSOCKET_MSG_CHAN,
+    get_req_id_from_trace_id, get_ws_session_by_req_id, get_ws_trace_id_query_object,
+    insert_in_ws_session_by_req_id, insert_in_ws_trace_id_query_object, insert_trace_id_to_req_id,
+    remove_from_ws_session_by_req_id, remove_trace_id_from_cache, WSClientMessage,
+    WEBSOCKET_MSG_CHAN,
 };
 use crate::handler::http::request::websocket::ws_utils::{
-    print_req_id_to_trace_id, print_sessions,
+    print_req_id_to_trace_id, print_sessions, WebSocketMessageType,
 };
 
 /// Spawns a background task that periodically checks the aliveness of the WebSocket session.
@@ -31,19 +32,22 @@ async fn aliveness_check(
     alive: Arc<Mutex<Instant>>,
 ) {
     actix_web::rt::spawn(async move {
-        let mut interval = actix_web::rt::time::interval(Duration::from_secs(5));
+        let mut interval = actix_web::rt::time::interval(Duration::from_secs(10));
 
         loop {
             interval.tick().await;
             if session.ping(b"").await.is_err() {
+                log::error!("{user_session_id} is not responding to pings, closing connection");
                 remove_from_ws_session_by_req_id(user_session_id).await;
                 break;
             }
 
             let client_timedout =
-                Instant::now().duration_since(*alive.lock().await) > Duration::from_secs(10);
+                Instant::now().duration_since(*alive.lock().await) > Duration::from_secs(30);
             if client_timedout {
-                log::info!("{user_session_id} is not responding, closing connection");
+                log::error!(
+                    "{user_session_id} is not responding even after 30s, closing connection"
+                );
                 let _ = session.close(None).await;
                 remove_from_ws_session_by_req_id(user_session_id).await;
                 break;
@@ -75,6 +79,12 @@ async fn websocket_handler(
                             Ok(client_msg) => {
                                 log::info!("Received trace_registration msg: {:?}", client_msg);
                                 insert_trace_id_to_req_id(client_msg.trace_id().to_string(), request_id.clone()).await;
+                                match client_msg{
+                                    WSClientMessage::Search{trace_id, query, .. } => {
+                                        insert_in_ws_trace_id_query_object(trace_id, query.clone()).await;
+                                    }
+                                    _ => {}
+                                };
                                 print_req_id_to_trace_id().await;
                             }
                             Err(e) => {
@@ -113,7 +123,19 @@ async fn websocket_handler(
 
                     if let Some(mut ws_session) = ws_session {
                         log::info!("Found websocket session for user_id: {} trace_id: {}", ws_msg.user_id, trace_id);
-                        let payload = serde_json::to_string(&ws_msg).unwrap();
+                        let data = match ws_msg.payload{
+                            WebSocketMessageType::QueryEnqueued { .. } => {
+                                if let Some(query_payload) = get_ws_trace_id_query_object(ws_msg.trace_id()).await{
+                                    let mut new_payload = ws_msg.clone();
+                                    new_payload.update_payload(query_payload);
+                                    new_payload
+                                }else{
+                                    ws_msg.clone()
+                                }
+                            },
+                            _ => ws_msg.clone(),
+                        };
+                        let payload = serde_json::to_string(&data).unwrap();
                         if let Err(e) = ws_session.text(payload).await {
                             log::error!("Error sending message: {}", e);
                             break;
