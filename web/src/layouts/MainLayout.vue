@@ -183,6 +183,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <div data-test="navbar-notifications" class="q-mx-sm">
+          <q-btn
+            flat
+            dense
+            unelevated
+            no-caps
+            size="12px"
+            padding="xs sm"
+            icon="notifications"
+            ><span style="font-size: 12px" class="q-ml-xs"
+              >Notifications</span
+            ></q-btn
+          >
+        </div>
         <div class="q-mr-xs">
           <q-btn-dropdown flat unelevated no-caps padding="xs sm">
             <template #label>
@@ -329,6 +343,7 @@ import {
   watch,
   markRaw,
   nextTick,
+  onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
@@ -364,6 +379,7 @@ import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
+import useWebSocket from "@/composables/useWebSocket";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -427,6 +443,8 @@ export default defineComponent({
       if (config.isCloud == "true") {
         window.location.href = logoutURL;
       }
+
+      this.closeWebSocket();
       this.$router.push("/logout");
     },
     goToHome() {
@@ -446,6 +464,8 @@ export default defineComponent({
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
     const { getStreams, resetStreams } = useStreams();
+
+    const { openWebSocket, closeWebSocket } = useWebSocket();
 
     const isMonacoEditorLoaded = ref(false);
 
@@ -623,7 +643,7 @@ export default defineComponent({
 
     onMounted(async () => {
       generateSessionId();
-      setWebSocketUrl();
+      setWebSocket();
 
       miniMode.value = true;
       filterMenus();
@@ -649,6 +669,10 @@ export default defineComponent({
       }
     });
 
+    onUnmounted(() => {
+      closeWebSocket();
+    });
+
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
 
@@ -659,12 +683,14 @@ export default defineComponent({
       );
     };
 
-    const setWebSocketUrl = () => {
+    const setWebSocket = () => {
       let url = `ws://${store.state.API_ENDPOINT.split("//")[1]}/api/ws/${
         store.state.userInfo.email
       }?request_id=${store.state.sessionId}`;
 
       store.dispatch("setWebSocketUrl", url);
+
+      openWebSocket(store.state.webSocketUrl);
     };
 
     const filterMenus = () => {
@@ -1032,6 +1058,7 @@ export default defineComponent({
       triggerRefreshToken,
       prefetch,
       expandMenu,
+      closeWebSocket,
     };
   },
   computed: {
