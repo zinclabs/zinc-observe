@@ -802,7 +802,6 @@ export default defineComponent({
           message: `Query enqueued ${eventData.payload?.content?.trace_id}`,
           color: "primary",
           position: "top-right",
-          timeout: 4000,
           actions: [
             {
               icon: "close",

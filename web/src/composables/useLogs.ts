@@ -19,7 +19,6 @@ import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, remove } from "lodash-es";
-import { tracer } from "@/utils/opentelemetry";
 
 import {
   useLocalLogFilterField,
@@ -1102,7 +1101,6 @@ const useLogs = () => {
             searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
           }
         } else {
- 
           const { traceparent, traceId } = generateTraceContext();
 
           addTraceId(traceId);
@@ -1879,7 +1877,6 @@ const useLogs = () => {
         // }
       }
 
-
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
 
@@ -2173,7 +2170,6 @@ const useLogs = () => {
 
           const { traceparent, traceId } = generateTraceContext();
           addTraceId(traceId);
-
 
           sendMessage(
             JSON.stringify({
