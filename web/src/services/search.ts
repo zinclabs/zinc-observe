@@ -15,7 +15,6 @@
 
 import { generateTraceContext } from "@/utils/zincutils";
 import http from "./http";
-import { propagation, context, trace, Span } from "@opentelemetry/api";
 
 const search = {
   search: (

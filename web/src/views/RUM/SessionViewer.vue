@@ -184,11 +184,15 @@ const getSession = () => {
 
     isLoading.value.push(true);
     searchService
-      .search({
-        org_identifier: store.state.selectedOrganization.identifier,
-        query: req,
-        page_type: "logs",
-      }, "RUM")
+      .search(
+        {
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: req,
+          page_type: "logs",
+          traceparent: "",
+        },
+        "RUM"
+      )
       .then((res) => {
         if (res.data.hits.length === 0) {
           return;
@@ -234,11 +238,14 @@ const getSessionSegments = () => {
   delete req.aggs;
   isLoading.value.push(true);
   searchService
-    .search({
-      org_identifier: store.state.selectedOrganization.identifier,
-      query: req,
-      page_type: "logs",
-    }, "RUM")
+    .search(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: req,
+        page_type: "logs",
+      },
+      "RUM"
+    )
     .then((res) => {
       // const segmentsCopy = [];
       // const viewIds = [];
@@ -284,11 +291,14 @@ const getSessionEvents = () => {
   delete req.aggs;
   isLoading.value.push(true);
   searchService
-    .search({
-      org_identifier: store.state.selectedOrganization.identifier,
-      query: req,
-      page_type: "logs",
-    }, "RUM")
+    .search(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: req,
+        page_type: "logs",
+      },
+      "RUM"
+    )
     .then((res) => {
       const events = ["action", "view", "error"];
 
@@ -332,11 +342,14 @@ const getSessionErrorLogs = () => {
   delete req.aggs;
   isLoading.value.push(true);
   searchService
-    .search({
-      org_identifier: store.state.selectedOrganization.identifier,
-      query: req,
-      page_type: "logs",
-    }, "RUM")
+    .search(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: req,
+        page_type: "logs",
+      },
+      "RUM"
+    )
     .then((res) => {
       const events = res.data.hits.filter((hit: any) => {
         return hit.date >= Number(sessionState.data.selectedSession.start_time);
