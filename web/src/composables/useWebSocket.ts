@@ -17,6 +17,8 @@ const openHandlers: OpenHandler[] = [];
 const closeHandlers: CloseHandler[] = [];
 const errorHandlers: ErrorHandler[] = [];
 
+let isSocketActive: boolean = false;
+
 const connect = (url: string, interval: number, maxAttempts: number) => {
   if (socket) return;
 
@@ -39,14 +41,12 @@ const onOpen = (event: Event) => {
 
 const onMessage = (event: MessageEvent) => {
   // ws_types.rs refer for the MessageEvent type
-  console.log("Message from server:", event.data);
   messageHandlers.forEach((handler) => handler(event));
 };
 
 const onClose = (event: CloseEvent) => {
-  console.log("WebSocket is closed now.");
   closeHandlers.forEach((handler) => handler(event));
-  if (reconnectAttempts < maxReconnectAttempts) {
+  if (isSocketActive && reconnectAttempts < maxReconnectAttempts) {
     setTimeout(() => {
       reconnectAttempts++;
       connect(socket!.url, reconnectInterval, maxReconnectAttempts);
@@ -60,8 +60,6 @@ const onError = (event: Event) => {
 };
 
 const sendMessage = (message: string) => {
-  console.log("Sending message to server:", message);
-  console.log("WebSocket ready state:", socket, socket?.readyState);
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(message);
   } else {
@@ -113,28 +111,26 @@ const removeErrorHandler = (handler: ErrorHandler) => {
   }
 };
 
-const useWebSocket = (
+const openWebSocket = (
   url: string,
   interval: number = 5000,
   maxAttempts: number = 10
 ) => {
   if (!socket) {
+    isSocketActive = true;
     connect(url, interval, maxAttempts);
   }
+};
 
-  onMounted(() => {
-    if (!socket) {
-      connect(url, interval, maxAttempts);
-    }
-  });
+const closeWebSocket = () => {
+  if (socket) {
+    isSocketActive = false;
+    socket.close();
+    socket = null;
+  }
+};
 
-  onUnmounted(() => {
-    if (socket) {
-      socket.close();
-      socket = null;
-    }
-  });
-
+const useWebSocket = () => {
   return {
     sendMessage,
     addMessageHandler,
@@ -145,6 +141,8 @@ const useWebSocket = (
     removeCloseHandler,
     addErrorHandler,
     removeErrorHandler,
+    openWebSocket,
+    closeWebSocket,
   };
 };
 
