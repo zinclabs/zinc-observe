@@ -16,7 +16,7 @@ use super::ws_utils::{
     WEBSOCKET_MSG_CHAN,
 };
 use crate::handler::http::request::websocket::ws_utils::{
-    print_req_id_to_trace_id, print_sessions, WebSocketMessageType,
+    print_req_id_to_trace_id, print_sessions, WSMessageType, WSServerResponseMessage,
 };
 
 /// Spawns a background task that periodically checks the aliveness of the WebSocket session.
@@ -75,11 +75,12 @@ async fn websocket_handler(
                     Ok(Message::Text(msg)) => {
                         match serde_json::from_str::<WSClientMessage>(&msg){
                             Ok(client_msg) => {
+                                let trace_id = client_msg.trace_id().to_string();
                                 log::info!("Received trace_registration msg: {:?}", client_msg);
-                                insert_trace_id_to_req_id(client_msg.trace_id().to_string(), request_id.clone()).await;
+                                insert_trace_id_to_req_id(trace_id.clone(), request_id.clone()).await;
                                 match client_msg{
-                                    WSClientMessage::Search{trace_id, query, .. } => {
-                                        insert_in_ws_trace_id_query_object(trace_id, query.clone()).await;
+                                    WSClientMessage::Search{  .. } => {
+                                        insert_in_ws_trace_id_query_object(trace_id, client_msg.clone()).await;
                                     }
                                     _ => {}
                                 };
@@ -106,45 +107,58 @@ async fn websocket_handler(
                     _ => (),
                 };
             }
-            Ok(ws_msg) = receiver.recv() => {
+            Ok(ws_internal_msg) = receiver.recv() => {
                 print_req_id_to_trace_id().await;
                 print_sessions().await;
 
-                let trace_id = ws_msg.trace_id();
-                log::info!("Search completed received ws message: {:?}", ws_msg);
-                let request_id = get_req_id_from_trace_id(trace_id).await;
-                log::info!("request_id: {:?} trace_id: {}", request_id, trace_id);
-                if let Some(req_id) = request_id{
-                    log::info!("Inside req_id: {}", req_id);
-                    let ws_session = get_ws_session_by_req_id(&req_id).await;
-                    log::info!("Inside get_ws_session_by_req_id");
+                log::info!("Search completed received ws message: {:?}", ws_internal_msg);
+                let trace_id = ws_internal_msg.trace_id().to_string();
+                let request_id = get_req_id_from_trace_id(&trace_id).await;
+                if request_id.is_none(){
+                    log::error!("Trace_id not found in req_id map: {}", trace_id);
+                    continue;
+                }
 
-                    if let Some(mut ws_session) = ws_session {
-                        log::info!("Found websocket session for user_id: {} trace_id: {}", ws_msg.user_id, trace_id);
-                        let data = match ws_msg.payload{
-                            WebSocketMessageType::QueryEnqueued { .. } => {
-                                if let Some(query_payload) = get_ws_trace_id_query_object(ws_msg.trace_id()).await{
-                                    let mut new_payload = ws_msg.clone();
-                                    new_payload.update_payload(query_payload);
-                                    new_payload
-                                }else{
-                                    ws_msg.clone()
+                log::info!("request_id: {:?} -> trace_id: {}", request_id, trace_id);
+                let ws_session = get_ws_session_by_req_id(request_id.unwrap().as_ref()).await;
+                if ws_session.is_none() {
+                    log::error!("No websocket session found for trace_id: {}", trace_id);
+                    continue;
+                }
+                let mut ws_session = ws_session.unwrap();
+                log::info!("Found websocket session for user_id: {} trace_id: {}", ws_internal_msg.user_id, trace_id);
+
+                let data = match ws_internal_msg.payload {
+                    WSMessageType::QueryEnqueued{trace_id} => {
+                        let wsclient_msg = get_ws_trace_id_query_object(&trace_id).await;
+                        match wsclient_msg{
+                            Some(WSClientMessage::Search{ query, query_type,.. }) => {
+                                WSServerResponseMessage::QueryEnqueued{
+                                    trace_id: trace_id.to_string(),
+                                    query: query.clone(),
+                                    query_type: query_type.clone(),
                                 }
                             },
-                            _ => ws_msg.clone(),
-                        };
-                        let payload = serde_json::to_string(&data).unwrap();
-                        if let Err(e) = ws_session.text(payload).await {
-                            log::error!("Error sending message: {}", e);
-                            break;
+                            _ => {
+                                log::error!("Failed to get query object from cache");
+                                continue;
+                            }
                         }
-                        log::info!("Sent message to the user, removing this trace_id from cache");
-                        let _ = remove_trace_id_from_cache(trace_id).await;
-                        continue;
-                    }
-                }else{
-                    log::error!("No websocket session found for user_id: {} trace_id: {}", ws_msg.user_id, trace_id);
+                    },
+                    _ => {
+                        log::error!("Unknown ws message type: {:?}", ws_internal_msg.payload);
+                        todo!()}
+                };
+                let payload = serde_json::to_string(&data).unwrap();
+                log::info!("Sending message to the user: {}", &payload);
+                if let Err(e) = ws_session.text(payload).await {
+                    log::error!("Error sending message: {}", e);
+                    break;
                 }
+                log::info!("Sent message to the user, removing this trace_id from cache {}", &trace_id);
+                let _ = remove_trace_id_from_cache(&trace_id).await;
+                continue;
+
             }
             else =>{
                 log::info!("Break the look because no message received");

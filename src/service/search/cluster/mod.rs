@@ -49,7 +49,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::infra::cluster as infra_cluster,
     handler::http::request::websocket::ws_utils::{
-        WebSocketMessage, WebSocketMessageType, WEBSOCKET_MSG_CHAN,
+        WSInternalMessage, WSMessageType, WEBSOCKET_MSG_CHAN,
     },
     service::file_list,
 };
@@ -306,9 +306,9 @@ pub async fn search(
         .process(trace_id, user_id,) //TODO(ansrivas): Query started processing
         .await
     {
-        let _ = WEBSOCKET_MSG_CHAN.0.send(WebSocketMessage {
+        let _ = WEBSOCKET_MSG_CHAN.0.send(WSInternalMessage {
             user_id: user_id.unwrap().to_string(),
-            payload: WebSocketMessageType::QueryProcessingStarted {
+            payload: WSMessageType::QueryProcessingStarted {
                 trace_id: trace_id.to_string(),
             },
         });

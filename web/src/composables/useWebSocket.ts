@@ -44,6 +44,7 @@ const onOpen = (event: Event) => {
 
 const onMessage = (event: MessageEvent) => {
   // ws_types.rs refer for the MessageEvent type
+  console.log("WebSocket message received:", event);
   messageHandlers.forEach((handler) => handler(event));
 };
 

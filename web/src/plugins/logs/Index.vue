@@ -789,17 +789,18 @@ export default defineComponent({
     const enqueuedTraceIds = ref([]);
     const onMessage = (event: MessageEvent) => {
       const eventData = JSON.parse(event.data);
-      if (eventData?.payload?.type === "query_enqueued") {
+      console.log("Logs : onMessage", eventData);
+      if (eventData?.type === "query_enqueued") {
         if (
-          enqueuedTraceIds.value.includes(eventData.payload?.content?.trace_id)
+          enqueuedTraceIds.value.includes(eventData.content?.trace_id)
         )
           return;
         else enqueuedTraceIds.value = [];
 
-        enqueuedTraceIds.value.push(eventData.payload?.content?.trace_id);
+        enqueuedTraceIds.value.push(eventData.content?.trace_id);
 
         $q.notify({
-          message: `Query enqueued ${eventData.payload?.content?.trace_id}`,
+          message: `Query enqueued ${eventData.content?.trace_id}`,
           color: "primary",
           position: "top-right",
           actions: [
