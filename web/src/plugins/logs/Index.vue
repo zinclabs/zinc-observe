@@ -391,17 +391,8 @@ export default defineComponent({
       addOrderByToQuery,
       getRegionInfo,
     } = useLogs();
-    const {
-      sendMessage,
-      addMessageHandler,
-      removeMessageHandler,
-      addOpenHandler,
-      removeOpenHandler,
-      addCloseHandler,
-      removeCloseHandler,
-      addErrorHandler,
-      removeErrorHandler,
-    } = useWebSocket(store.state.webSocketUrl);
+    const { sendMessage, addMessageHandler, removeMessageHandler } =
+      useWebSocket(store.state.webSocketUrl);
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     let parser: any;
@@ -795,8 +786,35 @@ export default defineComponent({
 
     // --------------- Web Socket -----------------------
 
+    const enqueuedTraceIds = ref([]);
     const onMessage = (event: MessageEvent) => {
-      console.log("Received message:", event.data);
+      const eventData = JSON.parse(event.data);
+      if (eventData?.payload?.type === "query_enqueued") {
+        if (
+          enqueuedTraceIds.value.includes(eventData.payload?.content?.trace_id)
+        )
+          return;
+        else enqueuedTraceIds.value = [];
+
+        enqueuedTraceIds.value.push(eventData.payload?.content?.trace_id);
+
+        $q.notify({
+          message: `Query enqueued ${eventData.payload?.content?.trace_id}`,
+          color: "primary",
+          position: "top-right",
+          timeout: 4000,
+          actions: [
+            {
+              icon: "close",
+              color: "white",
+              round: true,
+              handler: () => {
+                /* ... */
+              },
+            },
+          ],
+        });
+      }
     };
 
     return {
