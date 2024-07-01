@@ -11,6 +11,7 @@ let socket: WebSocket | null = null;
 let reconnectInterval: number;
 let maxReconnectAttempts: number;
 let reconnectAttempts = 0;
+let socketUrl: string = "";
 
 const messageHandlers: MessageHandler[] = [];
 const openHandlers: OpenHandler[] = [];
@@ -21,6 +22,8 @@ let isSocketActive: boolean = false;
 
 const connect = (url: string, interval: number, maxAttempts: number) => {
   if (socket) return;
+
+  socketUrl = url;
 
   reconnectInterval = interval;
   maxReconnectAttempts = maxAttempts;
@@ -49,7 +52,7 @@ const onClose = (event: CloseEvent) => {
   if (isSocketActive && reconnectAttempts < maxReconnectAttempts) {
     setTimeout(() => {
       reconnectAttempts++;
-      connect(socket!.url, reconnectInterval, maxReconnectAttempts);
+      connect(socketUrl, reconnectInterval, maxReconnectAttempts);
     }, reconnectInterval);
   }
 };
