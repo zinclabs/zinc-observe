@@ -116,7 +116,8 @@
     "allFieldsLabel": "All Fields",
     "allFieldsWarningMsg": "Searches can be slow when the number of fields in the schema are extremely high, please choose the required fields appropriately.",
     "regionFilterMsg": "Search Region/Cluster",
-    "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit."
+    "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
+    "cancel": "Cancel query"
   },
   "menu": {
     "home": "Home",

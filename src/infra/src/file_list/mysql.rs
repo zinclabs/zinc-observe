@@ -16,14 +16,14 @@
 use async_trait::async_trait;
 use config::{
     meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
-    utils::parquet::parse_file_key_columns,
+    utils::{hash::Sum64, parquet::parse_file_key_columns},
 };
 use hashbrown::HashMap;
 use sqlx::{Executor, MySql, QueryBuilder, Row};
 
 use crate::{
     db::mysql::CLIENT,
-    errors::{Error, Result},
+    errors::{DbError, Error, Result},
 };
 
 pub struct MysqlFileList {}
@@ -604,7 +604,7 @@ UPDATE stream_stats
         let stream_key = format!("{org_id}/{stream_type}/{stream}");
         let pool = CLIENT.clone();
         match sqlx::query(
-            "INSERT IGNORE INTO file_list_jobs (org, stream, offsets, status, node, updated_at) VALUES (?, ?, ?, ?, '', 0);",
+            "INSERT IGNORE INTO file_list_jobs (org, stream, offsets, status, node, started_at, updated_at) VALUES (?, ?, ?, ?, '', 0, 0);",
         )
         .bind(org_id)
         .bind(stream_key)
@@ -624,6 +624,39 @@ UPDATE stream_stats
     }
 
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<super::MergeJobRecord>> {
+        let lock_pool = CLIENT.clone();
+        let lock_key = "file_list_jobs:get_pending_jobs";
+        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
+        let lock_sql = format!(
+            "SELECT GET_LOCK('{}', {})",
+            lock_id,
+            config::get_config().limit.meta_transaction_lock_timeout
+        );
+        let unlock_sql = format!("SELECT RELEASE_LOCK('{}')", lock_id);
+        let mut lock_tx = lock_pool.begin().await?;
+        match sqlx::query_scalar::<_, i64>(&lock_sql)
+            .fetch_one(&mut *lock_tx)
+            .await
+        {
+            Ok(v) => {
+                if v != 1 {
+                    if let Err(e) = lock_tx.rollback().await {
+                        log::error!("[MYSQL] rollback lock for get_pending_jobs error: {}", e);
+                    }
+                    return Err(Error::from(DbError::DBOperError(
+                        "LockTimeout".to_string(),
+                        lock_key.to_string(),
+                    )));
+                }
+            }
+            Err(e) => {
+                if let Err(e) = lock_tx.rollback().await {
+                    log::error!("[MYSQL] rollback lock for get_pending_jobs error: {}", e);
+                }
+                return Err(e.into());
+            }
+        };
+
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         // get pending jobs group by stream and order by num desc
@@ -634,8 +667,7 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
     WHERE status = ? 
     GROUP BY stream 
     ORDER BY num DESC 
-    LIMIT ? 
-    FOR UPDATE;"#,
+    LIMIT ?;"#,
         )
         .bind(super::FileListJobStatus::Pending)
         .bind(limit)
@@ -649,6 +681,12 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
                         "[MYSQL] rollback select file_list_jobs pending jobs for update error: {e}"
                     );
                 }
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+                }
                 return Err(e.into());
             }
         };
@@ -658,21 +696,35 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
             if let Err(e) = tx.rollback().await {
                 log::error!("[MYSQL] rollback select file_list_jobs pending jobs error: {e}");
             }
+            if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+            }
+            if let Err(e) = lock_tx.commit().await {
+                log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+            }
             return Ok(Vec::new());
         }
         let sql = format!(
-            "UPDATE file_list_jobs SET status = ?, node = ?, updated_at = ? WHERE id IN ({});",
+            "UPDATE file_list_jobs SET status = ?, node = ?, started_at = ?, updated_at = ? WHERE id IN ({});",
             ids.join(",")
         );
+        let now = config::utils::time::now_micros();
         if let Err(e) = sqlx::query(&sql)
             .bind(super::FileListJobStatus::Running)
             .bind(node)
-            .bind(config::utils::time::now_micros())
+            .bind(now)
+            .bind(now)
             .execute(&mut *tx)
             .await
         {
             if let Err(e) = tx.rollback().await {
                 log::error!("[MYSQL] rollback update file_list_jobs status error: {e}");
+            }
+            if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+            }
+            if let Err(e) = lock_tx.commit().await {
+                log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
             }
             return Err(e.into());
         }
@@ -690,12 +742,24 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
                 if let Err(e) = tx.rollback().await {
                     log::error!("[MYSQL] rollback select file_list_jobs by ids error: {e}");
                 }
+                if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+                    log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+                }
+                if let Err(e) = lock_tx.commit().await {
+                    log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
+                }
                 return Err(e.into());
             }
         };
         if let Err(e) = tx.commit().await {
             log::error!("[MYSQL] commit select file_list_jobs pending jobs error: {e}");
             return Err(e.into());
+        }
+        if let Err(e) = sqlx::query(&unlock_sql).execute(&mut *lock_tx).await {
+            log::error!("[MYSQL] unlock get_pending_jobs error: {}", e);
+        }
+        if let Err(e) = lock_tx.commit().await {
+            log::error!("[MYSQL] commit for unlock get_pending_jobs error: {}", e);
         }
         Ok(ret)
     }
@@ -941,6 +1005,7 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     offsets    BIGINT not null,
     status     INT not null,
     node       VARCHAR(100) not null,
+    started_at BIGINT not null,
     updated_at BIGINT not null
 );
         "#,
@@ -968,9 +1033,16 @@ CREATE TABLE IF NOT EXISTS stream_stats
     .await?;
 
     // create column flattened for old version <= 0.10.5
-    add_column_flattened("file_list").await?;
-    add_column_flattened("file_list_history").await?;
-    add_column_flattened("file_list_deleted").await?;
+    let column = "flattened";
+    let data_type = "BOOLEAN default false not null";
+    add_column("file_list", column, data_type).await?;
+    add_column("file_list_history", column, data_type).await?;
+    add_column("file_list_deleted", column, data_type).await?;
+
+    // create column started_at for old version <= 0.10.8
+    let column = "started_at";
+    let data_type = "BIGINT default 0 not null";
+    add_column("file_list_jobs", column, data_type).await?;
 
     Ok(())
 }
@@ -1075,9 +1147,8 @@ pub async fn create_table_index() -> Result<()> {
     Ok(())
 }
 
-async fn add_column_flattened(table: &str) -> Result<()> {
+async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
     let pool = CLIENT.clone();
-    let column = "flattened";
     let check_sql = format!(
         "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
     );
@@ -1088,8 +1159,7 @@ async fn add_column_flattened(table: &str) -> Result<()> {
         return Ok(());
     }
 
-    let alert_sql =
-        format!("ALTER TABLE {table} ADD COLUMN {column} BOOLEAN default false not null;");
+    let alert_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
     let mut tx = pool.begin().await?;
     if let Err(e) = sqlx::query(&alert_sql).execute(&mut *tx).await {
         if !e.to_string().contains("Duplicate column name") {

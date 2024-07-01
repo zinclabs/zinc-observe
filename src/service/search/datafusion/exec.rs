@@ -594,7 +594,7 @@ pub async fn merge(
     let file_format = ParquetFormat::default();
     let listing_options = ListingOptions::new(Arc::new(file_format))
         .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(cfg.limit.cpu_num);
+        .with_target_partitions(ctx.state().config().target_partitions());
     let list_url = format!("tmpfs:///{}/", work_dir.name());
     let prefix = match ListingTableUrl::parse(list_url) {
         Ok(url) => url,
@@ -954,13 +954,13 @@ pub async fn convert_parquet_file(
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
+                .with_target_partitions(ctx.state().config().target_partitions())
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
-                .with_target_partitions(cfg.limit.cpu_num)
+                .with_target_partitions(ctx.state().config().target_partitions())
         }
         _ => {
             return Err(DataFusionError::Execution(format!(
@@ -1051,16 +1051,6 @@ pub async fn merge_parquet_files(
 ) -> Result<(Arc<Schema>, Vec<RecordBatch>)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    // Configure listing options
-    let file_format = ParquetFormat::default();
-    let listing_options = ListingOptions::new(Arc::new(file_format))
-        .with_file_extension(FileType::PARQUET.get_ext())
-        .with_target_partitions(cfg.limit.cpu_num);
-    let prefix = ListingTableUrl::parse(format!("tmpfs:///{trace_id}/"))?;
-    let config = ListingTableConfig::new(prefix)
-        .with_listing_options(listing_options)
-        .with_schema(schema.clone());
-    let table = Arc::new(ListingTable::try_new(config)?);
 
     // get all sorted data
     let query_sql = if stream_type == StreamType::Index {
@@ -1084,9 +1074,21 @@ pub async fn merge_parquet_files(
         )
     };
 
+    // create datafusion context
     let select_wildcard = RE_SELECT_WILDCARD.is_match(query_sql.as_str());
     let without_optimizer = select_wildcard && stream_type != StreamType::Index;
     let ctx = prepare_datafusion_context(None, &SearchType::Normal, without_optimizer).await?;
+
+    // Configure listing options
+    let file_format = ParquetFormat::default();
+    let listing_options = ListingOptions::new(Arc::new(file_format))
+        .with_file_extension(FileType::PARQUET.get_ext())
+        .with_target_partitions(ctx.state().config().target_partitions());
+    let prefix = ListingTableUrl::parse(format!("tmpfs:///{trace_id}/"))?;
+    let config = ListingTableConfig::new(prefix)
+        .with_listing_options(listing_options)
+        .with_schema(schema.clone());
+    let table = Arc::new(ListingTable::try_new(config)?);
     ctx.register_table("tbl", table.clone())?;
 
     let df = ctx.sql(&query_sql).await?;
@@ -1255,12 +1257,14 @@ pub async fn register_table(
             let file_format = ParquetFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::PARQUET.get_ext())
+                .with_target_partitions(ctx.state().config().target_partitions())
                 .with_collect_stat(true)
         }
         FileType::JSON => {
             let file_format = JsonFormat::default();
             ListingOptions::new(Arc::new(file_format))
                 .with_file_extension(FileType::JSON.get_ext())
+                .with_target_partitions(ctx.state().config().target_partitions())
                 .with_collect_stat(true)
         }
         _ => {

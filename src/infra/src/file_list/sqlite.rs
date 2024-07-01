@@ -619,7 +619,7 @@ SELECT stream, MIN(min_ts) as min_ts, MAX(max_ts) as max_ts, COUNT(*) as file_nu
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
         match sqlx::query(
-            "INSERT INTO file_list_jobs (org, stream, offsets, status, node, updated_at) VALUES ($1, $2, $3, $4, '', 0);",
+            "INSERT INTO file_list_jobs (org, stream, offsets, status, node, started_at, updated_at) VALUES ($1, $2, $3, $4, '', 0, 0);",
         )
         .bind(org_id)
         .bind(stream_key)
@@ -676,13 +676,15 @@ SELECT stream, max(id) as id, COUNT(*) AS num
             return Ok(Vec::new());
         }
         let sql = format!(
-            "UPDATE file_list_jobs SET status = $1, node = $2, updated_at = $3 WHERE id IN ({});",
+            "UPDATE file_list_jobs SET status = $1, node = $2, started_at = $3, updated_at = $4 WHERE id IN ({});",
             ids.join(",")
         );
+        let now = config::utils::time::now_micros();
         if let Err(e) = sqlx::query(&sql)
             .bind(super::FileListJobStatus::Running)
             .bind(node)
-            .bind(config::utils::time::now_micros())
+            .bind(now)
+            .bind(now)
             .execute(&mut *tx)
             .await
         {
@@ -968,6 +970,7 @@ CREATE TABLE IF NOT EXISTS file_list_jobs
     offsets    BIGINT not null,
     status     INT not null,
     node       VARCHAR not null,
+    started_at BIGINT not null,
     updated_at BIGINT not null
 );
         "#,
@@ -995,9 +998,16 @@ CREATE TABLE IF NOT EXISTS stream_stats
     .await?;
 
     // create column flattened for old version <= 0.10.5
-    add_column_flattened(&client, "file_list").await?;
-    add_column_flattened(&client, "file_list_history").await?;
-    add_column_flattened(&client, "file_list_deleted").await?;
+    let column = "flattened";
+    let data_type = "BOOLEAN default false not null";
+    add_column(&client, "file_list", column, data_type).await?;
+    add_column(&client, "file_list_history", column, data_type).await?;
+    add_column(&client, "file_list_deleted", column, data_type).await?;
+
+    // create column started_at for old version <= 0.10.8
+    let column = "started_at";
+    let data_type = "BIGINT default 0 not null";
+    add_column(&client, "file_list_jobs", column, data_type).await?;
 
     Ok(())
 }
@@ -1102,11 +1112,14 @@ pub async fn create_table_index() -> Result<()> {
     Ok(())
 }
 
-async fn add_column_flattened(client: &Pool<Sqlite>, table: &str) -> Result<()> {
+async fn add_column(
+    client: &Pool<Sqlite>,
+    table: &str,
+    column: &str,
+    data_type: &str,
+) -> Result<()> {
     // Attempt to add the column, ignoring the error if the column already exists
-    let column = "flattened";
-    let check_sql =
-        format!("ALTER TABLE {table} ADD COLUMN {column} BOOLEAN default false not null;");
+    let check_sql = format!("ALTER TABLE {table} ADD COLUMN {column} {data_type};");
     if let Err(e) = sqlx::query(&check_sql).execute(client).await {
         // Check if the error is about the duplicate column
         if !e.to_string().contains("duplicate column name") {

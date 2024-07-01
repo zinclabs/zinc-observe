@@ -18,7 +18,7 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use chrono::{Duration, Utc};
 use config::{
-    get_config, ider,
+    get_config,
     meta::{
         search::SearchEventType,
         stream::StreamType,
@@ -29,9 +29,7 @@ use config::{
     DISTINCT_FIELDS,
 };
 use infra::{errors, schema::STREAM_SCHEMAS_LATEST};
-use opentelemetry::{global, trace::TraceContextExt};
 use tracing::{Instrument, Span};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
     common::{
@@ -39,7 +37,8 @@ use crate::{
         utils::{
             functions,
             http::{
-                get_search_type_from_request, get_stream_type_from_request, RequestHeaderExtractor,
+                get_or_create_trace_id_and_span, get_search_type_from_request,
+                get_stream_type_from_request,
             },
         },
     },
@@ -128,21 +127,8 @@ pub async fn search(
     let started_at = Utc::now().timestamp_micros();
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
-    let cfg = get_config();
-    let mut http_span = None;
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!("/api/{org_id}/_search", org_id = org_id.clone());
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
+    let (trace_id, http_span) =
+        get_or_create_trace_id_and_span(in_req.headers(), format!("api/{org_id}/_search"));
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -434,24 +420,10 @@ pub async fn around(
     let started_at = Utc::now().timestamp_micros();
     let (org_id, stream_name) = path.into_inner();
     let cfg = get_config();
-    let mut http_span = None;
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!(
-            "/api/{org_id}/{stream_name}/_around",
-            org_id = org_id.clone(),
-            stream_name = stream_name.clone()
-        );
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
+    let (trace_id, http_span) = get_or_create_trace_id_and_span(
+        in_req.headers(),
+        format!("/api/{org_id}/{stream_name}/_around"),
+    );
 
     let mut uses_fn = false;
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -821,26 +793,11 @@ pub async fn values(
         Some(v) => v.to_str().unwrap(),
         None => "",
     };
+    let (trace_id, http_span) = get_or_create_trace_id_and_span(
+        in_req.headers(),
+        format!("/api/{org_id}/{stream_name}/_values"),
+    );
 
-    let cfg = get_config();
-    let mut http_span = None;
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!(
-            "/api/{org_id}/{stream_name}/_values",
-            org_id = org_id.clone(),
-            stream_name = stream_name.clone()
-        );
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
     if fields.len() == 1
         && DISTINCT_FIELDS.contains(&fields[0])
         && !query_context.to_lowercase().contains(" where ")
@@ -1466,20 +1423,10 @@ pub async fn search_partition(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-    let mut http_span = None;
-    let trace_id = if cfg.common.tracing_enabled {
-        let ctx = global::get_text_map_propagator(|propagator| {
-            propagator.extract(&RequestHeaderExtractor::new(in_req.headers()))
-        });
-        ctx.span().span_context().trace_id().to_string()
-    } else if cfg.common.tracing_search_enabled {
-        let span = tracing::info_span!("/api/{org_id}/_search_partition", org_id = org_id.clone());
-        let trace_id = span.context().span().span_context().trace_id().to_string();
-        http_span = Some(span);
-        trace_id
-    } else {
-        ider::uuid()
-    };
+    let (trace_id, http_span) = get_or_create_trace_id_and_span(
+        in_req.headers(),
+        format!("/api/{org_id}/_search_partition"),
+    );
 
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();

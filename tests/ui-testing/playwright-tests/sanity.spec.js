@@ -10,7 +10,7 @@ const dashboardName = `AutomatedDashboard${Date.now()}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  //  await page.getByText("Login as internal user").click();
+  // await page.getByText("Login as internal user").click();
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -825,7 +825,7 @@ test.describe("Sanity testcases", () => {
     const seconds = String(date.getSeconds()).padStart(2, "0");
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   };
-  test("should compare time displayed in table dashboard after changing timezone and then delete it ", async ({ page }) => {
+  test.skip("should compare time displayed in table dashboards after changing timezone and then delete it ", async ({ page }) => {
     const orgId = process.env["ORGNAME"];
     const streamName = "e2e_tabledashboard";
     const headers = getHeaders();

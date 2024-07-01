@@ -167,8 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             side
                             @click.stop="handleDeleteSavedView(props.row)"
                           >
-                            <q-icon name="delete"
-color="grey" size="xs" />
+                            <q-icon name="delete" color="grey" size="xs" />
                           </q-item-section>
                         </q-item> </q-td
                     ></template>
@@ -349,8 +348,7 @@ color="grey" size="xs" />
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item class="q-pa-sm saved-view-item"
-clickable v-close-popup>
+              <q-item class="q-pa-sm saved-view-item" clickable v-close-popup>
                 <q-item-section
                   @click.stop="toggleCustomDownloadDialog"
                   v-close-popup
@@ -441,6 +439,22 @@ clickable v-close-popup>
             </q-btn-group>
 
             <q-btn
+              v-if="
+                config.isEnterprise == 'true' &&
+                (searchObj.loading == true ||
+                  searchObj.loadingHistogram == true)
+              "
+              data-test="logs-search-bar-refresh-btn"
+              data-cy="search-bar-refresh-button"
+              dense
+              flat
+              :title="t('search.cancel')"
+              class="q-pa-none search-button cancel-search-button"
+              @click="cancelQuery"
+              >{{ t("search.cancel") }}</q-btn
+            >
+            <q-btn
+              v-else
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               dense
@@ -1004,6 +1018,7 @@ export default defineComponent({
       moveItemsToTop,
       validateFilterForMultiStream,
       extractFields,
+      cancelQuery,
     } = useLogs();
     const queryEditorRef = ref(null);
 
@@ -2424,6 +2439,7 @@ export default defineComponent({
       regionFilter,
       resetRegionFilter,
       validateFilterForMultiStream,
+      cancelQuery,
     };
   },
   computed: {
@@ -2744,7 +2760,7 @@ export default defineComponent({
   }
 
   .search-button {
-    min-width: 70px;
+    min-width: 77px;
     line-height: 29px;
     font-weight: bold;
     text-transform: initial;
@@ -2760,6 +2776,12 @@ export default defineComponent({
         font-size: 15px;
         color: #ffffff;
       }
+    }
+  }
+
+  .cancel-search-button {
+    .q-btn__content {
+      background: $negative !important;
     }
   }
 
