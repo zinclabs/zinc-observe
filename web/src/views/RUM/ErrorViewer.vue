@@ -154,6 +154,7 @@ const getError = () => {
           org_identifier: store.state.selectedOrganization.identifier,
           query: req,
           page_type: "logs",
+          traceparent: "",
         },
         "RUM"
       )
