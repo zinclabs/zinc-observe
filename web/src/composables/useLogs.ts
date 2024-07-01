@@ -245,7 +245,7 @@ const useLogs = () => {
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
   const notificationMsg = ref("");
 
-  const { sendMessage } = useWebSocket(store.state.webSocketUrl);
+  const { sendMessage } = useWebSocket();
 
   const { updateFieldKeywords } = useSqlSuggestions();
 
