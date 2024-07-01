@@ -111,7 +111,7 @@ async fn websocket_handler(
                 print_sessions().await;
 
                 let trace_id = ws_msg.trace_id();
-                log::info!("Received ws message: {:?}", ws_msg);
+                log::info!("Search completed received ws message: {:?}", ws_msg);
                 let request_id = get_req_id_from_trace_id(trace_id).await;
                 log::info!("request_id: {:?} trace_id: {}", request_id, trace_id);
                 if let Some(req_id) = request_id{
@@ -140,10 +140,11 @@ async fn websocket_handler(
                         }
                         log::info!("Sent message to the user, removing this trace_id from cache");
                         let _ = remove_trace_id_from_cache(trace_id).await;
-                        break;
+                        continue;
                     }
+                }else{
+                    log::error!("No websocket session found for user_id: {} trace_id: {}", ws_msg.user_id, trace_id);
                 }
-                log::error!("No websocket session found for user_id: {} trace_id: {}", ws_msg.user_id, trace_id);
             }
             else =>{
                 log::info!("Break the look because no message received");

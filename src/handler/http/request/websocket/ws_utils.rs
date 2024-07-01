@@ -112,13 +112,13 @@ pub static WEBSOCKET_MSG_CHAN: Lazy<(
 /// WebSocket session trace IDs.
 ///
 /// This HashMap is used to store and retrieve WebSocket session trace IDs based on the request ID.
-/// The `WS_REQUEST_ID_TO_TRACE_ID` static variable contains the HashMap, which can be used to
+/// The `WS_TRACE_ID_TO_REQ_ID` static variable contains the HashMap, which can be used to
 /// manage WebSocket session trace IDs throughout the application.
-static WS_REQ_ID_TO_TRACE_ID: Lazy<Mutex<HashMap<String, String>>> =
+static WS_TRACE_ID_TO_REQ_ID: Lazy<Mutex<HashMap<String, String>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub async fn insert_trace_id_to_req_id(trace_id: String, request_id: String) {
-    WS_REQ_ID_TO_TRACE_ID
+    WS_TRACE_ID_TO_REQ_ID
         .lock()
         .await
         .insert(trace_id, request_id);
@@ -126,17 +126,17 @@ pub async fn insert_trace_id_to_req_id(trace_id: String, request_id: String) {
 
 pub async fn print_req_id_to_trace_id() {
     println!("Traceid -> request_id");
-    for (trace_id, req_id) in WS_REQ_ID_TO_TRACE_ID.lock().await.iter() {
+    for (trace_id, req_id) in WS_TRACE_ID_TO_REQ_ID.lock().await.iter() {
         println!("{} -> {}", trace_id, req_id);
     }
 }
 
 pub async fn get_req_id_from_trace_id(trace_id: &str) -> Option<String> {
-    WS_REQ_ID_TO_TRACE_ID.lock().await.get(trace_id).cloned()
+    WS_TRACE_ID_TO_REQ_ID.lock().await.get(trace_id).cloned()
 }
 
 pub async fn remove_trace_id_from_cache(trace_id: &str) {
-    WS_REQ_ID_TO_TRACE_ID.lock().await.remove(trace_id);
+    WS_TRACE_ID_TO_REQ_ID.lock().await.remove(trace_id);
 }
 
 /// A lazy-initialized global HashMap that maps WebSocket request IDs to their corresponding
