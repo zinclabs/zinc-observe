@@ -243,6 +243,7 @@ const getSessionSegments = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
+        traceparent: "",
       },
       "RUM"
     )
@@ -296,6 +297,7 @@ const getSessionEvents = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
+        traceparent: "",
       },
       "RUM"
     )
@@ -347,6 +349,7 @@ const getSessionErrorLogs = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         query: req,
         page_type: "logs",
+        traceparent: "",
       },
       "RUM"
     )
