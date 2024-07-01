@@ -108,8 +108,6 @@ pub async fn search(
                 ),
             )
             .await;
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-        log::debug!("trace_id {} added to search-manager", trace_id);
     }
 
     #[cfg(feature = "enterprise")]
