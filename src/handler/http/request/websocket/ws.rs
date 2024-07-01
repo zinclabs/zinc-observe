@@ -144,7 +144,7 @@ async fn websocket_handler(
                         let _ = remove_trace_id_from_cache(trace_id).await;
                     }
                 }
-                log::info!("No websocket session found for user_id: {} trace_id: {}", ws_msg.user_id, trace_id);
+                log::error!("No websocket session found for user_id: {} trace_id: {}", ws_msg.user_id, trace_id);
             }
             else =>{
                 log::info!("Break the look because no message received");
