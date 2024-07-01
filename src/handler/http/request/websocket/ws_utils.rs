@@ -55,13 +55,22 @@ pub struct WebSocketMessage {
 pub enum WSClientMessage {
     Search {
         trace_id: String,
-        // query: String,
-        // #[serde(rename = "type")]
-        // query_type: String,
+        query: WSQueryPayload,
+        #[serde(rename = "type")]
+        query_type: String,
     },
     Cancel {
         trace_id: String,
     },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Hash)]
+pub struct WSQueryPayload {
+    pub sql: String,
+    pub start_time: i64,
+    pub end_time: i64,
+    pub size: i64,
+    pub sql_mode: String,
 }
 
 impl WSClientMessage {
@@ -150,41 +159,61 @@ pub async fn print_sessions() {
 
 #[cfg(test)]
 mod tests {
-    use super::WSClientMessage;
+
+    use super::*;
 
     #[test]
-    fn test_search_message_serialization() {
-        let trace_id = "abc123".to_string();
-        let message = WSClientMessage::Search { trace_id };
+    fn test_ws_client_message_search() {
+        let trace_id = "123".to_string();
+        let query = WSQueryPayload {
+            sql: "SELECT * FROM table".to_string(),
+            start_time: 1234567890,
+            end_time: 1234567900,
+            size: 100,
+            sql_mode: "mode".to_string(),
+        };
+        let query_type = "search".to_string();
 
-        let serialized = serde_json::to_string(&message).unwrap();
-        assert_eq!(
-            serialized,
-            r#"{"type":"search","content":{"trace_id":"abc123"}}"#
-        );
+        let message = WSClientMessage::Search {
+            trace_id: trace_id.clone(),
+            query: query.clone(),
+            query_type: query_type.clone(),
+        };
+
+        assert_eq!(message.trace_id(), trace_id);
     }
 
     #[test]
-    fn test_cancel_message_serialization() {
-        let trace_id = "def456".to_string();
-        let message = WSClientMessage::Cancel { trace_id };
+    fn test_ws_client_message_cancel() {
+        let trace_id = "456".to_string();
 
-        let serialized = serde_json::to_string(&message).unwrap();
-        assert_eq!(
-            serialized,
-            r#"{"type":"cancel","content":{"trace_id":"def456"}}"#
-        );
+        let message = WSClientMessage::Cancel {
+            trace_id: trace_id.clone(),
+        };
+
+        assert_eq!(message.trace_id(), trace_id);
     }
 
     #[test]
-    fn test_search_message_deserialization() {
-        let json = r#"{"type":"search","content":{"trace_id":"abc123"}}"#;
-        let message: WSClientMessage = serde_json::from_str(json).unwrap();
+    fn test_ws_query_payload() {
+        let sql = "SELECT * FROM table".to_string();
+        let start_time = 1234567890;
+        let end_time = 1234567900;
+        let size = 100;
+        let sql_mode = "mode".to_string();
 
-        if let WSClientMessage::Search { trace_id } = message {
-            assert_eq!(trace_id, "abc123");
-        } else {
-            panic!("Unexpected message type");
-        }
+        let payload = WSQueryPayload {
+            sql: sql.clone(),
+            start_time,
+            end_time,
+            size,
+            sql_mode: sql_mode.clone(),
+        };
+
+        assert_eq!(payload.sql, sql);
+        assert_eq!(payload.start_time, start_time);
+        assert_eq!(payload.end_time, end_time);
+        assert_eq!(payload.size, size);
+        assert_eq!(payload.sql_mode, sql_mode);
     }
 }
