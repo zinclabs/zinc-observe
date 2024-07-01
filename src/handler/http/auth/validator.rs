@@ -539,17 +539,14 @@ async fn oo_validator_internal(
     auth_info: AuthExtractor,
     path_prefix: &str,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    println!("Auth info: {:?}", auth_info);
     if auth_info.auth.starts_with("Basic") {
         let decoded = base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim())
             .expect("Failed to decode base64 string");
-        println!("Decoded: {:?}", decoded);
         let (username, password) = match get_user_details(decoded) {
             Some(value) => value,
             None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
         };
 
-        println!("Username: {:?}, Password: {:?}", username, password);
         validator(req, &username, &password, auth_info, path_prefix).await
     } else if auth_info.auth.starts_with("Bearer") {
         super::token::token_validator(req, auth_info).await
