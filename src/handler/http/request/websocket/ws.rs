@@ -37,9 +37,7 @@ async fn aliveness_check(
         loop {
             interval.tick().await;
             if session.ping(b"").await.is_err() {
-                log::error!("{user_session_id} is not responding to pings, closing connection");
-                remove_from_ws_session_by_req_id(user_session_id).await;
-                break;
+                log::error!("Unable to send ping to {user_session_id}");
             }
 
             let client_timedout =
@@ -142,6 +140,7 @@ async fn websocket_handler(
                         }
                         log::info!("Sent message to the user, removing this trace_id from cache");
                         let _ = remove_trace_id_from_cache(trace_id).await;
+                        break;
                     }
                 }
                 log::error!("No websocket session found for user_id: {} trace_id: {}", ws_msg.user_id, trace_id);
