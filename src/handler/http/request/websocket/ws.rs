@@ -78,12 +78,9 @@ async fn websocket_handler(
                                 let trace_id = client_msg.trace_id().to_string();
                                 log::info!("Received trace_registration msg: {:?}", client_msg);
                                 insert_trace_id_to_req_id(trace_id.clone(), request_id.clone()).await;
-                                match client_msg{
-                                    WSClientMessage::Search{  .. } => {
-                                        insert_in_ws_trace_id_query_object(trace_id, client_msg.clone()).await;
-                                    }
-                                    _ => {}
-                                };
+                                if let WSClientMessage::Search{  .. } = client_msg {
+                                   insert_in_ws_trace_id_query_object(trace_id, client_msg.clone()).await;
+                               };
                                 print_req_id_to_trace_id().await;
                             }
                             Err(e) => {
@@ -116,7 +113,7 @@ async fn websocket_handler(
                 // remove the last part of the trace_id as it contains suffixes -01,-02 for subsearches
 
                 let trace_id = trace_id.split('-').collect::<Vec<&str>>()[0];
-                let request_id = get_req_id_from_trace_id(&trace_id).await;
+                let request_id = get_req_id_from_trace_id(trace_id).await;
                 if request_id.is_none(){
                     log::error!("Trace_id not found in req_id map: {}", trace_id);
                     continue;
@@ -133,7 +130,7 @@ async fn websocket_handler(
 
                 let data = match ws_internal_msg.payload {
                     WSMessageType::QueryEnqueued{..} => {
-                        let wsclient_msg = get_ws_trace_id_query_object(&trace_id).await;
+                        let wsclient_msg = get_ws_trace_id_query_object(trace_id).await;
                         match wsclient_msg{
                             Some(WSClientMessage::Search{ query, query_type,.. }) => {
                                 WSServerResponseMessage::QueryEnqueued{
@@ -159,7 +156,7 @@ async fn websocket_handler(
                     break;
                 }
                 log::info!("Sent message to the user, removing this trace_id from cache {}", &trace_id);
-                let _ = remove_trace_id_from_cache(&trace_id).await;
+                let _ = remove_trace_id_from_cache(trace_id).await;
                 continue;
 
             }
