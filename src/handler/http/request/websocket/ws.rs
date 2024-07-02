@@ -113,6 +113,9 @@ async fn websocket_handler(
 
                 log::info!("Search completed received ws message: {:?}", ws_internal_msg);
                 let trace_id = ws_internal_msg.trace_id().to_string();
+                // remove the last part of the trace_id as it contains suffixes -01,-02 for subsearches
+
+                let trace_id = trace_id.split('-').collect::<Vec<&str>>()[0];
                 let request_id = get_req_id_from_trace_id(&trace_id).await;
                 if request_id.is_none(){
                     log::error!("Trace_id not found in req_id map: {}", trace_id);
@@ -129,7 +132,7 @@ async fn websocket_handler(
                 log::info!("Found websocket session for user_id: {} trace_id: {}", ws_internal_msg.user_id, trace_id);
 
                 let data = match ws_internal_msg.payload {
-                    WSMessageType::QueryEnqueued{trace_id} => {
+                    WSMessageType::QueryEnqueued{..} => {
                         let wsclient_msg = get_ws_trace_id_query_object(&trace_id).await;
                         match wsclient_msg{
                             Some(WSClientMessage::Search{ query, query_type,.. }) => {
