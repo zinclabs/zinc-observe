@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @handleQuickModeChange="handleQuickModeChange"
           />
         </template>
+
         <template v-slot:after>
           <div
             id="thirdLevel"
@@ -56,7 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     :key="
-                      searchObj.data.stream.selectedStream.join(',') || 'default'
+                      searchObj.data.stream.selectedStream.join(',') ||
+                      'default'
                     "
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
@@ -95,8 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning" color="warning"
-size="10rem" /><br />
+                    <q-icon name="warning" color="warning" size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -228,6 +229,8 @@ import {
   onBeforeMount,
   watch,
   defineAsyncComponent,
+  onMounted,
+  onUnmounted,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -240,6 +243,7 @@ import { verifyOrganizationStatus } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
+import useWebSocket from "@/composables/useWebSocket";
 
 export default defineComponent({
   name: "PageSearch",
@@ -387,6 +391,8 @@ export default defineComponent({
       addOrderByToQuery,
       getRegionInfo,
     } = useLogs();
+    const { sendMessage, addMessageHandler, removeMessageHandler } =
+      useWebSocket(store.state.webSocketUrl);
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     let parser: any;
@@ -480,6 +486,14 @@ export default defineComponent({
         MainLayoutCloudMixin.setup().getOrganizationThreshold(store);
       }
       searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
+    });
+
+    onMounted(() => {
+      addMessageHandler(onMessage);
+    });
+
+    onUnmounted(() => {
+      removeMessageHandler(onMessage);
     });
 
     /**
@@ -767,6 +781,39 @@ export default defineComponent({
           setQuery(searchObj.meta.quickMode);
           updateUrlQueryParams();
         }
+      }
+    };
+
+    // --------------- Web Socket -----------------------
+
+    const enqueuedTraceIds = ref([]);
+    const onMessage = (event: MessageEvent) => {
+      const eventData = JSON.parse(event.data);
+      console.log("Logs : onMessage", eventData);
+      if (eventData?.type === "query_enqueued") {
+        if (
+          enqueuedTraceIds.value.includes(eventData.content?.trace_id)
+        )
+          return;
+        else enqueuedTraceIds.value = [];
+
+        enqueuedTraceIds.value.push(eventData.content?.trace_id);
+
+        $q.notify({
+          message: `Query enqueued ${eventData.content?.trace_id}`,
+          color: "primary",
+          position: "top-right",
+          actions: [
+            {
+              icon: "close",
+              color: "white",
+              round: true,
+              handler: () => {
+                /* ... */
+              },
+            },
+          ],
+        });
       }
     };
 

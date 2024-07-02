@@ -543,11 +543,11 @@ async fn oo_validator_internal(
     if auth_info.auth.starts_with("Basic") {
         let decoded = base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim())
             .expect("Failed to decode base64 string");
-
         let (username, password) = match get_user_details(decoded) {
             Some(value) => value,
             None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
         };
+
         validator(req, &username, &password, auth_info, path_prefix).await
     } else if auth_info.auth.starts_with("Bearer") {
         super::token::token_validator(req, auth_info).await

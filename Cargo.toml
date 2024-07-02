@@ -162,6 +162,7 @@ ingester.workspace = true
 report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
+actix-ws = "0.2.5"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

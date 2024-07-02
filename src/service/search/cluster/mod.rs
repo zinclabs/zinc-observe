@@ -46,6 +46,10 @@ use tonic::{
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::websocket::ws_utils::{
+    WSInternalMessage, WSMessageType, WEBSOCKET_MSG_CHAN,
+};
 use crate::{common::infra::cluster as infra_cluster, service::file_list};
 
 pub mod cacher;
@@ -303,9 +307,16 @@ pub async fn search(
     if let Err(e) = work_group
         .as_ref()
         .unwrap()
-        .process(trace_id, user_id)
+        .process(trace_id, user_id,) //TODO(ansrivas): Query started processing
         .await
     {
+        let _ = WEBSOCKET_MSG_CHAN.0.send(WSInternalMessage {
+            user_id: user_id.unwrap().to_string(),
+            payload: WSMessageType::QueryProcessingStarted {
+                trace_id: trace_id.to_string(),
+            },
+        });
+
         dist_lock::unlock(&locker).await?;
         return Err(Error::Message(e.to_string()));
     }

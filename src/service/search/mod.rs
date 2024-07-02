@@ -36,6 +36,9 @@ use regex::Regex;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
+    crate::handler::http::request::websocket::ws_utils::{
+        WSInternalMessage, WSMessageType, WEBSOCKET_MSG_CHAN,
+    },
     hashbrown::HashSet,
     o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::TaskStatus},
     tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request},
@@ -94,7 +97,7 @@ pub async fn search(
         let start_time = Some(in_req.query.start_time);
         let end_time = Some(in_req.query.end_time);
         // set search task
-        SEARCH_SERVER
+        SEARCH_SERVER // TODO(ansrivas): add notification to the websocket
             .insert(
                 trace_id.clone(),
                 TaskStatus::new(
@@ -109,6 +112,12 @@ pub async fn search(
                 ),
             )
             .await;
+        let _ = WEBSOCKET_MSG_CHAN.0.send(WSInternalMessage {
+            user_id: user_id.clone().unwrap_or_default(),
+            payload: WSMessageType::QueryEnqueued {
+                trace_id: trace_id.clone(),
+            },
+        });
     }
 
     #[cfg(feature = "enterprise")]

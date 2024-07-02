@@ -19,7 +19,7 @@ import {
   useLocalCurrentUser,
   useLocalTimezone,
 } from "../utils/zincutils";
-import { Notification } from "@/ts/interfaces/notification";
+import type { Notification } from "@/ts/interfaces/notification";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -104,6 +104,8 @@ export default createStore({
         },
       ] as Notification[],
     },
+    sessionId: "",
+    webSocketUrl: "",
   },
   mutations: {
     login(state, payload) {
@@ -246,6 +248,12 @@ export default createStore({
     setNotificationDrawer(state, payload) {
       state.notifications.isOpen = payload;
     },
+    setSessionId(state, payload) {
+      state.sessionId = payload;
+    },
+    setWebSocketUrl(state, payload) {
+      state.webSocketUrl = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -364,6 +372,12 @@ export default createStore({
     },
     setNotificationDrawer({ commit }, payload) {
       commit("setNotificationDrawer", payload);
+    },
+    setSessionId(context, payload) {
+      context.commit("setSessionId", payload);
+    },
+    setWebSocketUrl(context, payload) {
+      context.commit("setWebSocketUrl", payload);
     },
   },
   modules: {},

@@ -171,11 +171,15 @@ export default defineComponent({
 
         queryData.value.errorCode = 0;
         search
-          .search({
-            org_identifier: store.state.selectedOrganization.identifier,
-            query: queryReq,
-            page_type: streamData.value?.stream_type || "logs",
-          }, "UI")
+          .search(
+            {
+              org_identifier: store.state.selectedOrganization.identifier,
+              query: queryReq,
+              page_type: streamData.value?.stream_type || "logs",
+              traceparent: "",
+            },
+            "UI"
+          )
           .then((res) => {
             isLoading.value.pop();
             if (res.data.from > 0) {
