@@ -1,100 +1,95 @@
 <template>
   <div
-    class="fixed top-0 right-0 mt-4 mr-4 w-96 bg-white shadow-lg rounded-lg overflow-hidden"
+    class="tw-mr-4 tw-w-96 tw-bg-white tw-shadow-lg tw-rounded-lg tw-overflow-hidden"
   >
-    <div class="flex justify-between items-center p-4 bg-gray-100 border-b">
-      <h2 class="text-lg font-semibold">Notifications</h2>
-      <button @click="markAllAsRead" class="text-sm text-blue-500">
+    <div class="tw-flex tw-justify-between tw-items-center tw-p-2 tw-border-b">
+      <p class="tw-text-lg tw-font-semibold">Notifications</p>
+
+      <button @click="closeNotifications" class="tw-text-grey-500">
+        <q-icon size="20px" :name="outlinedCancel" />
+      </button>
+    </div>
+    <div class="tw-flex tw-justify-end tw-px-4 tw-pt-4">
+      <button @click="markAllAsRead" class="tw-text-sm tw-text-blue-500">
         Mark all as read
       </button>
     </div>
-    <div class="p-4 space-y-4">
+    <div class="tw-p-4 tw-space-y-4">
       <div
-        v-for="notification in visibleNotifications"
+        v-for="notification in notifications"
         :key="notification.id"
-        class="p-4 rounded-lg border shadow-sm"
+        class="tw-p-4 tw-rounded-lg tw-border tw-shadow-sm"
       >
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="font-bold">{{ notification.title }}</h3>
-            <p class="text-sm text-gray-500">{{ notification.time }}</p>
+        <div>
+          <div class="tw-flex tw-items-center tw-justify-between">
+            <p class="tw-font-bold">{{ notification.title }}</p>
+            <button
+              @click="removeNotification(notification.id)"
+              class="tw-text-red-500"
+            >
+              <q-icon size="16px" :name="outlinedCancel" />
+            </button>
           </div>
-          <button
-            @click="removeNotification(notification.id)"
-            class="text-red-500"
-          >
-            ✖
-          </button>
+          <p class="tw-text-[12px] tw-text-gray-500">
+            {{ notification.time }}
+          </p>
         </div>
-        <p class="mt-2">{{ notification.message }}</p>
-        <div v-if="notification.expanded" class="mt-2 text-sm text-gray-600">
-          {{ notification.details }}
-        </div>
-        <div class="flex justify-end mt-2 space-x-2">
+        <p class="tw-mt-2 tw-text-[14px]">{{ notification.message }}</p>
+
+        <div class="tw-flex tw-justify-between tw-mt-2 tw-space-x-2">
           <button
-            @click="markAsRead(notification.id)"
-            :class="{
-              'text-gray-500': notification.read,
-              'text-green-500': !notification.read,
-            }"
+            @click="expandNotification(notification.id)"
+            class="tw-text-yellow-500"
           >
-            ✔
+            Show Details
           </button>
           <button
             @click="expandNotification(notification.id)"
-            class="text-yellow-500"
+            class="tw-text-yellow-500"
           >
-            🔍
+            Mark as read
           </button>
         </div>
       </div>
-      <button
-        v-if="showMoreButton"
-        @click="showMore"
-        class="w-full p-2 text-center text-blue-500"
-      >
-        Show more
-      </button>
+      <div class="tw-flex tw-justify-between tw-mt-2 tw-px-2">
+        <button @click="expandNotification" class="tw-text-yellow-500">
+          Show more
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
-<script>
+<script setup lang="ts">
 import { ref, computed } from "vue";
-import { useNotifications } from "@/composables/useNotifications";
+import useNotifications from "@/composables/useNotifications";
+import { Notification } from "@/types/notification";
+import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
+import { useStore } from "vuex";
 
-export default {
-  setup() {
-    const {
-      notifications,
-      removeNotification,
-      markAsRead,
-      markAllAsRead,
-      expandNotification,
-    } = useNotifications();
-    const notificationsToShow = ref(3); // Number of notifications to show initially
+const {
+  notifications,
+  removeNotification,
+  markAsRead,
+  markAllAsRead,
+  expandNotification,
+} = useNotifications();
+const notificationsToShow = ref(3); // Number of notifications to show initially
+const store = useStore();
 
-    const visibleNotifications = computed(() =>
-      notifications.value.slice(0, notificationsToShow.value)
-    );
-    const showMoreButton = computed(
-      () => notifications.value.length > notificationsToShow.value
-    );
+const visibleNotifications = computed(() =>
+  notifications.value.slice(0, notificationsToShow.value)
+);
+const showMoreButton = computed(
+  () => notifications.value.length > notificationsToShow.value
+);
 
-    const showMore = () => {
-      notificationsToShow.value += 3; // Show 3 more notifications on each click
-    };
+const showMore = () => {
+  notificationsToShow.value += 3; // Show 3 more notifications on each click
+};
 
-    return {
-      notifications: visibleNotifications,
-      showMoreButton,
-      removeNotification,
-      markAsRead,
-      markAllAsRead,
-      expandNotification,
-      showMore,
-    };
-  },
+const closeNotifications = () => {
+  store.commit("setNotificationDrawer", false);
 };
 </script>
 

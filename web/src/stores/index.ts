@@ -19,6 +19,7 @@ import {
   useLocalCurrentUser,
   useLocalTimezone,
 } from "../utils/zincutils";
+import { Notification } from "@/ts/interfaces/notification";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -71,6 +72,38 @@ export default createStore({
     savedViewFlag: false,
     savedFunctionDialog: false,
     regionInfo: [],
+    notifications: {
+      isOpen: false,
+      notifications: [
+        {
+          title: "Energy Consumption Alert",
+          message: "Current energy consumption exceeds the set threshold.",
+          details: "Consider optimizing equipment usage.",
+          time: "Today, 15:00 PM",
+        },
+        {
+          title: "Dr. Laura Cristya",
+          message:
+            "I'll be holding virtual office hours this week on Tuesday and Thursday from 2:00 PM to 4:00 PM.",
+          details: "",
+          time: "Today, 14:00 PM",
+        },
+        {
+          title: "Weather Advisory",
+          message:
+            "Severe weather alert: Expect heavy rain and potential flooding in the area.",
+          details: "",
+          time: "Yesterday, 08:30 AM",
+        },
+        {
+          title: "Dr. David Lee",
+          message:
+            "Hello students, I've uploaded the course materials for Week 3. Please review the lecture notes and readings.",
+          details: "",
+          time: "Yesterday, 08:00 AM",
+        },
+      ] as Notification[],
+    },
   },
   mutations: {
     login(state, payload) {
@@ -179,6 +212,40 @@ export default createStore({
     setRegionInfo(state, payload) {
       state.regionInfo = payload;
     },
+    addNotification(state, notification: Notification) {
+      state.notifications.notifications.push(notification);
+      state.notifications.isOpen = true;
+    },
+    removeNotification(state, notificationId) {
+      state.notifications.notifications =
+        state.notifications.notifications.filter(
+          (notification) => notification.id !== notificationId
+        );
+    },
+    markNotificationAsRead(state, notificationId) {
+      const notification = state.notifications.notifications.find(
+        (notification) => notification.id === notificationId
+      );
+      if (notification) {
+        notification.read = true;
+      }
+    },
+    markAllNotificationsAsRead(state) {
+      state.notifications.notifications.forEach((notification) => {
+        notification.read = true;
+      });
+    },
+    expandNotifications(state, notificationId) {
+      const notification = state.notifications.notifications.find(
+        (notification) => notification.id === notificationId
+      );
+      if (notification) {
+        notification.expanded = !notification.expanded;
+      }
+    },
+    setNotificationDrawer(state, payload) {
+      state.notifications.isOpen = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -279,6 +346,24 @@ export default createStore({
     },
     setRegionInfo(context, payload) {
       context.commit("setRegionInfo", payload);
+    },
+    addNotification({ commit }, notification: Notification) {
+      commit("addNotification", notification);
+    },
+    removeNotification({ commit }, notificationId: number) {
+      commit("removeNotification", notificationId);
+    },
+    markAsRead({ commit }, notificationId: number) {
+      commit("markNotificationAsRead", notificationId);
+    },
+    markAllAsRead({ commit }) {
+      commit("markAllNotificationsAsRead");
+    },
+    expandNotification({ commit }, notificationId: number) {
+      commit("expandNotifications", notificationId);
+    },
+    setNotificationDrawer({ commit }, payload) {
+      commit("setNotificationDrawer", payload);
     },
   },
   modules: {},

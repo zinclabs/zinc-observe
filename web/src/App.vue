@@ -16,15 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <router-view></router-view>
+  <app-notifications />
 </template>
 
 <script lang="ts">
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import config from "@/aws-exports";
+import AppNotifications from "@/components/notifications/AppNotifications.vue";
+
 export default {
+  components: {
+    AppNotifications,
+  },
   setup() {
-    const store = useStore();
     // if (
     //   config.isCloud == "false" &&
     //   window.location.origin != "http://localhost:8081"

@@ -107,7 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <ThemeSwitcher></ThemeSwitcher>
-        <template v-if="config.isCloud !== 'true' && !store.state.zoConfig?.custom_hide_menus?.split(',')?.includes('openapi')">
+        <template
+          v-if="
+            config.isCloud !== 'true' &&
+            !store.state.zoConfig?.custom_hide_menus
+              ?.split(',')
+              ?.includes('openapi')
+          "
+        >
           <q-btn
             class="q-ml-xs no-border"
             size="13px"
@@ -174,6 +181,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
             @update:model-value="updateOrganization()"
           />
+        </div>
+
+        <div data-test="navbar-notifications" class="q-mx-sm">
+          <q-btn
+            flat
+            dense
+            unelevated
+            no-caps
+            size="12px"
+            padding="xs sm"
+            icon="notifications"
+            @click="toggleNotifications"
+            ><span style="font-size: 12px" class="q-ml-xs"
+              >Notifications {{ store.state.notifications.isOpen }}</span
+            ></q-btn
+          >
         </div>
 
         <div class="q-mr-xs">
@@ -982,6 +1005,13 @@ export default defineComponent({
       if (!isMonacoEditorLoaded.value) prefetch();
     };
 
+    const toggleNotifications = () => {
+      store.dispatch(
+        "setNotificationDrawer",
+        !store.state.notifications.isOpen
+      );
+    };
+
     return {
       t,
       router,
@@ -1006,6 +1036,7 @@ export default defineComponent({
       triggerRefreshToken,
       prefetch,
       expandMenu,
+      toggleNotifications,
     };
   },
   computed: {
