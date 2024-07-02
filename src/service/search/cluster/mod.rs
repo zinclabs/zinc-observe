@@ -47,13 +47,11 @@ use tonic::{
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    common::infra::cluster as infra_cluster,
-    handler::http::request::websocket::ws_utils::{
-        WSInternalMessage, WSMessageType, WEBSOCKET_MSG_CHAN,
-    },
-    service::file_list,
+#[cfg(feature = "enterprise")]
+use crate::handler::http::request::websocket::ws_utils::{
+    WSInternalMessage, WSMessageType, WEBSOCKET_MSG_CHAN,
 };
+use crate::{common::infra::cluster as infra_cluster, service::file_list};
 
 pub mod cacher;
 pub mod grpc;
