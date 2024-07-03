@@ -151,7 +151,6 @@ pub async fn search(
         None
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),

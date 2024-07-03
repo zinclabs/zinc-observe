@@ -27,22 +27,12 @@ const search = {
       org_identifier: string;
       query: any;
       page_type: string;
-<<<<<<< HEAD
       traceparent?: string;
-||||||| parent of 909d40079 (fix: added traceparent headers for search requests)
-=======
-      traceparent: string;
->>>>>>> 909d40079 (fix: added traceparent headers for search requests)
     },
     search_type: string = "UI"
   ) => {
-<<<<<<< HEAD
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
 
-||||||| parent of 909d40079 (fix: added traceparent headers for search requests)
-=======
-    console.log("trace parent", traceparent);
->>>>>>> 909d40079 (fix: added traceparent headers for search requests)
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     if (typeof query.query.sql != "string") {
