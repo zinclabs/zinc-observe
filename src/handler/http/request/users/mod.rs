@@ -479,7 +479,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 }
                 format!("q_auth {}", s)
             } else if let Some(auth_header) = _req.headers().get("Authorization") {
-                log::debug!("get_auth: auth header found: {:?}", auth_header);
+                log::error!("get_auth: auth header found: {:?}", auth_header);
                 match auth_header.to_str() {
                     Ok(auth_header_str) => auth_header_str.to_string(),
                     Err(_) => {
@@ -502,12 +502,12 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             {
                 let token_validation_response = match request_time {
                     Some(req_ts) => {
-                        log::debug!("Validating user for query params");
+                        log::error!("Validating user for query params");
                         validate_user_for_query_params(&name, &password, Some(req_ts), expires_in)
                             .await
                     }
                     None => {
-                        log::debug!("Validating user for basic auth header");
+                        log::error!("Validating user for basic auth header");
                         validate_user(&name, &password).await
                     }
                 };
@@ -554,7 +554,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let expiry = cookie::time::OffsetDateTime::now_utc()
                     + cookie::time::Duration::seconds(cfg.auth.cookie_max_age);
 
-                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                log::error!("Setting cookie for user: {} - {}", name, cookie_name);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
                 let cookie_name = "auth_ext";
@@ -573,7 +573,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let expiry = cookie::time::OffsetDateTime::now_utc()
                     + cookie::time::Duration::seconds(req_ts);
 
-                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                log::error!("Setting cookie for user: {} - {}", name, cookie_name);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             };
 
