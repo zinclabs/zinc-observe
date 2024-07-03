@@ -281,24 +281,21 @@ pub async fn traces_json(
                             || trace_flags.is_none()
                             || trace_state.is_none()
                         {
-                            match link.get("context") {
-                                Some(span_context) => {
-                                    let span_context: SpanLinkContext =
-                                        json::from_value(span_context.to_owned()).unwrap();
-                                    if trace_id.is_none() {
-                                        trace_id = Some(span_context.trace_id);
-                                    }
-                                    if span_id.is_none() {
-                                        span_id = Some(span_context.span_id);
-                                    }
-                                    if trace_flags.is_none() {
-                                        trace_flags = span_context.trace_flags;
-                                    }
-                                    if trace_state.is_none() {
-                                        trace_state = span_context.trace_state;
-                                    }
+                            if let Some(span_context) = link.get("context") {
+                                let span_context: SpanLinkContext =
+                                    json::from_value(span_context.to_owned()).unwrap();
+                                if trace_id.is_none() {
+                                    trace_id = Some(span_context.trace_id);
                                 }
-                                _ => {}
+                                if span_id.is_none() {
+                                    span_id = Some(span_context.span_id);
+                                }
+                                if trace_flags.is_none() {
+                                    trace_flags = span_context.trace_flags;
+                                }
+                                if trace_state.is_none() {
+                                    trace_state = span_context.trace_state;
+                                }
                             }
                         }
                         links.push(SpanLink {
