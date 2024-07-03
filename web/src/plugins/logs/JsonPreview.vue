@@ -1,13 +1,23 @@
 <template>
-  <div class="q-py-xs flex justify-start q-px-md copy-log-btn">
+  <div class="q-py-xs flex justify-start q-px-md log-detail-actions">
     <q-btn
       :label="t('common.copyToClipboard')"
       dense
       size="sm"
       no-caps
-      class="q-px-sm"
+      class="q-px-sm copy-log-btn q-mr-sm"
       icon="content_copy"
       @click="copyLogToClipboard"
+    />
+
+    <q-btn
+      :label="t('search.viewTrace')"
+      dense
+      size="sm"
+      no-caps
+      class="q-px-sm view-trace-btn"
+      :icon="outlinedAccountTree"
+      @click="redirectToTraces"
     />
   </div>
   <div class="q-pl-md">
@@ -58,7 +68,7 @@
               >
             </q-item-section>
           </q-item>
-          
+
           <q-item
             clickable
             v-close-popup
@@ -135,6 +145,8 @@ import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { useI18n } from "vue-i18n";
 import useLogs from "../../composables/useLogs";
+import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
+import { useRouter } from "vue-router";
 
 export default {
   name: "JsonPreview",
@@ -154,6 +166,8 @@ export default {
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
     const store = useStore();
+
+    const router = useRouter();
     const copyLogToClipboard = () => {
       emit("copy", props.value);
     };
@@ -176,15 +190,21 @@ export default {
       });
     });
 
+    const redirectToTraces = () => {
+      emit("view-trace");
+    };
+
     return {
       t,
       copyLogToClipboard,
       getImageURL,
       addSearchTerm,
       addFieldToTable,
+      outlinedAccountTree,
       store,
       searchObj,
       multiStreamFields,
+      redirectToTraces,
     };
   },
 };

@@ -25,6 +25,8 @@ const Search = () => import("@/views/Search.vue");
 const AppMetrics = () => import("@/views/AppMetrics.vue");
 const AppTraces = () => import("@/views/AppTraces.vue");
 
+const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
+
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
@@ -107,6 +109,17 @@ const useRoutes = () => {
       path: "traces",
       name: "traces",
       component: AppTraces,
+      meta: {
+        keepAlive: true,
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "traces/trace-details",
+      name: "traceDetails",
+      component: TraceDetails,
       meta: {
         keepAlive: true,
       },

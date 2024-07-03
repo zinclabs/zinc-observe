@@ -54,7 +54,8 @@
     "expand": "Expand",
     "date": "Date",
     "description": "Description",
-    "cancelChanges": "Cancel Changes"
+    "cancelChanges": "Cancel Changes",
+    "logs": "Logs"
   },
   "search": {
     "selectIndex": "Select Stream First",
@@ -117,7 +118,8 @@
     "allFieldsWarningMsg": "Searches can be slow when the number of fields in the schema are extremely high, please choose the required fields appropriately.",
     "regionFilterMsg": "Search Region/Cluster",
     "queryRangeRestrictionMsg": "The query range is restricted to {range}. Please adjust the date range accordingly. Otherwise, the start date will be automatically adjusted to fit within the allowed limit.",
-    "cancel": "Cancel query"
+    "cancel": "Cancel query",
+    "viewTrace": "View Trace"
   },
   "menu": {
     "home": "Home",
@@ -837,7 +839,7 @@
     "updateuserKey": "Update User Key",
     "id": "Id",
     "update": "Update",
-    "generalLabel": "Settings",
+    "generalLabel": "General Settings",
     "queryManagement": "Query Management",
     "apikeyLabel": "API Keys",
     "generalPageTitle": "General Settings",
@@ -849,7 +851,11 @@
     "deleteLogoMessage": "Are you sure you want to delete this logo image? Click Ok to delete.",
     "deleteLogo": "Delete Logo",
     "logo": "Logo",
-    "customLogoText": "Custom Logo Text"
+    "customLogoText": "Custom Logo Text",
+    "orgLabel": "Organization Parameters",
+    "logDetails": "Log Details",
+    "traceIdFieldName": "Trace ID Field Name",
+    "spanIdFieldName": "Span ID Field Name"
   },
   "reports": {
     "header": "Reports",
@@ -879,5 +885,8 @@
     "cancelQuery": "Cancel Query",
     "queryRange": "Query Range",
     "refreshQuery": "Refresh Query"
+  },
+  "traces": {
+    "viewLogs": "View Logs"
   }
 }

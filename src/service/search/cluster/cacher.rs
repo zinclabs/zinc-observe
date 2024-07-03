@@ -21,6 +21,7 @@ use tracing::{info_span, Instrument};
 
 use crate::{common::meta::search::CachedQueryResponse, service::search::infra_cluster};
 
+#[allow(clippy::too_many_arguments)]
 pub async fn get_cached_results(
     start_time: i64,
     end_time: i64,
@@ -29,6 +30,7 @@ pub async fn get_cached_results(
     file_path: String,
     trace_id: String,
     result_ts_column: String,
+    discard_interval: i64,
 ) -> Option<CachedQueryResponse> {
     let start = std::time::Instant::now();
     // get nodes from cluster
@@ -73,6 +75,7 @@ pub async fn get_cached_results(
                     file_path,
                     timestamp_col: result_ts_column,
                     trace_id:trace_id.clone(),
+                    discard_interval,
                 };
 
                 let request = tonic::Request::new(req);
@@ -216,6 +219,7 @@ pub async fn get_cached_results(
         &file_path,
         result_ts_column.as_str(),
         &trace_id,
+        discard_interval,
     )
     .await
     {

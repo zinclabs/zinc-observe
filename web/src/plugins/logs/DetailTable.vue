@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @copy="copyContentToClipboard"
             @add-field-to-table="addFieldToTable"
             @add-search-term="toggleIncludeSearchTerm"
+            @view-trace="viewTrace"
           />
         </q-card-section>
       </q-tab-panel>
@@ -286,7 +287,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div
-          v-show="streamType !== 'enrichment_tables' && searchObj.data.stream.selectedStream.length <= 1"
+          v-show="
+            streamType !== 'enrichment_tables' &&
+            searchObj.data.stream.selectedStream.length <= 1
+          "
           class="col-8 row justify-center align-center q-gutter-sm"
         >
           <div style="line-height: 40px; font-weight: bold">
@@ -359,6 +363,7 @@ export default defineComponent({
     "remove:searchterm",
     "search:timeboxed",
     "add:table",
+    "view-trace",
   ],
   props: {
     modelValue: {
@@ -467,6 +472,10 @@ export default defineComponent({
       emit("add:table", value);
     };
 
+    const viewTrace = () => {
+      emit("view-trace");
+    };
+
     return {
       t,
       store,
@@ -483,6 +492,7 @@ export default defineComponent({
       addFieldToTable,
       searchObj,
       multiStreamFields,
+      viewTrace,
     };
   },
   async created() {

@@ -924,7 +924,7 @@ pub fn generate_histogram_interval(time_range: Option<(i64, i64)>, num: u16) -> 
     "10 second".to_string()
 }
 
-fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
+pub fn convert_histogram_interval_to_seconds(interval: &str) -> Result<i64, Error> {
     let Some((num, unit)) = interval.splitn(2, ' ').collect_tuple() else {
         return Err(Error::Message("Invalid interval format".to_string()));
     };

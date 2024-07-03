@@ -436,6 +436,18 @@ export default defineComponent({
         queryParams.stream_type !== searchObj.data.stream.streamType ||
         queryParams.stream !== searchObj.data.stream.selectedStream.join(",");
 
+      if (queryParams.type === "trace_explorer") {
+        searchObj.organizationIdetifier = "";
+        searchObj.data.stream.selectedStream.value = "";
+        searchObj.data.stream.streamType = "";
+        resetSearchObj();
+        resetStreamData();
+        restoreUrlQueryParams();
+        loadLogsData();
+
+        return;
+      }
+
       if (
         isStreamChanged &&
         queryParams.type === "stream_explorer" &&

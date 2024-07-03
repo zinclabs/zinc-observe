@@ -592,7 +592,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="menu-link-\\/settings\\/-item"]').click();
     await page.waitForTimeout(2000);
     await page.getByText("General SettingsScrape").click();
-    await page.getByRole("tab", { name: "Settings" }).click();
+    await page.getByRole("tab", { name: "General Settings" }).click();
     await page.getByLabel("Scrape Interval (In Seconds) *").fill("16");
     await page.locator('[data-test="dashboard-add-submit"]').click();
     await page.getByText("Organization settings updated").click();

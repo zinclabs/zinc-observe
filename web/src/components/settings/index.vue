@@ -16,15 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="page q-pa-md">
-    <div class="head q-table__title q-pb-md">
+  <q-page class="page">
+    <div class="head q-table__title q-mx-md q-my-sm">
       {{ t("settings.header") }}
     </div>
     <q-separator class="separator" />
     <q-splitter
       v-model="splitterModel"
       unit="px"
-      style="min-height: calc(100vh - 136px)"
+      style="min-height: calc(100vh - 104px)"
     >
       <template v-slot:before>
         <q-tabs
@@ -47,6 +47,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :to="'/settings/general'"
             :icon="outlinedSettings"
             :label="t('settings.generalLabel')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            name="organization"
+            :to="'/settings/organization'"
+            :icon="outlinedSettings"
+            :label="t('settings.orgLabel')"
             content-class="tab_content"
           />
         </q-tabs>
@@ -126,7 +133,7 @@ export default defineComponent({
       router,
       config,
       settingsTab,
-      splitterModel: ref(200),
+      splitterModel: ref(225),
       outlinedSettings,
       isMetaOrg,
     };

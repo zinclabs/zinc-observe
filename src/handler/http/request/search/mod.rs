@@ -25,7 +25,7 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, hash::Sum64, json, time::parse_str_to_timestamp_micros_as_option},
+    utils::{base64, hash::Sum64, json},
     DISTINCT_FIELDS,
 };
 use infra::{
@@ -51,7 +51,11 @@ use crate::{
         },
     },
     service::{
-        search::{self as SearchService, cache::cacher::check_cache, sql::RE_ONLY_SELECT},
+        search::{
+            self as SearchService,
+            cache::{cacher::check_cache, result_utils::get_ts_value},
+            sql::RE_ONLY_SELECT,
+        },
         usage::report_request_usage_stats,
     },
 };
@@ -269,12 +273,12 @@ pub async fn search(
             delta_end_time: req.query.end_time,
             delta_removed_hits: false,
         })
+    } else {
+        log::info!(
+            "[trace_id {trace_id}]  query deltas are: {:?}",
+            c_resp.deltas
+        );
     }
-
-    log::info!(
-        "[trace_id {trace_id}]  query deltas are: {:?}",
-        c_resp.deltas
-    );
     // Result caching check ends
     let mut results = Vec::new();
     let mut res = if should_exec_query {
@@ -1508,6 +1512,8 @@ fn merge_response(
         return;
     }
 
+    let mut files_cache_ratio = 0;
+    let mut result_cache_ratio = 0;
     let cache_ts = if cache_response.hits.is_empty() {
         get_ts_value(
             ts_column,
@@ -1521,7 +1527,9 @@ fn merge_response(
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
-        cache_response.cached_ratio += res.cached_ratio;
+        files_cache_ratio += res.cached_ratio;
+
+        result_cache_ratio += res.total;
 
         if res.hits.is_empty() {
             continue;
@@ -1538,17 +1546,10 @@ fn merge_response(
                 .collect();
         }
     }
-    cache_response.cached_ratio /= search_response.len() + 1;
-}
-
-fn get_ts_value(ts_column: &str, record: &json::Value) -> i64 {
-    match record.get(ts_column).unwrap() {
-        serde_json::Value::String(ts) => {
-            parse_str_to_timestamp_micros_as_option(ts.as_str()).unwrap()
-        }
-        serde_json::Value::Number(ts) => ts.as_i64().unwrap(),
-        _ => 0_i64,
-    }
+    cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    cache_response.result_cache_ratio = (cache_response.total as f64 * 100_f64
+        / (result_cache_ratio + cache_response.total) as f64)
+        as usize;
 }
 
 async fn write_results(

@@ -3240,8 +3240,8 @@ const useLogs = () => {
     }
 
     const date = {
-      startTime: queryParams.from,
-      endTime: queryParams.to,
+      startTime: Number(queryParams.from),
+      endTime: Number(queryParams.to),
       relativeTimePeriod: queryParams.period || null,
       type: queryParams.period ? "relative" : "absolute",
     };

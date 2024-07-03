@@ -25,7 +25,8 @@ message QueryCacheRequest {
     string  query_key = 4; 
     string  file_path = 5; 
     string  timestamp_col = 6; 
-    string  trace_id = 7; 
+    string  trace_id = 7;
+    int64 discard_interval = 8;
 }
 
 message QueryCacheRes {

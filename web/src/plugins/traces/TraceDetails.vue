@@ -16,9 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="trace-details"
+    class="trace-details full-width"
     :style="{
-      width: '97vw !important',
       background: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
     }"
   >
@@ -26,10 +25,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="row q-px-sm"
       v-if="traceTree.length && !searchObj.data.traceDetails.loading"
     >
-      <div
-        class="q-py-sm q-px-sm flex items-end justify-between col-12 toolbar"
-      >
-        <div class="flex items-end justify-start">
+      <div class="full-width flex items-center toolbar flex justify-between">
+        <div class="flex items-center">
+          <div
+            data-test="add-alert-back-btn"
+            class="flex justify-center items-center q-mr-md cursor-pointer"
+            style="
+              border: 1.5px solid;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+            "
+            title="Go Back"
+            @click="router.back()"
+          >
+            <q-icon name="arrow_back_ios_new" size="14px" />
+          </div>
           <div class="text-h6 q-mr-lg">
             {{ traceTree[0]["operationName"] }}
           </div>
@@ -44,12 +55,100 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div class="q-pb-xs">Spans: {{ spanList.length }}</div>
+          <div class="q-pb-xs q-mr-lg">Spans: {{ spanList.length }}</div>
+
+          <div
+            class="q-pb-xs q-mr-lg cursor-pointer flex items-center"
+            @click="openTraceDetails"
+          >
+            <q-icon :name="outlinedInfo" class="q-mr-xs" size="16px" />
+            Trace Details
+          </div>
+
+          <div class="o2-input flex items-center trace-logs-selector">
+            <q-select
+              data-test="log-search-index-list-select-stream"
+              v-model="searchObj.data.traceDetails.selectedLogStreams"
+              :label="
+                searchObj.data.traceDetails.selectedLogStreams.length
+                  ? ''
+                  : t('search.selectIndex')
+              "
+              :options="filteredStreamOptions"
+              data-cy="stream-selection"
+              input-debounce="0"
+              behavior="menu"
+              filled
+              multiple
+              borderless
+              dense
+              fill-input
+              :title="selectedStreamsString"
+            >
+              <template #no-option>
+                <div class="o2-input log-stream-search-input">
+                  <q-input
+                    data-test="alert-list-search-input"
+                    v-model="streamSearchValue"
+                    borderless
+                    filled
+                    debounce="500"
+                    autofocus
+                    dense
+                    size="xs"
+                    @update:model-value="filterStreamFn"
+                    class="q-ml-auto q-mb-xs no-border q-pa-xs"
+                    :placeholder="t('search.searchStream')"
+                  >
+                    <template #prepend>
+                      <q-icon name="search" class="cursor-pointer" />
+                    </template>
+                  </q-input>
+                </div>
+                <q-item>
+                  <q-item-section> {{ t("search.noResult") }}</q-item-section>
+                </q-item>
+              </template>
+              <template #before-options>
+                <div class="o2-input log-stream-search-input">
+                  <q-input
+                    data-test="alert-list-search-input"
+                    v-model="streamSearchValue"
+                    borderless
+                    debounce="500"
+                    filled
+                    dense
+                    autofocus
+                    @update:model-value="filterStreamFn"
+                    class="q-ml-auto q-mb-xs no-border q-pa-xs"
+                    :placeholder="t('search.searchStream')"
+                  >
+                    <template #prepend>
+                      <q-icon name="search" class="cursor-pointer" />
+                    </template>
+                  </q-input>
+                </div>
+              </template>
+            </q-select>
+            <q-btn
+              data-test="trace-view-logs-btn"
+              v-close-popup="true"
+              class="text-bold traces-view-logs-btn"
+              :label="t('traces.viewLogs')"
+              text-color="light-text"
+              padding="sm sm"
+              size="sm"
+              no-caps
+              dense
+              icon="search"
+              @click="redirectToLogs"
+            />
+          </div>
         </div>
         <div class="flex items-center">
           <q-btn
             data-test="logs-search-bar-share-link-btn"
-            class="q-mr-sm download-logs-btn q-px-sm"
+            class="q-mr-sm download-logs-btn"
             size="sm"
             icon="share"
             round
@@ -58,9 +157,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('search.shareLink')"
             @click="shareLink"
           />
-          <q-btn v-close-popup="true" round flat icon="cancel" size="md" />
+          <q-btn round flat icon="cancel" size="md" @click="router.back()" />
         </div>
       </div>
+
       <q-separator style="width: 100%" />
       <div class="col-12 flex justify-between items-end q-pr-sm q-pt-sm">
         <div
@@ -159,6 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :leftWidth="leftWidth"
                 class="trace-tree"
                 @toggle-collapse="toggleSpanCollapse"
+                @select-span="updateSelectedSpan"
               />
             </div>
           </div>
@@ -166,12 +267,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <q-separator vertical />
       <div
-        v-if="isSidebarOpen && selectedSpanId"
+        v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
         class="histogram-sidebar"
         :class="isTimelineExpanded ? '' : 'full'"
       >
         <trace-details-sidebar
-          :span="spanMap[selectedSpanId as string]"
+          :span="showTraceDetails ? traceDetails : spanMap[selectedSpanId as string]"
+          @view-logs="redirectToLogs"
           @close="closeSidebar"
         />
       </div>
@@ -195,6 +297,8 @@ import {
   onMounted,
   watch,
   defineAsyncComponent,
+  onBeforeMount,
+  onActivated,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import SpanRenderer from "./SpanRenderer.vue";
@@ -214,6 +318,12 @@ import {
 import { throttle } from "lodash-es";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import useStreams from "@/composables/useStreams";
+import { b64EncodeUnicode } from "@/utils/zincutils";
+import { useRouter } from "vue-router";
+import searchService from "@/services/search";
+import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "TraceDetails",
@@ -238,7 +348,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
-    const { searchObj } = useTraces();
+    const { searchObj, copyTracesUrl } = useTraces();
     const baseTracePosition: any = ref({});
     const collapseMapping: any = ref({});
     const traceRootSpan: any = ref(null);
@@ -247,6 +357,7 @@ export default defineComponent({
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
     const traceServiceMap: any = ref({});
+    const { getStreams } = useStreams();
     const spanDimensions = {
       height: 30,
       barHeight: 8,
@@ -262,9 +373,21 @@ export default defineComponent({
       colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
 
+    const { showErrorNotification } = useNotifications();
+
+    const logStreams = ref([]);
+
+    const filteredStreamOptions = ref([]);
+
+    const streamSearchValue = ref<string>("");
+
     const { t } = useI18n();
 
     const $q = useQuasar();
+
+    const router = useRouter();
+
+    const traceDetails = ref({});
 
     const traceVisuals = [
       { label: "Timeline", value: "timeline", icon: TraceTimelineIcon },
@@ -285,14 +408,90 @@ export default defineComponent({
 
     const throttledResizing = ref<any>(null);
 
+    const serviceColorIndex = ref(0);
+    const colors = ref(["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"]);
+
     const spanList: any = computed(() => {
       return searchObj.data.traceDetails.spanList;
     });
 
     const isTimelineExpanded = ref(false);
 
+    const selectedStreamsString = computed(() =>
+      searchObj.data.traceDetails.selectedLogStreams.join(", ")
+    );
+
+    const showTraceDetails = ref(false);
+
+    onActivated(() => {
+      const params = router.currentRoute.value.query;
+
+      if (
+        searchObj.data.traceDetails.selectedTrace &&
+        params.trace_id !== searchObj.data.traceDetails.selectedTrace?.trace_id
+      ) {
+        resetTraceDetails();
+        setupTraceDetails();
+      }
+    });
+
+    onBeforeMount(async () => {
+      setupTraceDetails();
+    });
+
+    watch(
+      () => router.currentRoute.value.query.trace_id,
+      (_new, _old) => {
+        if (_new !== _old) {
+          resetTraceDetails();
+          setupTraceDetails();
+          const params = router.currentRoute.value.query;
+          if (params.span_id) {
+            updateSelectedSpan(params.span_id as string);
+          }
+        }
+      }
+    );
+
+    const resetTraceDetails = () => {
+      searchObj.data.traceDetails.showSpanDetails = false;
+      searchObj.data.traceDetails.selectedSpanId = "";
+      searchObj.data.traceDetails.selectedTrace = {
+        trace_id: "",
+        trace_start_time: 0,
+        trace_end_time: 0,
+      };
+      searchObj.data.traceDetails.spanList = [];
+      searchObj.data.traceDetails.loading = true;
+    };
+
+    const setupTraceDetails = async () => {
+      showTraceDetails.value = false;
+      searchObj.data.traceDetails.showSpanDetails = false;
+      searchObj.data.traceDetails.selectedSpanId = "";
+
+      await getTraceMeta();
+      await getStreams("logs", false)
+        .then((res: any) => {
+          logStreams.value = res.list.map((option: any) => option.name);
+          filteredStreamOptions.value = JSON.parse(
+            JSON.stringify(logStreams.value)
+          );
+
+          if (!searchObj.data.traceDetails.selectedLogStreams.length)
+            searchObj.data.traceDetails.selectedLogStreams.push(
+              logStreams.value[0]
+            );
+        })
+        .catch(() => Promise.reject())
+        .finally(() => {});
+    };
+
     onMounted(() => {
-      buildTracesTree();
+      const params = router.currentRoute.value.query;
+      if (params.span_id) {
+        updateSelectedSpan(params.span_id as string);
+      }
     });
 
     watch(
@@ -312,6 +511,155 @@ export default defineComponent({
     const selectedSpanId = computed(() => {
       return searchObj.data.traceDetails.selectedSpanId;
     });
+
+    const getTraceMeta = () => {
+      searchObj.loading = true;
+
+      let filter = (router.currentRoute.value.query.filter as string) || "";
+
+      if (filter?.length)
+        filter += ` and trace_id='${router.currentRoute.value.query.trace_id}'`;
+      else filter += `trace_id='${router.currentRoute.value.query.trace_id}'`;
+
+      searchService
+        .get_traces({
+          org_identifier: router.currentRoute.value.query
+            .org_identifier as string,
+          start_time: Number(router.currentRoute.value.query.from),
+          end_time: Number(router.currentRoute.value.query.to),
+          filter: filter || "",
+          size: 1,
+          from: 0,
+          stream_name: router.currentRoute.value.query.stream as string,
+        })
+        .then(async (res: any) => {
+          const trace = getTracesMetaData(res.data.hits)[0];
+          if (!trace) {
+            showTraceDetailsError();
+            return;
+          }
+          searchObj.data.traceDetails.selectedTrace = trace;
+          getTraceDetails();
+        })
+        .catch(() => {
+          showTraceDetailsError();
+        })
+        .finally(() => {
+          searchObj.loading = false;
+        });
+    };
+
+    const getDefaultRequest = () => {
+      return {
+        query: {
+          sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start_time/1000) as trace_start_time, max(end_time/1000) as trace_end_time, min(service_name) as service_name, min(operation_name) as operation_name, count(trace_id) as spans, SUM(CASE WHEN span_status='ERROR' THEN 1 ELSE 0 END) as errors, max(duration) as duration, trace_id [QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE] group by trace_id order by zo_sql_timestamp DESC`,
+          start_time: (new Date().getTime() - 900000) * 1000,
+          end_time: new Date().getTime() * 1000,
+          from: 0,
+          size: 0,
+        },
+        encoding: "base64",
+      };
+    };
+
+    const buildTraceSearchQuery = (trace: any) => {
+      const req = getDefaultRequest();
+      req.query.from = 0;
+      req.query.size = 1000;
+      req.query.start_time =
+        Math.ceil(
+          Number(searchObj.data.traceDetails.selectedTrace?.trace_start_time)
+        ) - 30000000;
+      req.query.end_time =
+        Math.ceil(
+          Number(searchObj.data.traceDetails.selectedTrace?.trace_end_time)
+        ) + 30000000;
+
+      req.query.sql = b64EncodeUnicode(
+        `SELECT * FROM ${trace.stream} WHERE trace_id = '${trace.trace_id}' ORDER BY start_time`
+      ) as string;
+
+      return req;
+    };
+
+    const getTraceDetails = async () => {
+      searchObj.data.traceDetails.loading = true;
+      searchObj.data.traceDetails.spanList = [];
+      const req = buildTraceSearchQuery(router.currentRoute.value.query);
+
+      searchService
+        .search(
+          {
+            org_identifier: router.currentRoute.value.query
+              ?.org_identifier as string,
+            query: req,
+            page_type: "traces",
+          },
+          "UI"
+        )
+        .then((res: any) => {
+          searchObj.data.traceDetails.spanList = res.data?.hits || [];
+          buildTracesTree();
+        })
+        .finally(() => {
+          searchObj.data.traceDetails.loading = false;
+        });
+    };
+
+    const getTracesMetaData = (traces: any[]) => {
+      if (!traces.length) return [];
+
+      return traces.map((trace) => {
+        const _trace = {
+          trace_id: trace.trace_id,
+          trace_start_time: Math.round(trace.start_time / 1000),
+          trace_end_time: Math.round(trace.end_time / 1000),
+          service_name: trace.service_name,
+          operation_name: trace.operation_name,
+          spans: trace.spans[0],
+          errors: trace.spans[1],
+          duration: trace.duration,
+          services: {} as any,
+          zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
+        };
+        trace.service_name.forEach((service: any) => {
+          if (!searchObj.meta.serviceColors[service.service_name]) {
+            if (serviceColorIndex.value >= colors.value.length)
+              generateNewColor();
+
+            searchObj.meta.serviceColors[service.service_name] =
+              colors.value[serviceColorIndex.value];
+
+            serviceColorIndex.value++;
+          }
+          _trace.services[service.service_name] = service.count;
+        });
+        return _trace;
+      });
+    };
+
+    const showTraceDetailsError = () => {
+      showErrorNotification(
+        `Trace ${router.currentRoute.value.query.trace_id} not found`
+      );
+      const query = cloneDeep(router.currentRoute.value.query);
+      delete query.trace_id;
+      router.push({
+        name: "traces",
+        query: {
+          ...query,
+        },
+      });
+      return;
+    };
+
+    function generateNewColor() {
+      // Generate a color in HSL format
+      const hue = colors.value.length * (360 / 50);
+      const lightness = 50 + (colors.value.length % 2) * 15;
+      colors.value.push(`hsl(${hue}, 100%, ${lightness}%)`);
+      return colors;
+    }
 
     const calculateTracePosition = () => {
       const tics = [];
@@ -371,6 +719,8 @@ export default defineComponent({
         span.index = i;
 
         collapseMapping.value[span.spanId] = true;
+
+        span.links = JSON.parse(span.links || "[]");
 
         if (!span.parentId) {
           traceTree.value.push(span);
@@ -719,10 +1069,64 @@ export default defineComponent({
     };
 
     const shareLink = () => {
-      emit("shareLink");
+      copyTracesUrl({
+        from: router.currentRoute.value.query.from as string,
+        to: router.currentRoute.value.query.to as string,
+      });
+    };
+
+    const redirectToLogs = () => {
+      if (!searchObj.data.traceDetails.selectedTrace) {
+        return;
+      }
+      const stream: string =
+        searchObj.data.traceDetails.selectedLogStreams.join(",");
+      const from =
+        searchObj.data.traceDetails.selectedTrace?.trace_start_time - 60000000;
+      const to =
+        searchObj.data.traceDetails.selectedTrace?.trace_end_time + 60000000;
+      const refresh = 0;
+      const query = b64EncodeUnicode(
+        `trace_id='${spanList.value[0]["trace_id"]}'`
+      );
+
+      router.push({
+        path: "/logs",
+        query: {
+          stream_type: "logs",
+          stream,
+          from,
+          to,
+          refresh,
+          sql_mode: "false",
+          query,
+          org_identifier: store.state.selectedOrganization.identifier,
+          show_histogram: "true",
+          type: "trace_explorer",
+          quick_mode: "false",
+        },
+      });
+    };
+
+    const filterStreamFn = (val: any = "") => {
+      filteredStreamOptions.value = logStreams.value.filter((stream: any) => {
+        return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
+      });
+    };
+
+    const openTraceDetails = () => {
+      searchObj.data.traceDetails.showSpanDetails = true;
+      showTraceDetails.value = true;
+    };
+
+    const updateSelectedSpan = (spanId: string) => {
+      showTraceDetails.value = false;
+      searchObj.data.traceDetails.showSpanDetails = true;
+      searchObj.data.traceDetails.selectedSpanId = spanId;
     };
 
     return {
+      router,
       t,
       traceTree,
       collapseMapping,
@@ -754,6 +1158,16 @@ export default defineComponent({
       copyToClipboard,
       copyTraceId,
       shareLink,
+      outlinedInfo,
+      redirectToLogs,
+      filteredStreamOptions,
+      filterStreamFn,
+      streamSearchValue,
+      selectedStreamsString,
+      openTraceDetails,
+      showTraceDetails,
+      traceDetails,
+      updateSelectedSpan,
     };
   },
 });
@@ -765,6 +1179,7 @@ $seperatorWidth: 2px;
 $toolbarHeight: 50px;
 $traceHeaderHeight: 30px;
 $traceChartHeight: 210px;
+$appNavbarHeight: 57px;
 
 $traceChartCollapseHeight: 42px;
 
@@ -772,7 +1187,6 @@ $traceChartCollapseHeight: 42px;
   height: $toolbarHeight;
 }
 .trace-details {
-  height: 100vh;
   overflow: auto;
 }
 .histogram-container-full {
@@ -784,23 +1198,27 @@ $traceChartCollapseHeight: 42px;
 
 .histogram-sidebar {
   width: $sidebarWidth;
-  height: calc(100vh - $toolbarHeight - $traceChartHeight - 44px);
+  height: calc(
+    100vh - $toolbarHeight - $traceChartHeight - 44px - $appNavbarHeight
+  );
   overflow-y: auto;
   overflow-x: hidden;
 
   &.full {
-    height: calc(100vh - $toolbarHeight - 8px - 44px);
+    height: calc(100vh - $toolbarHeight - 8px - 44px - $appNavbarHeight);
   }
 }
 
 .histogram-spans-container {
-  height: calc(100vh - $toolbarHeight - $traceChartHeight - 44px);
+  height: calc(
+    100vh - $toolbarHeight - $traceChartHeight - 44px - $appNavbarHeight
+  );
   overflow-y: auto;
   position: relative;
   overflow-x: hidden;
 
   &.full {
-    height: calc(100vh - $toolbarHeight - 8px - 44px);
+    height: calc(100vh - $toolbarHeight - 8px - 44px - $appNavbarHeight);
   }
 }
 
@@ -822,6 +1240,14 @@ $traceChartCollapseHeight: 42px;
     .q-icon {
       color: #ffffff !important;
     }
+  }
+}
+
+.log-stream-search-input {
+  width: 226px;
+
+  .q-field .q-field__control {
+    padding: 0px 8px;
   }
 }
 </style>
@@ -866,6 +1292,39 @@ $traceChartCollapseHeight: 42px;
   &:hover {
     &.q-icon {
       text-shadow: 0px 2px 8px rgba(0, 0, 0, 0.5);
+    }
+  }
+}
+
+.trace-logs-selector {
+  .q-field {
+    span {
+      display: inline-block;
+      width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: left;
+    }
+  }
+}
+
+.log-stream-search-input {
+  .q-field .q-field__control {
+    padding: 0px 4px;
+  }
+}
+
+.traces-view-logs-btn {
+  height: 36px;
+  margin-left: -1px;
+  border-top-left-radius: 0px;
+  border-bottom-left-radius: 0px;
+
+  .q-btn__content {
+    span {
+      font-size: 12px;
+      color: #343434;
     }
   }
 }
