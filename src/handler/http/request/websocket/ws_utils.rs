@@ -150,9 +150,9 @@ pub async fn insert_trace_id_to_req_id(trace_id: String, request_id: String) {
 }
 
 pub async fn print_req_id_to_trace_id() {
-    println!("Traceid -> request_id");
+    log::debug!("WS_TRACE_ID_TO_REQ_ID:");
     for (trace_id, req_id) in WS_TRACE_ID_TO_REQ_ID.lock().await.iter() {
-        println!("{} -> {}", trace_id, req_id);
+        log::debug!("{} -> {}", trace_id, req_id);
     }
 }
 
@@ -174,7 +174,6 @@ static WS_SESSIONS_BY_REQ_ID: Lazy<Mutex<HashMap<String, actix_ws::Session>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub async fn remove_from_ws_session_by_req_id(request_id: String) {
-    log::info!("Removing ws session for request id {}", request_id);
     WS_SESSIONS_BY_REQ_ID.lock().await.remove(&request_id);
 }
 
@@ -190,9 +189,9 @@ pub async fn get_ws_session_by_req_id(request_id: &str) -> Option<actix_ws::Sess
 }
 
 pub async fn print_sessions() {
-    println!("Sessions:");
+    log::debug!("WS_SESSIONS_BY_REQ_ID:");
     for (req_id, _session) in WS_SESSIONS_BY_REQ_ID.lock().await.iter() {
-        println!("Request id found {}", req_id);
+        log::debug!("Request id found {}", req_id);
     }
 }
 
@@ -215,9 +214,9 @@ pub async fn remove_from_ws_trace_id_query_object(trace_id: &str) {
 }
 
 pub async fn print_ws_trace_id_query_object() {
-    println!("Traceid -> query_object");
+    log::debug!("WS_TRACE_ID_QUERY_OBJECT:");
     for (trace_id, query_object) in WS_TRACE_ID_QUERY_OBJECT.lock().await.iter() {
-        println!("{} -> {:?}", trace_id, query_object);
+        log::debug!("{} -> {:?}", trace_id, query_object);
     }
 }
 #[cfg(test)]

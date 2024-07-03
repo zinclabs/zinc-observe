@@ -707,6 +707,13 @@ pub struct Common {
         help = "Discard data of last n seconds from cached results"
     )]
     pub result_cache_discard_duration: i64,
+
+    #[env_config(
+        name = "ZO_ENABLE_WEBSOCKETS",
+        default = "false",
+        help = "Enable websocket support in the server, defaults to false"
+    )]
+    pub enable_websockets: bool,
 }
 
 #[derive(EnvConfig)]

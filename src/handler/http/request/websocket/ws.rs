@@ -5,6 +5,7 @@ use std::{
 
 use actix_web::{get, web, Error, HttpRequest, HttpResponse};
 use actix_ws::{Message, Session};
+use config::get_config;
 use futures::stream::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -68,7 +69,7 @@ async fn websocket_handler(
                 match msg {
                     Ok(Message::Ping(bytes)) => {
                         if session.pong(&bytes).await.is_err() {
-                            log::info!("Failed to send pong, bailing");
+                            log::info!("[WEBSOCKET]: Failed to send pong, bailing");
                             return;
                         }
                     }
@@ -76,7 +77,7 @@ async fn websocket_handler(
                         match serde_json::from_str::<WSClientMessage>(&msg){
                             Ok(client_msg) => {
                                 let trace_id = client_msg.trace_id().to_string();
-                                log::info!("Received trace_registration msg: {:?}", client_msg);
+                                log::debug!("[WEBSOCKET]: Received trace_registration msg: {:?}", client_msg);
                                 insert_trace_id_to_req_id(trace_id.clone(), request_id.clone()).await;
                                 if let WSClientMessage::Search{  .. } = client_msg {
                                    insert_in_ws_trace_id_query_object(trace_id, client_msg.clone()).await;
@@ -90,12 +91,12 @@ async fn websocket_handler(
                     }
                     Ok(Message::Close(reason)) => {
                         let _ = session.close(reason).await;
-                        log::info!("Got close, bailing");
+                        log::info!("[WEBSOCKET]: Got close, bailing");
                         return;
                     }
                     Ok(Message::Continuation(_)) => {
                         let _ = session.close(None).await;
-                        log::info!("Got continuation, bailing");
+                        log::info!("[WEBSOCKET]: Got continuation, bailing");
                         return;
                     }
                     Ok(Message::Pong(_)) => {
@@ -108,25 +109,23 @@ async fn websocket_handler(
                 print_req_id_to_trace_id().await;
                 print_sessions().await;
 
-                log::info!("Search completed received ws message: {:?}", ws_internal_msg);
                 let trace_id = ws_internal_msg.trace_id().to_string();
-                // remove the last part of the trace_id as it contains suffixes -01,-02 for subsearches
 
+                // remove the last part of the trace_id as it contains suffixes -01,-02 for subsearches
                 let trace_id = trace_id.split('-').collect::<Vec<&str>>()[0];
                 let request_id = get_req_id_from_trace_id(trace_id).await;
                 if request_id.is_none(){
-                    log::error!("Trace_id not found in req_id map: {}", trace_id);
+                    log::error!("[WEBSOCKET]: Trace_id not found in req_id map: {}", trace_id);
                     continue;
                 }
 
                 log::info!("request_id: {:?} -> trace_id: {}", request_id, trace_id);
                 let ws_session = get_ws_session_by_req_id(request_id.unwrap().as_ref()).await;
                 if ws_session.is_none() {
-                    log::error!("No websocket session found for trace_id: {}", trace_id);
+                    log::error!("[WEBSOCKET]: No websocket session found for trace_id: {}", trace_id);
                     continue;
                 }
                 let mut ws_session = ws_session.unwrap();
-                log::info!("Found websocket session for user_id: {} trace_id: {}", ws_internal_msg.user_id, trace_id);
 
                 let data = match ws_internal_msg.payload {
                     WSMessageType::QueryEnqueued{..} => {
@@ -140,34 +139,32 @@ async fn websocket_handler(
                                 }
                             },
                             _ => {
-                                log::error!("Failed to get query object from cache");
+                                log::error!("[WEBSOCKET]: Failed to get query object from cache");
                                 continue;
                             }
                         }
                     },
                     _ => {
-                        log::error!("Unknown ws message type: {:?}", ws_internal_msg.payload);
+                        log::error!("[WEBSOCKET]: Unknown ws message type: {:?}", ws_internal_msg.payload);
                         todo!()}
                 };
                 let payload = serde_json::to_string(&data).unwrap();
-                log::info!("Sending message to the user: {}", &payload);
                 if let Err(e) = ws_session.text(payload).await {
-                    log::error!("Error sending message: {}", e);
+                    log::error!("[WEBSOCKET]: Error sending message: {}", e);
                     break;
                 }
-                log::info!("Sent message to the user, removing this trace_id from cache {}", &trace_id);
                 let _ = remove_trace_id_from_cache(trace_id).await;
                 continue;
 
             }
             else =>{
-                log::info!("Break the look because no message received");
+                log::info!("[WEBSOCKET]: Break the look because no message received");
                  break
                 },
         }
     }
 
-    log::info!("Breaking the loop, everything is done");
+    log::info!("[WEBSOCKET]: Breaking the loop, everything is done");
     let _ = session.close(None).await;
 }
 
@@ -183,13 +180,20 @@ pub async fn websocket(
     stream: web::Payload,
     query: web::Query<WSQueryParam>,
 ) -> Result<HttpResponse, Error> {
+    let cfg = get_config();
+    if !cfg.common.enable_websockets {
+        log::info!(
+            "[WEBSOCKET]: Websocket is disabled. Set env `ZO_ENABLE_WEBSOCKETS=true` to enable it"
+        );
+        return Ok(HttpResponse::Ok().finish());
+    }
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
     let user_id = user_id.into_inner();
     let request_id = query.request_id.clone();
 
-    log::info!(
-        "Got websocket request for user_id: {} request_id {}",
+    log::debug!(
+        "[WEBSOCKET]: Got websocket request for user_id: {} request_id {}",
         user_id,
         request_id
     );
