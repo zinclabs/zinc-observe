@@ -374,7 +374,7 @@
           </div>
         </div>
       </div>
-      <div v-if="links.length">
+      <div v-if="span.links.length">
         <div
           class="flex items-center no-wrap cursor-pointer"
           @click="toggleLinks"
@@ -395,12 +395,12 @@
               font-size: 12px;
             "
           >
-            {{ links.length }}
+            {{ span.links.length }}
           </div>
         </div>
         <div v-show="isLinksExpanded" class="q-px-md q-my-sm">
           <q-separator />
-          <template v-for="link in links" :key="link.context.spanId">
+          <template v-for="link in span.links" :key="link.context.spanId">
             <div
               class="flex row justify-between items-center q-pa-xs links-container"
             >
@@ -434,7 +434,7 @@
           </template>
           <div
             class="full-width text-center q-pt-lg text-bold"
-            v-if="!links.length"
+            v-if="!span.links.length"
           >
             No events present for this span
           </div>

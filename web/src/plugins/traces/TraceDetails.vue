@@ -720,6 +720,8 @@ export default defineComponent({
 
         collapseMapping.value[span.spanId] = true;
 
+        span.links = JSON.parse(span.links || "[]");
+
         if (!span.parentId) {
           traceTree.value.push(span);
         } else if (!formattedSpanMap[span.parentId]) {
