@@ -41,6 +41,7 @@ pub struct Span {
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub service: HashMap<String, json::Value>,
     pub events: String,
+    pub links: String,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -59,6 +60,30 @@ pub struct Event {
     #[serde(flatten)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     pub attributes: HashMap<String, json::Value>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpanLinkContext {
+    pub trace_id: String,
+    pub span_id: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_flags: Option<u32>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_state: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpanLink {
+    pub context: SpanLinkContext,
+    #[serde(flatten)]
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    pub attributes: HashMap<String, json::Value>,
+    #[serde(default)]
+    pub dropped_attributes_count: u32,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, ToSchema)]

@@ -43,7 +43,7 @@ use crate::{
         alerts::Alert,
         http::HttpResponse as MetaHttpResponse,
         stream::{SchemaRecords, StreamParams},
-        traces::{Event, Span, SpanRefType},
+        traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
     service::{
         db, format_stream_name,
@@ -196,6 +196,24 @@ pub async fn handle_trace_request(
                     })
                 }
 
+                let mut links = vec![];
+                let mut link_att_map: HashMap<String, json::Value> = HashMap::new();
+                for link in span.links {
+                    for link_att in link.attributes {
+                        link_att_map.insert(link_att.key, get_val(&link_att.value.as_ref()));
+                    }
+                    links.push(SpanLink {
+                        context: SpanLinkContext {
+                            span_id: String::from_utf8(link.span_id).unwrap(),
+                            trace_id: String::from_utf8(link.trace_id).unwrap(),
+                            trace_flags: Some(link.flags),
+                            trace_state: Some(link.trace_state),
+                        },
+                        attributes: link_att_map.clone(),
+                        dropped_attributes_count: link.dropped_attributes_count, // TODO: add appropriate value
+                    })
+                }
+
                 let timestamp = (start_time / 1000) as i64;
                 if timestamp < min_ts {
                     partial_success.rejected_spans += 1;
@@ -218,6 +236,7 @@ pub async fn handle_trace_request(
                     flags: 1, // TODO add appropriate value
                     //_timestamp: timestamp,
                     events: json::to_string(&events).unwrap(),
+                    links: json::to_string(&links).unwrap(),
                 };
 
                 let value: json::Value = json::to_value(local_val).unwrap();
