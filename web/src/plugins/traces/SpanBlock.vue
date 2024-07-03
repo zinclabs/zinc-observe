@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         paddingBottom: '6px',
       }"
       ref="spanBlock"
-      @click="selectSpan"
+      @click="selectSpan(span.spanId)"
       @mouseover="onSpanHover"
     >
       <div
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         class="cursor-pointer flex items-center no-wrap position-relative"
         :class="defocusSpan ? 'defocus' : ''"
-        @click="selectSpan"
+        @click="selectSpan(span.spanId)"
       >
         <div
           :style="{
@@ -104,6 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :spanData="spanData"
         :baseTracePosition="baseTracePosition"
         @view-logs="viewSpanLogs"
+        @select-span="selectSpan"
       />
     </template>
   </div>
@@ -169,8 +170,9 @@ export default defineComponent({
     });
     const router = useRouter();
     const { t } = useI18n();
-    const selectSpan = () => {
-      emit("selectSpan", props.span.spanId);
+
+    const selectSpan = (spanId: string) => {
+      emit("selectSpan", spanId);
     };
     const toggleSpanCollapse = () => {
       emit("toggleCollapse", props.span.spanId);

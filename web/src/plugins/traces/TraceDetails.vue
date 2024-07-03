@@ -257,7 +257,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :spanDimensions="spanDimensions"
                 :spanMap="spanMap"
                 :leftWidth="leftWidth"
-                class="trace-tree"
                 @toggle-collapse="toggleSpanCollapse"
                 @select-span="updateSelectedSpan"
               />
@@ -720,8 +719,6 @@ export default defineComponent({
 
         collapseMapping.value[span.spanId] = true;
 
-        span.links = JSON.parse(span.links || "[]");
-
         if (!span.parentId) {
           traceTree.value.push(span);
         } else if (!formattedSpanMap[span.parentId]) {
@@ -874,6 +871,7 @@ export default defineComponent({
         style: {
           color: "",
         },
+        links: JSON.parse(span.links || "[]"),
       };
     };
 

@@ -503,7 +503,7 @@ const links = [
   },
 ];
 
-const emit = defineEmits(["view-logs"]);
+const emit = defineEmits(["view-logs", "select-span"]);
 
 const store = useStore();
 
@@ -687,6 +687,11 @@ const openReferenceTrace = (type: string, link: any) => {
 
   if (type !== "span") {
     delete query.span_id;
+  }
+
+  if (query.trace_id === props.spanData.trace_id) {
+    emit("select-span", link.context.spanId);
+    return;
   }
 
   router.push({
