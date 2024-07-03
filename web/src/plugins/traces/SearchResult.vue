@@ -67,7 +67,6 @@ import { useI18n } from "vue-i18n";
 import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
 import { getImageURL } from "../../utils/zincutils";
-import TraceDetails from "./TraceDetails.vue";
 import { convertTraceData } from "@/utils/traces/convertTraceData";
 import TraceBlock from "./TraceBlock.vue";
 import { useRouter } from "vue-router";
@@ -75,7 +74,6 @@ import { useRouter } from "vue-router";
 export default defineComponent({
   name: "SearchResult",
   components: {
-    TraceDetails,
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue")
     ),
@@ -208,7 +206,7 @@ export default defineComponent({
     };
 
     const closeTraceDetails = () => {
-      const query = cloneDeep(router.currentRoute.value.query);
+      const query = JSON.parse(JSON.stringify(router.currentRoute.value.query));
       delete query.trace_id;
       if (query.span_id) delete query.span_id;
 
