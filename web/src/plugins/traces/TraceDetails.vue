@@ -441,7 +441,12 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.trace_id,
       (_new, _old) => {
-        if (_new !== _old) {
+        // If trace_id changes, reset the trace details
+        if (
+          _new &&
+          _new !== _old &&
+          _new !== searchObj.data.traceDetails.selectedTrace?.trace_id
+        ) {
           resetTraceDetails();
           setupTraceDetails();
           const params = router.currentRoute.value.query;
@@ -934,100 +939,6 @@ export default defineComponent({
       timeRange.value.end = data.end || 0;
       calculateTracePosition();
     };
-    const mockServiceMap = [
-      {
-        name: "Service A",
-        color: "#000000",
-        duration: "10",
-        children: [
-          {
-            name: "Service B",
-            color: "#000000",
-            duration: "10",
-
-            children: [
-              {
-                name: "Service c",
-                color: "#000000",
-                duration: "10",
-
-                children: [
-                  {
-                    name: "Service F",
-                    color: "#000000",
-                    duration: "10",
-
-                    children: [
-                      {
-                        name: "Service G",
-                        color: "#000000",
-                        duration: "10",
-
-                        children: [
-                          {
-                            name: "Service H",
-                            color: "#000000",
-                            duration: "10",
-
-                            children: [
-                              {
-                                name: "Service H",
-                                color: "#000000",
-                                duration: "10",
-
-                                children: [
-                                  {
-                                    name: "Service H",
-                                    color: "#000000",
-                                    duration: "10",
-
-                                    children: [
-                                      {
-                                        name: "Service H H H H H H H H H H H H H H H H H",
-                                        color: "#000000",
-                                        duration: "10",
-                                      },
-                                    ],
-                                  },
-                                ],
-                              },
-                            ],
-                          },
-                        ],
-                      },
-                    ],
-                  },
-                ],
-              },
-              {
-                name: "Service E",
-                color: "#000000",
-                duration: "10",
-              },
-            ],
-          },
-          { name: "Service D", color: "#000000", duration: "10" },
-          { name: "Service D", color: "#000000", duration: "10" },
-        ],
-      },
-      {
-        name: "Service X",
-        color: "#000000",
-        duration: "10",
-      },
-      {
-        name: "Service Y",
-        color: "#000000",
-        duration: "10",
-        children: [
-          {
-            name: "Service YA",
-            color: "#000000",
-            duration: "10",
-          },
-        ],
-      },
-    ];
 
     onMounted(() => {
       throttledResizing.value = throttle(resizing, 50);
@@ -1144,7 +1055,6 @@ export default defineComponent({
       traceChart,
       updateChart,
       traceServiceMap,
-      mockServiceMap,
       activeVisual,
       traceVisuals,
       getImageURL,

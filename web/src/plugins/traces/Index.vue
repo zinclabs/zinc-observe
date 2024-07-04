@@ -1145,6 +1145,7 @@ export default defineComponent({
     });
 
     onActivated(() => {
+      restoreUrlQueryParams();
       const params = router.currentRoute.value.query;
       if (params.reload === "true") {
         loadPageData();

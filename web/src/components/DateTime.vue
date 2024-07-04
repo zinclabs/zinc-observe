@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-cy="date-time-button"
       outline
       no-caps
-      :label="displayValue"
+      :label="getDisplayValue"
       icon="schedule"
       icon-right="arrow_drop_down"
       class="date-time-button"
@@ -315,6 +315,7 @@ import {
   onMounted,
   watch,
   nextTick,
+  onActivated,
 } from "vue";
 import {
   getImageURL,
@@ -478,7 +479,7 @@ export default defineComponent({
         selectedType.value = props.defaultType;
         setAbsoluteTime(startTime, endTime);
         setRelativeTime(props.defaultRelativeTime);
-        displayValue.value = getDisplayValue();
+        // displayValue.value = getDisplayValue();
 
         if (props.autoApply) saveDate(props.defaultType);
       } catch (e) {
@@ -510,12 +511,31 @@ export default defineComponent({
         router.currentRoute.value.query?.from;
       },
       () => {
-        if(router.currentRoute.value.query.hasOwnProperty("from") && router.currentRoute.value.query.hasOwnProperty("to")) {
+        if (
+          router.currentRoute.value.query.hasOwnProperty("from") &&
+          router.currentRoute.value.query.hasOwnProperty("to")
+        ) {
           selectedType.value = "absolute";
-          selectedTime.value.startTime = timestampToTimezoneDate(router.currentRoute.value.query?.from/1000, store.state.timezone, "HH:mm");
-          selectedTime.value.endTime = timestampToTimezoneDate(router.currentRoute.value.query?.to/1000, store.state.timezone, "HH:mm");
-          selectedDate.value.from = timestampToTimezoneDate(router.currentRoute.value.query?.from/1000, store.state.timezone, "yyyy/MM/dd");
-          selectedDate.value.to = timestampToTimezoneDate(router.currentRoute.value.query?.to/1000, store.state.timezone, "yyyy/MM/dd");
+          selectedTime.value.startTime = timestampToTimezoneDate(
+            router.currentRoute.value.query?.from / 1000,
+            store.state.timezone,
+            "HH:mm"
+          );
+          selectedTime.value.endTime = timestampToTimezoneDate(
+            router.currentRoute.value.query?.to / 1000,
+            store.state.timezone,
+            "HH:mm"
+          );
+          selectedDate.value.from = timestampToTimezoneDate(
+            router.currentRoute.value.query?.from / 1000,
+            store.state.timezone,
+            "yyyy/MM/dd"
+          );
+          selectedDate.value.to = timestampToTimezoneDate(
+            router.currentRoute.value.query?.to / 1000,
+            store.state.timezone,
+            "yyyy/MM/dd"
+          );
           saveDate("absolute");
         }
       },
@@ -568,6 +588,8 @@ export default defineComponent({
         if (periodValue) {
           relativeValue.value = parseInt(periodValue);
         }
+
+        selectedType.value = "relative";
       }
     };
 
@@ -623,7 +645,7 @@ export default defineComponent({
     };
 
     const saveDate = (dateType) => {
-      displayValue.value = getDisplayValue();
+      // displayValue.value = getDisplayValue();
       const date = getConsumableDateTime();
       if (isNaN(date.endTime) || isNaN(date.startTime)) {
         return false;
@@ -784,10 +806,10 @@ export default defineComponent({
         }
       }
 
-      displayValue.value = getDisplayValue();
+      // displayValue.value = getDisplayValue();
     };
 
-    const getDisplayValue = () => {
+    const getDisplayValue = computed(() => {
       if (selectedType.value === "relative") {
         return `Past ${relativeValue.value} ${getPeriodLabel.value}`;
       } else {
@@ -805,7 +827,7 @@ export default defineComponent({
           return `${todayDate} ${selectedTime.value.startTime} - ${todayDate} ${selectedTime.value.endTime}`;
         }
       }
-    };
+    });
 
     const timezoneFilterFn = (val, update) => {
       filteredTimezone.value = filterColumns(timezoneOptions, val, update);
@@ -839,7 +861,7 @@ export default defineComponent({
 
     const setDateType = (type) => {
       selectedType.value = type;
-      displayValue.value = getDisplayValue();
+      // displayValue.value = getDisplayValue();
 
       if (props.autoApply)
         saveDate(type === "absolute" ? "absolute" : "relative-custom");
@@ -876,6 +898,8 @@ export default defineComponent({
       getConsumableDateTime,
       relativeDatesInHour,
       setAbsoluteTime,
+      setRelativeTime,
+      getDisplayValue,
     };
   },
 });
