@@ -622,6 +622,7 @@ pub(crate) fn setup_logs() -> tracing_appender::non_blocking::WorkerGuard {
                 .with_default_directive(TracingLevelFilter::INFO.into())
                 .from_env_lossy(),
         )
+        .with(config::meta::logger::TraceIdFormat)
         .with(layer)
         .init();
     guard

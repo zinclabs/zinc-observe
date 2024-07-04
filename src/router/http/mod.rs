@@ -18,7 +18,8 @@ use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
 use crate::common::infra::cluster;
 
-const QUERIER_ROUTES: [&str; 18] = [
+const QUERIER_ROUTES: [&str; 19] = [
+    "/ws",
     "/config",
     "/summary",
     "/organizations",
