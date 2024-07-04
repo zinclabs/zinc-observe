@@ -52,11 +52,6 @@ use super::usage::report_request_usage_stats;
 use crate::{
     common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
     handler::grpc::request::search::Searcher,
-    handler::{
-        http::request::websocket::ws_utils::{
-            WSInternalMessage, WSMessageType, WEBSOCKET_MSG_CHAN,
-        },
-    },
     service::format_partition_key,
 };
 
