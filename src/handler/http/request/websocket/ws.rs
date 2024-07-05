@@ -127,9 +127,11 @@ async fn websocket_handler(
                 }
                 let mut ws_session = ws_session.unwrap();
 
+                let wsclient_msg = get_ws_trace_id_query_object(trace_id).await;
+
+                log::info!("[WEBSOCKET]: Sending message to ws client: {:?}", ws_internal_msg);
                 let data = match ws_internal_msg.payload {
                     WSMessageType::QueryEnqueued{..} => {
-                        let wsclient_msg = get_ws_trace_id_query_object(trace_id).await;
                         match wsclient_msg{
                             Some(WSClientMessage::Search{ query, query_type,.. }) => {
                                 WSServerResponseMessage::QueryEnqueued{
@@ -139,7 +141,38 @@ async fn websocket_handler(
                                 }
                             },
                             _ => {
-                                log::error!("[WEBSOCKET]: Failed to get query object from cache");
+                                log::error!("[WEBSOCKET]: Failed to get query object from cache for trace_id: {}", trace_id);
+                                continue;
+                            }
+                        }
+                    },
+                    WSMessageType::QueryProcessingStarted{..} => {
+                        match wsclient_msg{
+                            Some(WSClientMessage::Search{ query, query_type,.. }) => {
+                                WSServerResponseMessage::QueryProcessingStarted {
+                                    trace_id: trace_id.to_string(),
+                                    query: query.clone(),
+                                    query_type: query_type.clone(),
+                                }
+                            },
+                            _ => {
+                                log::error!("[WEBSOCKET]: Failed to get query object from cache for trace_id: {}", trace_id);
+                                continue;
+                            }
+                        }
+                    },
+                    WSMessageType::QueryDone{..} => {
+                        match wsclient_msg{
+                            Some(WSClientMessage::Search{ query, query_type,.. }) => {
+                                let _ = remove_trace_id_from_cache(trace_id).await;
+                                WSServerResponseMessage::QueryDone {
+                                    trace_id: trace_id.to_string(),
+                                    query: query.clone(),
+                                    query_type: query_type.clone(),
+                                }
+                            },
+                            _ => {
+                                log::error!("[WEBSOCKET]: Failed to get query object from cache for trace_id: {}", trace_id);
                                 continue;
                             }
                         }
@@ -153,9 +186,6 @@ async fn websocket_handler(
                     log::error!("[WEBSOCKET]: Error sending message: {}", e);
                     break;
                 }
-                let _ = remove_trace_id_from_cache(trace_id).await;
-                continue;
-
             }
             else =>{
                 log::info!("[WEBSOCKET]: Break the look because no message received");

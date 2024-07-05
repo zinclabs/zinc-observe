@@ -12,8 +12,9 @@ use tokio::sync::{broadcast, Mutex};
 )]
 pub enum WSMessageType {
     QueryEnqueued { trace_id: String },
-    QueryCanceled { trace_id: String },
     QueryProcessingStarted { trace_id: String },
+    QueryCanceled { trace_id: String },
+    QueryDone { trace_id: String },
 }
 
 impl WSInternalMessage {
@@ -22,6 +23,7 @@ impl WSInternalMessage {
             WSMessageType::QueryEnqueued { trace_id, .. } => trace_id,
             WSMessageType::QueryCanceled { trace_id } => trace_id,
             WSMessageType::QueryProcessingStarted { trace_id } => trace_id,
+            WSMessageType::QueryDone { trace_id } => trace_id,
         }
     }
 }
@@ -110,6 +112,18 @@ impl WSClientMessage {
 )]
 pub enum WSServerResponseMessage {
     QueryEnqueued {
+        trace_id: String,
+        query: WSQueryPayload,
+        #[serde(rename = "type")]
+        query_type: String,
+    },
+    QueryProcessingStarted {
+        trace_id: String,
+        query: WSQueryPayload,
+        #[serde(rename = "type")]
+        query_type: String,
+    },
+    QueryDone {
         trace_id: String,
         query: WSQueryPayload,
         #[serde(rename = "type")]

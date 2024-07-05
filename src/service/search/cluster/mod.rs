@@ -316,37 +316,50 @@ pub async fn search(
 
     // 3. process the search in the work group
     #[cfg(feature = "enterprise")]
-    if let Err(e) = work_group
+    {
+        if let Err(e) = work_group
         .as_ref()
         .unwrap()
         .process(trace_id, user_id,) //TODO(ansrivas): Query started processing
         .await
-    {
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&req.org_id])
-            .dec();
-        let _ = WEBSOCKET_MSG_CHAN.0.send(WSInternalMessage {
-            user_id: user_id.unwrap().to_string(),
-            payload: WSMessageType::QueryProcessingStarted {
-                trace_id: trace_id.to_string(),
-            },
-        });
-
-        dist_lock::unlock(&locker).await?;
-        return Err(Error::Message(e.to_string()));
+        {
+            metrics::QUERY_PENDING_NUMS
+                .with_label_values(&[&req.org_id])
+                .dec();
+            dist_lock::unlock(&locker).await?;
+            return Err(Error::Message(e.to_string()));
+        } else {
+            log::debug!("[trace_id {trace_id}] search: work_group job processing started");
+            let _ = WEBSOCKET_MSG_CHAN.0.send(WSInternalMessage {
+                user_id: user_id.unwrap().to_string(),
+                payload: WSMessageType::QueryProcessingStarted {
+                    trace_id: trace_id.to_string(),
+                },
+            });
+        }
     }
     #[cfg(feature = "enterprise")]
-    if let Err(e) = dist_lock::unlock(&locker).await {
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&req.org_id])
-            .dec();
-        work_group
-            .as_ref()
-            .unwrap()
-            .done(trace_id, user_id)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
-        return Err(e);
+    {
+        if let Err(e) = dist_lock::unlock(&locker).await {
+            metrics::QUERY_PENDING_NUMS
+                .with_label_values(&[&req.org_id])
+                .dec();
+            work_group
+                .as_ref()
+                .unwrap()
+                .done(trace_id, user_id)
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+            return Err(e);
+        } else {
+            log::debug!("[trace_id {trace_id}] search: work_group job processing done");
+            let _ = WEBSOCKET_MSG_CHAN.0.send(WSInternalMessage {
+                user_id: user_id.unwrap().to_string(),
+                payload: WSMessageType::QueryDone {
+                    trace_id: trace_id.to_string(),
+                },
+            });
+        }
     }
     // done in the queue
     let took_wait = start.elapsed().as_millis() as usize - file_list_took;
