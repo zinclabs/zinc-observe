@@ -15,10 +15,14 @@
 
 use ::config::{get_config, meta::cluster::Role, utils::rand::get_rand_element};
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
+use actix_web_actors::ws;
+use tokio::sync::mpsc;
 
 use crate::common::infra::cluster;
+mod ws_proxy;
+pub use ws_proxy::CustomWebSocketHandlers;
 
-const QUERIER_ROUTES: [&str; 18] = [
+const QUERIER_ROUTES: [&str; 19] = [
     "/config",
     "/summary",
     "/organizations",
@@ -26,6 +30,7 @@ const QUERIER_ROUTES: [&str; 18] = [
     "/schema",
     "/streams",
     "/clusters",
+    "/ws/querier",
     "/query_manager",
     "/_search",
     "/_around",
@@ -149,6 +154,27 @@ async fn dispatch(
     let new_url = get_url(path).await;
     if new_url.is_error {
         return Ok(HttpResponse::ServiceUnavailable().body(new_url.value));
+    }
+
+    // Check if the request is for the WebSocket querier
+    if path.starts_with("/ws/querier") {
+        // Upgrade to WebSocket and handle accordingly
+        let ws_resp = ws::start(
+            CustomWebSocketHandlers {
+                tx: mpsc::unbounded_channel().0,
+                url: new_url.value.to_string(),
+            },
+            &req,
+            payload,
+        );
+        let resp = match ws_resp {
+            Ok(resp) => Ok(resp),
+            Err(e) => {
+                log::error!("dispatch: {}", e);
+                Ok(HttpResponse::ServiceUnavailable().body(e.to_string()))
+            }
+        };
+        return resp;
     }
 
     // send query

@@ -203,7 +203,7 @@ pub struct WSQueryParam {
     pub request_id: String,
 }
 
-#[get("/ws/{user_id}")]
+#[get("/ws/querier/{user_id}")]
 pub async fn websocket(
     user_id: web::Path<String>,
     req: HttpRequest,
