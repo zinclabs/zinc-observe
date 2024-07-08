@@ -55,6 +55,10 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
   "support-rust-embed-for-web",
   "base64",
 ] }
+actix-ws = "0.2.5"
+actix = "0.13.5"
+tokio-tungstenite = "0.23.1"
+actix-web-actors = "4.3.0"
 ahash.workspace = true
 anyhow.workspace = true
 argon2.workspace = true
@@ -162,7 +166,7 @@ ingester.workspace = true
 report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
-actix-ws = "0.2.5"
+
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
