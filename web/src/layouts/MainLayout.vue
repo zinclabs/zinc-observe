@@ -107,7 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
         </div>
         <ThemeSwitcher></ThemeSwitcher>
-        <template v-if="config.isCloud !== 'true' && !store.state.zoConfig?.custom_hide_menus?.split(',')?.includes('openapi')">
+        <template
+          v-if="
+            config.isCloud !== 'true' &&
+            !store.state.zoConfig?.custom_hide_menus
+              ?.split(',')
+              ?.includes('openapi')
+          "
+        >
           <q-btn
             class="q-ml-xs no-border"
             size="13px"
@@ -174,6 +181,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
             @update:model-value="updateOrganization()"
           />
+        </div>
+
+        <div data-test="navbar-notifications" class="q-mx-sm tw-relative">
+          <q-btn
+            flat
+            dense
+            unelevated
+            no-caps
+            size="12px"
+            padding="xs sm"
+            :icon="outlinedNotifications"
+            @click.stop="toggleNotifications"
+          >
+          </q-btn>
+
+          <div
+            v-if="unreadNotifications.length"
+            class="tw-absolute tw-top-[6px] tw-right-[8px] tw-text-[11px] tw-w-[10px] tw-h-[10px] tw-bg-white tw-rounded-full tw-flex tw-justify-center tw-items-center"
+          >
+            <div
+              class="tw-top-[6px] tw-right-[10px] tw-text-[11px] tw-w-[7px] tw-h-[7px] tw-bg-primary tw-rounded-full"
+            />
+          </div>
         </div>
 
         <div class="q-mr-xs">
@@ -350,12 +380,15 @@ import {
   outlinedSettings,
   outlinedManageAccounts,
   outlinedDescription,
+  outlinedNotifications,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
+import useWebSocket from "@/composables/useWebSocket";
+import useNotifications from "@/composables/useNotifications";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -438,6 +471,9 @@ export default defineComponent({
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
     const { getStreams, resetStreams } = useStreams();
+
+    const { openWebSocket, closeWebSocket } = useWebSocket();
+    const { unreadNotifications } = useNotifications();
 
     const isMonacoEditorLoaded = ref(false);
 
@@ -1006,6 +1042,9 @@ export default defineComponent({
       triggerRefreshToken,
       prefetch,
       expandMenu,
+      toggleNotifications,
+      outlinedNotifications,
+      unreadNotifications,
     };
   },
   computed: {
