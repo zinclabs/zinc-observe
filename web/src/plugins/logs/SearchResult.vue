@@ -23,6 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="searchListContainer"
       style="width: 100%"
     >
+      <!-- <div
+        v-if="searchObj.loadingHistogram == true"
+        class="loader-overlay absolute full-width"
+      /> -->
+
       <div class="row">
         <div class="col-6 text-left q-pl-lg q-mt-xs">
           {{ noOfRecordsTitle }}
@@ -83,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @updated:dataZoom="onChartUpdate"
         />
         <div
-          class="q-pb-lg"
+          class="q-pb-lg histogram-loader"
           style="top: 50px; position: absolute; left: 45%"
           v-if="searchObj.loadingHistogram == true"
         >
@@ -92,6 +97,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="25px"
             style="margin: 0 auto; display: block"
           />
+          <div class="text-subtitle2 text-weight-bold">
+            <template v-if="searchObj.histogramLoadingStatus">
+              {{ searchObj.histogramLoadingStatus }}
+            </template>
+            <template v-else>
+              {{ t("confirmDialog.loading") }}
+            </template>
+          </div>
         </div>
       </div>
       <div
@@ -138,10 +151,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         :style="{
           wordBreak: 'break-word',
-          height:
-            !searchObj.meta.showHistogram
-              ? 'calc(100% - 40px)'
-              : 'calc(100% - 140px)',
+          height: !searchObj.meta.showHistogram
+            ? 'calc(100% - 40px)'
+            : 'calc(100% - 140px)',
         }"
       >
         <template v-slot:before>
@@ -223,13 +235,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="text-subtitle2 text-weight-bold">
                   <q-spinner-hourglass size="20px" />
-                  {{ t("confirmDialog.loading") }}
+                  <template v-if="searchObj.logsLoadingStatus">
+                    {{ searchObj.logsLoadingStatus }}
+                  </template>
+                  <template v-else>
+                    {{ t("confirmDialog.loading") }}
+                  </template>
                 </div>
               </td>
             </tr>
             <tr
               v-if="
-                searchObj.loading == false && searchObj.data.missingStreamMessage != ''
+                searchObj.loading == false &&
+                searchObj.data.missingStreamMessage != ''
               "
             >
               <td
@@ -776,6 +794,16 @@ export default defineComponent({
 
 .search-list {
   width: 100%;
+
+  .loader-overlay {
+    height: 140px;
+    background: rgb(216 216 216 / 50%);
+    z-index: 1;
+  }
+
+  .histogram-loader {
+    z-index: 2;
+  }
 
   .chart {
     width: 100%;
