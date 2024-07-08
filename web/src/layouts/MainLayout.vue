@@ -684,7 +684,7 @@ export default defineComponent({
     };
 
     const setWebSocket = () => {
-      let url = `ws://${store.state.API_ENDPOINT.split("//")[1]}/api/ws/${
+      let url = `ws://${store.state.API_ENDPOINT.split("//")[1]}/api/ws/querier/${
         store.state.userInfo.email
       }?request_id=${store.state.sessionId}`;
 
