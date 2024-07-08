@@ -71,6 +71,12 @@ export default createStore({
     savedViewFlag: false,
     savedFunctionDialog: false,
     regionInfo: [],
+    notifications: {
+      isOpen: false,
+      notifications: [] as Notification[],
+    },
+    sessionId: "",
+    webSocketUrl: "",
   },
   mutations: {
     login(state, payload) {
@@ -178,6 +184,45 @@ export default createStore({
     },
     setRegionInfo(state, payload) {
       state.regionInfo = payload;
+    },
+    addNotification(state, notification: Notification) {
+      state.notifications.notifications.push(notification);
+    },
+    removeNotification(state, notificationId) {
+      state.notifications.notifications =
+        state.notifications.notifications.filter(
+          (notification) => notification.id !== notificationId
+        );
+    },
+    markNotificationAsRead(state, notificationId) {
+      const notification = state.notifications.notifications.find(
+        (notification) => notification.id === notificationId
+      );
+      if (notification) {
+        notification.read = true;
+      }
+    },
+    markAllNotificationsAsRead(state) {
+      state.notifications.notifications.forEach((notification) => {
+        notification.read = true;
+      });
+    },
+    expandNotifications(state, notificationId) {
+      const notification = state.notifications.notifications.find(
+        (notification) => notification.id === notificationId
+      );
+      if (notification) {
+        notification.expanded = !notification.expanded;
+      }
+    },
+    setNotificationDrawer(state, payload) {
+      state.notifications.isOpen = payload;
+    },
+    setSessionId(state, payload) {
+      state.sessionId = payload;
+    },
+    setWebSocketUrl(state, payload) {
+      state.webSocketUrl = payload;
     },
   },
   actions: {
