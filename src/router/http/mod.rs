@@ -158,6 +158,10 @@ async fn dispatch(
 
     // Check if the request is for the WebSocket querier
     if path.starts_with("/ws/querier") {
+        log::info!(
+            "WebSocket request received on dispatcher: {}",
+            new_url.value.to_string()
+        );
         // Upgrade to WebSocket and handle accordingly
         let ws_resp = ws::start(
             CustomWebSocketHandlers {

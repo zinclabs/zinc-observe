@@ -27,7 +27,7 @@ fn from_actix_message(msg: ws::Message) -> tungstenite::Message {
             tungstenite::Message::Close(None)
         }
         _ => {
-            log::debug!("[WebSocketProxy] Unsupported message type");
+            log::info!("[WebSocketProxy] Unsupported message type");
             tungstenite::Message::Close(None)
         }
     }
@@ -41,7 +41,7 @@ fn from_tungstenite_msg_to_actix_msg(msg: tungstenite::Message) -> ws::Message {
         tungstenite::Message::Pong(msg) => ws::Message::Pong(msg.into()),
         tungstenite::Message::Close(None) => ws::Message::Close(None),
         _ => {
-            log::debug!("[WebSocketProxy] Unsupported message type");
+            log::info!("[WebSocketProxy] Unsupported message type");
             ws::Message::Close(None)
         }
     }
@@ -67,7 +67,7 @@ impl actix::Actor for CustomWebSocketHandlers {
 
             tokio::spawn(async move {
                 while let Some(msg) = rx.recv().await {
-                    log::debug!(
+                    log::info!(
                         "[WebSocketProxy] Received message from the original websocket actor: {msg:?}"
                     );
                     ws_sink
@@ -78,7 +78,7 @@ impl actix::Actor for CustomWebSocketHandlers {
             });
 
             while let Some(Ok(msg)) = ws_stream.next().await {
-                log::debug!(
+                log::info!(
                     "[WebSocketProxy] Should have sent to the original websocket actor to send back to client: {msg:?}"
                 );
                 let to_send = from_tungstenite_msg_to_actix_msg(msg);
@@ -94,22 +94,22 @@ impl Handler<WebSocketMessageWrapper> for CustomWebSocketHandlers {
     fn handle(&mut self, msg: WebSocketMessageWrapper, ctx: &mut Self::Context) {
         match msg.0 {
             ws::Message::Text(text) => {
-                log::debug!(
+                log::info!(
                     "[WebSocketProxy] [WebSocketProxy] Text message received: {}",
                     text
                 );
                 ctx.text(text);
             }
             ws::Message::Binary(bin) => {
-                log::debug!("[WebSocketProxy] Binary message received: {:?}", bin);
+                log::info!("[WebSocketProxy] Binary message received: {:?}", bin);
                 ctx.binary(bin);
             }
             ws::Message::Ping(msg) => {
-                log::debug!("[WebSocketProxy] Ping message received: {:?}", msg);
+                log::info!("[WebSocketProxy] Ping message received: {:?}", msg);
                 ctx.ping(&msg);
             }
             ws::Message::Pong(msg) => {
-                log::debug!("[WebSocketProxy] Pong message received: {:?}", msg);
+                log::info!("[WebSocketProxy] Pong message received: {:?}", msg);
                 ctx.pong(&msg);
             }
             ws::Message::Close(reason) => {
