@@ -19,6 +19,7 @@ import {
   useLocalCurrentUser,
   useLocalTimezone,
 } from "../utils/zincutils";
+import type { Notification } from "@/ts/interfaces/notification";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -324,6 +325,30 @@ export default createStore({
     },
     setRegionInfo(context, payload) {
       context.commit("setRegionInfo", payload);
+    },
+    addNotification({ commit }, notification: Notification) {
+      commit("addNotification", notification);
+    },
+    removeNotification({ commit }, notificationId: number) {
+      commit("removeNotification", notificationId);
+    },
+    markAsRead({ commit }, notificationId: number) {
+      commit("markNotificationAsRead", notificationId);
+    },
+    markAllAsRead({ commit }) {
+      commit("markAllNotificationsAsRead");
+    },
+    expandNotification({ commit }, notificationId: number) {
+      commit("expandNotifications", notificationId);
+    },
+    setNotificationDrawer({ commit }, payload) {
+      commit("setNotificationDrawer", payload);
+    },
+    setSessionId(context, payload) {
+      context.commit("setSessionId", payload);
+    },
+    setWebSocketUrl(context, payload) {
+      context.commit("setWebSocketUrl", payload);
     },
   },
   modules: {},
