@@ -27,12 +27,14 @@ import "./styles/quasar-overrides.scss";
 import config from "./aws-exports";
 import SearchPlugin from "./plugins/index";
 import configService from "./services/config";
+import clickOutside from "@/directives/clickOutside";
 
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 
 const app = createApp(App);
 const router = createRouter(store);
+app.directive("click-outside", clickOutside);
 
 app
   .use(Quasar, {
