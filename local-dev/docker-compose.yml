@@ -1,0 +1,114 @@
+services:
+  postgres:
+    container_name: o2-postgres
+    image: postgres:15-alpine
+    ports:
+      - 5432:5432
+    volumes:
+      - o2-postgres-vol:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=S3cret
+      - POSTGRES_USER=o2pguser
+      - POSTGRES_DB=o2pgdb
+  nats:
+    container_name: o2-nats
+    image: nats:2.10-alpine3.20
+    ports:
+      - 4222:4222
+    command: ["-js"]
+  minio:
+    container_name: o2-minio
+    image: quay.io/minio/minio:latest
+    ports:
+      - 9000:9000
+      - 9001:9001
+    environment:
+      - MINIO_ROOT_USER=miniorootuser
+      - MINIO_ROOT_PASSWORD=miniorootpassword
+    command: ["server", "/data", "--console-address", ":9001"]
+  o2_ingester:
+    container_name: o2-ingester
+    image: github.com/ansrivas/o2local:latest
+    ports:
+      - 5080:5080
+    environment:
+      - ZO_LOCAL_MODE=false
+      - ZO_FILE_PUSH_INTERVAL=10
+      - ZO_TELEMETRY=false
+      - ZO_ROOT_USER_EMAIL=root@example.com
+      - ZO_ROOT_USER_PASSWORD=Complexpass#123
+      - ZO_BLOOM_FILTER_ENABLED=true
+      - ZO_BLOOM_FILTER_DEFAULT_COLUMNS="trace_id,span_id,parent_id"
+      - ZO_COMPACT_INTERVAL=1
+      - RUST_LOG=info,actix_web::middleware=warn
+      - ZO_ENABLE_WEBSOCKETS=true
+      - ZO_HTTP_PORT=5080
+      - ZO_NODE_ROLE=ingester
+      - ZO_META_POSTGRES_DSN=postgresql://o2pguser:S3cret@postgres/o2pgdb
+      - ZO_S3_ACCESS_KEY="miniorootuser"
+      - ZO_S3_SECRET_KEY="miniorootpassword"
+      - ZO_S3_SERVER_URL="http://minio:9000"
+      - ZO_S3_BUCKET_NAME="o2data"
+      - ZO_S3_REGION_NAME="us-west-1"
+      - ZO_S3_PROVIDER="minio"
+      - ZO_NATS_ADDR=nats://nats:4222
+      - ZO_CLUSTER_COORDINATOR=nats
+
+  o2_querier:
+    container_name: o2-querier
+    image: github.com/ansrivas/o2local:latest
+    ports:
+      - 5081:5081
+    environment:
+      - ZO_LOCAL_MODE=false
+      - ZO_FILE_PUSH_INTERVAL=10
+      - ZO_TELEMETRY=false
+      - ZO_ROOT_USER_EMAIL=root@example.com
+      - ZO_ROOT_USER_PASSWORD=Complexpass#123
+      - ZO_BLOOM_FILTER_ENABLED=true
+      - ZO_BLOOM_FILTER_DEFAULT_COLUMNS="trace_id,span_id,parent_id"
+      - ZO_COMPACT_INTERVAL=1
+      - RUST_LOG=info,actix_web::middleware=warn
+      - ZO_ENABLE_WEBSOCKETS=true
+      - ZO_HTTP_PORT=5081
+      - ZO_NODE_ROLE=querier
+      - ZO_META_POSTGRES_DSN=postgresql://o2pguser:S3cret@postgres/o2pgdb
+      - ZO_META_STORE=postgres
+      - ZO_S3_ACCESS_KEY="miniorootuser"
+      - ZO_S3_SECRET_KEY="miniorootpassword"
+      - ZO_S3_SERVER_URL="http://minio:9000"
+      - ZO_S3_BUCKET_NAME="o2data"
+      - ZO_S3_REGION_NAME="us-west-1"
+      - ZO_S3_PROVIDER="minio"
+      - ZO_NATS_ADDR=nats://nats:4222
+      - ZO_CLUSTER_COORDINATOR=nats
+
+  o2_router:
+    container_name: o2-router
+    image: github.com/ansrivas/o2local:latest
+    ports:
+      - 5082:5082
+    environment:
+      - ZO_LOCAL_MODE=false
+      - ZO_FILE_PUSH_INTERVAL=10
+      - ZO_TELEMETRY=false
+      - ZO_ROOT_USER_EMAIL=root@example.com
+      - ZO_ROOT_USER_PASSWORD=Complexpass#123
+      - ZO_BLOOM_FILTER_ENABLED=true
+      - ZO_BLOOM_FILTER_DEFAULT_COLUMNS="trace_id,span_id,parent_id"
+      - ZO_COMPACT_INTERVAL=1
+      - RUST_LOG=info,actix_web::middleware=warn
+      - ZO_ENABLE_WEBSOCKETS=true
+      - ZO_HTTP_PORT=5082
+      - ZO_NODE_ROLE=router
+      - ZO_META_POSTGRES_DSN=postgresql://o2pguser:S3cret@postgres/o2pgdb
+      - ZO_S3_ACCESS_KEY="miniorootuser"
+      - ZO_S3_SECRET_KEY="miniorootpassword"
+      - ZO_S3_SERVER_URL="http://minio:9000"
+      - ZO_S3_BUCKET_NAME="o2data"
+      - ZO_S3_REGION_NAME="us-west-1"
+      - ZO_S3_PROVIDER="minio"
+      - ZO_NATS_ADDR=nats://nats:4222
+      - ZO_CLUSTER_COORDINATOR=nats
+volumes:
+  o2-postgres-vol: {}
