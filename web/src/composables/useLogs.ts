@@ -63,6 +63,8 @@ const defaultObject = {
   loadingHistogram: false,
   loadingStream: false,
   loadingSavedView: false,
+  logsLoadingStatus: "",
+  histogramLoadingStatus: "",
   shouldIgnoreWatcher: false,
   config: {
     splitterModel: 20,
@@ -1015,7 +1017,8 @@ const useLogs = () => {
     } catch (e: any) {
       // showErrorNotification("Invalid SQL Syntax");
       console.log(e);
-      notificationMsg.value = "An error occurred while constructing the search query.";
+      notificationMsg.value =
+        "An error occurred while constructing the search query.";
       return "";
     }
   }
@@ -1044,7 +1047,8 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
 
       if (searchObj.meta.sqlMode && parsedSQL == undefined) {
-        searchObj.data.queryResults.error = "Error while search partition. Search query is invalid.";
+        searchObj.data.queryResults.error =
+          "Error while search partition. Search query is invalid.";
         return;
       }
 
@@ -1104,6 +1108,17 @@ const useLogs = () => {
           const { traceparent, traceId } = generateTraceContext();
 
           addTraceId(traceId);
+
+          sendMessage(
+            JSON.stringify({
+              type: "search",
+              content: {
+                type: "partition",
+                trace_id: traceId,
+                query: partitionQueryReq,
+              },
+            })
+          );
 
           await searchService
             .partition({
@@ -1317,7 +1332,8 @@ const useLogs = () => {
                   Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
                 0
               );
-            partitionDetail.partitionTotal[0] = searchObj.data.queryResults.total;
+            partitionDetail.partitionTotal[0] =
+              searchObj.data.queryResults.total;
           }
         } else {
           searchObj.data.queryResults.total =
@@ -1456,7 +1472,7 @@ const useLogs = () => {
         isNaN(searchObj.data.datetime.startTime)
       ) {
         const queryParams: any = router.currentRoute.value.query;
-        let currentPeriod: string = queryParams?.period || "15m";
+        const currentPeriod: string = queryParams?.period || "15m";
         const extractedDate: any = extractTimestamps(currentPeriod);
         searchObj.data.datetime.startTime = extractedDate.from;
         searchObj.data.datetime.endTime = extractedDate.to;
@@ -1673,7 +1689,7 @@ const useLogs = () => {
         }
       } else {
         searchObj.loading = false;
-        if(!notificationMsg.value) {
+        if (!notificationMsg.value) {
           notificationMsg.value = "Search query is empty or invalid.";
         }
       }
@@ -1687,7 +1703,9 @@ const useLogs = () => {
       console.log("=================== getQueryData Debug ===================");
     } catch (e: any) {
       searchObj.loading = false;
-      showErrorNotification(notificationMsg.value || "Error occurred during the search operation.");
+      showErrorNotification(
+        notificationMsg.value || "Error occurred during the search operation."
+      );
       notificationMsg.value = "";
     }
   };
@@ -1815,7 +1833,8 @@ const useLogs = () => {
         })
         .catch((err) => {
           searchObj.loading = false;
-          searchObj.data.errorMsg = "Error while processing search total count request.";
+          searchObj.data.errorMsg =
+            "Error while processing search total count request.";
           if (err.response != undefined) {
             searchObj.data.errorMsg = err.response.data.error;
           } else {
@@ -2106,6 +2125,10 @@ const useLogs = () => {
             searchObj.data.errorMsg = err.response.data.message;
           }
           reject(false);
+        })
+        .finally(() => {
+          searchObj.loading = false;
+          searchObj.logsLoadingStatus = "";
         });
     });
   };
@@ -2225,7 +2248,8 @@ const useLogs = () => {
             })
             .catch((err) => {
               searchObj.loadingHistogram = false;
-              searchObj.data.errorMsg = "Error while processing histogram request.";
+              searchObj.data.errorMsg =
+                "Error while processing histogram request.";
               if (err.response != undefined) {
                 searchObj.data.histogram.errorMsg = err.response.data.error;
               } else {
@@ -2249,6 +2273,10 @@ const useLogs = () => {
               }
 
               reject(false);
+            })
+            .finally(() => {
+              searchObj.loadingHistogram = false;
+              searchObj.histogramLoadingStatus = "";
             });
         }
       } catch (e: any) {
@@ -2861,7 +2889,8 @@ const useLogs = () => {
   function getHistogramTitle() {
     try {
       const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
-      const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
+      const startCount =
+        currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
       let endCount;
 
       let totalCount = searchObj.data.queryResults.total || 0;
@@ -3158,14 +3187,17 @@ const useLogs = () => {
   };
 
   const refreshData = () => {
-    try{
+    try {
       if (
         searchObj.meta.refreshInterval > 0 &&
         router.currentRoute.value.name == "logs"
       ) {
         clearInterval(store.state.refreshIntervalID);
         const refreshIntervalID = setInterval(async () => {
-          if (searchObj.loading == false && searchObj.loadingHistogram == false) {
+          if (
+            searchObj.loading == false &&
+            searchObj.loadingHistogram == false
+          ) {
             searchObj.loading = true;
             await getQueryData(false);
             generateHistogramData();

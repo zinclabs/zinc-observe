@@ -56,7 +56,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     :key="
-                      searchObj.data.stream.selectedStream.join(',') || 'default'
+                      searchObj.data.stream.selectedStream.join(',') ||
+                      'default'
                     "
                     class="full-height"
                     @setInterestingFieldInSQLQuery="
@@ -95,8 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                 >
                   <h5 class="text-center">
-                    <q-icon name="warning" color="warning"
-size="10rem" /><br />
+                    <q-icon name="warning" color="warning" size="10rem" /><br />
                     <div
                       data-test="logs-search-filter-error-message"
                       v-html="searchObj.data.filterErrMsg"
@@ -240,6 +240,8 @@ import { verifyOrganizationStatus } from "@/utils/zincutils";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
+import useWebSocket from "@/composables/useWebSocket";
+import { getUUID } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -767,6 +769,47 @@ export default defineComponent({
           setQuery(searchObj.meta.quickMode);
           updateUrlQueryParams();
         }
+      }
+    };
+
+    // --------------- Web Socket -----------------------
+
+    const enqueuedTraceIds = ref([]);
+
+    const onMessage = (event: MessageEvent) => {
+      const eventData = JSON.parse(event.data);
+      if (eventData?.type === "query_enqueued") {
+        const traceId = eventData.content?.trace_id;
+
+        // Return early if traceId is already enqueued
+        if (enqueuedTraceIds.value.includes(traceId)) return;
+
+        // Clear the enqueuedTraceIds array and add the new traceId
+        enqueuedTraceIds.value = [traceId];
+
+        let title;
+        switch (eventData.content?.type) {
+          case "search_logs":
+            searchObj.logsLoadingStatus = "Search Logs Query Enqueued";
+            title = "Search Logs Query Enqueued";
+            break;
+          case "search_logs_histogram":
+            searchObj.histogramLoadingStatus = "Histogram Query Enqueued";
+            title = "Histogram Query Enqueued";
+            break;
+          default:
+            return; // If the type doesn't match, exit early
+        }
+
+        store.dispatch("addNotification", {
+          id: getUUID(),
+          title,
+          message: "",
+          details: "",
+          time: new Date().getTime(),
+          read: false,
+          expanded: false,
+        });
       }
     };
 
