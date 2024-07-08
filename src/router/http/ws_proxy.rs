@@ -106,11 +106,11 @@ impl Handler<WebSocketMessageWrapper> for CustomWebSocketHandlers {
             }
             ws::Message::Ping(msg) => {
                 log::debug!("[WebSocketProxy] Ping message received: {:?}", msg);
-                ctx.ping(&msg.to_vec());
+                ctx.ping(&msg);
             }
             ws::Message::Pong(msg) => {
                 log::debug!("[WebSocketProxy] Pong message received: {:?}", msg);
-                ctx.pong(&msg.to_vec());
+                ctx.pong(&msg);
             }
             ws::Message::Close(reason) => {
                 log::info!("[WebSocketProxy] Close message received: {:?}", reason);
