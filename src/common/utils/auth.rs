@@ -405,9 +405,6 @@ impl FromRequest for AuthExtractor {
                                 )
                                 .as_str(),
                             )
-                        } else if stream_type.eq(&StreamType::Index) {
-                            object_type
-                                .replace("stream:", format!("{}:", StreamType::Logs).as_str())
                         } else {
                             object_type.replace("stream:", format!("{}:", stream_type).as_str())
                         }
