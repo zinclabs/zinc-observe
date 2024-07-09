@@ -40,6 +40,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
 import { logsErrorMessage } from "@/utils/common";
 import useSqlSuggestions from "@/composables/useSuggestions";
+import useWebSocket from "@/composables/useWebSocket";
 // import {
 //   b64EncodeUnicode,
 //   useLocalLogFilterField,
@@ -1772,6 +1773,17 @@ const useLogs = () => {
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
 
+      sendMessage(
+        JSON.stringify({
+          type: "search",
+          content: {
+            type: "search_logs",
+            trace_id: traceId,
+            query: queryReq.query,
+          },
+        })
+      );
+
       searchService
         .search(
           {
@@ -3076,6 +3088,19 @@ const useLogs = () => {
 
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
+
+      sendMessage(
+        JSON.stringify({
+          type: "search",
+          content: {
+            type: "search_logs",
+            trace_id: traceId,
+            query: {
+              sql: sqlContext,
+            },
+          },
+        })
+      );
 
       searchService
         .search_around({

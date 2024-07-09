@@ -216,6 +216,7 @@ export default createStore({
     },
     addNotification(state, notification: Notification) {
       state.notifications.notifications.push(notification);
+      state.notifications.notifications.slice(0, 20);
       state.notifications.isOpen = true;
     },
     removeNotification(state, notificationId) {

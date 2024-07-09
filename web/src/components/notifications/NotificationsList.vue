@@ -10,7 +10,7 @@
         <q-icon size="20px" :name="outlinedCancel" />
       </button>
     </div>
-    <div class="tw-flex tw-justify-between tw-px-4 tw-py-2">
+    <!-- <div class="tw-flex tw-justify-between tw-px-4 tw-py-2">
       <div class="notifications-tabs">
         <AppTabs
           :show="true"
@@ -35,7 +35,7 @@
       >
         Mark all as read
       </button>
-    </div>
+    </div> -->
     <div
       class="notifications-list tw-pb-0 tw-px-3 tw-space-y-3 tw-overflow-y-auto"
     >
@@ -55,16 +55,16 @@
               <p class="tw-font-bold">{{ notification.title }}</p>
 
               <div class="tw-flex tw-items-center">
-                <div
+                <!-- <div
                   v-if="!notification.read"
                   class="tw-mr-2 tw-text-[11px] tw-w-[8px] tw-h-[8px] tw-bg-primary tw-rounded-full"
-                />
-                <button
+                /> -->
+                <!-- <button
                   @click.stop="removeNotification(notification.id)"
                   class="tw-text-gray-500"
                 >
                   <q-icon size="16px" :name="outlinedCancel" />
-                </button>
+                </button> -->
               </div>
             </div>
             <p class="tw-text-[12px] tw-text-gray-500">
@@ -81,7 +81,7 @@
             {{ notification.message }}
           </p>
 
-          <div class="tw-flex tw-justify-between tw-mt-1 tw-space-x-2">
+          <!-- <div class="tw-flex tw-justify-between tw-mt-1 tw-space-x-2">
             <button
               @click="expandNotification(notification.id)"
               class="tw-text-gray-600"
@@ -94,7 +94,7 @@
             >
               Mark as read
             </button>
-          </div>
+          </div> -->
         </div>
       </template>
     </div>
