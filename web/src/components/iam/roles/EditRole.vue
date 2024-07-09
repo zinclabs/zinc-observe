@@ -713,7 +713,8 @@ const updateRolePermissions = async (permissions: Permission[]) => {
       } else if (
         resource === "logs" ||
         resource === "metrics" ||
-        resource === "traces"
+        resource === "traces" ||
+        resource === "index"
       ) {
         const streamResource = resourceMapper["stream"].entities.find(
           (e: Entity) => e.name === resource
@@ -890,7 +891,8 @@ const updateJsonInTable = () => {
       } else if (
         resource === "logs" ||
         resource === "metrics" ||
-        resource === "traces"
+        resource === "traces" ||
+        resource === "index"
       ) {
         resourceDetails = resourceMapper.value["stream"].entities.find(
           (e: Entity) => e.name === resource
@@ -935,7 +937,8 @@ const updateJsonInTable = () => {
       } else if (
         resource === "logs" ||
         resource === "metrics" ||
-        resource === "traces"
+        resource === "traces" ||
+        resource === "index"
       ) {
         resourceDetails = resourceMapper.value["stream"].entities.find(
           (e: Entity) => e.name === resource
@@ -1035,7 +1038,8 @@ const updatePermissionVisibility = (
     if (
       permission.name === "logs" ||
       permission.name === "metrics" ||
-      permission.name === "traces"
+      permission.name === "traces" ||
+      permission.name === "index"
     ) {
       updatePermissionVisibility(
         heavyResourceEntities.value[permission.name] || [],
@@ -1058,7 +1062,8 @@ const updatePermissionVisibility = (
     if (
       permission.name === "logs" ||
       permission.name === "metrics" ||
-      permission.name === "traces"
+      permission.name === "traces" ||
+      permission.name === "index"
     ) {
       filteredEntities =
         heavyResourceEntities.value[permission.name]?.filter(
@@ -1077,7 +1082,8 @@ const updatePermissionVisibility = (
       permission.show &&
       (permission.name === "logs" ||
         permission.name === "metrics" ||
-        permission.name === "traces")
+        permission.name === "traces" ||
+        permission.name === "index")
     ) {
       permission.entities =
         filter.value.permissions === "all"
@@ -1238,6 +1244,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     logs: getLogs,
     metrics: getMetrics,
     traces: getTraces,
+    index: getIndexStreams,
     alert: getAlerts,
     template: getTemplates,
     destination: getDestinations,
@@ -1449,6 +1456,16 @@ const getLogs = async (resource: Resource | Entity) => {
   });
 };
 
+const getIndexStreams = async (resource: Resource | Entity) => {
+  const indices: any = await getStreams("index", false);
+
+  updateEntityEntities(resource, ["name"], indices.list);
+
+  return new Promise((resolve, reject) => {
+    resolve(true);
+  });
+};
+
 const getMetrics = async (resource: Resource | Entity) => {
   const metrics: any = await getStreams("metrics", false);
 
@@ -1484,6 +1501,7 @@ const getStreamsTypes = async () => {
     { stream_type: "logs", name: "Logs" },
     { stream_type: "traces", name: "Traces" },
     { stream_type: "metrics", name: "Metrics" },
+    { stream_type: "index", name: "Indices" },
   ];
 
   streams.forEach((stream) => {
@@ -1614,7 +1632,8 @@ const updateEntityEntities = (
   if (
     entity.name === "logs" ||
     entity.name === "metrics" ||
-    entity.name === "traces"
+    entity.name === "traces" ||
+    entity.name === "index"
   ) {
     heavyResourceEntities.value[entity.name] = [...entities];
     if (entity.entities) entity.entities.push(...entities.slice(0, 50));
