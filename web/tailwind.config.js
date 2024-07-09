@@ -11,10 +11,10 @@ module.exports = {
     extend: {
       colors: {
         primary: {
-          DEFAULT: "rgb(var(--q-primary) / <alpha-value>)",
+          DEFAULT: "#5960B2",
         },
         secondary: {
-          DEFAULT: "rgb(var(--q-secondary) / <alpha-value>)",
+          DEFAULT: "#5ca380",
         },
       },
     },

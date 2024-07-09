@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div data-test="navbar-notifications" class="q-mx-sm">
+        <div data-test="navbar-notifications" class="q-mx-sm tw-relative">
           <q-btn
             flat
             dense
@@ -191,12 +191,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             size="12px"
             padding="xs sm"
-            icon="notifications"
-            @click="toggleNotifications"
-            ><span style="font-size: 12px" class="q-ml-xs"
-              >Notifications {{ store.state.notifications.isOpen }}</span
-            ></q-btn
+            :icon="outlinedNotifications"
+            @click.stop="toggleNotifications"
           >
+          </q-btn>
+
+          <div
+            v-if="unreadNotifications.length"
+            class="tw-absolute tw-top-[6px] tw-right-[8px] tw-text-[11px] tw-w-[10px] tw-h-[10px] tw-bg-white tw-rounded-full tw-flex tw-justify-center tw-items-center"
+          >
+            <div
+              class="tw-top-[6px] tw-right-[10px] tw-text-[11px] tw-w-[7px] tw-h-[7px] tw-bg-primary tw-rounded-full"
+            />
+          </div>
         </div>
 
         <div class="q-mr-xs">
@@ -375,6 +382,7 @@ import {
   outlinedSettings,
   outlinedManageAccounts,
   outlinedDescription,
+  outlinedNotifications,
 } from "@quasar/extras/material-icons-outlined";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
@@ -382,6 +390,7 @@ import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useWebSocket from "@/composables/useWebSocket";
+import useNotifications from "@/composables/useNotifications";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -468,6 +477,7 @@ export default defineComponent({
     const { getStreams, resetStreams } = useStreams();
 
     const { openWebSocket, closeWebSocket } = useWebSocket();
+    const { unreadNotifications } = useNotifications();
 
     const isMonacoEditorLoaded = ref(false);
 
@@ -1068,6 +1078,9 @@ export default defineComponent({
       prefetch,
       expandMenu,
       toggleNotifications,
+      outlinedNotifications,
+      unreadNotifications,
+      closeWebSocket,
     };
   },
   computed: {

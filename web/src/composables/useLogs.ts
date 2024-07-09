@@ -63,6 +63,8 @@ const defaultObject = {
   loadingHistogram: false,
   loadingStream: false,
   loadingSavedView: false,
+  logsLoadingStatus: "",
+  histogramLoadingStatus: "",
   shouldIgnoreWatcher: false,
   config: {
     splitterModel: 20,
@@ -1076,7 +1078,6 @@ const useLogs = () => {
           }
         }
 
-        
         if (parsedSQL != undefined && hasAggregation(parsedSQL?.columns)) {
           searchObj.data.queryResults.partitionDetail = {
             partitions: [],
@@ -1117,7 +1118,6 @@ const useLogs = () => {
               },
             })
           );
-
 
           await searchService
             .partition({
@@ -1771,7 +1771,6 @@ const useLogs = () => {
 
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
-
 
       searchService
         .search(
@@ -3673,12 +3672,6 @@ const useLogs = () => {
         if (searchObj.loading) searchObj.loading = false;
         if (searchObj.loadingHistogram) searchObj.loadingHistogram = false;
       });
-  };
-
-  const getTraceParentHeader = () => {
-    return `00-${getUUID().replace(/-/g, "")}-${getUUID()
-      .replace(/-/g, "")
-      .slice(0, 16)}-01`;
   };
 
   return {

@@ -1,7 +1,7 @@
 <template>
   <div
     v-show="store.state.notifications.isOpen"
-    class="tw-fixed tw-top-[57px] tw-right-0 tw-bg-white tw-z-10"
+    class="tw-fixed tw-top-[57px] tw-right-0 tw-bg-white tw-z-10 tw-max-h-[85%]"
   >
     <notifications-list />
   </div>

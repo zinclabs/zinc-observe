@@ -36,7 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @handleQuickModeChange="handleQuickModeChange"
           />
         </template>
-
         <template v-slot:after>
           <div
             id="thirdLevel"
@@ -229,8 +228,6 @@ import {
   onBeforeMount,
   watch,
   defineAsyncComponent,
-  onMounted,
-  onUnmounted,
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -244,6 +241,7 @@ import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
 import useWebSocket from "@/composables/useWebSocket";
+import { getUUID } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -391,8 +389,9 @@ export default defineComponent({
       addOrderByToQuery,
       getRegionInfo,
     } = useLogs();
-    const { sendMessage, addMessageHandler, removeMessageHandler } =
-      useWebSocket(store.state.webSocketUrl);
+    const { addMessageHandler, removeMessageHandler } = useWebSocket(
+      store.state.webSocketUrl
+    );
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     let parser: any;
@@ -787,32 +786,40 @@ export default defineComponent({
     // --------------- Web Socket -----------------------
 
     const enqueuedTraceIds = ref([]);
+
     const onMessage = (event: MessageEvent) => {
       const eventData = JSON.parse(event.data);
-      console.log("Logs : onMessage", eventData);
       if (eventData?.type === "query_enqueued") {
-        if (
-          enqueuedTraceIds.value.includes(eventData.content?.trace_id)
-        )
-          return;
-        else enqueuedTraceIds.value = [];
+        const traceId = eventData.content?.trace_id;
 
-        enqueuedTraceIds.value.push(eventData.content?.trace_id);
+        // Return early if traceId is already enqueued
+        if (enqueuedTraceIds.value.includes(traceId)) return;
 
-        $q.notify({
-          message: `Query enqueued ${eventData.content?.trace_id}`,
-          color: "primary",
-          position: "top-right",
-          actions: [
-            {
-              icon: "close",
-              color: "white",
-              round: true,
-              handler: () => {
-                /* ... */
-              },
-            },
-          ],
+        // Clear the enqueuedTraceIds array and add the new traceId
+        enqueuedTraceIds.value = [traceId];
+
+        let title;
+        switch (eventData.content?.type) {
+          case "search_logs":
+            searchObj.logsLoadingStatus = "Search Logs Query Enqueued";
+            title = "Search Logs Query Enqueued";
+            break;
+          case "search_logs_histogram":
+            searchObj.histogramLoadingStatus = "Histogram Query Enqueued";
+            title = "Histogram Query Enqueued";
+            break;
+          default:
+            return; // If the type doesn't match, exit early
+        }
+
+        store.dispatch("addNotification", {
+          id: getUUID(),
+          title,
+          message: "",
+          details: "",
+          time: new Date().getTime(),
+          read: false,
+          expanded: false,
         });
       }
     };

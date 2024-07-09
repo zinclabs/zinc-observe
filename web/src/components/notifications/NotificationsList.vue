@@ -1,6 +1,7 @@
 <template>
   <div
     class="tw-mr-4 tw-w-96 tw-bg-white tw-shadow-lg tw-rounded-lg tw-overflow-hidden"
+    v-click-outside="closeNotifications"
   >
     <div class="tw-flex tw-justify-between tw-items-center tw-p-2 tw-border-b">
       <p class="tw-text-lg tw-font-semibold">Notifications</p>
@@ -9,63 +10,115 @@
         <q-icon size="20px" :name="outlinedCancel" />
       </button>
     </div>
-    <div class="tw-flex tw-justify-end tw-px-4 tw-pt-4">
-      <button @click="markAllAsRead" class="tw-text-sm tw-text-blue-500">
+    <div class="tw-flex tw-justify-between tw-px-4 tw-py-2">
+      <div class="notifications-tabs">
+        <AppTabs
+          :show="true"
+          v-model:active-tab="activeTab"
+          :tabs="[
+            {
+              label: 'All',
+              value: 'all',
+            },
+            {
+              label: 'Unread',
+              value: 'unread',
+            },
+          ]"
+          class="tw-text-sm"
+        />
+      </div>
+      <button
+        :disabled="!visibleNotifications.length"
+        @click="markAllAsRead"
+        class="tw-text-sm tw-text-primary"
+      >
         Mark all as read
       </button>
     </div>
-    <div class="tw-p-4 tw-space-y-4">
-      <div
-        v-for="notification in notifications"
-        :key="notification.id"
-        class="tw-p-4 tw-rounded-lg tw-border tw-shadow-sm"
-      >
-        <div>
-          <div class="tw-flex tw-items-center tw-justify-between">
-            <p class="tw-font-bold">{{ notification.title }}</p>
+    <div
+      class="notifications-list tw-pb-0 tw-px-3 tw-space-y-3 tw-overflow-y-auto"
+    >
+      <template v-if="!visibleNotifications.length">
+        <p class="tw-text-center tw-text-gray-500 tw-mt-4 tw-text-[14px]">
+          No notifications to show
+        </p>
+      </template>
+      <template v-else>
+        <div
+          v-for="notification in visibleNotifications"
+          :key="notification.id"
+          class="tw-px-3 tw-py-2 tw-rounded-lg tw-border tw-shadow-sm"
+        >
+          <div>
+            <div class="tw-flex tw-items-center tw-justify-between">
+              <p class="tw-font-bold">{{ notification.title }}</p>
+
+              <div class="tw-flex tw-items-center">
+                <div
+                  v-if="!notification.read"
+                  class="tw-mr-2 tw-text-[11px] tw-w-[8px] tw-h-[8px] tw-bg-primary tw-rounded-full"
+                />
+                <button
+                  @click.stop="removeNotification(notification.id)"
+                  class="tw-text-gray-500"
+                >
+                  <q-icon size="16px" :name="outlinedCancel" />
+                </button>
+              </div>
+            </div>
+            <p class="tw-text-[12px] tw-text-gray-500">
+              {{
+                timestampToTimezoneDate(
+                  notification.time,
+                  useLocalTimezone(),
+                  "dd MMMM    hh:mm a"
+                )
+              }}
+            </p>
+          </div>
+          <p class="tw-mt-1 tw-text-[13px] tw-text-gray-700">
+            {{ notification.message }}
+          </p>
+
+          <div class="tw-flex tw-justify-between tw-mt-1 tw-space-x-2">
             <button
-              @click="removeNotification(notification.id)"
-              class="tw-text-red-500"
+              @click="expandNotification(notification.id)"
+              class="tw-text-gray-600"
             >
-              <q-icon size="16px" :name="outlinedCancel" />
+              Show Details
+            </button>
+            <button
+              @click="markAsRead(notification.id)"
+              class="tw-text-gray-600"
+            >
+              Mark as read
             </button>
           </div>
-          <p class="tw-text-[12px] tw-text-gray-500">
-            {{ notification.time }}
-          </p>
         </div>
-        <p class="tw-mt-2 tw-text-[14px]">{{ notification.message }}</p>
-
-        <div class="tw-flex tw-justify-between tw-mt-2 tw-space-x-2">
-          <button
-            @click="expandNotification(notification.id)"
-            class="tw-text-yellow-500"
-          >
-            Show Details
-          </button>
-          <button
-            @click="expandNotification(notification.id)"
-            class="tw-text-yellow-500"
-          >
-            Mark as read
-          </button>
-        </div>
-      </div>
-      <div class="tw-flex tw-justify-between tw-mt-2 tw-px-2">
-        <button @click="expandNotification" class="tw-text-yellow-500">
-          Show more
-        </button>
-      </div>
+      </template>
+    </div>
+    <div class="tw-flex tw-justify-between tw-py-3 tw-px-3 tw-pl-4">
+      <button
+        :disabled="notificationsToShow >= totalNotifications"
+        @click="showMore"
+        class="tw-text-primary"
+        L
+      >
+        Show more
+      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import { Notification } from "@/types/notification";
 import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
+import AppTabs from "@/components/common/AppTabs.vue";
+import { timestampToTimezoneDate, useLocalTimezone } from "@/utils/zincutils";
 
 const {
   notifications,
@@ -73,13 +126,28 @@ const {
   markAsRead,
   markAllAsRead,
   expandNotification,
+  unreadNotifications,
 } = useNotifications();
 const notificationsToShow = ref(3); // Number of notifications to show initially
 const store = useStore();
+const activeTab = ref("all");
 
-const visibleNotifications = computed(() =>
-  notifications.value.slice(0, notificationsToShow.value)
-);
+const visibleNotifications = computed(() => {
+  if (activeTab.value === "unread") {
+    return unreadNotifications.value.slice(0, notificationsToShow.value);
+  }
+
+  return notifications.value.slice(0, notificationsToShow.value);
+});
+
+const totalNotifications = computed(() => {
+  if (activeTab.value === "unread") {
+    return unreadNotifications.value.length;
+  }
+
+  return notifications.value.length;
+});
+
 const showMoreButton = computed(
   () => notifications.value.length > notificationsToShow.value
 );
@@ -93,6 +161,35 @@ const closeNotifications = () => {
 };
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 /* Add your styles here if needed */
+.notifications-list {
+  max-height: calc(83vh - 81px);
+}
+</style>
+<style lang="scss">
+.notifications-tabs {
+  .rum-tabs:first-child .rum-tab {
+    width: 34px !important;
+  }
+
+  .rum-tabs div:nth-child(2) {
+    .rum-tab {
+      width: 56px !important;
+    }
+  }
+
+  .rum-tab {
+    width: 60px !important;
+    font-size: 12px !important;
+    padding: 0px 4px !important;
+    border: none !important;
+    border-radius: 2px !important;
+
+    &.active {
+      background: $primary !important;
+      color: #ffffff !important;
+    }
+  }
+}
 </style>
