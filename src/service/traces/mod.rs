@@ -445,6 +445,12 @@ async fn write_traces(
             .get("trace_id")
             .unwrap()
             .as_str()
+            .map(|trace_id| {
+                trace_id
+                    .split_once('-')
+                    .map(|(part, _)| part)
+                    .unwrap_or(trace_id)
+            })
             .unwrap()
             .to_string();
         trace_index_values.push(MetadataItem::TraceListIndexer(TraceListItem {
