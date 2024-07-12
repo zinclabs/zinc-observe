@@ -934,12 +934,6 @@ async fn get_file_list_by_inverted_index(
     let cfg = get_config();
     let stream_type = StreamType::from(idx_req.stream_type.as_str());
 
-    // fast_mode is for 1st page optimization
-    //  1. single WHERE clause of `match_all()`
-    //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
-    let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
-        && idx_req.query.as_ref().unwrap().size > 0);
-
     // Get all the unique terms which the user has searched.
     let terms = meta
         .fts_terms
@@ -988,21 +982,13 @@ async fn get_file_list_by_inverted_index(
         })
         .collect::<Vec<_>>();
     let index_condition = index_terms.join(" OR ");
-    let mut search_condition = if fts_condition.is_empty() {
+    let search_condition = if fts_condition.is_empty() {
         index_condition
     } else if index_condition.is_empty() {
         fts_condition
     } else {
         format!("{} OR {}", fts_condition, index_condition)
     };
-
-    let (time_min, time_max) = meta.meta.time_range.unwrap_or((0, 0));
-    if fast_mode && time_min > 0 && time_max > 0 {
-        search_condition = format!(
-            "({}) AND max_ts >= {} AND min_ts <= {}",
-            search_condition, time_max, time_min
-        );
-    }
 
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
@@ -1015,6 +1001,11 @@ async fn get_file_list_by_inverted_index(
         index_stream_name, search_condition, cfg.common.column_timestamp
     );
 
+    // fast_mode is for 1st page optimization
+    //  1. single WHERE clause of `match_all()`
+    //  2. size > 0: hits equal to size (https://github.com/openobserve/openobserve/pull/3658)
+    let fast_mode = (matches!(meta.meta.selection, Some(sqlparser::ast::Expr::Function(_)))
+        && idx_req.query.as_ref().unwrap().size > 0);
     idx_req.stream_type = StreamType::Index.to_string();
     idx_req.query.as_mut().unwrap().sql = query;
     idx_req.query.as_mut().unwrap().sql_mode = "full".to_string();
