@@ -33,13 +33,14 @@ import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import { openobserveRum } from "@openobserve/browser-rum";
+import moment from "moment";
 
-let moment: any;
+// let moment: any;
 
-const importMoment = async () => {
-  const momentModule: any = await import("moment");
-  moment = momentModule.default;
-};
+// const importMoment = async () => {
+//   const momentModule: any = await import("moment");
+//   moment = momentModule.default;
+// };
 
 export default defineComponent({
   name: "PageLoginCallback",
