@@ -35,15 +35,10 @@ import segment from "@/services/segment_analytics";
 import { openobserveRum } from "@openobserve/browser-rum";
 
 let moment: any;
-let momentInitialized = false;
 
 const importMoment = async () => {
-  if (!momentInitialized) {
-    const momentModule: any = await import("moment-timezone");
-    moment = momentModule.default;
-    momentInitialized = true;
-  }
-  return moment;
+  const momentModule: any = await import("moment");
+  moment = momentModule.default;
 };
 
 export default defineComponent({
@@ -54,12 +49,6 @@ export default defineComponent({
     const router = useRouter();
     const selectedOrg = ref("");
     let orgOptions = ref([{ label: Number, value: String }]);
-    let moment: any;
-
-    const importMoment = async () => {
-      const momentModule: any = await import("moment");
-      moment = momentModule.default;
-    };
 
     onBeforeMount(async () => {
       await importMoment();
