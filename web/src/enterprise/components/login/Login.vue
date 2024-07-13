@@ -34,6 +34,18 @@ import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import { openobserveRum } from "@openobserve/browser-rum";
 
+let moment: any;
+let momentInitialized = false;
+
+const importMoment = async () => {
+  if (!momentInitialized) {
+    const momentModule: any = await import("moment-timezone");
+    moment = momentModule.default;
+    momentInitialized = true;
+  }
+  return moment;
+};
+
 export default defineComponent({
   name: "PageLoginCallback",
   setup() {
