@@ -1562,7 +1562,14 @@ fn merge_response(
 
     let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
-    let cache_ts = if cache_response.hits.is_empty() {
+    let cache_ts = if cache_response.hits.is_empty()
+        && !search_response.first().unwrap().hits.is_empty()
+    {
+        get_ts_value(
+            ts_column,
+            search_response.first().unwrap().hits.first().unwrap(),
+        )
+    } else if cache_response.hits.is_empty() && !search_response.last().unwrap().hits.is_empty() {
         get_ts_value(
             ts_column,
             search_response.first().unwrap().hits.first().unwrap(),
