@@ -250,29 +250,14 @@ pub async fn get_cached_results(
                 match get_results(file_path, &file_name).await {
                     Ok(v) => {
                         let mut cached_response: Response = json::from_str::<Response>(&v).unwrap();
-                        let first_ts = get_ts_value(
-                            &cache_req.ts_column,
-                            cached_response.hits.first().unwrap(),
-                        );
-
+                        
                         let last_ts = get_ts_value(
                             &cache_req.ts_column,
                             cached_response.hits.last().unwrap(),
                         );
 
-                        let discard_ts = if cache_req.is_descending {
-                            if cache_req.discard_interval > 0 {
-                                first_ts
-                            } else {
-                                // non-aggregate query
-                                let m_first_ts = round_down_to_nearest_minute(first_ts);
-                                if Utc::now().timestamp_micros() - discard_duration < m_first_ts {
-                                    m_first_ts - discard_duration
-                                } else {
-                                    m_first_ts
-                                }
-                            }
-                        } else if cache_req.discard_interval > 0 {
+                       
+                        let discard_ts = if cache_req.discard_interval > 0 {
                             last_ts
                         } else {
                             // non-aggregate query
