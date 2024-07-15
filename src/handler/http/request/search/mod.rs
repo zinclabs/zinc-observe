@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::{cmp, collections::HashMap, io::Error};
 
 use actix_web::{get, http::StatusCode, post, web, HttpRequest, HttpResponse};
-use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
     get_config,
@@ -26,15 +25,23 @@ use config::{
         usage::{RequestStats, UsageType},
     },
     metrics,
-    utils::{base64, json},
+    utils::{base64, hash::Sum64, json},
     DISTINCT_FIELDS,
 };
-use infra::errors;
+use infra::{
+    cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
+    errors,
+    schema::STREAM_SCHEMAS_LATEST,
+};
 use tracing::{Instrument, Span};
 
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse},
+        meta::{
+            self,
+            http::HttpResponse as MetaHttpResponse,
+            search::{CachedQueryResponse, QueryDelta},
+        },
         utils::{
             functions,
             http::{
@@ -44,8 +51,12 @@ use crate::{
         },
     },
     service::{
-        search as SearchService,
-        usage::{http_report_metrics, report_request_usage_stats},
+        search::{
+            self as SearchService,
+            cache::{cacher::check_cache, result_utils::get_ts_value},
+            sql::RE_ONLY_SELECT,
+        },
+        usage::report_request_usage_stats,
     },
 };
 
@@ -124,6 +135,9 @@ pub async fn search(
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
+    let user_id_hdr = in_req.headers().get("user_id").unwrap();
+    let user_id = user_id_hdr.to_str().unwrap().to_string();
+    let started_at = Utc::now().timestamp_micros();
     let start = std::time::Instant::now();
     let org_id = org_id.into_inner();
     let mut range_error = String::new();
@@ -134,12 +148,6 @@ pub async fn search(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
@@ -147,7 +155,12 @@ pub async fn search(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
+    let search_type = match get_search_type_from_request(&query) {
+        Ok(v) => v,
+        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+    };
+
+    let use_cache = get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -157,13 +170,9 @@ pub async fn search(
         return Ok(MetaHttpResponse::bad_request(e));
     }
 
-    // set search event type
-    req.search_type = match get_search_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
-
-    // get stream name
+    let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
+    rpc_req.org_id = org_id.to_string();
+    rpc_req.stream_type = stream_type.to_string();
     let parsed_sql = match config::meta::sql::Sql::new(&req.query.sql) {
         Ok(v) => v,
         Err(e) => {
@@ -175,23 +184,28 @@ pub async fn search(
             );
         }
     };
+
     let stream_name = &parsed_sql.source;
 
-    // get stream settings
-    if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await {
-        let max_query_range = settings.max_query_range;
-        if max_query_range > 0
-            && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
-                > max_query_range
-        {
-            req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
-            range_error = format!(
-                "Query duration is modified due to query range restriction of {} hours",
-                max_query_range
-            );
+    let r = STREAM_SCHEMAS_LATEST.read().await;
+    let stream_schema = r.get(format!("{}/{}/{}", org_id, stream_type, stream_name).as_str());
+    if let Some(det) = stream_schema {
+        let local_schema = det.schema();
+        if let Some(settings) = infra::schema::unwrap_stream_settings(local_schema) {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && (req.query.end_time - req.query.start_time) / (1000 * 1000 * 60 * 60)
+                    > max_query_range
+            {
+                req.query.start_time = req.query.end_time - max_query_range * 1000 * 1000 * 60 * 60;
+                range_error = format!(
+                    "Query duration is modified due to query range restriction of {} hours",
+                    max_query_range
+                );
+            }
         }
     }
-
+    drop(r);
     // Check permissions on stream
     #[cfg(feature = "enterprise")]
     {
@@ -225,54 +239,269 @@ pub async fn search(
         // Check permissions on stream ends
     }
 
-    // run search with cache
-    let res = SearchService::cache::search(
-        &trace_id,
-        &org_id,
-        stream_type,
-        Some(user_id),
-        &req,
-        use_cache,
-    )
-    .instrument(http_span)
-    .await;
-    match res {
-        Ok(mut res) => {
-            if !range_error.is_empty() {
-                res.is_partial = true;
-                res.function_error = if res.function_error.is_empty() {
-                    range_error
-                } else {
-                    format!("{} \n {}", range_error, res.function_error)
-                };
-                res.new_start_time = Some(req.query.start_time);
-                res.new_end_time = Some(req.query.end_time);
-            }
-            Ok(HttpResponse::Ok().json(res))
-        }
-        Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, "", "500", "_search");
-            log::error!("[trace_id {trace_id}] search error: {}", err);
-            Ok(match err {
-                errors::Error::ErrorCode(code) => match code {
-                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                        .json(meta::http::HttpResponse::error_code_with_trace_id(
-                            code,
-                            Some(trace_id),
-                        )),
-                    _ => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                    ),
-                },
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            })
-        }
-    }
-}
+    // Result caching check start
+    let mut origin_sql = req.query.sql.clone();
+    let is_aggregate = crate::service::search::cache::result_utils::is_aggregate_query(&origin_sql)
+        .unwrap_or_default();
 
+    let mut h = config::utils::hash::gxhash::new();
+    let hashed_query = h.sum64(&origin_sql);
+    let mut file_path = format!(
+        "{}/{}/{}/{}",
+        org_id, stream_type, stream_name, hashed_query
+    );
+
+    let mut should_exec_query = true;
+    let mut ext_took_wait = 0;
+
+    let mut c_resp: CachedQueryResponse = if use_cache && cfg.common.result_cache_enabled {
+        check_cache(
+            &rpc_req,
+            &mut req,
+            &mut origin_sql,
+            &parsed_sql,
+            &mut file_path,
+            is_aggregate,
+            &mut should_exec_query,
+            &trace_id,
+        )
+        .await
+    } else {
+        CachedQueryResponse::default()
+    };
+
+    // No cache data present, add delta for full query
+    if !c_resp.has_cached_data {
+        c_resp.deltas.push(QueryDelta {
+            delta_start_time: req.query.start_time,
+            delta_end_time: req.query.end_time,
+            delta_removed_hits: false,
+        })
+    } else {
+        log::info!(
+            "[trace_id {trace_id}]  query deltas are: {:?}",
+            c_resp.deltas
+        );
+        log::info!(
+            "[trace_id {trace_id}]  Query original start time: {}, end time : {}",
+            req.query.start_time,
+            req.query.end_time
+        );
+    }
+    // Result caching check ends
+    let mut results = Vec::new();
+    let mut res = if should_exec_query {
+        let mut query_fn = req.query.query_fn.and_then(|v| base64::decode_url(&v).ok());
+        if let Some(vrl_function) = &query_fn {
+            if !vrl_function.trim().ends_with('.') {
+                query_fn = Some(format!("{} \n .", vrl_function));
+            }
+        }
+        req.query.query_fn = query_fn;
+
+        for fn_name in functions::get_all_transform_keys(&org_id).await {
+            if req.query.sql.contains(&format!("{}(", fn_name)) {
+                req.query.uses_zo_fn = true;
+                break;
+            }
+        }
+
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .inc();
+
+        // get a local search queue lock
+        #[cfg(not(feature = "enterprise"))]
+        let locker = SearchService::QUEUE_LOCKER.clone();
+        #[cfg(not(feature = "enterprise"))]
+        let locker = locker.lock().await;
+        #[cfg(not(feature = "enterprise"))]
+        if !cfg.common.feature_query_queue_enabled {
+            drop(locker);
+        }
+        #[cfg(not(feature = "enterprise"))]
+        let took_wait = start.elapsed().as_millis() as usize;
+        #[cfg(feature = "enterprise")]
+        let took_wait = 0;
+        ext_took_wait = took_wait;
+        log::info!("http search API wait in queue took: {} ms", took_wait);
+
+        metrics::QUERY_PENDING_NUMS
+            .with_label_values(&[&org_id])
+            .dec();
+
+        let mut tasks = Vec::new();
+
+        for (i, delta) in c_resp.deltas.into_iter().enumerate() {
+            let http_span_local = http_span.clone();
+            let mut req = req.clone();
+            let org_id = org_id.clone();
+            let trace_id = format!("{}-{:?}", trace_id.clone(), i);
+            let user_id = user_id.clone();
+
+            let task = tokio::task::spawn(async move {
+                let trace_id = trace_id.clone();
+                req.query.start_time = delta.delta_start_time;
+                req.query.end_time = delta.delta_end_time;
+                let cfg = get_config();
+
+                if cfg.common.result_cache_enabled
+                    && cfg.common.print_key_sql
+                    && c_resp.has_cached_data
+                {
+                    log::info!(
+                        "[trace_id {trace_id}]  Query new start time: {}, end time : {}",
+                        req.query.start_time,
+                        req.query.end_time
+                    );
+                }
+
+                SearchService::search(
+                    &trace_id,
+                    &org_id,
+                    stream_type,
+                    Some(user_id.to_string()),
+                    &req,
+                )
+                .instrument(http_span_local)
+                .await
+            })
+            .instrument(http_span.clone());
+            tasks.push(task);
+        }
+
+        for task in tasks {
+            match task.await {
+                Ok(res) => match res {
+                    Ok(res) => results.push(res),
+                    Err(err) => {
+                        report_metrics(start, &org_id, stream_type, "", "500", "_search");
+                        log::error!("search error: {:?}", err);
+                        return Ok(match err {
+                            errors::Error::ErrorCode(code) => match code {
+                                errors::ErrorCodes::SearchCancelQuery(_) => {
+                                    HttpResponse::TooManyRequests().json(
+                                        meta::http::HttpResponse::error_code_with_trace_id(
+                                            code,
+                                            Some(trace_id),
+                                        ),
+                                    )
+                                }
+                                _ => HttpResponse::InternalServerError().json(
+                                    meta::http::HttpResponse::error_code_with_trace_id(
+                                        code,
+                                        Some(trace_id),
+                                    ),
+                                ),
+                            },
+                            _ => HttpResponse::InternalServerError().json(
+                                meta::http::HttpResponse::error(
+                                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                    err.to_string(),
+                                ),
+                            ),
+                        });
+                    }
+                },
+                Err(err) => {
+                    report_metrics(start, &org_id, stream_type, "", "500", "_search");
+                    log::error!("search error: {:?}", err);
+                    return Ok(HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error(
+                            StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            err.to_string(),
+                        ),
+                    ));
+                }
+            }
+        }
+        if c_resp.has_cached_data {
+            merge_response(
+                &mut c_resp.cached_response,
+                &results,
+                &c_resp.ts_column,
+                c_resp.limit,
+                c_resp.is_descending,
+            );
+            c_resp.cached_response
+        } else {
+            results[0].clone()
+        }
+    } else {
+        c_resp.cached_response
+    };
+
+    // do search
+    let time = start.elapsed().as_secs_f64();
+    report_metrics(start, &org_id, stream_type, "", "200", "_search");
+    res.set_trace_id(trace_id.clone());
+    res.set_local_took(start.elapsed().as_millis() as usize, ext_took_wait);
+    if !range_error.is_empty() {
+        res.is_partial = true;
+        res.function_error = if res.function_error.is_empty() {
+            range_error
+        } else {
+            format!("{} \n {}", range_error, res.function_error)
+        };
+        res.new_start_time = Some(req.query.start_time);
+        res.new_end_time = Some(req.query.end_time);
+    }
+
+    let req_stats = RequestStats {
+        records: res.hits.len() as i64,
+        response_time: time,
+        size: res.scan_size as f64,
+        request_body: Some(req.query.sql),
+        user_email: Some(user_id.to_string()),
+        min_ts: Some(req.query.start_time),
+        max_ts: Some(req.query.end_time),
+        cached_ratio: Some(res.cached_ratio),
+        search_type,
+        trace_id: Some(trace_id.clone()),
+        took_wait_in_queue: if res.took_detail.is_some() {
+            let resp_took = res.took_detail.as_ref().unwrap();
+            // Consider only the cluster wait queue duration
+            Some(resp_took.cluster_wait_queue)
+        } else {
+            None
+        },
+        result_cache_ratio: Some(res.result_cache_ratio),
+        ..Default::default()
+    };
+    let num_fn = req.query.query_fn.is_some() as u16;
+    report_request_usage_stats(
+        req_stats,
+        &org_id,
+        stream_name,
+        StreamType::Logs,
+        UsageType::Search,
+        num_fn,
+        started_at,
+    )
+    .await;
+
+    // result cache save changes start
+    if cfg.common.result_cache_enabled
+        && should_exec_query
+        && c_resp.cache_query_response
+        && (!results.first().unwrap().hits.is_empty() || !results.last().unwrap().hits.is_empty())
+    {
+        write_results(
+            &c_resp.ts_column,
+            req.query.start_time,
+            req.query.end_time,
+            &res,
+            file_path,
+            is_aggregate,
+            trace_id,
+            c_resp.is_descending,
+        )
+        .await;
+    }
+    // result cache save changes Ends
+
+    Ok(HttpResponse::Ok().json(res))
+}
 /// SearchAround
 #[utoipa::path(
     context_path = "/api",
@@ -337,10 +566,6 @@ pub async fn around(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .map(|v| v.to_str().unwrap_or("").to_string());
 
     let mut uses_fn = false;
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
@@ -461,6 +686,13 @@ pub async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
     };
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .unwrap()
+        .to_str()
+        .ok()
+        .map(|v| v.to_string());
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span.clone())
         .await;
@@ -468,7 +700,7 @@ pub async fn around(
     let resp_forward = match search_res {
         Ok(res) => res,
         Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, &stream_name, "500", "_around");
+            report_metrics(start, &org_id, stream_type, &stream_name, "500", "_around");
             log::error!("search around error: {:?}", err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => match code {
@@ -514,14 +746,14 @@ pub async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
     };
-    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
+    let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
         .instrument(http_span)
         .await;
 
     let resp_backward = match search_res {
         Ok(res) => res,
         Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, &stream_name, "500", "_around");
+            report_metrics(start, &org_id, stream_type, &stream_name, "500", "_around");
             log::error!("search around error: {:?}", err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => match code {
@@ -560,14 +792,18 @@ pub async fn around(
     resp.cached_ratio = (resp_forward.cached_ratio + resp_backward.cached_ratio) / 2;
 
     let time = start.elapsed().as_secs_f64();
-    http_report_metrics(start, &org_id, stream_type, &stream_name, "200", "_around");
+    report_metrics(start, &org_id, stream_type, &stream_name, "200", "_around");
 
+    let user_id = match in_req.headers().get("user_id") {
+        Some(v) => v.to_str().unwrap(),
+        None => "",
+    };
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
         response_time: time,
         size: resp.scan_size as f64,
         request_body: Some(req.query.sql),
-        user_email: user_id,
+        user_email: Some(user_id.to_string()),
         min_ts: Some(around_start_time),
         max_ts: Some(around_end_time),
         cached_ratio: Some(resp.cached_ratio),
@@ -619,7 +855,6 @@ pub async fn around(
         ("end_time" = i64, Query, description = "end time"),
         ("regions" = Option<String>, Query, description = "regions, split by comma"),
         ("timeout" = Option<i64>, Query, description = "timeout, seconds"),
-        ("no_count" = Option<bool>, Query, description = "no need count, true of false"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = SearchResponse, example = json!({
@@ -656,12 +891,10 @@ pub async fn values(
         None => "".to_string(),
         Some(v) => base64::decode_url(v).unwrap_or("".to_string()),
     };
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
+    let user_id = match in_req.headers().get("user_id") {
+        Some(v) => v.to_str().unwrap(),
+        None => "",
+    };
     let http_span = if config::get_config().common.tracing_search_enabled {
         tracing::info_span!(
             "/api/{org_id}/{stream_name}/_values",
@@ -689,7 +922,7 @@ pub async fn values(
                         &fields[0],
                         Some((column[0], column[1])),
                         &query,
-                        &user_id,
+                        user_id,
                         trace_id,
                         http_span,
                     )
@@ -704,7 +937,7 @@ pub async fn values(
                     &fields[0],
                     None,
                     &query,
-                    &user_id,
+                    user_id,
                     trace_id,
                     http_span,
                 )
@@ -719,7 +952,7 @@ pub async fn values(
                 &fields[0],
                 None,
                 &query,
-                &user_id,
+                user_id,
                 trace_id,
                 http_span,
             )
@@ -732,7 +965,7 @@ pub async fn values(
         stream_type,
         &stream_name,
         &query,
-        &user_id,
+        user_id,
         trace_id,
         http_span,
     )
@@ -782,18 +1015,6 @@ async fn values_v1(
         }
     };
 
-    let keyword = match query.get("keyword") {
-        None => "".to_string(),
-        Some(v) => v.trim().to_string(),
-    };
-    let no_count = match query.get("no_count") {
-        None => false,
-        Some(v) => {
-            let v = v.to_lowercase();
-            v == "true" || v == "1"
-        }
-    };
-
     let mut query_context = match query.get("sql") {
         None => None,
         Some(v) => match base64::decode_url(v) {
@@ -814,12 +1035,14 @@ async fn values_v1(
         query_context = None;
     }
 
-    // pick up where clause from sql
-    let where_str = match SearchService::sql::pickup_where(&query_sql, None) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return Err(Error::other(e));
-        }
+    // if it is select *, replace to select _timestamp
+    if RE_ONLY_SELECT.is_match(&query_sql) {
+        query_sql = RE_ONLY_SELECT
+            .replace(
+                &query_sql,
+                format!("SELECT {} ", cfg.common.column_timestamp).as_str(),
+            )
+            .to_string()
     };
 
     let size = query
@@ -857,20 +1080,47 @@ async fn values_v1(
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
 
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[org_id])
+        .inc();
+    // get a local search queue lock
+    #[cfg(not(feature = "enterprise"))]
+    let locker = SearchService::QUEUE_LOCKER.clone();
+    #[cfg(not(feature = "enterprise"))]
+    let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    if !cfg.common.feature_query_queue_enabled {
+        drop(locker);
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let took_wait = start.elapsed().as_millis() as usize;
+    #[cfg(feature = "enterprise")]
+    let took_wait = 0;
+    log::info!(
+        "http search value_v1 API wait in queue took: {} ms",
+        took_wait
+    );
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[org_id])
+        .dec();
+
     // search
-    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(query);
-    let req = config::meta::search::Request {
+    let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql,
-            sql_mode: "full".to_string(),
             from: 0,
-            size: config::meta::sql::MAX_LIMIT,
+            size: 0,
             start_time,
             end_time,
+            sort_by: None,
+            sql_mode: "".to_string(),
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            query_context,
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
-            query_context,
-            ..Default::default()
+            skip_wal: false,
         },
         aggs: HashMap::new(),
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -881,130 +1131,78 @@ async fn values_v1(
     };
 
     // skip fields which aren't part of the schema
-    let schema = infra::schema::get(org_id, stream_name, stream_type)
-        .await
-        .unwrap_or(Schema::empty());
-
-    let mut query_results = Vec::with_capacity(fields.len());
-    let sql_where = if where_str.is_empty() {
-        "".to_string()
+    let key = format!("{org_id}/{stream_type}/{stream_name}");
+    let r = STREAM_SCHEMAS_LATEST.read().await;
+    let schema = if let Some(schema) = r.get(&key) {
+        schema.schema().clone()
     } else {
-        format!("WHERE {}", where_str)
+        arrow_schema::Schema::empty()
     };
+    drop(r);
+
     for field in &fields {
-        let http_span = http_span.clone();
         // skip values for field which aren't part of the schema
         if schema.field_with_name(field).is_err() {
             continue;
         }
-        let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
-            format!("{sql_where} AND {field} ILIKE '%{keyword}%'")
-        } else if !keyword.is_empty() {
-            format!("WHERE {field} ILIKE '%{keyword}%'")
-        } else {
-            sql_where.clone()
-        };
-        let sql = if no_count {
-            format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
-            )
-        } else {
-            format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
-            )
-        };
-        let mut req = req.clone();
-        req.query.sql = sql;
-
-        let search_res = SearchService::cache::search(
-            &trace_id,
-            org_id,
-            stream_type,
-            Some(user_id.to_string()),
-            &req,
-            use_cache,
-        )
-        .instrument(http_span)
-        .await;
-        let resp_search = match search_res {
-            Ok(res) => res,
-            Err(err) => {
-                http_report_metrics(start, org_id, stream_type, stream_name, "500", "_values/v1");
-                log::error!("search values error: {:?}", err);
-                return Ok(match err {
-                    errors::Error::ErrorCode(code) => match code {
-                        errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                            .json(meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            )),
-                        _ => HttpResponse::InternalServerError().json(
-                            meta::http::HttpResponse::error_code_with_trace_id(
-                                code,
-                                Some(trace_id),
-                            ),
-                        ),
-                    },
-                    _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        err.to_string(),
-                    )),
-                });
-            }
-        };
-        query_results.push((field.to_string(), resp_search));
+        req.aggs.insert(
+                field.clone(),
+                format!(
+                    "SELECT {field} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM query GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {size}"
+                ),
+            );
     }
+    let search_res = SearchService::search(
+        &trace_id,
+        org_id,
+        stream_type,
+        Some(user_id.to_string()),
+        &req,
+    )
+    .instrument(http_span)
+    .await;
+
+    let resp_search = match search_res {
+        Ok(res) => res,
+        Err(err) => {
+            report_metrics(start, org_id, stream_type, stream_name, "500", "_values/v1");
+            log::error!("search values error: {:?}", err);
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => match code {
+                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
+                        .json(meta::http::HttpResponse::error_code_with_trace_id(
+                            code,
+                            Some(trace_id),
+                        )),
+                    _ => HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+                    ),
+                },
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            });
+        }
+    };
 
     let mut resp = config::meta::search::Response::default();
     let mut hit_values: Vec<json::Value> = Vec::new();
-    for (key, ret) in query_results {
-        let mut top_hits: HashMap<String, i64> = HashMap::default();
-        for row in ret.hits {
-            let key = row
-                .get("zo_sql_key")
-                .map(|v| v.as_str().unwrap_or(""))
-                .unwrap_or("")
-                .to_string();
-            let num = row
-                .get("zo_sql_num")
-                .map(|v| v.as_i64().unwrap_or(0))
-                .unwrap_or(0);
-            let key_num = top_hits.entry(key).or_insert(0);
-            *key_num += num;
-        }
-        let mut top_hits = top_hits.into_iter().collect::<Vec<_>>();
-        if no_count {
-            top_hits.sort_by(|a, b| a.0.cmp(&b.0));
-        } else {
-            top_hits.sort_by(|a, b| b.1.cmp(&a.1));
-        }
-        let top_hits = top_hits
-            .into_iter()
-            .take(size as usize)
-            .map(|(k, v)| {
-                let mut item = json::Map::new();
-                item.insert("zo_sql_key".to_string(), json::Value::String(k));
-                item.insert("zo_sql_num".to_string(), json::Value::Number(v.into()));
-                json::Value::Object(item)
-            })
-            .collect::<Vec<_>>();
-
+    for (key, val) in resp_search.aggs {
         let mut field_value: json::Map<String, json::Value> = json::Map::new();
         field_value.insert("field".to_string(), json::Value::String(key));
-        field_value.insert("values".to_string(), json::Value::Array(top_hits));
+        field_value.insert("values".to_string(), json::Value::Array(val));
         hit_values.push(json::Value::Object(field_value));
-        resp.scan_size = std::cmp::max(resp.scan_size, ret.scan_size);
-        resp.scan_records = std::cmp::max(resp.scan_records, ret.scan_records);
-        resp.cached_ratio = std::cmp::max(resp.cached_ratio, ret.cached_ratio);
-        resp.result_cache_ratio = std::cmp::max(resp.result_cache_ratio, ret.result_cache_ratio);
     }
     resp.total = fields.len();
     resp.hits = hit_values;
     resp.size = size;
+    resp.scan_size = resp_search.scan_size;
     resp.took = start.elapsed().as_millis() as usize;
+    resp.cached_ratio = resp_search.cached_ratio;
 
     let time = start.elapsed().as_secs_f64();
-    http_report_metrics(start, org_id, stream_type, stream_name, "200", "_values/v1");
+    report_metrics(start, org_id, stream_type, stream_name, "200", "_values/v1");
 
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
@@ -1057,24 +1255,10 @@ async fn values_v2(
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
 
-    let no_count = match query.get("no_count") {
-        None => false,
-        Some(v) => {
-            let v = v.to_lowercase();
-            v == "true" || v == "1"
-        }
-    };
-    let mut query_sql = if no_count {
-        format!(
-            "SELECT field_value AS zo_sql_key FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
-            stream_type, stream_name, field
-        )
-    } else {
-        format!(
-            "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
-            stream_type, stream_name, field
-        )
-    };
+    let mut query_sql = format!(
+        "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
+        stream_type, stream_name, field
+    );
     if let Some((key, val)) = filter {
         let val = val.split(',').collect::<Vec<_>>().join("','");
         query_sql = format!(
@@ -1103,11 +1287,6 @@ async fn values_v2(
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
     if end_time == 0 {
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
-    }
-    if no_count {
-        query_sql = format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {size}")
-    } else {
-        query_sql = format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {size}")
     }
 
     let regions = query.get("regions").map_or(vec![], |regions| {
@@ -1157,7 +1336,7 @@ async fn values_v2(
     // search
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: query_sql,
+            sql: format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {size}"),
             from: 0,
             size: 0,
             start_time,
@@ -1192,7 +1371,7 @@ async fn values_v2(
     let resp_search = match search_res {
         Ok(res) => res,
         Err(err) => {
-            http_report_metrics(start, org_id, stream_type, stream_name, "500", "_values/v2");
+            report_metrics(start, org_id, stream_type, stream_name, "500", "_values/v2");
             log::error!("search values error: {:?}", err);
             return Ok(match err {
                 errors::Error::ErrorCode(code) => match code {
@@ -1228,7 +1407,7 @@ async fn values_v2(
     resp.cached_ratio = resp_search.cached_ratio;
 
     let time = start.elapsed().as_secs_f64();
-    http_report_metrics(start, org_id, stream_type, stream_name, "200", "_values/v2");
+    report_metrics(start, org_id, stream_type, stream_name, "200", "_values/v2");
 
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
@@ -1333,11 +1512,11 @@ pub async fn search_partition(
     // do search
     match search_res {
         Ok(res) => {
-            http_report_metrics(start, &org_id, stream_type, "", "200", "_search_partition");
+            report_metrics(start, &org_id, stream_type, "", "200", "_search_partition");
             Ok(HttpResponse::Ok().json(res))
         }
         Err(err) => {
-            http_report_metrics(start, &org_id, stream_type, "", "500", "_search_partition");
+            report_metrics(start, &org_id, stream_type, "", "500", "_search_partition");
             log::error!("search error: {:?}", err);
             Ok(match err {
                 errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
@@ -1350,4 +1529,188 @@ pub async fn search_partition(
             })
         }
     }
+}
+
+// based on _timestamp of first record in config::meta::search::Response either add it in start
+// or end to cache response
+fn merge_response(
+    cache_response: &mut config::meta::search::Response,
+    search_response: &Vec<config::meta::search::Response>,
+    ts_column: &str,
+    limit: i64,
+    is_descending: bool,
+) {
+    if cache_response.hits.is_empty() && search_response.is_empty() {
+        return;
+    }
+
+    if cache_response.hits.is_empty()
+        && search_response.is_empty()
+        && search_response.first().unwrap().hits.is_empty()
+        && search_response.last().unwrap().hits.is_empty()
+    {
+        for res in search_response {
+            cache_response.total += res.total;
+            cache_response.scan_size += res.scan_size;
+            cache_response.took += res.took;
+        }
+        return;
+    }
+    let cache_hits_len = cache_response.hits.len();
+
+    cache_response.scan_size = 0;
+
+    let mut files_cache_ratio = 0;
+    let mut result_cache_len = 0;
+    let cache_ts = if cache_response.hits.is_empty() {
+        get_ts_value(
+            ts_column,
+            search_response.first().unwrap().hits.first().unwrap(),
+        )
+    } else {
+        get_ts_value(ts_column, cache_response.hits.first().unwrap())
+    };
+
+    for res in search_response {
+        cache_response.total += res.total;
+        cache_response.scan_size += res.scan_size;
+        cache_response.took += res.took;
+        files_cache_ratio += res.cached_ratio;
+
+        result_cache_len += res.total;
+
+        if res.hits.is_empty() {
+            continue;
+        }
+        let search_ts = get_ts_value(ts_column, res.hits.first().unwrap());
+        if search_ts < cache_ts && is_descending {
+            cache_response.hits.extend(res.hits.clone());
+        } else {
+            cache_response.hits = res
+                .hits
+                .iter()
+                .chain(cache_response.hits.iter())
+                .cloned()
+                .collect();
+        }
+    }
+    if is_descending {
+        cache_response
+            .hits
+            .sort_by_key(|b| std::cmp::Reverse(get_ts_value(ts_column, b)));
+    } else {
+        cache_response
+            .hits
+            .sort_by_key(|a| get_ts_value(ts_column, a));
+    }
+
+    if cache_response.hits.len() > limit as usize {
+        cache_response.hits.truncate(limit as usize);
+    }
+    cache_response.cached_ratio = files_cache_ratio / search_response.len();
+    log::info!(
+        "cache_response.hits.len: {}, Result cache len: {}",
+        cache_hits_len,
+        result_cache_len,
+    );
+    cache_response.result_cache_ratio =
+        (cache_hits_len as f64 * 100_f64 / (result_cache_len + cache_hits_len) as f64) as usize;
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn write_results(
+    ts_column: &str,
+    req_query_start_time: i64,
+    req_query_end_time: i64,
+    res: &config::meta::search::Response,
+    file_path: String,
+    is_aggregate: bool,
+    trace_id: String,
+    is_descending: bool,
+) {
+    let last_rec_ts = get_ts_value(ts_column, res.hits.last().unwrap());
+    let first_rec_ts = get_ts_value(ts_column, res.hits.first().unwrap());
+
+    if (last_rec_ts - first_rec_ts).abs()
+        < get_config().common.result_cache_discard_duration * 1000 * 1000
+    {
+        return;
+    }
+
+    let largest_ts = cmp::max(first_rec_ts, last_rec_ts);
+
+    let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
+        last_rec_ts
+    } else {
+        req_query_end_time
+    };
+    let file_name = format!(
+        "{}_{}_{}_{}.json",
+        req_query_start_time,
+        cache_end_time,
+        if is_aggregate { 1 } else { 0 },
+        if is_descending { 1 } else { 0 }
+    );
+
+    let res_cache = json::to_string(&res).unwrap();
+    let query_key = file_path.replace('/', "_");
+    tokio::spawn(async move {
+        let file_path_local = file_path.clone();
+
+        match SearchService::cache::cacher::cache_results_to_disk(
+            &trace_id,
+            &file_path_local,
+            &file_name,
+            res_cache,
+        )
+        .await
+        {
+            Ok(_) => {
+                let mut w = QUERY_RESULT_CACHE.write().await;
+                w.entry(query_key)
+                    .or_insert_with(Vec::new)
+                    .push(ResultCacheMeta {
+                        start_time: req_query_start_time,
+                        end_time: cache_end_time,
+                        is_aggregate,
+                        is_descending,
+                    });
+                drop(w);
+            }
+            Err(e) => {
+                log::error!("Cache results to disk failed: {:?}", e);
+            }
+        }
+    });
+}
+
+#[inline]
+fn report_metrics(
+    start: std::time::Instant,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    code: &str,
+    uri: &str,
+) {
+    let time = start.elapsed().as_secs_f64();
+    let uri = format!("/api/org/{}", uri);
+    metrics::HTTP_RESPONSE_TIME
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .observe(time);
+    metrics::HTTP_INCOMING_REQUESTS
+        .with_label_values(&[
+            &uri,
+            code,
+            org_id,
+            stream_name,
+            stream_type.to_string().as_str(),
+        ])
+        .inc();
 }

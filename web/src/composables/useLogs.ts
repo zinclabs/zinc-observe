@@ -94,7 +94,6 @@ const defaultObject = {
     ],
   },
   meta: {
-    logsVisualizeToggle: "logs",
     refreshInterval: <number>0,
     refreshIntervalLabel: "Off",
     showFields: true,
@@ -1625,9 +1624,7 @@ const useLogs = () => {
             searchObj.data.stream.selectedStream.length <= 1 &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
-          if(searchObj.data.queryResults.hits.length > 0) {
-            await getHistogramQueryData(searchObj.data.histogramQuery);
-          }
+          await getHistogramQueryData(searchObj.data.histogramQuery);
           refreshPartitionPagination(true);
         } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
           searchObj.data.histogram = {
@@ -1643,11 +1640,7 @@ const useLogs = () => {
             errorDetail: "",
           };
         } else {
-          let aggFlag = false;
-          if (parsedSQL) {
-            aggFlag = hasAggregation(parsedSQL?.columns);
-          }
-          if (queryReq.query.from == 0 && searchObj.data.queryResults.hits.length > 0 && !aggFlag) {
+          if (queryReq.query.from == 0) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
               await getPageCount(queryReq);
@@ -2904,22 +2897,25 @@ const useLogs = () => {
       if(searchObj.data.queryResults.partitionDetail.partitions.length > 1 && searchObj.meta.showHistogram == false) {
         plusSign = "+";
       }
-      const scanSizeLabel =  (searchObj.data.queryResults.result_cache_ratio !== undefined && searchObj.data.queryResults.result_cache_ratio > 0)? "Delta Scan Size" : "Scan Size";
+    
+      const scanSizeLabel = searchObj.data.queryResults.result_cache_ratio > 0 ? "Delta Scan Size" : "Scan Size";
 
       const title =
-        "Showing " +
-        startCount +
-        " to " +
-        endCount +
-        " out of " +
-        totalCount.toLocaleString() +
-        plusSign +
-        " events in " +
-        searchObj.data.queryResults.took +
-        " ms. (" + scanSizeLabel  + ": " +
-        formatSizeFromMB(searchObj.data.queryResults.scan_size) +
-        plusSign +
-        ")";
+          "Showing " +
+          startCount +
+          " to " +
+          endCount +
+          " out of " +
+          totalCount.toLocaleString() +
+          plusSign +
+          " events in " +
+          searchObj.data.queryResults.took +
+          " ms. (" +
+          scanSizeLabel +
+          ": " +
+          formatSizeFromMB(searchObj.data.queryResults.scan_size) +
+          plusSign +
+          ")";
       return title;
     } catch (e: any) {
       console.log("Error while generating histogram title", e);
@@ -3180,26 +3176,18 @@ const useLogs = () => {
       ) {
         clearInterval(store.state.refreshIntervalID);
         const refreshIntervalID = setInterval(async () => {
-          if (
-            searchObj.loading == false &&
-            searchObj.loadingHistogram == false &&
-            searchObj.meta.logsVisualizeToggle == "logs"
-          ) {
+          if (searchObj.loading == false && searchObj.loadingHistogram == false) {
             searchObj.loading = true;
             await getQueryData(false);
           }
         }, searchObj.meta.refreshInterval * 1000);
         store.dispatch("setRefreshIntervalID", refreshIntervalID);
-
-        // only notify if user is in logs page
-        if(searchObj.meta.logsVisualizeToggle == "logs"){
-          $q.notify({
-            message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
-            color: "positive",
-            position: "top",
-            timeout: 1000,
-          });
-        }
+        $q.notify({
+          message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
+          color: "positive",
+          position: "top",
+          timeout: 1000,
+        });
       } else {
         clearInterval(store.state.refreshIntervalID);
       }
@@ -3322,7 +3310,7 @@ const useLogs = () => {
       searchObj.meta.useUserDefinedSchemas = queryParams.defined_schemas;
     }
     if (queryParams.refresh) {
-      searchObj.meta.refreshInterval = parseInt(queryParams.refresh);
+      searchObj.meta.refreshInterval = queryParams.refresh;
     }
     useLocalTimezone(queryParams.timezone);
 
