@@ -55,7 +55,8 @@ use datafusion::{
 use hashbrown::HashMap;
 use infra::cache::tmpfs::Directory;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::WorkGroup};
+use o2_enterprise::enterprise::search::WorkGroup;
+use once_cell::sync::Lazy;
 use parquet::arrow::ArrowWriter;
 use regex::Regex;
 
@@ -69,12 +70,12 @@ use crate::{
     common::meta::functions::VRLResultResolver,
     service::search::{
         datafusion::{rewrite, ExtLimit},
-        sql::{Sql, RE_COUNT_DISTINCT, RE_FIELD_FN, RE_SELECT_WILDCARD, RE_WHERE},
+        sql::Sql,
+        RE_SELECT_WILDCARD,
     },
 };
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
-const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
 
 const AGGREGATE_UDF_LIST: [&str; 7] = [
     "min",
@@ -85,6 +86,13 @@ const AGGREGATE_UDF_LIST: [&str; 7] = [
     "array_agg",
     "approx_percentile_cont",
 ];
+
+static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").unwrap());
+static RE_COUNT_DISTINCT: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)count\s*\(\s*distinct\(.*?\)\)|count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap()
+});
+static RE_FIELD_FN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"\ a-zA-Z0-9,._*]+)"#).unwrap());
 
 pub async fn sql(
     session: &SearchSession,
@@ -303,8 +311,6 @@ async fn exec_query(
         query = rewrite::rewrite_count_distinct_sql(&query, true)?;
     } else {
         query = rewrite::add_group_by_order_by_field_to_select(&query)?;
-        query = rewrite::rewrite_count_operate(&query, 1)?;
-        query = rewrite::remove_having_clause(&query)?;
     }
 
     // Debug SQL
@@ -724,8 +730,6 @@ fn merge_rewrite_sql(
     let mut sql = sql.to_string();
     if !is_final_phase {
         sql = rewrite::add_group_by_order_by_field_to_select(&sql)?;
-        sql = rewrite::rewrite_count_operate(&sql, 2)?;
-        sql = rewrite::remove_having_clause(&sql)?;
     }
 
     let mut fields = Vec::new();
@@ -916,8 +920,7 @@ fn merge_rewrite_sql(
         if fn_name == "count" {
             // the special case for count / count
             if field.contains("/") {
-                fields[i] = format!("({}", field);
-                continue;
+                fn_name = "avg".to_string();
             } else {
                 fn_name = "sum".to_string();
             }
@@ -950,10 +953,6 @@ fn merge_rewrite_sql(
             sql = sql.replace(r#""_PLACEHOLDER_", "#, "");
             sql = sql.replace(r#", "_PLACEHOLDER_""#, "");
         }
-    }
-
-    if is_final_phase {
-        sql = rewrite::rewrite_count_operate(&sql, 3)?;
     }
 
     sql = rewrite::remove_where_clause(&sql)?;
@@ -1143,14 +1142,12 @@ pub async fn merge_parquet_files(
 pub fn create_session_config(
     search_type: &SearchType,
     sort_by_timestamp_desc: bool,
-    target_partition: usize,
     limit: Option<usize>,
 ) -> Result<SessionConfig> {
     let cfg = get_config();
-    let target_partition = std::cmp::max(DATAFUSION_MIN_PARTITION, target_partition);
     let mut config = SessionConfig::from_env()?
         .with_batch_size(PARQUET_BATCH_SIZE)
-        .with_target_partitions(target_partition)
+        .with_target_partitions(cfg.limit.query_thread_num)
         .with_information_schema(true);
     config = config.set_bool(
         "datafusion.execution.listing_table_ignore_subdirectory",
@@ -1178,7 +1175,7 @@ pub fn create_session_config(
     Ok(config)
 }
 
-pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
+pub async fn create_runtime_env(_work_group: Option<String>) -> Result<RuntimeEnv> {
     let object_store_registry = DefaultObjectStoreRegistry::new();
 
     let memory = super::storage::memory::FS::new();
@@ -1203,64 +1200,48 @@ pub async fn create_runtime_env(memory_limit: usize) -> Result<RuntimeEnv> {
         ));
         rn_config = rn_config.with_cache_manager(cache_config);
     }
-
-    let memory_size = std::cmp::max(DATAFUSION_MIN_MEM, memory_limit);
-    let mem_pool = super::MemoryPoolType::from_str(&cfg.memory_cache.datafusion_memory_pool)
-        .map_err(|e| {
-            DataFusionError::Execution(format!("Invalid datafusion memory pool type: {}", e))
-        })?;
-    match mem_pool {
-        super::MemoryPoolType::Greedy => {
-            rn_config = rn_config.with_memory_pool(Arc::new(GreedyMemoryPool::new(memory_size)))
+    if cfg.memory_cache.datafusion_max_size > 0 {
+        #[cfg(not(feature = "enterprise"))]
+        let memory_size = cfg.memory_cache.datafusion_max_size;
+        #[cfg(feature = "enterprise")]
+        let mut memory_size = cfg.memory_cache.datafusion_max_size;
+        #[cfg(feature = "enterprise")]
+        if let Some(wg) = _work_group {
+            if let Ok(wg) = WorkGroup::from_str(&wg) {
+                let (_cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
+                    DataFusionError::Execution(format!("Failed to get dynamic resource: {}", e))
+                })?;
+                memory_size = memory_size * mem as usize / 100;
+                log::debug!("[datafusion:{}] memory pool size: {}", wg, memory_size);
+            }
         }
-        super::MemoryPoolType::Fair => {
-            rn_config = rn_config.with_memory_pool(Arc::new(FairSpillPool::new(memory_size)))
-        }
-        super::MemoryPoolType::None => {}
+        let memory_size = std::cmp::max(DATAFUSION_MIN_MEM, memory_size);
+        let mem_pool = super::MemoryPoolType::from_str(&cfg.memory_cache.datafusion_memory_pool)
+            .map_err(|e| {
+                DataFusionError::Execution(format!("Invalid datafusion memory pool type: {}", e))
+            })?;
+        match mem_pool {
+            super::MemoryPoolType::Greedy => {
+                rn_config = rn_config.with_memory_pool(Arc::new(GreedyMemoryPool::new(memory_size)))
+            }
+            super::MemoryPoolType::Fair => {
+                rn_config = rn_config.with_memory_pool(Arc::new(FairSpillPool::new(memory_size)))
+            }
+            super::MemoryPoolType::None => {}
+        };
     };
     RuntimeEnv::new(rn_config)
 }
 
 pub async fn prepare_datafusion_context(
-    _work_group: Option<String>,
+    work_group: Option<String>,
     search_type: &SearchType,
     without_optimizer: bool,
     sort_by_timestamp_desc: bool,
     limit: Option<usize>,
 ) -> Result<SessionContext, DataFusionError> {
-    let cfg = get_config();
-    #[cfg(not(feature = "enterprise"))]
-    let (memory_size, target_partition) = (
-        cfg.memory_cache.datafusion_max_size,
-        cfg.limit.query_thread_num,
-    );
-    #[cfg(feature = "enterprise")]
-    let (mut memory_size, mut target_partition) = (
-        cfg.memory_cache.datafusion_max_size,
-        cfg.limit.query_thread_num,
-    );
-    #[cfg(feature = "enterprise")]
-    if let Some(wg) = _work_group {
-        if let Ok(wg) = WorkGroup::from_str(&wg) {
-            let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
-                DataFusionError::Execution(format!("Failed to get dynamic resource: {}", e))
-            })?;
-            if O2_CONFIG.search_group.cpu_limit_enabled {
-                target_partition = target_partition * cpu as usize / 100;
-            }
-            memory_size = memory_size * mem as usize / 100;
-            log::debug!(
-                "[datafusion:{}] target_partition: {}, memory_size: {}",
-                wg,
-                target_partition,
-                memory_size
-            );
-        }
-    }
-
-    let session_config =
-        create_session_config(search_type, sort_by_timestamp_desc, target_partition, limit)?;
-    let runtime_env = create_runtime_env(memory_size).await?;
+    let session_config = create_session_config(search_type, sort_by_timestamp_desc, limit)?;
+    let runtime_env = create_runtime_env(work_group).await?;
     if without_optimizer {
         let state = SessionState::new_with_config_rt(session_config, Arc::new(runtime_env))
             .with_optimizer_rules(vec![])
