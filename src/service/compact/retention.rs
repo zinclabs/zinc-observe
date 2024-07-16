@@ -147,6 +147,15 @@ pub async fn delete_all(
         stream_name
     );
 
+    // delete stream schema
+    db::schema::delete(org_id, stream_name, Some(stream_type)).await?;
+    log::info!(
+        "deleted stream_schema for: {}/{}/{}",
+        org_id,
+        stream_type,
+        stream_name
+    );
+
     // delete stream stats
     infra_file_list::del_stream_stats(org_id, stream_type, stream_name).await?;
     log::info!(
