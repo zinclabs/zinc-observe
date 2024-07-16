@@ -125,7 +125,7 @@ pub async fn check_cache(
     }
     let query_key = file_path.replace('/', "_");
 
-    let mut is_descending = true;
+    let mut is_descending = false;
 
     if !order_by.is_empty() {
         for (field, order) in &order_by {
@@ -261,7 +261,7 @@ pub async fn get_cached_results(
                             cached_response.hits.last().unwrap(),
                         );
 
-                        let discard_ts = if first_ts > last_ts {
+                        let discard_ts = if cache_req.is_descending {
                             if cache_req.discard_interval > 0 {
                                 first_ts
                             } else {
