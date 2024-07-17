@@ -333,12 +333,17 @@ const getPipeline = () => {
     .then(async (response) => {
       await getFunctions();
 
-      const _pipeline = response.data.list.find(
-        (pipeline: Pipeline) =>
-          pipeline.name === route.query.name &&
-          pipeline.stream_name === route.query.stream &&
-          pipeline.stream_type === route.query.stream_type
-      );
+      let _pipeline;
+      try {
+        _pipeline = response.data.list.find(
+          (pipeline: Pipeline) =>
+            pipeline.name === route.query.name &&
+            pipeline.stream_name === route.query.stream &&
+            pipeline.stream_type === route.query.stream_type
+        );
+      } catch (e) {
+        console.log(e);
+      }
 
       if (!_pipeline) {
         q.notify({
@@ -356,9 +361,16 @@ const getPipeline = () => {
         return;
       }
 
+      const functionsSet = new Set();
+
       pipeline.value = {
         ..._pipeline,
-        functions: _pipeline?.functions?.list || [],
+        functions:
+          _pipeline?.functions?.list.filter((fn: any) => {
+            if (functionsSet.has(fn.name)) return false;
+            functionsSet.add(fn.name);
+            return true;
+          }) || [],
       };
 
       setupNodes();
@@ -696,45 +708,49 @@ const getNodeSymbol = (type: string) => {
 };
 
 const updateGraph = () => {
-  const data = nodes.value.map((node) => ({
-    name: node.name,
-    x: node.x, // You may want to adjust these manually if needed (like x: 100 for 'k8s_event')
-    y: node.y,
-    symbol: getNodeSymbol(node.type),
-    fixed: node.fixed,
-    type: node.type,
-    label: {
-      show: true,
-      position: "bottom",
-      fontSize: 12,
-      formatter: (params: any) => {
-        if (params.data.type === "condition") return "Condition";
-        else return params.data.name;
+  try {
+    const data = nodes.value.map((node) => ({
+      name: node.name,
+      x: node.x, // You may want to adjust these manually if needed (like x: 100 for 'k8s_event')
+      y: node.y,
+      symbol: getNodeSymbol(node.type),
+      fixed: node.fixed,
+      type: node.type,
+      label: {
+        show: true,
+        position: "bottom",
+        fontSize: 12,
+        formatter: (params: any) => {
+          if (params.data.type === "condition") return "Condition";
+          else return params.data.name;
+        },
       },
-    },
-  }));
+    }));
 
-  // Prepare links from 'nodeLinks'
-  const links: any[] = [];
-  for (const nodeName in nodeLinks.value) {
-    const { to, from } = nodeLinks.value[nodeName];
-    from.forEach((source) => {
-      links.push({
-        source: source,
-        target: nodeName,
+    // Prepare links from 'nodeLinks'
+    const links: any[] = [];
+    for (const nodeName in nodeLinks.value) {
+      const { to, from } = nodeLinks.value[nodeName];
+      from.forEach((source) => {
+        links.push({
+          source: source,
+          target: nodeName,
+        });
       });
-    });
 
-    to.forEach((target) => {
-      links.push({
-        source: nodeName,
-        target: target,
+      to.forEach((target) => {
+        links.push({
+          source: nodeName,
+          target: target,
+        });
       });
-    });
+    }
+
+    plotChart.value.options.series[0].data = data;
+    plotChart.value.options.series[0].links = links;
+  } catch (e) {
+    console.log(e);
   }
-
-  plotChart.value.options.series[0].data = data;
-  plotChart.value.options.series[0].links = links;
 };
 
 const getFunctions = () => {
@@ -750,12 +766,16 @@ const getFunctions = () => {
       store.state.selectedOrganization.identifier
     )
     .then((res) => {
-      functions.value = {};
-      functionOptions.value = [];
-      res.data.list.forEach((func: Function) => {
-        functions.value[func.name] = func;
-        functionOptions.value.push(func.name);
-      });
+      try {
+        functions.value = {};
+        functionOptions.value = [];
+        res.data.list.forEach((func: Function) => {
+          functions.value[func.name] = func;
+          functionOptions.value.push(func.name);
+        });
+      } catch (e) {
+        console.log(e);
+      }
     })
     .finally(() => {
       isFetchingFunctions.value = false;
