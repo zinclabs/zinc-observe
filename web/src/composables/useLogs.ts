@@ -1640,7 +1640,11 @@ const useLogs = () => {
             errorDetail: "",
           };
         } else {
-          if (queryReq.query.from == 0 && !hasAggregation(parsedSQL.columns)) {
+          let aggFlag = false;
+          if(parsedSQL) {
+            aggFlag = hasAggregation(parsedSQL.columns);
+          }
+          if (queryReq.query.from == 0 && !aggFlag) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
               await getPageCount(queryReq);
@@ -1780,7 +1784,7 @@ const useLogs = () => {
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
           removeTraceId(traceId);
-          searchObj.data.queryResults.scan_size = res.data.scan_size;
+          // searchObj.data.queryResults.scan_size = res.data.scan_size;
           searchObj.data.queryResults.took += res.data.took;
           for (const [
             index,
