@@ -1643,7 +1643,9 @@ const useLogs = () => {
           if (queryReq.query.from == 0) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
-              await getPageCount(queryReq);
+              if(!hasAggregation) {
+                await getPageCount(queryReq);
+              }
               searchObjDebug["pagecountEndTime"] = performance.now();
               console.log(
                 `Total count took ${
