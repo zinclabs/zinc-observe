@@ -1640,12 +1640,10 @@ const useLogs = () => {
             errorDetail: "",
           };
         } else {
-          if (queryReq.query.from == 0) {
+          if (queryReq.query.from == 0 && !hasAggregation) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
-              if(!hasAggregation) {
-                await getPageCount(queryReq);
-              }
+              await getPageCount(queryReq);
               searchObjDebug["pagecountEndTime"] = performance.now();
               console.log(
                 `Total count took ${
