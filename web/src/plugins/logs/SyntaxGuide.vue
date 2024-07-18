@@ -73,11 +73,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="bg-highlight">stream='stderr'</span>
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on cloumn
-                  log use
-                  <span class="bg-highlight">extract_ip(log) | code=200</span>
-                </li>
-                <li>
                   For additional examples,
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
@@ -137,14 +132,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   To search value 'stderr' for stream column use
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
-                  >
-                </li>
-                <li>
-                  To search and use query function <i>extract_ip</i> on cloumn
-                  log use
-                  <span class="bg-highlight"
-                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE
-                    code=200</span
                   >
                 </li>
                 <li>
