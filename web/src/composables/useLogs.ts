@@ -1640,7 +1640,7 @@ const useLogs = () => {
             errorDetail: "",
           };
         } else {
-          if (queryReq.query.from == 0 && !hasAggregation(parsedSQL)) {
+          if (queryReq.query.from == 0 && !hasAggregation(parsedSQL.columns)) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
               await getPageCount(queryReq);
