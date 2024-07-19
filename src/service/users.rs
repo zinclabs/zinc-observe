@@ -26,7 +26,9 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::DEFAULT_ORG,
-            user::{UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole},
+            user::{
+                DBUser, UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole,
+            },
         },
         utils::auth::{get_hash, get_role, is_root_user},
     },
@@ -123,28 +125,27 @@ pub async fn post_user(
     }
 }
 
-// pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
-//     if db_user.password.is_empty() {
-//         let salt = ider::uuid();
-//         let generated_pass = generate_random_string(8);
-//         let password = get_hash(&generated_pass, &salt);
-//         db_user.password = password;
-//         db_user.salt = salt;
-//     }
-//     for org in &mut db_user.organizations {
-//         if org.token.is_empty() {
-//             let token = generate_random_string(16);
-//             org.token = token;
-//         };
-//         if org.rum_token.is_none() {
-//             let rum_token = format!("rum{}", generate_random_string(16));
-//             org.rum_token = Some(rum_token);
-//         };
-//     }
-//     db::user::set(&db_user).await
-// }
+pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
+    if db_user.password.is_empty() {
+        let salt = ider::uuid();
+        let generated_pass = generate_random_string(8);
+        let password = get_hash(&generated_pass, &salt);
+        db_user.password = password;
+        db_user.salt = salt;
+    }
+    for org in &mut db_user.organizations {
+        if org.token.is_empty() {
+            let token = generate_random_string(16);
+            org.token = token;
+        };
+        if org.rum_token.is_none() {
+            let rum_token = format!("rum{}", generate_random_string(16));
+            org.rum_token = Some(rum_token);
+        };
+    }
+    db::user::set(&db_user).await
+}
 
-// TODO(taiming): still needs to be updated to use username
 pub async fn update_user(
     org_id: &str,
     username: &str,
@@ -284,7 +285,6 @@ pub async fn update_user(
                     });
                 }
                 db::user::set(&db_user).await.unwrap();
-                // TODO(taiming) - pending
                 #[cfg(feature = "enterprise")]
                 {
                     use o2_enterprise::enterprise::openfga::authorizer::authz::update_user_role;
@@ -303,9 +303,10 @@ pub async fn update_user(
                             }
                             if old_str != new_str {
                                 log::debug!(
-                                    "updating openfga role for {email} from {old_str} to {new_str}"
+                                    "updating openfga role for {} from {old_str} to {new_str}",
+                                    new_user.email
                                 );
-                                update_user_role(&old_str, &new_str, email, org_id).await;
+                                update_user_role(&old_str, &new_str, &new_user.email, org_id).await;
                             }
                         }
                     }
@@ -374,7 +375,7 @@ pub async fn add_user_to_org(
             name: local_org.to_string(),
             token,
             rum_token: Some(rum_token),
-            role,
+            role: role.clone(),
         });
         db::user::set(&db_user).await.unwrap();
 
@@ -388,7 +389,7 @@ pub async fn add_user_to_org(
             };
             if O2_CONFIG.openfga.enabled {
                 let mut tuples = vec![];
-                get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
+                get_user_role_tuple(&role.to_string(), &db_user.email, org_id, &mut tuples);
                 get_org_creation_tuples(
                     org_id,
                     &mut tuples,
@@ -480,7 +481,6 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     for user in USERS.iter() {
         if user.key().starts_with(&format!("{org_id}/")) {
             user_list.push(UserResponse {
-                // email: user.value().email.clone(),
                 username: user.value().username.clone(),
                 role: user.value().role.clone(),
                 first_name: user.value().first_name.clone(),
@@ -490,14 +490,13 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
         }
     }
 
-    // TODO(taiming): pending
     #[cfg(feature = "enterprise")]
     {
         if !org_id.eq(DEFAULT_ORG) {
             let root = ROOT_USER.get("root").unwrap();
             let root_user = root.value();
             user_list.push(UserResponse {
-                email: root_user.email.clone(),
+                username: root_user.username.clone(),
                 role: root_user.role.clone(),
                 first_name: root_user.first_name.clone(),
                 last_name: root_user.last_name.clone(),
@@ -529,7 +528,6 @@ pub async fn remove_user_from_org(
                 if !user.organizations.is_empty() {
                     if user.organizations.len() == 1 {
                         let _ = db::user::delete(&user.email).await;
-                        // TODO(taiming) - pending
                         #[cfg(feature = "enterprise")]
                         {
                             use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
@@ -543,11 +541,10 @@ pub async fn remove_user_from_org(
                             };
                             if O2_CONFIG.openfga.enabled {
                                 log::debug!("delete user single org, role: {}", &user_fga_role);
-                                delete_user_from_org(org_id, email_id, &user_fga_role).await;
+                                delete_user_from_org(org_id, &user.email, &user_fga_role).await;
                             }
                         }
                     } else {
-                        // TODO(taiming) - pending
                         let mut _user_fga_role: Option<String> = None;
                         #[cfg(feature = "enterprise")]
                         for org in user.organizations.iter() {
@@ -567,7 +564,6 @@ pub async fn remove_user_from_org(
                         // special case as we cache flattened user struct
                         if resp.is_ok() {
                             USERS.remove(&format!("{org_id}/{}", user.email));
-                            // TODO(taiming) - pending
                             #[cfg(feature = "enterprise")]
                             {
                                 use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
@@ -578,7 +574,7 @@ pub async fn remove_user_from_org(
                                 if O2_CONFIG.openfga.enabled && _user_fga_role.is_some() {
                                     delete_user_from_org(
                                         org_id,
-                                        email_id,
+                                        &user.email,
                                         _user_fga_role.unwrap().as_str(),
                                     )
                                     .await;

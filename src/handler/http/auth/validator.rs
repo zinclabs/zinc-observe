@@ -133,15 +133,7 @@ pub async fn validate_credentials(
     };
 
     let Some(user) = user else {
-        return Ok(TokenValidationResponse {
-            is_valid: false,
-            user_email: "".to_string(),
-            username: "".to_string(),
-            is_internal_user: false,
-            user_role: None,
-            family_name: "".to_string(),
-            given_name: "".to_string(),
-        });
+        return Ok(TokenValidationResponse::default());
     };
 
     if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
@@ -197,7 +189,7 @@ pub async fn validate_credentials(
 
 #[cfg(feature = "enterprise")]
 pub async fn validate_credentials_ext(
-    user_id: &str,
+    email_id: &str,
     in_password: &str,
     path: &str,
     auth_token: AuthTokensExt,
@@ -213,46 +205,20 @@ pub async fn validate_credentials_ext(
     }
 
     // this is only applicable for super admin user
-    if is_root_user(user_id) {
-        user = users::get_user(None, user_id).await;
-        if user.is_none() {
-            return Ok(TokenValidationResponse {
-                is_valid: false,
-                user_email: "".to_string(),
-                is_internal_user: false,
-                user_role: None,
-                user_name: "".to_string(),
-                family_name: "".to_string(),
-                given_name: "".to_string(),
-            });
-        }
+    if is_root_user(email_id) {
+        user = users::get_user(None, email_id).await;
     } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
-        let db_user = db::user::get_db_user(user_id).await;
-        user = match db_user {
-            Ok(user) => {
-                let all_users = user.get_all_users();
-                if all_users.is_empty() {
-                    None
-                } else {
-                    all_users.first().cloned()
-                }
-            }
-            Err(_) => None,
-        }
+        let db_user = db::user::get_db_user(email_id).await;
+        user = db_user
+            .ok()
+            .and_then(|db_user| db_user.get_all_users().first().cloned());
     } else {
-        user = match path.find('/') {
-            Some(index) => {
-                let org_id = &path[0..index];
-                users::get_user(Some(org_id), user_id).await
-            }
-            None => users::get_user(None, user_id).await,
-        }
+        user = users::get_user(path.find('/').map(|index| &path[0..index]), email_id).await;
     };
 
-    if user.is_none() {
+    let Some(user) = user else {
         return Ok(TokenValidationResponse::default());
-    }
-    let user = user.unwrap();
+    };
 
     let hashed_pass = get_hash(
         &format!(
@@ -272,14 +238,14 @@ pub async fn validate_credentials_ext(
         || (path.contains("/user")
             && (user.role.eq(&UserRole::Admin)
                 || user.role.eq(&UserRole::Root)
-                || user.email.eq(user_id)))
+                || user.email.eq(email_id)))
     {
         Ok(TokenValidationResponse {
             is_valid: true,
             user_email: user.email,
+            username: user.username,
             is_internal_user: !user.is_external,
             user_role: Some(user.role),
-            user_name: user.first_name.to_owned(),
             family_name: user.last_name,
             given_name: user.first_name,
         })
@@ -559,7 +525,7 @@ pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
             None => None,
         }
     } else if auth_str.starts_with("Bearer") {
-        super::token::get_user_name_from_token(auth_str).await
+        super::token::get_user_email_from_token(auth_str).await
     } else if auth_str.starts_with("{\"auth_ext\":") {
         let auth_tokens: AuthTokensExt =
             config::utils::json::from_str(auth_str).unwrap_or_default();

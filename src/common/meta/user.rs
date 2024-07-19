@@ -302,7 +302,7 @@ pub struct UserList {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct SignInUser {
-    pub email_id: String,
+    pub email: String, // QUESTION(taiming): does changing this field name affect the api endpoint?
     pub password: String,
 }
 

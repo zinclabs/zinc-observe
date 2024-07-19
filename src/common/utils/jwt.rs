@@ -10,7 +10,7 @@ use {
 };
 
 #[cfg(feature = "enterprise")]
-use crate::common::meta::user::TokenValidationResponse;
+use crate::{common::meta::user::TokenValidationResponse, service::users::generate_username};
 
 #[cfg(feature = "enterprise")]
 pub(crate) async fn verify_decode_token(
@@ -57,10 +57,17 @@ pub(crate) async fn verify_decode_token(
                     ""
                 };
 
-                let user_name = if let Some(name) = decoded_token.claims.get("name") {
-                    name.as_str().unwrap()
+                // QUESTION(taiming): I should be generating username here, correct?
+                // although i don't think it matters, cause this info is not used anywhere.
+                // let username = if let Some(name) = decoded_token.claims.get("username") {
+                //     name.as_str().unwrap()
+                // } else {
+                //     ""
+                // };
+                let username = if !user_email.is_empty() {
+                    generate_username(user_email).await
                 } else {
-                    ""
+                    "".to_string()
                 };
 
                 let family_name = if let Some(family_name) = decoded_token.claims.get("family_name")
@@ -80,7 +87,7 @@ pub(crate) async fn verify_decode_token(
                     TokenValidationResponse {
                         is_valid: true,
                         user_email: user_email.to_owned(),
-                        user_name: user_name.to_owned(),
+                        username,
                         family_name: family_name.to_owned(),
                         given_name: given_name.to_owned(),
                         is_internal_user: false,

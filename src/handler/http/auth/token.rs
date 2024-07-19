@@ -121,7 +121,7 @@ pub async fn token_validator(
 }
 
 #[cfg(feature = "enterprise")]
-pub async fn get_user_name_from_token(auth_str: &str) -> Option<String> {
+pub async fn get_user_email_from_token(auth_str: &str) -> Option<String> {
     let keys = get_jwks().await;
     match jwt::verify_decode_token(
         auth_str.strip_prefix("Bearer").unwrap().trim(),

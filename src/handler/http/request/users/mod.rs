@@ -278,12 +278,12 @@ pub async fn authentication(
                 let auth_header = _req.headers().get("Authorization");
                 if auth_header.is_some() {
                     let auth_header = auth_header.unwrap().to_str().unwrap();
-                    if let Some((name, password)) =
+                    if let Some((email, password)) =
                         o2_enterprise::enterprise::dex::service::auth::get_user_from_token(
                             auth_header,
                         )
                     {
-                        SignInUser { name, password }
+                        SignInUser { email, password }
                     } else {
                         audit_unauthorized_error(audit_message).await;
                         return unauthorized_error(resp);
@@ -302,10 +302,10 @@ pub async fn authentication(
 
     #[cfg(feature = "enterprise")]
     {
-        audit_message.user_email = auth.name.clone();
+        audit_message.user_email = auth.email.clone();
     }
 
-    match crate::handler::http::auth::validator::validate_user(&auth.email_id, &auth.password).await {
+    match crate::handler::http::auth::validator::validate_user(&auth.email, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
                 resp.status = true;
@@ -321,41 +321,35 @@ pub async fn authentication(
             return unauthorized_error(resp);
         }
     };
-    if resp.status {
-        let cfg = get_config();
 
-        let access_token = format!(
-            "Basic {}",
-            base64::encode(&format!("{}:{}", auth.email_id, auth.password))
-        );
-        let tokens = json::to_string(&AuthTokens {
-            access_token,
-            refresh_token: "".to_string(),
-        })
-        .unwrap();
+    let cfg = get_config();
+    let access_token = format!(
+        "Basic {}",
+        base64::encode(&format!("{}:{}", auth.email, auth.password))
+    );
+    let tokens = json::to_string(&AuthTokens {
+        access_token,
+        refresh_token: "".to_string(),
+    })
+    .unwrap();
 
-        let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
-        auth_cookie.set_expires(
-            cookie::time::OffsetDateTime::now_utc()
-                + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
-        );
-        auth_cookie.set_http_only(true);
-        auth_cookie.set_secure(cfg.auth.cookie_secure_only);
-        auth_cookie.set_path("/");
-        if cfg.auth.cookie_same_site_lax {
-            auth_cookie.set_same_site(cookie::SameSite::Lax);
-        } else {
-            auth_cookie.set_same_site(cookie::SameSite::None);
-        }
-        // audit the successful login
-        #[cfg(feature = "enterprise")]
-        audit(audit_message).await;
-        Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
+    let mut auth_cookie = cookie::Cookie::new("auth_tokens", tokens);
+    auth_cookie.set_expires(
+        cookie::time::OffsetDateTime::now_utc()
+            + cookie::time::Duration::seconds(cfg.auth.cookie_max_age),
+    );
+    auth_cookie.set_http_only(true);
+    auth_cookie.set_secure(cfg.auth.cookie_secure_only);
+    auth_cookie.set_path("/");
+    if cfg.auth.cookie_same_site_lax {
+        auth_cookie.set_same_site(cookie::SameSite::Lax);
     } else {
-        #[cfg(feature = "enterprise")]
-        audit_unauthorized_error(audit_message).await;
-        unauthorized_error(resp)
+        auth_cookie.set_same_site(cookie::SameSite::None);
     }
+    // audit the successful login
+    #[cfg(feature = "enterprise")]
+    audit(audit_message).await;
+    Ok(HttpResponse::Ok().cookie(auth_cookie).json(resp))
 }
 
 #[derive(serde::Deserialize)]
@@ -445,7 +439,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             _timestamp: chrono::Utc::now().timestamp_micros(),
         };
 
-        let (name, password) = {
+        let (email_id, password) = {
             let auth_header = if let Some(s) = query.get("auth") {
                 match query.get("request_time") {
                     Some(req_time_str) => {
@@ -497,54 +491,59 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 validate_user, validate_user_for_query_params,
             };
 
-            let (name, password) = if let Some((name, password)) = get_user_from_token(&auth_header)
-            {
-                let token_validation_response = match request_time {
-                    Some(req_ts) => {
-                        log::debug!("Validating user for query params");
-                        validate_user_for_query_params(&name, &password, Some(req_ts), expires_in)
+            let (email_id, password) =
+                if let Some((email_id, password)) = get_user_from_token(&auth_header) {
+                    let token_validation_response = match request_time {
+                        Some(req_ts) => {
+                            log::debug!("Validating user for query params");
+                            validate_user_for_query_params(
+                                &email_id,
+                                &password,
+                                Some(req_ts),
+                                expires_in,
+                            )
                             .await
-                    }
-                    None => {
-                        log::debug!("Validating user for basic auth header");
-                        validate_user(&name, &password).await
-                    }
-                };
+                        }
+                        None => {
+                            log::debug!("Validating user for basic auth header");
+                            validate_user(&email_id, &password).await
+                        }
+                    };
 
-                audit_message.user_email = name.clone();
-                match token_validation_response {
-                    Ok(v) => {
-                        if v.is_valid {
-                            resp.status = true;
-                            (name, password)
-                        } else {
+                    audit_message.user_email = email_id.clone();
+                    match token_validation_response {
+                        Ok(v) => {
+                            if v.is_valid {
+                                resp.status = true;
+                                (email_id, password)
+                            } else {
+                                audit_unauthorized_error(audit_message).await;
+                                return unauthorized_error(resp);
+                            }
+                        }
+                        Err(_) => {
                             audit_unauthorized_error(audit_message).await;
                             return unauthorized_error(resp);
                         }
                     }
-                    Err(_) => {
-                        audit_unauthorized_error(audit_message).await;
-                        return unauthorized_error(resp);
-                    }
-                }
-            } else {
-                audit_unauthorized_error(audit_message).await;
-                return unauthorized_error(resp);
-            };
-            (name, password)
+                } else {
+                    audit_unauthorized_error(audit_message).await;
+                    return unauthorized_error(resp);
+                };
+            (email_id, password)
         };
 
         if resp.status {
             let cfg = get_config();
             let id_token = config::utils::json::json!({
-                "email": name,
-                "name": name,
+                "email": email_id,
+                "name": email_id,
             });
             let cookie_name = "auth_tokens";
             let auth_cookie = if req_ts == 0 {
                 let access_token = format!(
                     "Basic {}",
-                    base64::encode(&format!("{}:{}", &name, &password))
+                    base64::encode(&format!("{}:{}", &email_id, &password))
                 );
                 let tokens = AuthTokens {
                     access_token,
@@ -553,14 +552,14 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let expiry = cookie::time::OffsetDateTime::now_utc()
                     + cookie::time::Duration::seconds(cfg.auth.cookie_max_age);
 
-                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                log::debug!("Setting cookie for user: {} - {}", email_id, cookie_name);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             } else {
                 let cookie_name = "auth_ext";
                 let auth_ext = format!(
                     "{} {}",
                     cookie_name,
-                    base64::encode(&format!("{}:{}", &name, &password))
+                    base64::encode(&format!("{}:{}", &email_id, &password))
                 );
 
                 let tokens = AuthTokensExt {
@@ -572,7 +571,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 let expiry = cookie::time::OffsetDateTime::now_utc()
                     + cookie::time::Duration::seconds(req_ts);
 
-                log::debug!("Setting cookie for user: {} - {}", name, cookie_name);
+                log::debug!("Setting cookie for user: {} - {}", email_id, cookie_name);
                 _prepare_cookie(&cfg, cookie_name, &tokens, expiry)
             };
 

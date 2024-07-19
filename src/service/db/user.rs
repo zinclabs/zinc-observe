@@ -127,7 +127,7 @@ pub async fn set(user: &DBUser) -> Result<(), anyhow::Error> {
 
     // cache user
     for org in &user.organizations {
-        let mut user = User {
+        let user = User {
             email: user.email.clone(),
             first_name: user.first_name.clone(),
             last_name: user.last_name.clone(),
@@ -147,6 +147,7 @@ pub async fn set(user: &DBUser) -> Result<(), anyhow::Error> {
 
         #[cfg(not(feature = "enterprise"))]
         if !user.role.eq(&UserRole::Root) {
+            let mut user = user;
             user.role = UserRole::Admin;
         }
 
@@ -271,9 +272,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     for (_, item_value) in ret {
         let json_val: DBUser = json::from_slice(&item_value).unwrap();
         let users = json_val.get_all_users();
-        for mut user in users {
+        for user in users {
             #[cfg(not(feature = "enterprise"))]
             if !user.role.eq(&UserRole::Root) {
+                let mut user = user;
                 user.role = UserRole::Admin;
             }
 
@@ -314,6 +316,17 @@ pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/user/";
     db::delete(key, true, db::NO_NEED_WATCH, None).await?;
     Ok(())
+}
+
+pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
+    let key = "/user/";
+    let ret = db::list_values(key).await.unwrap();
+    ret.iter()
+        .filter_map(|item| {
+            let user: DBUser = serde_json::from_slice(item).unwrap();
+            user.email.eq(email).then_some(user)
+        })
+        .next()
 }
 
 #[cfg(test)]

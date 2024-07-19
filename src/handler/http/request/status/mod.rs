@@ -446,9 +446,11 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             match token_ver {
                 Ok(res) => {
                     audit_message.user_email = res.0.user_email.clone();
+                    // QUESTION(taiming): what's the potential effect of changing the field "name"
+                    // to "username". since this token is used to create login_url?
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,
-                        "name": res.0.user_name,
+                        "username": res.0.username,
                         "family_name": res.0.family_name,
                         "given_name": res.0.given_name,
                         "is_valid": res.0.is_valid,

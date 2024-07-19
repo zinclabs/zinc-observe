@@ -74,10 +74,7 @@ pub async fn process_token(
 
     let user_email = res.0.user_email.to_owned();
 
-    let name = match dec_token.claims.get("name") {
-        None => res.0.user_email.to_owned(),
-        Some(name) => name.as_str().unwrap().to_string(),
-    };
+    let (given_name, family_name) = (res.0.given_name.as_str(), res.0.family_name.as_str());
     let mut source_orgs: Vec<UserOrg> = vec![];
     let mut custom_roles: Vec<String> = vec![];
     let mut tuples_to_add = HashMap::new();
@@ -107,7 +104,7 @@ pub async fn process_token(
 
     // Assign users custom roles in RBAC
     if O2_CONFIG.openfga.map_group_to_role {
-        map_group_to_custom_role(&user_email, &name, custom_roles).await;
+        map_group_to_custom_role(&user_email, given_name, family_name, custom_roles).await;
         return;
     }
 
@@ -147,8 +144,9 @@ pub async fn process_token(
         }
         let updated_db_user = DBUser {
             email: user_email.to_owned(),
-            first_name: name.to_owned(),
-            last_name: "".to_owned(),
+            username: users::generate_username(&user_email).await,
+            first_name: given_name.to_owned(),
+            last_name: family_name.to_owned(),
             password: "".to_owned(),
             salt: "".to_owned(),
             organizations: source_orgs,
@@ -179,6 +177,7 @@ pub async fn process_token(
     } else {
         log::info!("User exists in the database perform check for role change");
         let existing_db_user = db_user.unwrap();
+        let username = existing_db_user.username;
         let existing_orgs = existing_db_user.organizations;
         let mut orgs_removed = Vec::new();
         let mut orgs_role_changed = HashMap::new();
@@ -219,7 +218,7 @@ pub async fn process_token(
         for org in orgs_added {
             match users::add_user_to_org(
                 &org.name,
-                &user_email,
+                &username,
                 org.role.clone(),
                 &get_config().auth.root_user_email,
             )
@@ -242,7 +241,7 @@ pub async fn process_token(
         for org in orgs_removed {
             match users::remove_user_from_org(
                 &org.name,
-                &user_email,
+                &username,
                 &get_config().auth.root_user_email,
             )
             .await
@@ -267,7 +266,7 @@ pub async fn process_token(
         for (existing_role, org) in orgs_role_changed {
             match users::update_user(
                 &org.name,
-                &user_email,
+                &username,
                 false,
                 &get_config().auth.root_user_email,
                 crate::common::meta::user::UpdateUser {
@@ -362,7 +361,12 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
 }
 
 #[cfg(feature = "enterprise")]
-async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Vec<String>) {
+async fn map_group_to_custom_role(
+    user_email: &str,
+    given_name: &str,
+    family_name: &str,
+    custom_roles: Vec<String>,
+) {
     // Check if the user exists in the database
     let db_user = db::user::get_user_by_email(user_email).await;
     log::debug!("map_group_to_custom_role custom roles: {:#?}", custom_roles);
@@ -399,8 +403,9 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
         }
         let updated_db_user = DBUser {
             email: user_email.to_owned(),
-            first_name: name.to_owned(),
-            last_name: "".to_owned(),
+            username: users::generate_username(user_email).await,
+            first_name: given_name.to_owned(),
+            last_name: family_name.to_owned(),
             password: "".to_owned(),
             salt: "".to_owned(),
             organizations: vec![UserOrg {
