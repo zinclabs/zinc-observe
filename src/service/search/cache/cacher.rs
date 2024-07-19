@@ -269,7 +269,7 @@ pub async fn get_cached_results(
                                 if Utc::now().timestamp_micros() - discard_duration < m_first_ts {
                                     m_first_ts - discard_duration
                                 } else {
-                                    m_first_ts
+                                    first_ts
                                 }
                             }
                         } else if cache_req.discard_interval > 0 {
@@ -280,7 +280,7 @@ pub async fn get_cached_results(
                             if Utc::now().timestamp_micros() - discard_duration < last_ts {
                                 m_last_ts - discard_duration
                             } else {
-                                m_last_ts
+                                last_ts
                             }
                         };
 
