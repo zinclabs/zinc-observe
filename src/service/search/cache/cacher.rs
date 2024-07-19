@@ -243,7 +243,7 @@ pub async fn get_cached_results(
 
                 let cache_duration = matching_cache_meta.end_time - matching_cache_meta.start_time;
                 // return None if cache duration is less than 2 * discard_duration
-                if cache_duration <= discard_duration {
+                if cache_duration <= discard_duration && matching_cache_meta.start_time > Utc::now().timestamp_micros() - discard_duration  {
                     return None;
                 }
 
