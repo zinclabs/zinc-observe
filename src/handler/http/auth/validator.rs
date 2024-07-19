@@ -43,7 +43,7 @@ pub const ID_TOKEN_HEADER: &str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
 
 pub async fn validator(
     req: ServiceRequest,
-    user_id: &str,
+    email_id: &str,
     password: &str,
     auth_info: AuthExtractor,
     path_prefix: &str,
@@ -60,9 +60,9 @@ pub async fn validator(
     match if auth_info.auth.starts_with("{\"auth_ext\":") {
         let auth_token: AuthTokensExt =
             config::utils::json::from_str(&auth_info.auth).unwrap_or_default();
-        validate_credentials_ext(user_id, password, path, auth_token).await
+        validate_credentials_ext(email_id, password, path, auth_token).await
     } else {
-        validate_credentials(user_id, password.trim(), path).await
+        validate_credentials(email_id, password.trim(), path).await
     } {
         Ok(res) => {
             if res.is_valid {
@@ -80,7 +80,7 @@ pub async fn validator(
                 );
 
                 if auth_info.bypass_check
-                    || check_permissions(user_id, auth_info, res.user_role).await
+                    || check_permissions(email_id, auth_info, res.user_role).await
                 {
                     Ok(req)
                 } else {
@@ -108,7 +108,7 @@ pub async fn validate_token(token: &str, org_id: &str) -> Result<(), Error> {
 }
 
 pub async fn validate_credentials(
-    user_id: &str,
+    email_id: &str,
     user_password: &str,
     path: &str,
 ) -> Result<TokenValidationResponse, Error> {
@@ -121,54 +121,28 @@ pub async fn validate_credentials(
     }
 
     // this is only applicable for super admin user
-    if is_root_user(user_id) {
-        user = users::get_user(None, user_id).await;
-        if user.is_none() {
-            return Ok(TokenValidationResponse {
-                is_valid: false,
-                user_email: "".to_string(),
-                is_internal_user: false,
-                user_role: None,
-                user_name: "".to_string(),
-                family_name: "".to_string(),
-                given_name: "".to_string(),
-            });
-        }
+    if is_root_user(email_id) {
+        user = users::get_user(None, email_id).await;
     } else if path_columns.last().unwrap_or(&"").eq(&"organizations") {
-        let db_user = db::user::get_db_user(user_id).await;
-        user = match db_user {
-            Ok(user) => {
-                let all_users = user.get_all_users();
-                if all_users.is_empty() {
-                    None
-                } else {
-                    all_users.first().cloned()
-                }
-            }
-            Err(_) => None,
-        }
+        let db_user = db::user::get_db_user(email_id).await;
+        user = db_user
+            .ok()
+            .and_then(|db_user| db_user.get_all_users().first().cloned());
     } else {
-        user = match path.find('/') {
-            Some(index) => {
-                let org_id = &path[0..index];
-                users::get_user(Some(org_id), user_id).await
-            }
-            None => users::get_user(None, user_id).await,
-        }
+        user = users::get_user(path.find('/').map(|index| &path[0..index]), email_id).await;
     };
 
-    if user.is_none() {
+    let Some(user) = user else {
         return Ok(TokenValidationResponse {
             is_valid: false,
             user_email: "".to_string(),
+            username: "".to_string(),
             is_internal_user: false,
             user_role: None,
-            user_name: "".to_string(),
             family_name: "".to_string(),
             given_name: "".to_string(),
         });
-    }
-    let user = user.unwrap();
+    };
 
     if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
         && user.token.eq(&user_password)
@@ -176,9 +150,9 @@ pub async fn validate_credentials(
         return Ok(TokenValidationResponse {
             is_valid: true,
             user_email: user.email,
+            username: user.username,
             is_internal_user: !user.is_external,
             user_role: Some(user.role),
-            user_name: user.first_name.to_owned(),
             family_name: user.last_name,
             given_name: user.first_name,
         });
@@ -194,9 +168,9 @@ pub async fn validate_credentials(
         return Ok(TokenValidationResponse {
             is_valid: false,
             user_email: "".to_string(),
+            username: "".to_string(),
             is_internal_user: false,
             user_role: None,
-            user_name: "".to_string(),
             family_name: "".to_string(),
             given_name: "".to_string(),
         });
@@ -205,14 +179,14 @@ pub async fn validate_credentials(
         || (path.contains("/user")
             && (user.role.eq(&UserRole::Admin)
                 || user.role.eq(&UserRole::Root)
-                || user.email.eq(user_id)))
+                || user.email.eq(email_id)))
     {
         Ok(TokenValidationResponse {
             is_valid: true,
             user_email: user.email,
+            username: user.username.to_owned(),
             is_internal_user: !user.is_external,
             user_role: Some(user.role),
-            user_name: user.first_name.to_owned(),
             family_name: user.last_name,
             given_name: user.first_name,
         })
@@ -316,7 +290,7 @@ pub async fn validate_credentials_ext(
 
 #[cfg(not(feature = "enterprise"))]
 pub async fn validate_credentials_ext(
-    _user_id: &str,
+    _email_id: &str,
     _in_password: &str,
     _path: &str,
     _auth_token: AuthTokensExt,
@@ -331,7 +305,6 @@ async fn validate_user_from_db(
     exp_in: i64,
     password_ext_salt: &str,
 ) -> Result<TokenValidationResponse, Error> {
-    // let db_user = db::user::get_db_user(user_id).await;
     match db_user {
         Ok(mut user) => {
             let in_pass = get_hash(user_password, &user.salt);
@@ -376,21 +349,21 @@ async fn validate_user_from_db(
 }
 
 pub async fn validate_user(
-    user_id: &str,
+    email_id: &str,
     user_password: &str,
 ) -> Result<TokenValidationResponse, Error> {
-    let db_user = db::user::get_db_user(user_id).await;
+    let db_user = db::user::get_db_user(email_id).await;
     let config = get_config();
     validate_user_from_db(db_user, user_password, None, 0, &config.auth.ext_auth_salt).await
 }
 
 pub async fn validate_user_for_query_params(
-    user_id: &str,
+    email_id: &str,
     user_password: &str,
     req_time: Option<&String>,
     exp_in: i64,
 ) -> Result<TokenValidationResponse, Error> {
-    let db_user = db::user::get_db_user(user_id).await;
+    let db_user = db::user::get_db_user(email_id).await;
     let config = get_config();
     validate_user_from_db(
         db_user,
@@ -544,11 +517,11 @@ async fn oo_validator_internal(
         let decoded = base64::decode(auth_info.auth.strip_prefix("Basic").unwrap().trim())
             .expect("Failed to decode base64 string");
 
-        let (username, password) = match get_user_details(decoded) {
+        let (email_id, password) = match get_user_details(decoded) {
             Some(value) => value,
             None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
         };
-        validator(req, &username, &password, auth_info, path_prefix).await
+        validator(req, &email_id, &password, auth_info, path_prefix).await
     } else if auth_info.auth.starts_with("Bearer") {
         super::token::token_validator(req, auth_info).await
     } else if auth_info.auth.starts_with("{\"auth_ext\":") {
@@ -565,11 +538,10 @@ async fn oo_validator_internal(
                     .trim(),
             )
             .expect("Failed to decode base64 string");
-            let (username, password) = match get_user_details(decoded) {
-                Some(value) => value,
-                None => return Err((ErrorUnauthorized("Unauthorized Access"), req)),
+            let Some((email_id, password)) = get_user_details(decoded) else {
+                return Err((ErrorUnauthorized("Unauthorized Access"), req));
             };
-            validator(req, &username, &password, auth_info, path_prefix).await
+            validator(req, &email_id, &password, auth_info, path_prefix).await
         }
     } else {
         Err((ErrorUnauthorized("Unauthorized Access"), req))
@@ -620,10 +592,8 @@ fn get_user_details(decoded: String) -> Option<(String, String)> {
     if parts.len() != 2 {
         return None;
     }
-    let (username, password) = (parts[0], parts[1]);
-    let username = username.to_owned();
-    let password = password.to_owned();
-    Some((username, password))
+    let (email_id, password) = (parts[0], parts[1]);
+    Some((email_id.to_string(), password.to_string()))
 }
 
 /// Validates the authentication information in the incoming request and returns the request if
@@ -716,7 +686,7 @@ pub(crate) async fn check_permissions(
 
 #[cfg(not(feature = "enterprise"))]
 pub(crate) async fn check_permissions(
-    _user_id: &str,
+    _email_id: &str,
     _auth_info: AuthExtractor,
     _role: Option<UserRole>,
 ) -> bool {
@@ -777,12 +747,13 @@ mod tests {
     use infra::db as infra_db;
 
     use super::*;
-    use crate::common::meta::user::UserRequest;
+    use crate::{common::meta::user::UserRequest, service::users::generate_username};
 
     #[tokio::test]
     async fn test_validation_response_builder_from_db_user() {
         let user = DBUser {
             email: "test@email.com".into(),
+            username: generate_username("test@email.com").await,
             first_name: "first_name".into(),
             last_name: "last_name".into(),
             password: "some_pass".into(),
@@ -797,9 +768,9 @@ mod tests {
         let resp = TokenValidationResponse {
             is_valid: true,
             user_email: user.email,
+            username: user.username,
             is_internal_user: !user.is_external,
             user_role: None,
-            user_name: user.first_name.to_owned(),
             family_name: user.last_name,
             given_name: user.first_name,
         };
@@ -808,19 +779,19 @@ mod tests {
         assert!(resp_from_builder.user_email.eq(&resp.user_email));
         assert_eq!(resp_from_builder.is_internal_user, resp.is_internal_user);
         assert_eq!(resp_from_builder.user_role, resp.user_role);
-        assert!(resp_from_builder.user_name.eq(&resp.user_name));
+        assert!(resp_from_builder.username.eq(&resp.username));
         assert!(resp_from_builder.family_name.eq(&resp.family_name));
         assert!(resp_from_builder.given_name.eq(&resp.given_name));
     }
 
-    #[tokio::test]
-    async fn test_validation_response_default() {
+    #[test]
+    fn test_validation_response_default() {
         let actual = TokenValidationResponse {
             is_valid: false,
             user_email: "".to_string(),
+            username: "".to_string(),
             is_internal_user: false,
             user_role: None,
-            user_name: "".to_string(),
             family_name: "".to_string(),
             given_name: "".to_string(),
         };
@@ -840,17 +811,14 @@ mod tests {
         let pwd = "Complexpass#123";
 
         infra_db::create_table().await.unwrap();
-        users::create_root_user(
-            org_id,
-            UserRequest {
-                email: init_user.to_string(),
-                password: pwd.to_string(),
-                role: crate::common::meta::user::UserRole::Root,
-                first_name: "root".to_owned(),
-                last_name: "".to_owned(),
-                is_external: false,
-            },
-        )
+        users::create_root_user(UserRequest {
+            email: init_user.to_string(),
+            password: pwd.to_string(),
+            role: crate::common::meta::user::UserRole::Root,
+            first_name: "root".to_owned(),
+            last_name: "".to_owned(),
+            is_external: false,
+        })
         .await
         .unwrap();
         users::post_user(

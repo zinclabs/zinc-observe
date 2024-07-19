@@ -93,7 +93,7 @@ mod tests {
     use config::cache_instance_id;
 
     use super::*;
-    use crate::common::meta::user::User;
+    use crate::{common::meta::user::User, service::users::generate_username};
 
     #[tokio::test]
     async fn test_check_no_auth() {
@@ -102,6 +102,7 @@ mod tests {
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),
+                username: generate_username("root@example.com").await,
                 password: "Complexpass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
@@ -132,6 +133,7 @@ mod tests {
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),
+                username: generate_username("root@example.com").await,
                 password: "Complexpass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
@@ -160,6 +162,7 @@ mod tests {
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),
+                username: generate_username("root@example.com").await,
                 password: "Complexpass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),

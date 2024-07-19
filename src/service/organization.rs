@@ -221,7 +221,6 @@ mod tests {
 
         infra_db::create_table().await.unwrap();
         users::create_root_user(
-            org_id,
             UserRequest {
                 email: init_user.to_string(),
                 password: pwd.to_string(),

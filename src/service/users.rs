@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{collections::HashSet, io::Error};
 
 use actix_web::{http, HttpResponse};
 use config::{get_config, ider, utils::rand::generate_random_string};
@@ -26,9 +26,7 @@ use crate::{
         meta::{
             http::HttpResponse as MetaHttpResponse,
             organization::DEFAULT_ORG,
-            user::{
-                DBUser, UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole,
-            },
+            user::{UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole},
         },
         utils::auth::{get_hash, get_role, is_root_user},
     },
@@ -38,15 +36,15 @@ use crate::{
 pub async fn post_user(
     org_id: &str,
     usr_req: UserRequest,
-    initiator_id: &str,
+    initiator_email: &str,
 ) -> Result<HttpResponse, Error> {
-    let initiator_user = db::user::get(Some(org_id), initiator_id).await;
-    let cfg = get_config();
-    if is_root_user(initiator_id)
+    let initiator_user = db::user::get(Some(org_id), initiator_email).await;
+    if is_root_user(initiator_email)
         || (initiator_user.is_ok()
             && initiator_user.as_ref().unwrap().is_some()
             && initiator_user.unwrap().unwrap().role.eq(&UserRole::Admin))
     {
+        let cfg = get_config();
         let existing_user = if is_root_user(&usr_req.email) {
             db::user::get(None, &usr_req.email).await
         } else {
@@ -54,11 +52,13 @@ pub async fn post_user(
         };
         if existing_user.is_err() {
             let salt = ider::uuid();
+            let username = generate_username(&usr_req.email).await;
             let password = get_hash(&usr_req.password, &salt);
             let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
             let user = usr_req.to_new_dbuser(
+                username,
                 password,
                 salt,
                 org_id.replace(' ', "_"),
@@ -123,361 +123,318 @@ pub async fn post_user(
     }
 }
 
-pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
-    if db_user.password.is_empty() {
-        let salt = ider::uuid();
-        let generated_pass = generate_random_string(8);
-        let password = get_hash(&generated_pass, &salt);
-        db_user.password = password;
-        db_user.salt = salt;
-    }
-    for org in &mut db_user.organizations {
-        if org.token.is_empty() {
-            let token = generate_random_string(16);
-            org.token = token;
-        };
-        if org.rum_token.is_none() {
-            let rum_token = format!("rum{}", generate_random_string(16));
-            org.rum_token = Some(rum_token);
-        };
-    }
-    db::user::set(&db_user).await
-}
+// pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
+//     if db_user.password.is_empty() {
+//         let salt = ider::uuid();
+//         let generated_pass = generate_random_string(8);
+//         let password = get_hash(&generated_pass, &salt);
+//         db_user.password = password;
+//         db_user.salt = salt;
+//     }
+//     for org in &mut db_user.organizations {
+//         if org.token.is_empty() {
+//             let token = generate_random_string(16);
+//             org.token = token;
+//         };
+//         if org.rum_token.is_none() {
+//             let rum_token = format!("rum{}", generate_random_string(16));
+//             org.rum_token = Some(rum_token);
+//         };
+//     }
+//     db::user::set(&db_user).await
+// }
 
+// TODO(taiming): still needs to be updated to use username
 pub async fn update_user(
     org_id: &str,
-    email: &str,
+    username: &str,
     self_update: bool,
-    initiator_id: &str,
+    initiator_email: &str,
     user: UpdateUser,
 ) -> Result<HttpResponse, Error> {
     let mut allow_password_update = false;
 
-    let existing_user = if is_root_user(email) {
-        db::user::get(None, email).await
-    } else {
-        db::user::get(Some(org_id), email).await
+    let Some(local_user) = db::user::get_db_user_by_username(username)
+        .await
+        .and_then(|db_user| db_user.get_user(org_id.to_string()))
+    else {
+        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            "User not found".to_string(),
+        )));
     };
+
+    if local_user.is_external {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+            http::StatusCode::BAD_REQUEST.into(),
+            "Updates not allowed in OpenObserve, please update with source system".to_string(),
+        )));
+    }
 
     let mut old_role = None;
     let mut new_role = None;
     let conf = get_config();
     let password_ext_salt = conf.auth.ext_auth_salt.as_str();
-    if existing_user.is_ok() {
-        let mut new_user;
-        let mut is_updated = false;
-        let mut is_org_updated = false;
-        let mut message = "";
-        match existing_user.unwrap() {
-            Some(local_user) => {
-                if local_user.is_external {
-                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        "Updates not allowed in OpenObserve, please update with source system"
-                            .to_string(),
-                    )));
+    let mut is_updated = false;
+    let mut is_org_updated = false;
+    let mut message = "";
+
+    let initiating_user = db::user::get(Some(org_id), initiator_email)
+        .await
+        .unwrap()
+        .unwrap();
+
+    if !self_update {
+        // initiator is the root user OR
+        // initiator is an Admin AND local_user is not the root user
+        if is_root_user(initiator_email)
+            || (!local_user.role.eq(&UserRole::Root) && initiating_user.role.eq(&UserRole::Admin))
+        {
+            allow_password_update = true
+        }
+    }
+
+    let mut new_user = local_user.clone();
+    // update password
+    if self_update && user.old_password.is_some() && user.new_password.is_some() {
+        if local_user.password.eq(&get_hash(
+            &user.old_password.clone().unwrap(),
+            &local_user.salt,
+        )) {
+            let new_pass = user.new_password.unwrap();
+
+            new_user.password = get_hash(&new_pass, &local_user.salt);
+            new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
+            log::info!("Password self updated for user: {}", username);
+            is_updated = true;
+        } else {
+            message = "Existing/old password mismatch, please provide valid existing password";
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                http::StatusCode::BAD_REQUEST.into(),
+                message.to_string(),
+            )));
+        }
+    } else if self_update && user.old_password.is_none() {
+        message = "Please provide existing password"
+    } else if !self_update
+        && allow_password_update
+        && user.new_password.is_some()
+        && !local_user.is_external
+    {
+        let new_pass = user.new_password.unwrap();
+
+        new_user.password = get_hash(&new_pass, &local_user.salt);
+        new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
+        log::info!(
+            "User {username}'s password is updated by user: {}",
+            initiating_user.username
+        );
+
+        is_updated = true;
+    } else {
+        message = "You are not authorized to change other users' password"
+    }
+
+    // update first or last name
+    if user.first_name.is_some() && !local_user.is_external {
+        new_user.first_name = user.first_name.unwrap();
+        is_updated = true;
+    }
+    if user.last_name.is_some() && !local_user.is_external {
+        new_user.last_name = user.last_name.unwrap();
+        is_updated = true;
+    }
+
+    // update role
+    if user.role.is_some()
+        && !local_user.is_external
+        && (!self_update
+            || (local_user.role.eq(&UserRole::Admin) || local_user.role.eq(&UserRole::Root)))
+        // if the User Role is Root, we do not change the Role
+        // Admins Role can still be mutable.
+        && !local_user.role.eq(&UserRole::Root)
+    {
+        old_role = Some(new_user.role);
+        new_user.role = user.role.unwrap();
+        new_role = Some(new_user.role.clone());
+        is_org_updated = true;
+    }
+
+    // update token
+    if user.token.is_some() {
+        new_user.token = user.token.unwrap();
+        is_org_updated = true;
+    }
+
+    // save the new user
+    if is_updated || is_org_updated {
+        match db::user::get_db_user(&new_user.email).await {
+            Ok(mut db_user) => {
+                db_user.password = new_user.password;
+                db_user.password_ext = new_user.password_ext;
+                db_user.first_name = new_user.first_name;
+                db_user.last_name = new_user.last_name;
+                if is_org_updated {
+                    db_user.organizations.retain(|org| !org.name.eq(org_id));
+                    db_user.organizations.push(UserOrg {
+                        name: org_id.to_string(),
+                        token: new_user.token,
+                        rum_token: new_user.rum_token,
+                        role: new_user.role,
+                    });
                 }
-                if !self_update {
-                    if is_root_user(initiator_id) {
-                        allow_password_update = true
-                    } else {
-                        let initiating_user = db::user::get(Some(org_id), initiator_id)
-                            .await
-                            .unwrap()
-                            .unwrap();
-                        if (local_user.role.eq(&UserRole::Root)
-                            && initiating_user.role.eq(&UserRole::Root))
-                            || (!local_user.role.eq(&UserRole::Root)
-                                && (initiating_user.role.eq(&UserRole::Admin)
-                                    || initiating_user.role.eq(&UserRole::Root)))
-                        {
-                            allow_password_update = true
+                db::user::set(&db_user).await.unwrap();
+                // TODO(taiming) - pending
+                #[cfg(feature = "enterprise")]
+                {
+                    use o2_enterprise::enterprise::openfga::authorizer::authz::update_user_role;
+
+                    if O2_CONFIG.openfga.enabled && old_role.is_some() && new_role.is_some() {
+                        let old = old_role.unwrap();
+                        let new = new_role.unwrap();
+                        if !old.eq(&new) {
+                            let mut old_str = old.to_string();
+                            let mut new_str = new.to_string();
+                            if old.eq(&UserRole::User) || old.eq(&UserRole::ServiceAccount) {
+                                old_str = "allowed_user".to_string();
+                            }
+                            if new.eq(&UserRole::User) || new.eq(&UserRole::ServiceAccount) {
+                                new_str = "allowed_user".to_string();
+                            }
+                            if old_str != new_str {
+                                log::debug!(
+                                    "updating openfga role for {email} from {old_str} to {new_str}"
+                                );
+                                update_user_role(&old_str, &new_str, email, org_id).await;
+                            }
                         }
                     }
                 }
 
-                new_user = local_user.clone();
-                if self_update && user.old_password.is_some() && user.new_password.is_some() {
-                    if local_user.password.eq(&get_hash(
-                        &user.clone().old_password.unwrap(),
-                        &local_user.salt,
-                    )) {
-                        let new_pass = user.new_password.unwrap();
-
-                        new_user.password = get_hash(&new_pass, &local_user.salt);
-                        new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
-                        log::info!("Password self updated for user: {}", email);
-                        is_updated = true;
-                    } else {
-                        message = "Existing/old password mismatch, please provide valid existing password";
-                        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                            http::StatusCode::BAD_REQUEST.into(),
-                            message.to_string(),
-                        )));
-                    }
-                } else if self_update && user.old_password.is_none() {
-                    message = "Please provide existing password"
-                } else if !self_update
-                    && allow_password_update
-                    && user.new_password.is_some()
-                    && !local_user.is_external
-                {
-                    let new_pass = user.new_password.unwrap();
-
-                    new_user.password = get_hash(&new_pass, &local_user.salt);
-                    new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
-                    log::info!("Password by root updated for user: {}", email);
-
-                    is_updated = true;
-                } else {
-                    message = "You are not authorised to change the password"
-                }
-                if user.first_name.is_some() && !local_user.is_external {
-                    new_user.first_name = user.first_name.unwrap();
-                    is_updated = true;
-                }
-                if user.last_name.is_some() && !local_user.is_external {
-                    new_user.last_name = user.last_name.unwrap();
-                    is_updated = true;
-                }
-                if user.role.is_some()
-                    && !local_user.is_external
-                    && (!self_update
-                        || (local_user.role.eq(&UserRole::Admin)
-                            || local_user.role.eq(&UserRole::Root)))
-                    // if the User Role is Root, we do not change the Role
-                    // Admins Role can still be mutable.
-                    && !local_user.role.eq(&UserRole::Root)
-                {
-                    old_role = Some(new_user.role);
-                    new_user.role = user.role.unwrap();
-                    new_role = Some(new_user.role.clone());
-                    is_org_updated = true;
-                }
-                if user.token.is_some() {
-                    new_user.token = user.token.unwrap();
-                    is_org_updated = true;
-                }
-                if is_updated || is_org_updated {
-                    let user = db::user::get_db_user(email).await;
-                    match user {
-                        Ok(mut db_user) => {
-                            db_user.password = new_user.password;
-                            db_user.password_ext = new_user.password_ext;
-                            db_user.first_name = new_user.first_name;
-                            db_user.last_name = new_user.last_name;
-                            if is_org_updated {
-                                let mut orgs = db_user.clone().organizations;
-                                let new_orgs = if orgs.is_empty() {
-                                    vec![UserOrg {
-                                        name: org_id.to_string(),
-                                        token: new_user.token,
-                                        rum_token: new_user.rum_token,
-                                        role: new_user.role,
-                                    }]
-                                } else {
-                                    orgs.retain(|org| !org.name.eq(org_id));
-                                    orgs.push(UserOrg {
-                                        name: org_id.to_string(),
-                                        token: new_user.token,
-                                        rum_token: new_user.rum_token,
-                                        role: new_user.role,
-                                    });
-                                    orgs
-                                };
-                                db_user.organizations = new_orgs;
-                            }
-
-                            db::user::set(&db_user).await.unwrap();
-
-                            #[cfg(feature = "enterprise")]
-                            {
-                                use o2_enterprise::enterprise::openfga::authorizer::authz::update_user_role;
-
-                                if O2_CONFIG.openfga.enabled
-                                    && old_role.is_some()
-                                    && new_role.is_some()
-                                {
-                                    let old = old_role.unwrap();
-                                    let new = new_role.unwrap();
-                                    if !old.eq(&new) {
-                                        let mut old_str = old.to_string();
-                                        let mut new_str = new.to_string();
-                                        if old.eq(&UserRole::User)
-                                            || old.eq(&UserRole::ServiceAccount)
-                                        {
-                                            old_str = "allowed_user".to_string();
-                                        }
-                                        if new.eq(&UserRole::User)
-                                            || new.eq(&UserRole::ServiceAccount)
-                                        {
-                                            new_str = "allowed_user".to_string();
-                                        }
-                                        if old_str != new_str {
-                                            log::debug!(
-                                                "updating openfga role for {email} from {old_str} to {new_str}"
-                                            );
-                                            update_user_role(&old_str, &new_str, email, org_id)
-                                                .await;
-                                        }
-                                    }
-                                }
-                            }
-
-                            #[cfg(not(feature = "enterprise"))]
-                            log::debug!("Role chnaged from {:?} to {:?}", old_role, new_role);
-                            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                                http::StatusCode::OK.into(),
-                                "User updated successfully".to_string(),
-                            )))
-                        }
-                        Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                            http::StatusCode::NOT_FOUND.into(),
-                            "User not found".to_string(),
-                        ))),
-                    }
-                } else {
-                    if message.is_empty() {
-                        message = "Not allowed to update";
-                    }
-                    Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        message.to_string(),
-                    )))
-                }
+                #[cfg(not(feature = "enterprise"))]
+                log::debug!("Role changed from {:?} to {:?}", old_role, new_role);
+                Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                    http::StatusCode::OK.into(),
+                    "User updated successfully".to_string(),
+                )))
             }
-            None => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
                 http::StatusCode::NOT_FOUND.into(),
                 "User not found".to_string(),
             ))),
         }
     } else {
-        Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "User not found".to_string(),
+        if message.is_empty() {
+            message = "Not allowed to update";
+        }
+        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+            http::StatusCode::BAD_REQUEST.into(),
+            message.to_string(),
         )))
     }
 }
 
 pub async fn add_user_to_org(
     org_id: &str,
-    email: &str,
+    username: &str,
     role: UserRole,
-    initiator_id: &str,
+    initiator_email: &str,
 ) -> Result<HttpResponse, Error> {
-    let existing_user = db::user::get_db_user(email).await;
+    let Some(mut db_user) = db::user::get_db_user_by_username(username).await else {
+        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            "User not found".to_string(),
+        )));
+    };
     let root_user = ROOT_USER.clone();
-    if existing_user.is_ok() {
-        let mut db_user = existing_user.unwrap();
-        let local_org;
-        let initiating_user = if is_root_user(initiator_id) {
-            local_org = org_id.replace(' ', "_");
-            root_user.get("root").unwrap().clone()
-        } else {
-            local_org = org_id.to_owned();
-            db::user::get(Some(org_id), initiator_id)
-                .await
-                .unwrap()
-                .unwrap()
-        };
+    let local_org;
+    let initiating_user = if is_root_user(initiator_email) {
+        local_org = org_id.replace(' ', "_");
+        root_user.get("root").unwrap().clone()
+    } else {
+        local_org = org_id.to_owned();
+        db::user::get(Some(org_id), initiator_email)
+            .await
+            .unwrap()
+            .unwrap()
+    };
+    if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
         let role = get_role(role);
-        if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
-            let token = generate_random_string(16);
-            let rum_token = format!("rum{}", generate_random_string(16));
-            let mut orgs = db_user.clone().organizations;
-            let new_orgs = if orgs.is_empty() {
-                vec![UserOrg {
-                    name: local_org.to_string(),
-                    token,
-                    rum_token: Some(rum_token),
-                    role: role.clone(),
-                }]
-            } else {
-                if db_user.is_external {
-                    for org in orgs.iter() {
-                        if org.name.eq(org_id) {
-                            // External user is already part of this org
-                            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
-                                http::StatusCode::FORBIDDEN.into(),
-                                "Not Allowed".to_string(),
-                            )));
-                        }
-                    }
-                }
-                orgs.retain(|org| !org.name.eq(&local_org));
-                orgs.push(UserOrg {
-                    name: local_org.to_string(),
-                    token,
-                    rum_token: Some(rum_token),
-                    role: role.clone(),
-                });
-                orgs
-            };
-            db_user.organizations = new_orgs;
-            db::user::set(&db_user).await.unwrap();
+        let token = generate_random_string(16);
+        let rum_token = format!("rum{}", generate_random_string(16));
+        if db_user.is_external && db_user.organizations.iter().any(|org| org.name.eq(org_id)) {
+            // External user is already part of this org
+            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                http::StatusCode::FORBIDDEN.into(),
+                "Not Allowed".to_string(),
+            )));
+        }
+        db_user.organizations.retain(|org| !org.name.eq(&local_org));
+        db_user.organizations.push(UserOrg {
+            name: local_org.to_string(),
+            token,
+            rum_token: Some(rum_token),
+            role,
+        });
+        db::user::set(&db_user).await.unwrap();
 
-            // Update OFGA
-            #[cfg(feature = "enterprise")]
-            {
-                use o2_enterprise::enterprise::openfga::{
-                    authorizer::authz::{
-                        get_org_creation_tuples, get_user_role_tuple, update_tuples,
-                    },
-                    meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
-                };
-                if O2_CONFIG.openfga.enabled {
-                    let mut tuples = vec![];
-                    get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
-                    get_org_creation_tuples(
-                        org_id,
-                        &mut tuples,
-                        OFGA_MODELS
-                            .iter()
-                            .map(|(_, fga_entity)| fga_entity.key)
-                            .collect(),
-                        NON_OWNING_ORG.to_vec(),
-                    )
-                    .await;
-                    match update_tuples(tuples, vec![]).await {
-                        Ok(_) => {
-                            log::info!("User added to org successfully in openfga");
-                        }
-                        Err(e) => {
-                            log::error!("Error adding user to the org in openfga: {}", e);
-                        }
+        // TODO(taiming): pending
+        // Update OFGA
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_enterprise::enterprise::openfga::{
+                authorizer::authz::{get_org_creation_tuples, get_user_role_tuple, update_tuples},
+                meta::mapping::{NON_OWNING_ORG, OFGA_MODELS},
+            };
+            if O2_CONFIG.openfga.enabled {
+                let mut tuples = vec![];
+                get_user_role_tuple(&role.to_string(), email, org_id, &mut tuples);
+                get_org_creation_tuples(
+                    org_id,
+                    &mut tuples,
+                    OFGA_MODELS
+                        .iter()
+                        .map(|(_, fga_entity)| fga_entity.key)
+                        .collect(),
+                    NON_OWNING_ORG.to_vec(),
+                )
+                .await;
+                match update_tuples(tuples, vec![]).await {
+                    Ok(_) => {
+                        log::info!("User added to org successfully in openfga");
+                    }
+                    Err(e) => {
+                        log::error!("Error adding user to the org in openfga: {}", e);
                     }
                 }
             }
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "User added to org successfully".to_string(),
-            )))
-        } else {
-            Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-                http::StatusCode::UNAUTHORIZED.into(),
-                "Not Allowed".to_string(),
-            )))
         }
+        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "User added to org successfully".to_string(),
+        )))
     } else {
-        Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "User not found".to_string(),
+        Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+            http::StatusCode::UNAUTHORIZED.into(),
+            "Not Allowed".to_string(),
         )))
     }
 }
 
-pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
+pub async fn get_user(org_id: Option<&str>, email_id: &str) -> Option<User> {
     let key = match org_id {
-        Some(local_org) => format!("{local_org}/{name}"),
-        None => format!("{DEFAULT_ORG}/{name}"),
+        Some(local_org) => format!("{local_org}/{email_id}"),
+        None => format!("{DEFAULT_ORG}/{email_id}"),
     };
     let user = USERS.get(&key);
     match user {
         Some(loc_user) => Some(loc_user.value().clone()),
-        None => db::user::get(org_id, name).await.ok().flatten(),
+        None => db::user::get(org_id, email_id).await.ok().flatten(),
     }
 }
 
+// TODO(taiming): this can be refactored, since the db::user::get_by_token is basically doing the
+// same thing
 pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     let rum_tokens = USERS_RUM_TOKEN.clone();
     let key = format!("{DEFAULT_ORG}/{token}");
@@ -517,12 +474,14 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     }
 }
 
+// TODO(taiming): updated the response and check with
 pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     let mut user_list: Vec<UserResponse> = vec![];
     for user in USERS.iter() {
         if user.key().starts_with(&format!("{org_id}/")) {
             user_list.push(UserResponse {
-                email: user.value().email.clone(),
+                // email: user.value().email.clone(),
+                username: user.value().username.clone(),
                 role: user.value().role.clone(),
                 first_name: user.value().first_name.clone(),
                 last_name: user.value().last_name.clone(),
@@ -531,6 +490,7 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
         }
     }
 
+    // TODO(taiming): pending
     #[cfg(feature = "enterprise")]
     {
         if !org_id.eq(DEFAULT_ORG) {
@@ -551,29 +511,29 @@ pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
 
 pub async fn remove_user_from_org(
     org_id: &str,
-    email_id: &str,
-    initiator_id: &str,
+    username: &str,
+    initiator_email: &str,
 ) -> Result<HttpResponse, Error> {
-    let initiating_user = if is_root_user(initiator_id) {
+    let initiating_user = if is_root_user(initiator_email) {
         ROOT_USER.get("root").unwrap().clone()
     } else {
-        db::user::get(Some(org_id), initiator_id)
+        db::user::get(Some(org_id), initiator_email)
             .await
             .unwrap()
             .unwrap()
     };
     if initiating_user.role.eq(&UserRole::Root) || initiating_user.role.eq(&UserRole::Admin) {
-        let ret_user = db::user::get_db_user(email_id).await;
+        let ret_user = db::user::get_db_user_by_username(username).await;
         match ret_user {
-            Ok(mut user) => {
+            Some(mut user) => {
                 if !user.organizations.is_empty() {
-                    let mut orgs = user.clone().organizations;
-                    if orgs.len() == 1 {
-                        let _ = db::user::delete(email_id).await;
+                    if user.organizations.len() == 1 {
+                        let _ = db::user::delete(&user.email).await;
+                        // TODO(taiming) - pending
                         #[cfg(feature = "enterprise")]
                         {
                             use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
-                            let user_role = &orgs[0].role;
+                            let user_role = &user.organizations[0].role;
                             let user_fga_role = if user_role.eq(&UserRole::ServiceAccount)
                                 || user_role.eq(&UserRole::User)
                             {
@@ -587,10 +547,11 @@ pub async fn remove_user_from_org(
                             }
                         }
                     } else {
+                        // TODO(taiming) - pending
                         let mut _user_fga_role: Option<String> = None;
                         #[cfg(feature = "enterprise")]
-                        for org in orgs.iter() {
-                            if org.name.eq(&org_id.to_string()) {
+                        for org in user.organizations.iter() {
+                            if org.name.eq(org_id) {
                                 let user_role = &org.role;
                                 _user_fga_role = if user_role.eq(&UserRole::ServiceAccount)
                                     || user_role.eq(&UserRole::User)
@@ -601,12 +562,12 @@ pub async fn remove_user_from_org(
                                 };
                             }
                         }
-                        orgs.retain(|x| !x.name.eq(&org_id.to_string()));
-                        user.organizations = orgs;
+                        user.organizations.retain(|org| !org.name.eq(org_id));
                         let resp = db::user::set(&user).await;
                         // special case as we cache flattened user struct
                         if resp.is_ok() {
-                            USERS.remove(&format!("{org_id}/{email_id}"));
+                            USERS.remove(&format!("{org_id}/{}", user.email));
+                            // TODO(taiming) - pending
                             #[cfg(feature = "enterprise")]
                             {
                                 use o2_enterprise::enterprise::openfga::authorizer::authz::delete_user_from_org;
@@ -632,13 +593,13 @@ pub async fn remove_user_from_org(
                 } else {
                     Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
                         http::StatusCode::NOT_FOUND.into(),
-                        "User for the organization not found".to_string(),
+                        format!("User not found with in organization {org_id}"),
                     )))
                 }
             }
-            Err(_) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            None => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
                 http::StatusCode::NOT_FOUND.into(),
-                "User for the organization not found".to_string(),
+                "User associated with the given username not found".to_string(),
             ))),
         }
     } else {
@@ -666,7 +627,7 @@ pub async fn delete_user(email_id: &str) -> Result<HttpResponse, Error> {
 pub async fn root_user_exists() -> bool {
     let local_users = ROOT_USER.clone();
     if !local_users.is_empty() {
-        local_users.is_empty()
+        true
     } else {
         db::user::root_user_exists().await
     }
@@ -677,26 +638,28 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
         (false, UserOrg::default())
     } else {
         let mut local_orgs = orgs;
-        local_orgs.retain(|org| !org.name.eq(&org_id.to_string()));
-        if local_orgs.is_empty() {
-            (false, UserOrg::default())
-        } else {
-            (true, local_orgs.first().unwrap().clone())
-        }
+        local_orgs.retain(|org| !org.name.eq(org_id));
+        local_orgs
+            .first()
+            .map_or((false, UserOrg::default()), |user_org| {
+                (true, user_org.clone())
+            })
     }
 }
 
-pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Result<(), Error> {
+pub(crate) async fn create_root_user(usr_req: UserRequest) -> Result<(), Error> {
     let cfg = get_config();
     let salt = ider::uuid();
+    let username = generate_username(&usr_req.email).await;
     let password = get_hash(&usr_req.password, &salt);
     let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
     let token = generate_random_string(16);
     let rum_token = format!("rum{}", generate_random_string(16));
     let user = usr_req.to_new_dbuser(
+        username,
         password,
         salt,
-        org_id.replace(' ', "_"),
+        DEFAULT_ORG.replace(' ', "_"),
         token,
         rum_token,
         usr_req.is_external,
@@ -704,6 +667,33 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
     );
     db::user::set(&user).await.unwrap();
     Ok(())
+}
+
+/// Based on the given `email_id`, generates a new username that is unique in the
+/// entire system. To keep the generated username meaningful and memorable, first
+/// attempts to take the prefix of the given email (already validated).
+///
+/// If the attempted username already exists, modifies the username by appending
+/// a random string of length 2 until it is new.
+/// Random string generated evenly through a-z, A-Z, and 0-9. 3844, 62 * 62,
+/// possible strings in total, which fits the application's current scope.
+pub(crate) async fn generate_username(email_id: &str) -> String {
+    let existing_usernames: HashSet<String> = {
+        let mut usernames = HashSet::new();
+        if let Some(db_users) = db::user::list_db_users().await {
+            usernames.extend(db_users.into_iter().map(|user| user.username));
+        }
+        // root_user is also part of [USERS]
+        usernames.extend(USERS.iter().map(|entry| entry.username.clone()));
+        usernames
+    };
+
+    let attempt = email_id.split_once('@').unwrap().0.to_string();
+    let mut username = attempt.clone();
+    while existing_usernames.contains(&username) {
+        username = format!("{}{}", attempt, generate_random_string(2));
+    }
+    username
 }
 
 #[cfg(test)]
@@ -717,6 +707,7 @@ mod tests {
             "dummy/admin@zo.dev".to_string(),
             User {
                 email: "admin@zo.dev".to_string(),
+                username: generate_username("admin@zo.dev").await,
                 password: "pass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Admin,
                 salt: String::new(),

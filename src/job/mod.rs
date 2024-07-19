@@ -20,10 +20,7 @@ use o2_enterprise::enterprise::common::infra::config::O2_CONFIG;
 use regex::Regex;
 
 use crate::{
-    common::{
-        infra::config::SYSLOG_ENABLED,
-        meta::{organization::DEFAULT_ORG, user::UserRequest},
-    },
+    common::{infra::config::SYSLOG_ENABLED, meta::user::UserRequest},
     service::{compact::stats::update_stats_from_file_list, db, usage, users},
 };
 
@@ -56,17 +53,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
             );
         }
-        let _ = users::create_root_user(
-            DEFAULT_ORG,
-            UserRequest {
-                email: cfg.auth.root_user_email.clone(),
-                password: cfg.auth.root_user_password.clone(),
-                role: crate::common::meta::user::UserRole::Root,
-                first_name: "root".to_owned(),
-                last_name: "".to_owned(),
-                is_external: false,
-            },
-        )
+        let _ = users::create_root_user(UserRequest {
+            email: cfg.auth.root_user_email.clone(),
+            password: cfg.auth.root_user_password.clone(),
+            role: crate::common::meta::user::UserRole::Root,
+            first_name: "root".to_owned(),
+            last_name: "".to_owned(),
+            is_external: false,
+        })
         .await;
     }
 

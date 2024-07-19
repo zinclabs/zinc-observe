@@ -26,10 +26,10 @@ use crate::{
     service::db,
 };
 
-pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyhow::Error> {
+pub async fn get(org_id: Option<&str>, email_id: &str) -> Result<Option<User>, anyhow::Error> {
     let user = match org_id {
         None => ROOT_USER.get("root"),
-        Some(org_id) => USERS.get(&format!("{org_id}/{name}")),
+        Some(org_id) => USERS.get(&format!("{org_id}/{email_id}")),
     };
 
     if let Some(user) = user {
@@ -38,10 +38,24 @@ pub async fn get(org_id: Option<&str>, name: &str) -> Result<Option<User>, anyho
 
     let org_id = org_id.expect("Missing org_id");
 
-    let key = format!("/user/{name}");
+    let key = format!("/user/{email_id}");
     let val = db::get(&key).await?;
     let db_user: DBUser = json::from_slice(&val).unwrap();
     Ok(db_user.get_user(org_id.to_string()))
+}
+
+/// Lists all users from db
+pub async fn list_db_users() -> Option<Vec<DBUser>> {
+    let key = "/user/";
+    if let Ok(ret) = db::list_values(key).await {
+        let mut db_users = Vec::with_capacity(ret.len());
+        for bytes in ret {
+            let db_user: DBUser = json::from_slice(&bytes).ok()?;
+            db_users.push(db_user);
+        }
+        return Some(db_users);
+    }
+    None
 }
 
 /// Retrieve the user object given token and the requested org
@@ -67,15 +81,16 @@ pub async fn get_by_token(
     let ret = db::list_values(key).await.unwrap();
 
     let normal_valid_user = |org: &UserOrg| {
-        org.name == org_id && org.rum_token.is_some() && org.rum_token.as_ref().unwrap() == token
+        org.name == org_id
+            && org
+                .rum_token
+                .as_ref()
+                .is_some_and(|rum_token| rum_token == token)
     };
 
     let users: Vec<DBUser> = ret
         .iter()
-        .map(|item| {
-            let user: DBUser = json::from_slice(item).unwrap();
-            user
-        })
+        .map(|item| json::from_slice::<DBUser>(item).unwrap())
         .filter(|user| user.organizations.iter().any(normal_valid_user))
         .collect();
 
@@ -86,10 +101,18 @@ pub async fn get_by_token(
     Ok(users[0].get_user(org_id.to_string()))
 }
 
-pub async fn get_db_user(name: &str) -> Result<DBUser, anyhow::Error> {
-    let key = format!("/user/{name}");
+pub async fn get_db_user(email_id: &str) -> Result<DBUser, anyhow::Error> {
+    let key = format!("/user/{email_id}");
     let val = db::get(&key).await?;
     Ok(json::from_slice::<DBUser>(&val).unwrap())
+}
+
+pub async fn get_db_user_by_username(username: &str) -> Option<DBUser> {
+    list_db_users().await.and_then(|db_users| {
+        db_users
+            .into_iter()
+            .find(|db_user| db_user.username == username)
+    })
 }
 
 pub async fn set(user: &DBUser) -> Result<(), anyhow::Error> {
@@ -104,10 +127,11 @@ pub async fn set(user: &DBUser) -> Result<(), anyhow::Error> {
 
     // cache user
     for org in &user.organizations {
-        let user = User {
+        let mut user = User {
             email: user.email.clone(),
             first_name: user.first_name.clone(),
             last_name: user.last_name.clone(),
+            username: user.username.clone(),
             password: user.password.clone(),
             role: org.role.clone(),
             org: org.name.clone(),
@@ -117,30 +141,32 @@ pub async fn set(user: &DBUser) -> Result<(), anyhow::Error> {
             is_external: user.is_external,
             password_ext: user.password_ext.clone(),
         };
-        USERS.insert(
-            format!("{}/{}", org.name.clone(), user.email.clone()),
-            user.clone(),
-        );
-
         if let Some(rum_token) = &org.rum_token {
-            USERS_RUM_TOKEN
-                .clone()
-                .insert(format!("{}/{}", org.name, rum_token), user);
+            USERS_RUM_TOKEN.insert(format!("{}/{}", org.name, rum_token), user.clone());
         }
+
+        #[cfg(not(feature = "enterprise"))]
+        if !user.role.eq(&UserRole::Root) {
+            user.role = UserRole::Admin;
+        }
+
+        if user.role.eq(&UserRole::Root) {
+            ROOT_USER.insert("root".to_string(), user.clone());
+        }
+        USERS.insert(format!("{}/{}", org.name, user.email), user);
     }
     Ok(())
 }
 
-pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
-    let key = format!("/user/{name}");
+pub async fn delete(email_id: &str) -> Result<(), anyhow::Error> {
+    let key = format!("/user/{email_id}");
     match db::delete(&key, false, db::NEED_WATCH, None).await {
-        Ok(_) => {}
+        Ok(_) => Ok(()),
         Err(e) => {
             log::error!("Error deleting user: {}", e);
-            return Err(anyhow::anyhow!("Error deleting user: {}", e));
+            Err(anyhow::anyhow!("Error deleting user: {}", e))
         }
     }
-    Ok(())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
@@ -243,35 +269,23 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/user/";
     let ret = db::list(key).await?;
     for (_, item_value) in ret {
-        // let item_key = item_key.strip_prefix(key).unwrap();
         let json_val: DBUser = json::from_slice(&item_value).unwrap();
         let users = json_val.get_all_users();
-        #[cfg(not(feature = "enterprise"))]
         for mut user in users {
-            if user.role.eq(&UserRole::Root) {
-                ROOT_USER.insert("root".to_string(), user.clone());
-            } else {
+            #[cfg(not(feature = "enterprise"))]
+            if !user.role.eq(&UserRole::Root) {
                 user.role = UserRole::Admin;
             }
-            USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
-            if let Some(rum_token) = &user.rum_token {
-                USERS_RUM_TOKEN
-                    .clone()
-                    .insert(format!("{}/{}", user.org, rum_token), user);
-            }
-        }
 
-        #[cfg(feature = "enterprise")]
-        for user in users {
             if user.role.eq(&UserRole::Root) {
                 ROOT_USER.insert("root".to_string(), user.clone());
             }
-            USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
             if let Some(rum_token) = &user.rum_token {
                 USERS_RUM_TOKEN
                     .clone()
-                    .insert(format!("{}/{}", user.org, rum_token), user);
+                    .insert(format!("{}/{}", user.org, rum_token), user.clone());
             }
+            USERS.insert(format!("{}/{}", user.org, user.email), user);
         }
     }
     log::info!("Users Cached");
@@ -291,7 +305,7 @@ pub async fn root_user_exists() -> bool {
             .as_ref()
             .unwrap()
             .role
-            .eq(&crate::common::meta::user::UserRole::Root)
+            .eq(&UserRole::Root)
     });
     !ret.is_empty()
 }
@@ -300,21 +314,6 @@ pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/user/";
     db::delete(key, true, db::NO_NEED_WATCH, None).await?;
     Ok(())
-}
-
-pub async fn get_user_by_email(email: &str) -> Option<DBUser> {
-    let key = "/user/";
-    let mut ret = db::list_values(key).await.unwrap();
-    ret.retain(|item| {
-        let user: DBUser = serde_json::from_slice(item).unwrap();
-        user.email.eq(email)
-    });
-    if !ret.is_empty() {
-        let user: DBUser = serde_json::from_slice(&ret[0]).unwrap();
-        Some(user)
-    } else {
-        None
-    }
 }
 
 #[cfg(test)]
@@ -327,6 +326,7 @@ mod tests {
         let email = "user3@example.com";
         let resp = set(&DBUser {
             email: email.to_string(),
+            username: "user3".to_string(),
             password: "pass".to_string(),
             salt: String::from("sdfjshdkfshdfkshdfkshdfkjh"),
             first_name: "admin".to_owned(),

@@ -177,10 +177,10 @@ pub async fn add_user_to_org(
     role: web::Json<UserOrgRole>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = params.into_inner();
+    let (org_id, username) = params.into_inner();
     let initiator_id = user_email.user_id;
     let role = role.into_inner().role;
-    users::add_user_to_org(&org_id, &email_id, role, &initiator_id).await
+    users::add_user_to_org(&org_id, &username, role, &initiator_id).await
 }
 
 fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
@@ -305,7 +305,7 @@ pub async fn authentication(
         audit_message.user_email = auth.name.clone();
     }
 
-    match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
+    match crate::handler::http::auth::validator::validate_user(&auth.email_id, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
                 resp.status = true;
@@ -326,7 +326,7 @@ pub async fn authentication(
 
         let access_token = format!(
             "Basic {}",
-            base64::encode(&format!("{}:{}", auth.name, auth.password))
+            base64::encode(&format!("{}:{}", auth.email_id, auth.password))
         );
         let tokens = json::to_string(&AuthTokens {
             access_token,

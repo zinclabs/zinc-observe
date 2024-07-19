@@ -83,8 +83,8 @@ pub(crate) fn get_hash(pass: &str, salt: &str) -> String {
     }
 }
 
-pub(crate) fn is_root_user(user_id: &str) -> bool {
-    match USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
+pub(crate) fn is_root_user(email_id: &str) -> bool {
+    match USERS.get(&format!("{DEFAULT_ORG}/{email_id}")) {
         Some(user) => user.role.eq(&UserRole::Root),
         None => false,
     }
@@ -642,7 +642,6 @@ mod tests {
     async fn test_is_root_user2() {
         infra_db::create_table().await.unwrap();
         let _ = users::create_root_user(
-            DEFAULT_ORG,
             UserRequest {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),

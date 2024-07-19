@@ -38,6 +38,7 @@ impl UserRequest {
     #[allow(clippy::too_many_arguments)]
     pub fn to_new_dbuser(
         &self,
+        username: String,
         password: String,
         salt: String,
         org: String,
@@ -50,6 +51,7 @@ impl UserRequest {
             email: self.email.clone(),
             first_name: self.first_name.clone(),
             last_name: self.last_name.clone(),
+            username,
             password,
             salt,
             organizations: vec![UserOrg {
@@ -71,6 +73,7 @@ pub struct DBUser {
     pub first_name: String,
     #[serde(default)]
     pub last_name: String,
+    pub username: String,
     pub password: String,
     #[serde(default)]
     pub salt: String,
@@ -97,6 +100,7 @@ impl DBUser {
             email: local.email,
             first_name: local.first_name,
             last_name: local.last_name,
+            username: local.username,
             password: local.password,
             role: org.role.clone(),
             org: org.name.clone(),
@@ -118,6 +122,7 @@ impl DBUser {
                     email: self.email.clone(),
                     first_name: self.first_name.clone(),
                     last_name: self.last_name.clone(),
+                    username: self.username.clone(),
                     password: self.password.clone(),
                     role: org.role,
                     org: org.name,
@@ -139,6 +144,7 @@ pub struct User {
     pub first_name: String,
     #[serde(default)]
     pub last_name: String,
+    pub username: String,
     pub password: String,
     #[serde(default)]
     pub salt: String,
@@ -279,7 +285,7 @@ impl FromStr for UserRole {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct UserResponse {
-    pub email: String,
+    pub username: String,
     #[serde(default)]
     pub first_name: String,
     #[serde(default)]
@@ -296,7 +302,7 @@ pub struct UserList {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct SignInUser {
-    pub name: String,
+    pub email_id: String,
     pub password: String,
 }
 
@@ -310,7 +316,7 @@ pub struct SignInResponse {
 pub struct TokenValidationResponse {
     pub is_valid: bool,
     pub user_email: String,
-    pub user_name: String,
+    pub username: String,
     pub family_name: String,
     pub given_name: String,
     pub is_internal_user: bool,
@@ -338,7 +344,7 @@ impl TokenValidationResponseBuilder {
                 user_email: user.email.clone(),
                 is_internal_user: !user.is_external,
                 user_role: None,
-                user_name: user.first_name.clone(),
+                username: user.username.clone(),
                 given_name: user.first_name.clone(),
                 family_name: user.last_name.clone(),
             },
@@ -357,7 +363,7 @@ impl TokenValidationResponseBuilder {
                 user_email: user.email.clone(),
                 is_internal_user: !user.is_external,
                 user_role: Some(user.role.clone()),
-                user_name: user.first_name.clone(),
+                username: user.username.clone(),
                 given_name: user.first_name.clone(),
                 family_name: user.last_name.clone(),
             },
@@ -380,8 +386,8 @@ impl TokenValidationResponseBuilder {
         self
     }
 
-    pub fn user_name(mut self, user_name: String) -> Self {
-        self.response.user_name = user_name;
+    pub fn username(mut self, username: String) -> Self {
+        self.response.username = username;
         self
     }
 
@@ -409,7 +415,7 @@ impl TokenValidationResponseBuilder {
         TokenValidationResponse {
             is_valid: self.response.is_valid,
             user_email: self.response.user_email,
-            user_name: self.response.user_name,
+            username: self.response.username,
             family_name: self.response.family_name,
             given_name: self.response.given_name,
             is_internal_user: self.response.is_internal_user,
