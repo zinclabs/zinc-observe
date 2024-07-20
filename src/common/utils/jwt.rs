@@ -57,13 +57,7 @@ pub(crate) async fn verify_decode_token(
                     ""
                 };
 
-                // QUESTION(taiming): I should be generating username here, correct?
-                // although i don't think it matters, cause this info is not used anywhere.
-                // let username = if let Some(name) = decoded_token.claims.get("username") {
-                //     name.as_str().unwrap()
-                // } else {
-                //     ""
-                // };
+                // TODO(taiming): probably shouldn't generate username here
                 let username = if !user_email.is_empty() {
                     generate_username(user_email).await
                 } else {

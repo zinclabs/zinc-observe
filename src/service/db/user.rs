@@ -23,7 +23,7 @@ use crate::{
         infra::config::{ROOT_USER, USERS, USERS_RUM_TOKEN},
         meta::user::{DBUser, User, UserOrg, UserRole},
     },
-    service::db,
+    service::{db, users::generate_username},
 };
 
 pub async fn get(org_id: Option<&str>, email_id: &str) -> Result<Option<User>, anyhow::Error> {
@@ -127,13 +127,26 @@ pub async fn set(user: &DBUser) -> Result<(), anyhow::Error> {
 
     // cache user
     for org in &user.organizations {
+        let role = match org.role {
+            UserRole::Root => org.role.clone(),
+            _ => {
+                #[cfg(feature = "enterprise")]
+                {
+                    org.role.clone()
+                }
+                #[cfg(not(feature = "enterprise"))]
+                {
+                    UserRole::Admin
+                }
+            }
+        };
         let user = User {
             email: user.email.clone(),
             first_name: user.first_name.clone(),
             last_name: user.last_name.clone(),
             username: user.username.clone(),
             password: user.password.clone(),
-            role: org.role.clone(),
+            role,
             org: org.name.clone(),
             token: org.token.clone(),
             rum_token: org.rum_token.clone(),
@@ -144,13 +157,6 @@ pub async fn set(user: &DBUser) -> Result<(), anyhow::Error> {
         if let Some(rum_token) = &org.rum_token {
             USERS_RUM_TOKEN.insert(format!("{}/{}", org.name, rum_token), user.clone());
         }
-
-        #[cfg(not(feature = "enterprise"))]
-        if !user.role.eq(&UserRole::Root) {
-            let mut user = user;
-            user.role = UserRole::Admin;
-        }
-
         if user.role.eq(&UserRole::Root) {
             ROOT_USER.insert("root".to_string(), user.clone());
         }
@@ -268,20 +274,43 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/user/";
-    let ret = db::list(key).await?;
-    for (_, item_value) in ret {
-        let json_val: DBUser = json::from_slice(&item_value).unwrap();
-        let users = json_val.get_all_users();
+    let bytes = db::list_values(key).await?;
+    for item in bytes {
+        let mut db_user: DBUser = json::from_slice(&item).unwrap();
+        // backfill empty usernames and save to db
+        if db_user.username.is_empty() {
+            db_user.username = generate_username(&db_user.email).await;
+            if let Err(e) = set(&db_user).await {
+                log::error!("Error saving updated user into database: {}", e);
+                return Err(anyhow::anyhow!(
+                    "Error saving updated user into database: {}",
+                    e
+                ));
+            }
+        }
+        let users = db_user.get_all_users();
         for user in users {
-            #[cfg(not(feature = "enterprise"))]
-            if !user.role.eq(&UserRole::Root) {
-                let mut user = user;
-                user.role = UserRole::Admin;
-            }
+            let user = {
+                match user.role {
+                    UserRole::Root => {
+                        ROOT_USER.insert("root".to_string(), user.clone());
+                        user
+                    }
+                    _ => {
+                        #[cfg(not(feature = "enterprise"))]
+                        {
+                            let mut user = user;
+                            user.role = UserRole::Admin;
+                            user
+                        }
+                        #[cfg(feature = "enterprise")]
+                        {
+                            user
+                        }
+                    }
+                }
+            };
 
-            if user.role.eq(&UserRole::Root) {
-                ROOT_USER.insert("root".to_string(), user.clone());
-            }
             if let Some(rum_token) = &user.rum_token {
                 USERS_RUM_TOKEN
                     .clone()

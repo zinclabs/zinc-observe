@@ -379,7 +379,6 @@ pub async fn add_user_to_org(
         });
         db::user::set(&db_user).await.unwrap();
 
-        // TODO(taiming): pending
         // Update OFGA
         #[cfg(feature = "enterprise")]
         {
@@ -434,8 +433,6 @@ pub async fn get_user(org_id: Option<&str>, email_id: &str) -> Option<User> {
     }
 }
 
-// TODO(taiming): this can be refactored, since the db::user::get_by_token is basically doing the
-// same thing
 pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     let rum_tokens = USERS_RUM_TOKEN.clone();
     let key = format!("{DEFAULT_ORG}/{token}");
@@ -475,7 +472,6 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     }
 }
 
-// TODO(taiming): updated the response and check with
 pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
     let mut user_list: Vec<UserResponse> = vec![];
     for user in USERS.iter() {
