@@ -59,7 +59,7 @@ pub(crate) async fn verify_decode_token(
 
                 // TODO(taiming): probably shouldn't generate username here
                 let username = if !user_email.is_empty() {
-                    generate_username(user_email).await
+                    generate_username(user_email, None).await
                 } else {
                     "".to_string()
                 };

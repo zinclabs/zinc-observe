@@ -102,7 +102,7 @@ mod tests {
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),
-                username: generate_username("root@example.com").await,
+                username: generate_username("root@example.com", None).await,
                 password: "Complexpass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
@@ -133,7 +133,7 @@ mod tests {
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),
-                username: generate_username("root@example.com").await,
+                username: generate_username("root@example.com", None).await,
                 password: "Complexpass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
@@ -162,7 +162,7 @@ mod tests {
             "root".to_string(),
             User {
                 email: "root@example.com".to_string(),
-                username: generate_username("root@example.com").await,
+                username: generate_username("root@example.com", None).await,
                 password: "Complexpass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),

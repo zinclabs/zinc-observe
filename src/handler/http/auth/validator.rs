@@ -719,7 +719,7 @@ mod tests {
     async fn test_validation_response_builder_from_db_user() {
         let user = DBUser {
             email: "test@email.com".into(),
-            username: generate_username("test@email.com").await,
+            username: generate_username("test@email.com", None).await,
             first_name: "first_name".into(),
             last_name: "last_name".into(),
             password: "some_pass".into(),

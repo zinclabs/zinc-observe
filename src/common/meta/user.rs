@@ -73,6 +73,7 @@ pub struct DBUser {
     pub first_name: String,
     #[serde(default)]
     pub last_name: String,
+    #[serde(default)]
     pub username: String,
     pub password: String,
     #[serde(default)]

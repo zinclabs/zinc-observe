@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, io::Error};
+use std::{borrow::Cow, collections::HashSet, io::Error};
 
 use actix_web::{http, HttpResponse};
 use config::{get_config, ider, utils::rand::generate_random_string};
@@ -54,7 +54,7 @@ pub async fn post_user(
         };
         if existing_user.is_err() {
             let salt = ider::uuid();
-            let username = generate_username(&usr_req.email).await;
+            let username = generate_username(&usr_req.email, None).await;
             let password = get_hash(&usr_req.password, &salt);
             let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
             let token = generate_random_string(16);
@@ -642,7 +642,7 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
 pub(crate) async fn create_root_user(usr_req: UserRequest) -> Result<(), Error> {
     let cfg = get_config();
     let salt = ider::uuid();
-    let username = generate_username(&usr_req.email).await;
+    let username = generate_username(&usr_req.email, None).await;
     let password = get_hash(&usr_req.password, &salt);
     let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
     let token = generate_random_string(16);
@@ -669,15 +669,21 @@ pub(crate) async fn create_root_user(usr_req: UserRequest) -> Result<(), Error> 
 /// a random string of length 2 until it is new.
 /// Random string generated evenly through a-z, A-Z, and 0-9. 3844, 62 * 62,
 /// possible strings in total, which fits the application's current scope.
-pub(crate) async fn generate_username(email_id: &str) -> String {
-    let existing_usernames: HashSet<String> = {
-        let mut usernames = HashSet::new();
-        if let Some(db_users) = db::user::list_db_users().await {
-            usernames.extend(db_users.into_iter().map(|user| user.username));
+pub(crate) async fn generate_username(
+    email_id: &str,
+    existing_usernames: Option<&HashSet<String>>,
+) -> String {
+    let existing_usernames = match existing_usernames {
+        Some(usernames) => Cow::Borrowed(usernames),
+        None => {
+            let mut usernames = HashSet::new();
+            if let Some(db_users) = db::user::list_db_users().await {
+                usernames.extend(db_users.into_iter().map(|user| user.username));
+            }
+            // root_user is also part of [USERS]
+            usernames.extend(USERS.iter().map(|entry| entry.username.clone()));
+            Cow::Owned(usernames)
         }
-        // root_user is also part of [USERS]
-        usernames.extend(USERS.iter().map(|entry| entry.username.clone()));
-        usernames
     };
 
     let attempt = email_id.split_once('@').unwrap().0.to_string();
@@ -699,7 +705,7 @@ mod tests {
             "dummy/admin@zo.dev".to_string(),
             User {
                 email: "admin@zo.dev".to_string(),
-                username: generate_username("admin@zo.dev").await,
+                username: generate_username("admin@zo.dev", None).await,
                 password: "pass#123".to_string(),
                 role: crate::common::meta::user::UserRole::Admin,
                 salt: String::new(),

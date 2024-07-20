@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::bail;
 use config::utils::json;
@@ -275,11 +275,23 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 pub async fn cache() -> Result<(), anyhow::Error> {
     let key = "/user/";
     let bytes = db::list_values(key).await?;
-    for item in bytes {
-        let mut db_user: DBUser = json::from_slice(&item).unwrap();
+    let db_users = bytes
+        .into_iter()
+        .map(|bytes| json::from_slice::<DBUser>(&bytes).unwrap())
+        .collect::<Vec<_>>();
+    // for backfilling missing usernames of existing users prior to the introduction of username
+    let mut existing_usernames = db_users
+        .iter()
+        .filter_map(|db_user| (!db_user.username.is_empty()).then_some(db_user.username.clone()))
+        .collect::<HashSet<_>>();
+
+    for mut db_user in db_users {
         // backfill empty usernames and save to db
         if db_user.username.is_empty() {
-            db_user.username = generate_username(&db_user.email).await;
+            log::debug!("backfilling missing username for user: {}", db_user.email);
+            let username = generate_username(&db_user.email, Some(&existing_usernames)).await;
+            existing_usernames.insert(username.clone());
+            db_user.username = username;
             if let Err(e) = set(&db_user).await {
                 log::error!("Error saving updated user into database: {}", e);
                 return Err(anyhow::anyhow!(
