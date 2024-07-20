@@ -41,6 +41,7 @@ import "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js";
 import "monaco-editor/esm/vs/basic-languages/sql/sql.js";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api";
 
+
 import { useStore } from "vuex";
 import { debounce } from "quasar";
 import useLogs from "@/composables/useLogs";
