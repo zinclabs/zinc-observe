@@ -310,6 +310,10 @@ pub struct SignInUser {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct SignInResponse {
     pub status: bool,
+    pub username: String,
+    pub given_name: String,
+    pub family_name: String,
+    pub role: String,
     pub message: String,
 }
 

@@ -308,6 +308,10 @@ pub async fn authentication(
     match crate::handler::http::auth::validator::validate_user(&auth.email, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
+                resp.username = v.username;
+                resp.family_name = v.family_name;
+                resp.given_name = v.given_name;
+                resp.role = v.user_role.map_or("".to_string(), |role| role.to_string());
                 resp.status = true;
             } else {
                 #[cfg(feature = "enterprise")]
@@ -491,45 +495,50 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 validate_user, validate_user_for_query_params,
             };
 
-            let (email_id, password) =
-                if let Some((email_id, password)) = get_user_from_token(&auth_header) {
-                    let token_validation_response = match request_time {
-                        Some(req_ts) => {
-                            log::debug!("Validating user for query params");
-                            validate_user_for_query_params(
-                                &email_id,
-                                &password,
-                                Some(req_ts),
-                                expires_in,
-                            )
-                            .await
-                        }
-                        None => {
-                            log::debug!("Validating user for basic auth header");
-                            validate_user(&email_id, &password).await
-                        }
-                    };
+            let (email_id, password) = if let Some((email_id, password)) =
+                get_user_from_token(&auth_header)
+            {
+                let token_validation_response = match request_time {
+                    Some(req_ts) => {
+                        log::debug!("Validating user for query params");
+                        validate_user_for_query_params(
+                            &email_id,
+                            &password,
+                            Some(req_ts),
+                            expires_in,
+                        )
+                        .await
+                    }
+                    None => {
+                        log::debug!("Validating user for basic auth header");
+                        validate_user(&email_id, &password).await
+                    }
+                };
 
-                    audit_message.user_email = email_id.clone();
-                    match token_validation_response {
-                        Ok(v) => {
-                            if v.is_valid {
-                                resp.status = true;
-                                (email_id, password)
-                            } else {
-                                audit_unauthorized_error(audit_message).await;
-                                return unauthorized_error(resp);
-                            }
-                        }
-                        Err(_) => {
+                audit_message.user_email = email_id.clone();
+                match token_validation_response {
+                    Ok(v) => {
+                        if v.is_valid {
+                            resp.status = true;
+                            resp.username = v.username;
+                            resp.family_name = v.family_name;
+                            resp.given_name = v.given_name;
+                            resp.role = v.user_role.map_or("".to_string(), |role| role.to_string());
+                            (email_id, password)
+                        } else {
                             audit_unauthorized_error(audit_message).await;
                             return unauthorized_error(resp);
                         }
                     }
-                } else {
-                    audit_unauthorized_error(audit_message).await;
-                    return unauthorized_error(resp);
-                };
+                    Err(_) => {
+                        audit_unauthorized_error(audit_message).await;
+                        return unauthorized_error(resp);
+                    }
+                }
+            } else {
+                audit_unauthorized_error(audit_message).await;
+                return unauthorized_error(resp);
+            };
             (email_id, password)
         };
 
