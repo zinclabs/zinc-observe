@@ -61,12 +61,13 @@ pub async fn organizations(user_email: UserEmail) -> Result<HttpResponse, Error>
     let is_root_user = is_root_user(user_id);
     if is_root_user {
         id += 1;
+        let root_user = USERS.get(&format!("{DEFAULT_ORG}/{user_id}")).unwrap();
         org_names.insert(DEFAULT_ORG.to_string());
         orgs.push(OrgDetails {
             id,
             identifier: DEFAULT_ORG.to_string(),
             name: DEFAULT_ORG.to_string(),
-            user_email: user_id.to_string(),
+            username: root_user.username.clone(),
             ingest_threshold: THRESHOLD,
             search_threshold: THRESHOLD,
             org_type: DEFAULT_ORG.to_string(),
@@ -84,7 +85,7 @@ pub async fn organizations(user_email: UserEmail) -> Result<HttpResponse, Error>
                 id,
                 identifier: key.split('/').collect::<Vec<&str>>()[0].to_string(),
                 name: key.split('/').collect::<Vec<&str>>()[0].to_string(),
-                user_email: user_id.to_string(),
+                username: root_user.username.clone(),
                 ingest_threshold: THRESHOLD,
                 search_threshold: THRESHOLD,
                 org_type: CUSTOM.to_string(),
@@ -110,7 +111,7 @@ pub async fn organizations(user_email: UserEmail) -> Result<HttpResponse, Error>
             id,
             identifier: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
             name: user.key().split('/').collect::<Vec<&str>>()[0].to_string(),
-            user_email: user_id.to_string(),
+            username: user.username.clone(),
             ingest_threshold: THRESHOLD,
             search_threshold: THRESHOLD,
             org_type: CUSTOM.to_string(),

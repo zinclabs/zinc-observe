@@ -40,7 +40,7 @@ pub struct OrgDetails {
     pub id: i64,
     pub identifier: String,
     pub name: String,
-    pub user_email: String,
+    pub username: String,
     pub ingest_threshold: i64,
     pub search_threshold: i64,
     #[serde(rename = "type")]

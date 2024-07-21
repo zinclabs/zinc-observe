@@ -144,7 +144,7 @@ pub async fn process_token(
         }
         let updated_db_user = DBUser {
             email: user_email.to_owned(),
-            username: users::generate_username(&user_email).await,
+            username: users::generate_username(&user_email, None).await,
             first_name: given_name.to_owned(),
             last_name: family_name.to_owned(),
             password: "".to_owned(),
@@ -267,7 +267,6 @@ pub async fn process_token(
             match users::update_user(
                 &org.name,
                 &username,
-                false,
                 &get_config().auth.root_user_email,
                 crate::common::meta::user::UpdateUser {
                     role: Some(org.role.clone()),
@@ -403,7 +402,7 @@ async fn map_group_to_custom_role(
         }
         let updated_db_user = DBUser {
             email: user_email.to_owned(),
-            username: users::generate_username(user_email).await,
+            username: users::generate_username(user_email, None).await,
             first_name: given_name.to_owned(),
             last_name: family_name.to_owned(),
             password: "".to_owned(),

@@ -169,7 +169,7 @@ pub async fn update(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/users/username")]
+#[post("/{org_id}/users/{username}")]
 pub async fn add_user_to_org(
     params: web::Path<(String, String)>,
     role: web::Json<UserOrgRole>,
