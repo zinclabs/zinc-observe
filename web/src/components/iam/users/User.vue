@@ -243,7 +243,7 @@ export default defineComponent({
         addUser({}, false);
       } else {
         usersState.users.map((member: any) => {
-          if (member.email == router.currentRoute.value.query.email) {
+          if (member.username == router.currentRoute.value.query.username) {
             addUser({ row: member }, true);
           }
         });
@@ -278,9 +278,9 @@ export default defineComponent({
         align: "left",
       },
       {
-        name: "email",
-        field: "email",
-        label: t("user.email"),
+        name: "username",
+        field: "username",
+        label: t("user.username"),
         align: "left",
         sortable: true,
       },
@@ -310,7 +310,7 @@ export default defineComponent({
     const options = ref([{ label: "Admin", value: "admin" }]);
     const selectedRole = ref(options.value[0].value);
     const currentUserRole = ref("");
-    let deleteUserEmail = "";
+    let deleteUserUsername = "";
 
     const getRoles = () => {
       return new Promise((resolve) => {
@@ -344,18 +344,18 @@ export default defineComponent({
             let counter = 1;
             currentUserRole.value = "";
             usersState.users = res.data.data.map((data: any) => {
-              if (store.state.userInfo.email == data.email) {
+              if (store.state.userInfo.username == data.username) {
                 currentUserRole.value = data.role;
                 isCurrentUserInternal.value = !data.is_external;
               }
 
-              if (data.email == router.currentRoute.value.query.email) {
+              if (data.username == router.currentRoute.value.query.username) {
                 addUser({ row: data }, true);
               }
 
               return {
                 "#": counter <= 9 ? `0${counter++}` : counter++,
-                email: maskText(data.email),
+                username: data.username,
                 first_name: data.first_name,
                 last_name: data.last_name,
                 role: data.role,
@@ -368,7 +368,7 @@ export default defineComponent({
                   "YYYY-MM-DDTHH:mm:ssZ"
                 ),
                 org_member_id: data.org_member_id,
-                isLoggedinUser: store.state.userInfo.email == data.email,
+                isLoggedinUser: store.state.userInfo.username == data.username,
                 isExternal: !!data.is_external,
                 enableEdit: false,
                 enableChangeRole: false,
@@ -508,7 +508,7 @@ export default defineComponent({
           button: "Actions",
           user_org: store.state.selectedOrganization.identifier,
           user_id: store.state.userInfo.email,
-          update_user: props.row.email,
+          update_user: props.row.username,
           page: "Users",
         });
       } else {
@@ -526,7 +526,7 @@ export default defineComponent({
           query: {
             action: "update",
             org_identifier: store.state.selectedOrganization.identifier,
-            email: props.row.email,
+            email: props.row.username,
           },
         });
         addUser(
@@ -586,6 +586,7 @@ export default defineComponent({
                   ? `0${usersState.users.length + 1}`
                   : usersState.users.length + 1,
               email: data.email,
+              username: res.data.username,
               first_name: data.first_name,
               last_name: data.last_name,
               role: data.role,
@@ -603,7 +604,7 @@ export default defineComponent({
           }
         } else {
           usersState.users.forEach((member: any, key: number) => {
-            if (member.email == data.email) {
+            if (member.username == data.username) {
               usersState.users[key] = {
                 ...usersState.users[key],
                 ...data,
@@ -622,12 +623,12 @@ export default defineComponent({
 
     const confirmDeleteAction = (props: any) => {
       confirmDelete.value = true;
-      deleteUserEmail = props.row.email;
+      deleteUserUsername = props.row.username;
     };
 
     const deleteUser = async () => {
       usersService
-        .delete(store.state.selectedOrganization.identifier, deleteUserEmail)
+        .delete(store.state.selectedOrganization.identifier, deleteUserUsername)
         .then(async (res: any) => {
           if (res.data.code == 200) {
             $q.notify({
@@ -658,7 +659,7 @@ export default defineComponent({
           {
             id: parseInt(row.orgMemberId ? row.orgMemberId : row.org_member_id),
             role: row.role,
-            email: row.email,
+            username: row.username,
             organization_id: parseInt(store.state.selectedOrganization.id),
           },
           store.state.selectedOrganization.identifier
@@ -689,7 +690,7 @@ export default defineComponent({
         button: "Update Role",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
-        update_user: row.email,
+        update_user: row.username,
         page: "Users",
       });
     };

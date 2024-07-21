@@ -182,7 +182,7 @@ export default defineComponent({
             name: data.name,
             identifier: data.identifier,
             type: convertToTitleCase(data.type),
-            owner: data.user_email,
+            owner: data.username,
           };
         });
 

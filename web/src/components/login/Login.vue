@@ -246,7 +246,7 @@ export default defineComponent({
           //authorize user using username and password
           authService
             .sign_in_user({
-              name: name.value,
+              email: name.value,
               password: password.value,
             })
             .then(async (res: any) => {
@@ -255,13 +255,13 @@ export default defineComponent({
                 //get user info from backend and extract auth token and set it into localstorage
                 const authToken = getBasicAuth(name.value, password.value);
                 const userInfo = {
-                  given_name: name.value,
+                  given_name: res.data.given_name,
                   auth_time: Math.floor(Date.now() / 1000),
-                  name: name.value,
+                  username: res.data.username,
                   exp: Math.floor(
                     (new Date().getTime() + 1000 * 60 * 60 * 24 * 30) / 1000
                   ),
-                  family_name: "",
+                  family_name: res.data.family_name,
                   email: name.value,
                   role: res.data.role,
                 };

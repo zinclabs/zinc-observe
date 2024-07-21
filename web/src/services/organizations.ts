@@ -57,7 +57,7 @@ const organizations = {
     return http().get(`api/${orgIdentifier}/organizations/associated_members`);
   },
   update_member_role: (data: any, orgIdentifier: string) => {
-    return http().put(`api/${orgIdentifier}/users/${data.email}`, data);
+    return http().put(`api/${orgIdentifier}/users/${data.username}`, data);
   },
   verify_identifier: (name: string) => {
     return http().get(`api/organizations/verify_identifier/${name}`);

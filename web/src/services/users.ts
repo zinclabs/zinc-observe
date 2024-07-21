@@ -32,18 +32,18 @@ const users = {
   create: (data: any, org_identifier: string) => {
     return http().post(`/api/${org_identifier}/users`, data);
   },
-  update: (data: any, org_identifier: string, user_email: string) => {
-    return http().put(`/api/${org_identifier}/users/${user_email}`, data);
+  update: (data: any, org_identifier: string, username: string) => {
+    return http().put(`/api/${org_identifier}/users/${username}`, data);
   },
   updateexistinguser: (
     data: any,
     org_identifier: string,
-    user_email: string
+    username: string
   ) => {
-    return http().post(`/api/${org_identifier}/users/${user_email}`, data);
+    return http().post(`/api/${org_identifier}/users/${username}`, data);
   },
-  delete: (org_identifier: string, user_email: string) => {
-    return http().delete(`/api/${org_identifier}/users/${user_email}`);
+  delete: (org_identifier: string, username: string) => {
+    return http().delete(`/api/${org_identifier}/users/${username}`);
   },
   verifyUser: (email: string) => {
     return http().get(`/api/users/verifyuser/${email}`);
