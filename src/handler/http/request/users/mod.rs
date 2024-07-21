@@ -118,21 +118,20 @@ pub async fn save(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("email_id" = String, Path, description = "User's email id"),
+        ("username" = String, Path, description = "User's username"),
     ),
     request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/{org_id}/users/{email_id}")]
+#[put("/{org_id}/users/{username}")]
 pub async fn update(
     params: web::Path<(String, String)>,
     user: web::Json<UpdateUser>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = params.into_inner();
-    let email_id = email_id.trim().to_string();
+    let (org_id, username) = params.into_inner();
     #[cfg(not(feature = "enterprise"))]
     let mut user = user.into_inner();
     #[cfg(feature = "enterprise")]
@@ -150,8 +149,7 @@ pub async fn update(
         user.role = Some(meta::user::UserRole::Admin);
     }
     let initiator_id = &user_email.user_id;
-    let self_update = user_email.user_id.eq(&email_id);
-    users::update_user(&org_id, &email_id, self_update, initiator_id, user).await
+    users::update_user(&org_id, &username, initiator_id, user).await
 }
 
 /// AddUserToOrganization
@@ -164,14 +162,14 @@ pub async fn update(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("email_id" = String, Path, description = "User's email id"),
+        ("username" = String, Path, description = "User's username"),
     ),
     request_body(content = UserOrgRole, description = "User role", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/users/{email_id}")]
+#[post("/{org_id}/users/username")]
 pub async fn add_user_to_org(
     params: web::Path<(String, String)>,
     role: web::Json<UserOrgRole>,
@@ -212,21 +210,21 @@ fn _prepare_cookie<'a, T: Serialize + ?Sized, E: Into<cookie::Expiration>>(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("email_id" = String, Path, description = "User name"),
+        ("username" = String, Path, description = "User's username"),
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[delete("/{org_id}/users/{email_id}")]
+#[delete("/{org_id}/users/{username}")]
 pub async fn delete(
     path: web::Path<(String, String)>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, email_id) = path.into_inner();
+    let (org_id, username) = path.into_inner();
     let initiator_id = user_email.user_id;
-    users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
+    users::remove_user_from_org(&org_id, &username, &initiator_id).await
 }
 
 /// AuthenticateUser

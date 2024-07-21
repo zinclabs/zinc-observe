@@ -143,7 +143,6 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     let _ = users::update_user(
                         meta::organization::DEFAULT_ORG,
                         cfg.auth.root_user_email.as_str(),
-                        false,
                         cfg.auth.root_user_email.as_str(),
                         meta::user::UpdateUser {
                             change_password: true,

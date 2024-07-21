@@ -27,7 +27,8 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::DEFAULT_ORG,
             user::{
-                DBUser, UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole,
+                DBUser, SaveNewUserResponse, UpdateUser, User, UserList, UserOrg, UserRequest,
+                UserResponse, UserRole,
             },
         },
         utils::auth::{get_hash, get_role, is_root_user},
@@ -60,7 +61,7 @@ pub async fn post_user(
             let token = generate_random_string(16);
             let rum_token = format!("rum{}", generate_random_string(16));
             let user = usr_req.to_new_dbuser(
-                username,
+                username.clone(),
                 password,
                 salt,
                 org_id.replace(' ', "_"),
@@ -107,10 +108,11 @@ pub async fn post_user(
                     }
                 }
             }
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "User saved successfully".to_string(),
-            )))
+            Ok(HttpResponse::Ok().json(SaveNewUserResponse {
+                status: true,
+                username,
+                message: "User saved successfully".to_string(),
+            }))
         } else {
             Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
                 http::StatusCode::BAD_REQUEST.into(),
@@ -149,7 +151,6 @@ pub async fn update_db_user(mut db_user: DBUser) -> Result<(), anyhow::Error> {
 pub async fn update_user(
     org_id: &str,
     username: &str,
-    self_update: bool,
     initiator_email: &str,
     user: UpdateUser,
 ) -> Result<HttpResponse, Error> {
@@ -172,6 +173,7 @@ pub async fn update_user(
         )));
     }
 
+    let self_update = initiator_email.eq(&local_user.email);
     let mut old_role = None;
     let mut new_role = None;
     let conf = get_config();
@@ -767,7 +769,6 @@ mod tests {
         let resp = update_user(
             "dummy",
             "user2@example.com",
-            true,
             "user2@example.com",
             UpdateUser {
                 token: Some("new_token".to_string()),
@@ -786,7 +787,6 @@ mod tests {
         let resp = update_user(
             "dummy",
             "user2@example.com",
-            false,
             "admin@zo.dev",
             UpdateUser {
                 token: Some("new_token".to_string()),
