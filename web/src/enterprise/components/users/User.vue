@@ -189,9 +189,9 @@ export default defineComponent({
         align: "left",
       },
       {
-        name: "email",
-        field: "email",
-        label: t("user.email"),
+        name: "username",
+        field: "username",
+        label: t("user.username"),
         align: "left",
         sortable: true,
       },
@@ -239,7 +239,7 @@ export default defineComponent({
         .orgUsers(
           0,
           1000,
-          "email",
+          "username",
           false,
           "",
           store.state.selectedOrganization.identifier
@@ -255,7 +255,7 @@ export default defineComponent({
 
             return {
               "#": counter <= 9 ? `0${counter++}` : counter++,
-              email: maskText(data.email),
+              username: data.username,
               first_name: data.first_name,
               last_name: data.last_name,
               role: data.role,
@@ -387,7 +387,7 @@ export default defineComponent({
           {
             id: parseInt(row.orgMemberId ? row.orgMemberId : row.org_member_id),
             role: row.role,
-            email: row.email,
+            username: row.username,
             organization_id: parseInt(store.state.selectedOrganization.id),
           },
           store.state.selectedOrganization.identifier
@@ -447,7 +447,7 @@ export default defineComponent({
           if (
             rows[i]["first_name"]?.toLowerCase().includes(terms) ||
             rows[i]["last_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["email"]?.toLowerCase().includes(terms) ||
+            rows[i]["username"]?.toLowerCase().includes(terms) ||
             rows[i]["role"].toLowerCase().includes(terms)
           ) {
             filtered.push(rows[i]);

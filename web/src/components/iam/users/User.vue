@@ -334,7 +334,7 @@ export default defineComponent({
           .orgUsers(
             0,
             1000,
-            "email",
+            "username",
             false,
             "",
             store.state.selectedOrganization.identifier
@@ -526,7 +526,7 @@ export default defineComponent({
           query: {
             action: "update",
             org_identifier: store.state.selectedOrganization.identifier,
-            email: props.row.username,
+            username: props.row.username,
           },
         });
         addUser(
@@ -585,7 +585,6 @@ export default defineComponent({
                 usersState.users.length + 1 <= 9
                   ? `0${usersState.users.length + 1}`
                   : usersState.users.length + 1,
-              email: data.email,
               username: res.data.username,
               first_name: data.first_name,
               last_name: data.last_name,
@@ -733,7 +732,7 @@ export default defineComponent({
           if (
             rows[i]["first_name"]?.toLowerCase().includes(terms) ||
             rows[i]["last_name"]?.toLowerCase().includes(terms) ||
-            rows[i]["email"]?.toLowerCase().includes(terms) ||
+            rows[i]["username"]?.toLowerCase().includes(terms) ||
             rows[i]["role"].toLowerCase().includes(terms)
           ) {
             filtered.push(rows[i]);

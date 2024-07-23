@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-slot:select="slotProps: any">
             <q-checkbox
-              :data-test="`iam-users-selection-table-body-row-${slotProps.column.row.email}-checkbox`"
+              :data-test="`iam-users-selection-table-body-row-${slotProps.column.row.username}-checkbox`"
               size="xs"
               v-model="slotProps.column.row.isInGroup"
               class="filter-check-box cursor-pointer"
@@ -193,8 +193,8 @@ const columns = [
     slotName: "select",
   },
   {
-    name: "email",
-    field: "email",
+    name: "username",
+    field: "username",
     label: t("iam.userName"),
     align: "left",
     sortable: true,
@@ -245,9 +245,9 @@ const getchOrgUsers = async () => {
     usersState.users = cloneDeep(
       data.map((user: any, index: number) => {
         return {
-          email: user.email,
+          username: user.username,
           "#": index + 1,
-          isInGroup: groupUsersMap.value.has(user.email),
+          isInGroup: groupUsersMap.value.has(user.username),
         };
       })
     );
@@ -256,8 +256,8 @@ const getchOrgUsers = async () => {
       (user: any, index: number) => {
         return {
           "#": index + 1,
-          email: user.email,
-          isInGroup: groupUsersMap.value.has(user.email),
+          username: user.username,
+          isInGroup: groupUsersMap.value.has(user.username),
         };
       }
     );
@@ -266,18 +266,18 @@ const getchOrgUsers = async () => {
 };
 
 const toggleUserSelection = (user: any) => {
-  if (user.isInGroup && !groupUsersMap.value.has(user.email)) {
-    props.addedUsers.add(user.email);
-  } else if (!user.isInGroup && groupUsersMap.value.has(user.email)) {
-    props.removedUsers.add(user.email);
+  if (user.isInGroup && !groupUsersMap.value.has(user.username)) {
+    props.addedUsers.add(user.username);
+  } else if (!user.isInGroup && groupUsersMap.value.has(user.username)) {
+    props.removedUsers.add(user.username);
   }
 
-  if (!user.isInGroup && props.addedUsers.has(user.email)) {
-    props.addedUsers.delete(user.email);
+  if (!user.isInGroup && props.addedUsers.has(user.username)) {
+    props.addedUsers.delete(user.username);
   }
 
-  if (!user.isInGroup && props.addedUsers.has(user.email)) {
-    props.removedUsers.delete(user.email);
+  if (!user.isInGroup && props.addedUsers.has(user.username)) {
+    props.removedUsers.delete(user.username);
   }
 };
 
@@ -285,7 +285,7 @@ const filterUsers = (rows: any[], term: string) => {
   var filtered = [];
   for (var i = 0; i < rows.length; i++) {
     var user = rows[i];
-    if (user.email.toLowerCase().indexOf(term.toLowerCase()) > -1) {
+    if (user.username.toLowerCase().indexOf(term.toLowerCase()) > -1) {
       filtered.push(user);
     }
   }
