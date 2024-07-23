@@ -48,7 +48,7 @@
     "quasar": "^2.16.6",
     "rollup-plugin-node-polyfills": "^0.2.1",
     "rollup-plugin-polyfill-node": "^0.13.0",
-    "rudder-sdk-js": "^2.48.12",
+    "rudder-sdk-js": "^2.45.0",
     "uuid": "^10.0.0",
     "vue": "^3.4.31",
     "vue-drag-resize": "^1.5.4",
