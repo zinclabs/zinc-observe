@@ -111,12 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ><br />
           <span v-if="disableMoreErrorDetails">
             {{ searchObj.data.histogram.errorMsg }}
-            {{ searchObj.data.histogram.errorDetail }}
           </span>
         </h6>
         <h6 class="text-center" v-else>
           {{ searchObj.data.histogram.errorMsg }}
-          {{ searchObj.data.histogram.errorDetail }}
         </h6>
       </div>
       <q-virtual-scroll
@@ -467,6 +465,7 @@ import EqualIcon from "../../components/icons/EqualIcon.vue";
 import NotEqualIcon from "../../components/icons/NotEqualIcon.vue";
 import useLogs from "../../composables/useLogs";
 import { convertLogData } from "@/utils/logs/convertLogData";
+import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 
 export default defineComponent({
   name: "SearchResult",
@@ -479,6 +478,7 @@ export default defineComponent({
     ChartRenderer: defineAsyncComponent(
       () => import("@/components/dashboards/panels/ChartRenderer.vue")
     ),
+    SanitizedHtmlRenderer,
   },
   emits: [
     "update:scroll",

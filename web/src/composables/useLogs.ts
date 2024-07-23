@@ -1016,7 +1016,8 @@ const useLogs = () => {
     } catch (e: any) {
       // showErrorNotification("Invalid SQL Syntax");
       console.log(e);
-      notificationMsg.value = "An error occurred while constructing the search query.";
+      notificationMsg.value =
+        "An error occurred while constructing the search query.";
       return "";
     }
   }
@@ -1045,7 +1046,8 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
 
       if (searchObj.meta.sqlMode && parsedSQL == undefined) {
-        searchObj.data.queryResults.error = "Error while search partition. Search query is invalid.";
+        searchObj.data.queryResults.error =
+          "Error while search partition. Search query is invalid.";
         return;
       }
 
@@ -1318,7 +1320,8 @@ const useLogs = () => {
                   Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
                 0
               );
-            partitionDetail.partitionTotal[0] = searchObj.data.queryResults.total;
+            partitionDetail.partitionTotal[0] =
+              searchObj.data.queryResults.total;
           }
         } else {
           searchObj.data.queryResults.total =
@@ -1457,7 +1460,7 @@ const useLogs = () => {
         isNaN(searchObj.data.datetime.startTime)
       ) {
         const queryParams: any = router.currentRoute.value.query;
-        let currentPeriod: string = queryParams?.period || "15m";
+        const currentPeriod: string = queryParams?.period || "15m";
         const extractedDate: any = extractTimestamps(currentPeriod);
         searchObj.data.datetime.startTime = extractedDate.from;
         searchObj.data.datetime.endTime = extractedDate.to;
@@ -1539,11 +1542,11 @@ const useLogs = () => {
         searchObj.data.histogramQuery.query.sql_mode = "full";
 
         // searchObj.data.histogramQuery.query.start_time =
-        //   queryReq.query.start_time;             
-      
+        //   queryReq.query.start_time;
+
         // searchObj.data.histogramQuery.query.end_time =
         //   queryReq.query.end_time;
-   
+
         delete searchObj.data.histogramQuery.query.quick_mode;
         delete searchObj.data.histogramQuery.query.from;
 
@@ -1625,7 +1628,7 @@ const useLogs = () => {
             searchObj.data.stream.selectedStream.length <= 1 &&
             searchObj.data.resultGrid.currentPage == 1)
         ) {
-          if(searchObj.data.queryResults.hits.length > 0) {
+          if (searchObj.data.queryResults.hits.length > 0) {
             await getHistogramQueryData(searchObj.data.histogramQuery);
           }
           refreshPartitionPagination(true);
@@ -1647,7 +1650,11 @@ const useLogs = () => {
           if (parsedSQL) {
             aggFlag = hasAggregation(parsedSQL?.columns);
           }
-          if (queryReq.query.from == 0 && searchObj.data.queryResults.hits.length > 0 && !aggFlag) {
+          if (
+            queryReq.query.from == 0 &&
+            searchObj.data.queryResults.hits.length > 0 &&
+            !aggFlag
+          ) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();
               await getPageCount(queryReq);
@@ -1678,7 +1685,7 @@ const useLogs = () => {
         }
       } else {
         searchObj.loading = false;
-        if(!notificationMsg.value) {
+        if (!notificationMsg.value) {
           notificationMsg.value = "Search query is empty or invalid.";
         }
       }
@@ -1692,7 +1699,9 @@ const useLogs = () => {
       console.log("=================== getQueryData Debug ===================");
     } catch (e: any) {
       searchObj.loading = false;
-      showErrorNotification(notificationMsg.value || "Error occurred during the search operation.");
+      showErrorNotification(
+        notificationMsg.value || "Error occurred during the search operation."
+      );
       notificationMsg.value = "";
     }
   };
@@ -1822,11 +1831,21 @@ const useLogs = () => {
         })
         .catch((err) => {
           searchObj.loading = false;
-          searchObj.data.errorMsg = "Error while processing search total count request.";
+          let trace_id = "";
+          searchObj.data.errorMsg = "Error while processing search request.";
           if (err.response != undefined) {
-            searchObj.data.errorMsg = err.response.data.error;
+            searchObj.data.errorMsg =
+              err.response.data.error +
+              " TraceID:" +
+              err.response.data?.trace_id;
+            if (err.response.data.hasOwnProperty("trace_id")) {
+              trace_id = err.response.data?.trace_id;
+            }
           } else {
-            searchObj.data.errorMsg = err.message;
+            searchObj.data.errorMsg = err.message + " TraceID:" + err?.trace_id;
+            if (err.hasOwnProperty("trace_id")) {
+              trace_id = err?.trace_id;
+            }
           }
 
           const customMessage = logsErrorMessage(err?.response?.data.code);
@@ -1838,9 +1857,19 @@ const useLogs = () => {
 
           notificationMsg.value = searchObj.data.errorMsg;
 
-          if (err?.response?.data?.code == 429) {
-            notificationMsg.value = err.response.data.message;
-            searchObj.data.errorMsg = err.response.data.message;
+          if (err?.request?.status >= 429) {
+            notificationMsg.value = err?.response?.data?.message;
+            searchObj.data.errorMsg =
+              err?.response?.data?.message;
+          }
+
+          if (trace_id) {
+            searchObj.data.errorMsg +=
+              " <br><span class='text-subtitle1'>TraceID:" +
+              trace_id +
+              "</span>";
+            notificationMsg.value += " TraceID:" + trace_id;
+            trace_id = "";
           }
           reject(false);
         });
@@ -2092,11 +2121,24 @@ const useLogs = () => {
         })
         .catch((err) => {
           searchObj.loading = false;
-          searchObj.data.errorMsg = "Error while processing search request.";
+          let trace_id = "";
+          searchObj.data.errorMsg =
+                typeof err == "string" && err
+                  ? err
+                  : "Error while processing histogram request.";
           if (err.response != undefined) {
-            searchObj.data.errorMsg = err.response.data.error;
+            searchObj.data.errorMsg =
+              err.response.data.error +
+              " TraceID:" +
+              err.response.data?.trace_id;
+            if (err.response.data.hasOwnProperty("trace_id")) {
+              trace_id = err.response.data?.trace_id;
+            }
           } else {
-            searchObj.data.errorMsg = err.message;
+            searchObj.data.errorMsg = err.message + " TraceID:" + err?.trace_id;
+            if (err.hasOwnProperty("trace_id")) {
+              trace_id = err?.trace_id;
+            }
           }
 
           const customMessage = logsErrorMessage(err?.response?.data.code);
@@ -2108,10 +2150,21 @@ const useLogs = () => {
 
           notificationMsg.value = searchObj.data.errorMsg;
 
-          if (err?.response?.data?.code == 429) {
-            notificationMsg.value = err.response.data.message;
-            searchObj.data.errorMsg = err.response.data.message;
+          if (err?.request?.status >= 429) {
+            notificationMsg.value = err?.response?.data?.message;
+            searchObj.data.errorMsg =
+              err?.response?.data?.message;
           }
+
+          if (trace_id) {
+            searchObj.data.errorMsg +=
+              " <br><span class='text-subtitle1'>TraceID:" +
+              trace_id +
+              "</span>";
+            notificationMsg.value += " TraceID:" + trace_id;
+            trace_id = "";
+          }
+
           reject(false);
         });
     });
@@ -2194,7 +2247,8 @@ const useLogs = () => {
               searchObj.data.queryResults.aggs = res.data.hits;
               searchObj.data.queryResults.scan_size = res.data.scan_size;
               searchObj.data.queryResults.took += res.data.took;
-              searchObj.data.queryResults.result_cache_ratio += res.data.result_cache_ratio;
+              searchObj.data.queryResults.result_cache_ratio +=
+                res.data.result_cache_ratio;
               // if (hasAggregationFlag) {
               //   searchObj.data.queryResults.total = res.data.total;
               // }
@@ -2233,11 +2287,25 @@ const useLogs = () => {
             })
             .catch((err) => {
               searchObj.loadingHistogram = false;
-              searchObj.data.errorMsg = "Error while processing histogram request.";
+              let trace_id = "";
+              searchObj.data.histogram.errorMsg =
+                typeof err == "string" && err
+                  ? err
+                  : "Error while processing histogram request.";
               if (err.response != undefined) {
-                searchObj.data.histogram.errorMsg = err.response.data.error;
+                searchObj.data.histogram.errorMsg =
+                  err.response.data.error +
+                  " TraceID:" +
+                  err.response.data?.trace_id;
+                if (err.response.data.hasOwnProperty("trace_id")) {
+                  trace_id = err.response.data?.trace_id;
+                }
               } else {
-                searchObj.data.histogram.errorMsg = err.message;
+                searchObj.data.histogram.errorMsg =
+                  err.message + " TraceID:" + err?.trace_id;
+                if (err.hasOwnProperty("trace_id")) {
+                  trace_id = err?.trace_id;
+                }
               }
 
               const customMessage = logsErrorMessage(err?.response?.data.code);
@@ -2251,9 +2319,21 @@ const useLogs = () => {
 
               notificationMsg.value = searchObj.data.histogram.errorMsg;
 
-              if (err?.response?.data?.code == 429) {
-                notificationMsg.value = err.response.data.message;
-                searchObj.data.histogram.errorMsg = err.response.data.message;
+              if (err?.request?.status >= 429) {
+                notificationMsg.value = err?.response?.data?.message;
+                searchObj.data.histogram.errorMsg =
+                  err?.response?.data?.message;
+                searchObj.data.histogram.errorDetail =
+                  err?.response?.data?.error_detail;
+              }
+
+              if (trace_id) {
+                searchObj.data.histogram.errorMsg +=
+                  " <br><span class='text-subtitle1'>TraceID:" +
+                  trace_id +
+                  "</span>";
+                notificationMsg.value += " TraceID:" + trace_id;
+                trace_id = "";
               }
 
               reject(false);
@@ -2869,7 +2949,8 @@ const useLogs = () => {
   function getHistogramTitle() {
     try {
       const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
-      const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
+      const startCount =
+        currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
       let endCount;
 
       let totalCount = searchObj.data.queryResults.total || 0;
@@ -2903,10 +2984,17 @@ const useLogs = () => {
       }
 
       let plusSign: string = "";
-      if(searchObj.data.queryResults.partitionDetail.partitions.length > 1 && searchObj.meta.showHistogram == false) {
+      if (
+        searchObj.data.queryResults.partitionDetail.partitions.length > 1 &&
+        searchObj.meta.showHistogram == false
+      ) {
         plusSign = "+";
       }
-      const scanSizeLabel =  (searchObj.data.queryResults.result_cache_ratio !== undefined && searchObj.data.queryResults.result_cache_ratio > 0)? "Delta Scan Size" : "Scan Size";
+      const scanSizeLabel =
+        searchObj.data.queryResults.result_cache_ratio !== undefined &&
+        searchObj.data.queryResults.result_cache_ratio > 0
+          ? "Delta Scan Size"
+          : "Scan Size";
 
       const title =
         "Showing " +
@@ -2918,7 +3006,9 @@ const useLogs = () => {
         plusSign +
         " events in " +
         searchObj.data.queryResults.took +
-        " ms. (" + scanSizeLabel  + ": " +
+        " ms. (" +
+        scanSizeLabel +
+        ": " +
         formatSizeFromMB(searchObj.data.queryResults.scan_size) +
         plusSign +
         ")";
@@ -3155,16 +3245,41 @@ const useLogs = () => {
           // }, 500);
         })
         .catch((err) => {
+          let trace_id = "";
+          searchObj.data.errorMsg = "Error while processing search request.";
           if (err.response != undefined) {
-            searchObj.data.errorMsg = err.response.data.error;
+            searchObj.data.errorMsg =
+              err.response.data.error +
+              " TraceID:" +
+              err.response.data?.trace_id;
+            if (err.response.data.hasOwnProperty("trace_id")) {
+              trace_id = err.response.data?.trace_id;
+            }
           } else {
-            searchObj.data.errorMsg = err.message;
+            searchObj.data.errorMsg = err.message + " TraceID:" + err?.trace_id;
+            if (err.hasOwnProperty("trace_id")) {
+              trace_id = err?.trace_id;
+            }
           }
 
           const customMessage = logsErrorMessage(err.response.data.code);
           searchObj.data.errorCode = err.response.data.code;
           if (customMessage != "") {
             searchObj.data.errorMsg = customMessage;
+          }
+
+          if (err?.request?.status >= 429) {
+            notificationMsg.value = err?.response?.data?.message;
+            searchObj.data.errorMsg =
+              err?.response?.data?.message;
+          }
+
+          if (trace_id) {
+            searchObj.data.errorMsg +=
+              " <br><span class='text-subtitle1'>TraceID:" +
+              trace_id +
+              "</span>";
+            trace_id = "";
           }
         })
         .finally(() => (searchObj.loading = false));
@@ -3175,7 +3290,7 @@ const useLogs = () => {
   };
 
   const refreshData = () => {
-    try{
+    try {
       if (
         searchObj.meta.refreshInterval > 0 &&
         router.currentRoute.value.name == "logs"
@@ -3194,7 +3309,7 @@ const useLogs = () => {
         store.dispatch("setRefreshIntervalID", refreshIntervalID);
 
         // only notify if user is in logs page
-        if(searchObj.meta.logsVisualizeToggle == "logs"){
+        if (searchObj.meta.logsVisualizeToggle == "logs") {
           $q.notify({
             message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
             color: "positive",
