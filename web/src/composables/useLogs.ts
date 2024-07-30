@@ -1195,7 +1195,10 @@ const useLogs = () => {
                 }
                 // });
               } else {
-                searchObj.data.queryResults.total = res.data.records;
+                console.log(searchObj.data.queryResults.total,"res before query data")
+                searchObj.data.queryResults.total = 0;
+
+
                 const partitions = res.data.partitions;
                 let pageObject = [];
                 searchObj.data.queryResults.partitionDetail.partitions =
@@ -2972,7 +2975,7 @@ const useLogs = () => {
         currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
       let endCount;
 
-      let totalCount = searchObj.data.queryResults.total || 0;
+      let totalCount = searchObj.data.queryResults.total || searchObj.data.queryResults.hits.length;
       if (searchObj.meta.resultGrid.showPagination == false) {
         endCount = searchObj.data.queryResults.hits.length;
         totalCount = searchObj.data.queryResults.hits.length;
