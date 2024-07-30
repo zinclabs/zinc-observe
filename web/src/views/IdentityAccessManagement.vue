@@ -121,7 +121,7 @@ function setTabs() {
 
   const rbac = ["groups", "roles"];
 
-  const os = ["users"];
+  const os = ["users","organizations"];
 
   const isEnterprise =
     config.isEnterprise == "true" || config.isCloud == "true";
@@ -146,7 +146,6 @@ const updateActiveTab = (tab: string) => {
   if (tab) activeTab.value = tab;
   else {
     const value = router.currentRoute.value.name;
-
     if (!iamRouteTabsRef.value) return;
 
     if (value === "editGroup" || value === "groups") {

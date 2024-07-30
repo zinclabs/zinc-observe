@@ -31,8 +31,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #no-data><NoData /></template>
 
       <template #top="scope">
-        <div class="full-width q-mb-md">
+        <div
+          class="full-width flex justify-between items-start"
+          style="margin-bottom: 2px; height: 44px"
+        >
           <div class="q-table__title">{{ t("organization.header") }}</div>
+          <q-btn
+            class="q-ml-md q-mb-xs text-bold no-border"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            icon="add"
+            dense
+            :label="t(`organization.add`)"
+            @click="addOrganization"
+          />
         </div>
         <q-input
           v-model="filterQuery"
@@ -69,12 +82,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
     </q-table>
+    <q-dialog
+      v-model="showAddOrganizationDialog"
+      position="right"
+      full-height
+      maximized
+      @before-hide="hideAddOrgDialog"
+    >
+      <add-update-organization @updated="updateOrganizationList" />
+    </q-dialog>
   </q-page>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { defineComponent, onMounted, onUpdated, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
@@ -85,12 +107,16 @@ import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertToTitleCase } from "@/utils/zincutils";
 import { onBeforeMount } from "vue";
+import segment from "@/services/segment_analytics";
+
+import AddUpdateOrganization from "./AddUpdateOrganization.vue";
 
 export default defineComponent({
   name: "PageOrganization",
   components: {
     QTablePagination,
     NoData,
+    AddUpdateOrganization,
   },
   setup() {
     const store = useStore();
@@ -100,6 +126,7 @@ export default defineComponent({
     const organizations = ref([]);
     const organization = ref({});
     const qTable: any = ref(null);
+    const showAddOrganizationDialog = ref(false);
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -144,6 +171,7 @@ export default defineComponent({
       { label: "100", value: 100 },
       { label: "All", value: 0 },
     ];
+
     const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
@@ -151,18 +179,68 @@ export default defineComponent({
       rowsPerPage: 20,
     });
 
+    watch(
+      () => router.currentRoute.value.query?.action,
+      (action) => {
+        if (action == "add") {
+          showAddOrganizationDialog.value = true;
+        }
+      }
+    );
+
+
+    onMounted(() => {
+      if (router.currentRoute.value.query.action == "add") {
+        showAddOrganizationDialog.value = true;
+      }
+    });
+
+
     onBeforeMount(() => {
       getOrganizations();
     });
+
+    onUpdated(() => {
+      if (router.currentRoute.value.query.action == "add") {
+        showAddOrganizationDialog.value = true;
+      }
+    });
+
+
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
+    const hideAddOrgDialog = () => {
+      router.push({
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
     const changeMaxRecordToReturn = (val: any) => {
       maxRecordToReturn.value = val;
       getOrganizations();
+    };
+    const addOrganization = (evt) => {
+      router.push({
+        query: {
+          action: "add",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+
+      if (evt) {
+        let button_txt = evt.target.innerText;
+        segment.track("Button Click", {
+          button: button_txt,
+          user_org: store.state.selectedOrganization.identifier,
+          user_id: store.state.userInfo.email,
+          page: "Organizations",
+        });
+      }
     };
 
     const getOrganizations = () => {
@@ -196,12 +274,15 @@ export default defineComponent({
       router,
       qTable,
       loading: ref(false),
+      hideAddOrgDialog,
       organizations,
       organization,
       columns,
       getOrganizations,
+      addOrganization,
       pagination,
       resultTotal,
+      showAddOrganizationDialog,
       perPageOptions,
       selectedPerPage,
       changePagination,

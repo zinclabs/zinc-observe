@@ -337,13 +337,15 @@ export default defineComponent({
       });
       organizationsService.list(0, 100000, "name", false, "").then((res) => {
         // Updating store so that organizations in navbar also gets updated
+        console.log(res.data.data,"res ")
         store.dispatch("setOrganizations", res.data.data);
-
         resultTotal.value = res.data.data.length;
         let counter = 1;
         organizations.value = res.data.data.map((data: any) => {
+
           const memberrole = data.OrganizationMemberObj.filter(
             (v: any) =>
+
               v.user_id == store.state.currentuser.id && v.role == "admin"
           );
 

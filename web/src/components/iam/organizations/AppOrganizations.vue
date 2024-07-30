@@ -25,7 +25,7 @@ import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OrganizationsCloud from "@/enterprise/components/organizations/Organization.vue";
-import OrganizationsEnterprise from "@/components/iam/organizations/ListOrganizations.vue";
+import OrganizationOpenSource from "@/components/iam/organizations/ListOrganizations.vue";
 
 import config from "@/aws-exports";
 import { watch } from "vue";
@@ -34,7 +34,7 @@ export default defineComponent({
   name: "AppOrganizations",
   components: {
     OrganizationsCloud,
-    OrganizationsEnterprise,
+    OrganizationOpenSource,
   },
   setup() {
     const store = useStore();
@@ -43,16 +43,16 @@ export default defineComponent({
     const componentName = ref("");
 
     const loadComponent = ref(false);
+    
 
     watch(
       () => store.state.zoConfig,
       (zoConfig) => {
-        if (config.isCloud == "true") {
+        if (zoConfig.sso_enabled || config.isEnterprise == "true" || config.isCloud == "true") {
           componentName.value = "OrganizationsCloud";
         }
-
-        if (zoConfig.sso_enabled || config.isEnterprise == "true") {
-          componentName.value = "OrganizationsEnterprise";
+       else{
+          componentName.value = "OrganizationOpenSource";
         }
 
         loadComponent.value = true;

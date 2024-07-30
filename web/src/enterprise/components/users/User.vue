@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("user.header") }}
         </div>
+
         <div class="full-width row q-mb-xs items-start">
           <q-input
             v-model="filterQuery"
@@ -67,7 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="search" />
             </template>
           </q-input>
-
           <div class="col-8 flex" v-if="currentUserRole == 'admin'">
             <q-separator vertical class="separator q-mr-sm" />
 
@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: calc(100% - 120px)"
                 class="q-pr-sm"
               />
+              
               <div class="flex justify-center">
                 <q-select
                   dense
@@ -114,10 +115,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 top: 1px;
               "
             />
+            
             <label class="inputHint q-pl-md" style="display: block">{{
               t("user.inviteByEmailHint")
             }}</label>
           </div>
+         
         </div>
         <QTablePagination
           :scope="scope"
