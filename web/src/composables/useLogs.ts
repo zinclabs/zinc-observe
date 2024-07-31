@@ -797,7 +797,7 @@ const useLogs = () => {
           //replace backticks with \" for sql_mode
           query = query.replace(/`/g, '"');
           searchObj.data.queryResults.hits = [];
-          searchObj.data.queryResults.total = 0;
+
         }
 
         req.query.sql = query;
@@ -1195,7 +1195,8 @@ const useLogs = () => {
                 }
                 // });
               } else {
-                // searchObj.data.queryResults.total = res.data.records;
+                searchObj.data.queryResults.total = 0;
+                // delete searchObj.data.histogram.chartParams.title;
               
                 // generateHistogramData();
                 const partitions = res.data.partitions;
@@ -1480,7 +1481,6 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
-      searchObj.data.queryResults.total = 0;
       // searchObj.data.histogram.chartParams.title = "";
       console.log("=================== Start Debug ===================");
       searchObjDebug["queryDataStartTime"] = performance.now();
