@@ -2244,6 +2244,14 @@ const useLogs = () => {
           searchObj.loadingHistogram = true;
           queryReq.query.size = -1;
           const parsedSQL: any = fnParsedSQL();
+          queryReq.query.start_time =
+          searchObj.data.queryResults.partitionDetail.paginations[
+            searchObj.data.resultGrid.currentPage - 1
+          ][0].startTime;
+        queryReq.query.end_time =
+          searchObj.data.queryResults.partitionDetail.paginations[
+            searchObj.data.resultGrid.currentPage - 1
+          ][0].endTime;
 
           // let hasAggregationFlag = false;
           // if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
