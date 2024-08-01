@@ -982,7 +982,9 @@ export default defineComponent({
             });
         });
       } catch (err) {
+        fieldValues.value[name]["isLoading"] = false;
         console.log(err);
+
         $q.notify({
           type: "negative",
           message: "Error while fetching field values",
