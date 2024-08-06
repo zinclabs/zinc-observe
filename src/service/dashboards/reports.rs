@@ -17,6 +17,7 @@ use std::{str::FromStr, time::Duration};
 
 use actix_web::http;
 use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams, Page};
+use chrono::Timelike;
 use config::{get_chrome_launch_options, get_config, SMTP_CLIENT};
 use cron::Schedule;
 use futures::{future::try_join_all, StreamExt};
@@ -74,6 +75,17 @@ pub async fn save(
     }
 
     if report.frequency.frequency_type == ReportFrequencyType::Cron {
+        let cron_exp = report.frequency.cron.clone();
+        if cron_exp.starts_with("* ") {
+            let (_, rest) = cron_exp.split_once(" ").unwrap();
+            let now = chrono::Utc::now().second().to_string();
+            report.frequency.cron = format!("{now} {rest}");
+            log::debug!(
+                "New cron expression for report {}: {}",
+                report.name,
+                report.frequency.cron
+            );
+        }
         // Check if the cron expression is valid
         Schedule::from_str(&report.frequency.cron)?;
     } else if report.frequency.interval == 0 {
