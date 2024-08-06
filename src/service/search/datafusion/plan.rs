@@ -16,9 +16,12 @@
 use std::sync::Arc;
 
 use arrow::array::RecordBatch;
-use datafusion::physical_plan::{
-    coalesce_batches::CoalesceBatchesExec, empty::EmptyExec, memory::MemoryExec,
-    repartition::RepartitionExec, ExecutionPlan, Partitioning,
+use datafusion::{
+    common::tree_node::{Transformed, TreeNodeRecursion, TreeNodeRewriter},
+    physical_plan::{
+        coalesce_batches::CoalesceBatchesExec, empty::EmptyExec, limit::GlobalLimitExec,
+        memory::MemoryExec, repartition::RepartitionExec, ExecutionPlan, Partitioning,
+    },
 };
 
 const DISTRIBUTED_PLAN_NAMES: [&str; 3] = [
@@ -145,5 +148,50 @@ pub fn get_without_dist_plan(
         coalesce_exec
     } else {
         plan.clone().with_new_children(vec![coalesce_exec]).unwrap()
+    }
+}
+
+/// Rewriter to update the offset and limit of a GlobalLimitExec node
+pub(crate) struct UpdateOffsetExec {
+    offset: usize,
+    limit: usize,
+}
+
+impl UpdateOffsetExec {
+    pub fn new(offset: usize, limit: usize) -> Self {
+        Self { offset, limit }
+    }
+}
+
+impl TreeNodeRewriter for UpdateOffsetExec {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_down(
+        &mut self,
+        node: Self::Node,
+    ) -> Result<Transformed<Self::Node>, datafusion::error::DataFusionError> {
+        if let Some(node) = node.as_any().downcast_ref::<GlobalLimitExec>() {
+            if let Some(fetch) = node.fetch() {
+                if fetch > self.limit {
+                    let node =
+                        GlobalLimitExec::new(node.input().clone(), self.offset, Some(self.limit));
+                    return Ok(Transformed::new(
+                        Arc::new(node),
+                        true,
+                        TreeNodeRecursion::Stop,
+                    ));
+                }
+            }
+            let node = GlobalLimitExec::new(node.input().clone(), node.skip(), node.fetch());
+            Ok(Transformed::new(
+                Arc::new(node),
+                false,
+                TreeNodeRecursion::Stop,
+            ))
+        } else if node.name() == "ProjectionExec" {
+            Ok(Transformed::new(node, false, TreeNodeRecursion::Continue))
+        } else {
+            Ok(Transformed::new(node, false, TreeNodeRecursion::Stop))
+        }
     }
 }

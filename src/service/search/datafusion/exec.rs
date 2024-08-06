@@ -30,7 +30,7 @@ use datafusion::{
         datatypes::{DataType, Schema},
         record_batch::RecordBatch,
     },
-    common::Column,
+    common::{tree_node::TreeNode, Column},
     datasource::{
         empty::EmptyTable,
         file_format::{json::JsonFormat, parquet::ParquetFormat},
@@ -59,7 +59,7 @@ use super::{
 };
 use crate::service::search::{
     datafusion::{
-        plan::{get_final_plan, get_without_dist_plan},
+        plan::{get_final_plan, get_without_dist_plan, UpdateOffsetExec},
         ExtLimit,
     },
     sql::{Sql, RE_SELECT_WILDCARD},
@@ -210,8 +210,8 @@ async fn exec_query(
 #[allow(clippy::too_many_arguments)]
 pub async fn merge_partitions(
     org_id: &str,
-    _offset: i64,
-    _limit: i64,
+    offset: i64,
+    limit: i64,
     sql: &str,
     schema: Arc<Schema>,
     batches: Vec<RecordBatch>,
@@ -275,6 +275,8 @@ pub async fn merge_partitions(
         }
         _ => physical_plan.clone(),
     };
+    let mut update_offset_rewriter = UpdateOffsetExec::new(offset as usize, limit as usize);
+    let final_plan = final_plan.rewrite(&mut update_offset_rewriter)?.data;
     let plan = datafusion::physical_plan::displayable(final_plan.as_ref())
         .set_show_schema(false)
         .indent(true)
