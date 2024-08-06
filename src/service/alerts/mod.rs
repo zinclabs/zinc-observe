@@ -467,7 +467,7 @@ impl QueryCondition {
                 query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: false,
-                query_fn: alert.vrl_function.clone(),
+                query_fn: alert.query_condition.vrl_function.clone(),
                 skip_wal: false,
             },
             encoding: config::meta::search::RequestEncoding::Empty,
