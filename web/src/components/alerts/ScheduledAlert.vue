@@ -57,19 +57,24 @@
 
       <div class="flex">
         <template v-if="tab === 'sql'">
-          <query-editor
-            data-test="scheduled-alert-sql-editor"
-            ref="queryEditorRef"
-            editor-id="alerts-query-editor"
-            class="monaco-editor q-mb-md"
-            v-model:query="query"
-            :class="
-              query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
-            "
-            @update:query="updateQueryValue"
-            @focus="queryEditorPlaceholderFlag = false"
-            @blur="queryEditorPlaceholderFlag = true"
-          />
+          <div>
+            <query-editor
+              data-test="scheduled-alert-sql-editor"
+              ref="queryEditorRef"
+              editor-id="alerts-query-editor"
+              class="monaco-editor"
+              v-model:query="query"
+              :class="
+                query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
+              "
+              @update:query="updateQueryValue"
+              @focus="queryEditorPlaceholderFlag = false"
+              @blur="onBlurQueryEditor"
+            />
+            <div class="text-negative q-mb-xs" style="height: 21px">
+              <span v-show="!isValidSqlQuery"> Invalid SQL Query</span>
+            </div>
+          </div>
         </template>
         <template v-if="tab === 'promql'">
           <query-editor
@@ -713,6 +718,8 @@ import {
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
+import useQuery from "@/composables/useQuery";
+import searchService from "@/services/search";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -731,6 +738,7 @@ const props = defineProps([
   "promql_condition",
   "vrl_function",
   "showVrlFunction",
+  "isValidSqlQuery",
 ]);
 
 const emits = defineEmits([
@@ -746,6 +754,7 @@ const emits = defineEmits([
   "update:promql_condition",
   "update:vrl_function",
   "update:showVrlFunction",
+  "validate-sql",
 ]);
 
 const { t } = useI18n();
@@ -962,6 +971,12 @@ const filterFunctionOptions = (val: string, update: any) => {
     });
   });
 };
+
+const onBlurQueryEditor = () => {
+  queryEditorPlaceholderFlag.value = true;
+  emits("validate-sql");
+};
+
 defineExpose({
   tab,
 });

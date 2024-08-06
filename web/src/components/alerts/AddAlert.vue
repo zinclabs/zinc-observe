@@ -182,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :columns="filteredColumns"
                 :conditions="formData.query_condition.conditions"
                 :alertData="formData"
+                :isValidSqlQuery="isValidSqlQuery"
                 v-model:trigger="formData.trigger_condition"
                 v-model:sql="formData.query_condition.sql"
                 v-model:promql="formData.query_condition.promql"
@@ -196,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @field:add="addField"
                 @field:remove="removeField"
                 @input:update="onInputUpdate"
+                @validate-sql="validateSqlQuery"
                 class="q-mt-sm"
               />
             </div>
@@ -440,7 +442,6 @@ import alertsService from "../../services/alerts";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, debounce } from "quasar";
-import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import {
   getUUID,
@@ -453,6 +454,8 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 import useFunctions from "@/composables/useFunctions";
+import useQuery from "@/composables/useQuery";
+import searchService from "@/services/search";
 
 const defaultValue: any = () => {
   return {
@@ -572,7 +575,13 @@ export default defineComponent({
 
     const { getStreams, getStream } = useStreams();
 
+    const { buildQueryPayload } = useQuery();
+
     const previewQuery = ref("");
+
+    const isValidSqlQuery = ref(true);
+
+    const validateSqlQueryPromise = ref<Promise<unknown>>();
 
     const addAlertFormRef = ref(null);
 
@@ -1074,6 +1083,43 @@ export default defineComponent({
       return true;
     };
 
+    const validateSqlQuery = () => {
+      const query = buildQueryPayload({
+        sqlMode: true,
+        streamName: formData.value.stream_name,
+      });
+
+      delete query.aggs;
+
+      query.query.sql = formData.value.query_condition.sql;
+
+      validateSqlQueryPromise.value = new Promise((resolve, reject) => {
+        searchService
+          .search({
+            org_identifier: store.state.selectedOrganization.identifier,
+            query,
+            page_type: "logs",
+          })
+          .then((res: any) => {
+            isValidSqlQuery.value = true;
+            resolve("");
+          })
+          .catch((err: any) => {
+            if (err.response.data.code === 500) {
+              isValidSqlQuery.value = false;
+              q.notify({
+                type: "negative",
+                message: "Invalid SQL Query : " + err.response.data.message,
+                timeout: 3000,
+              });
+              reject("");
+            } else isValidSqlQuery.value = true;
+
+            resolve("");
+          });
+      });
+    };
+
     return {
       t,
       q,
@@ -1128,6 +1174,9 @@ export default defineComponent({
       outlinedInfo,
       getTimezoneOffset,
       showVrlFunction,
+      validateSqlQuery,
+      isValidSqlQuery,
+      validateSqlQueryPromise,
     };
   },
 
@@ -1192,7 +1241,7 @@ export default defineComponent({
       });
     },
 
-    onSubmit() {
+    async onSubmit() {
       if (
         !this.formData.is_real_time &&
         this.formData.query_condition.type == "sql" &&
@@ -1219,6 +1268,12 @@ export default defineComponent({
         this.formData.trigger_condition.frequency_type == "cron"
       ) {
         this.formData.tz_offset = this.getTimezoneOffset();
+      }
+
+      try {
+        await this.validateSqlQueryPromise;
+      } catch (e) {
+        return false;
       }
 
       this.addAlertForm.validate().then((valid: any) => {

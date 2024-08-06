@@ -150,36 +150,41 @@ const useQuery = () => {
           sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
-          from: data.from,
-          size: data.size,
+          from: data.from || 0,
+          size: data.size || 100,
         },
         aggs: {
           histogram:
             "select histogram(" +
-            data.timestamp_column +
+            (data?.timestamp_column ||
+              store.state.zoConfig.timestamp_column ||
+              "_timestamp") +
             ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
         },
       };
 
       req.aggs.histogram = req.aggs.histogram.replaceAll(
         "[INTERVAL]",
-        data.timeInterval
+        data.timeInterval,
       );
 
       req.query.sql = req.query.sql.replaceAll(
         "[QUERY_FUNCTIONS]",
-        data.parsedQuery?.queryFunctions || ""
+        data.parsedQuery?.queryFunctions || "",
       );
 
       req.query.sql = req.query.sql.replaceAll("[INDEX_NAME]", data.streamName);
 
       req.query.sql = req.query.sql.replaceAll(
         "[WHERE_CLAUSE]",
-        data.parsedQuery?.whereClause || ""
+        data.parsedQuery?.whereClause || "",
       );
 
-      req.query.start_time = data.timestamps.startTime;
-      req.query.end_time = data.timestamps.endTime;
+      if (data?.timestamps?.startTime)
+        req.query.start_time = data.timestamps.startTime;
+
+      if (data?.timestamps?.endTime)
+        req.query.end_time = data.timestamps.endTime;
 
       if (store.state.zoConfig.sql_base64_enabled) {
         req["encoding"] = "base64";
