@@ -97,8 +97,9 @@
                 hide-selected
                 menu-anchor="top left"
                 fill-input
-                option-label="label"
-                option-value="value"
+                option-label="name"
+                option-value="name"
+                @filter="filterFunctionOptions"
                 @update:modelValue="onFunctionSelect"
                 style="width: 100%"
               >
@@ -108,26 +109,6 @@
                   </q-item>
                 </template>
               </q-select>
-              <q-btn
-                no-caps
-                padding="xs"
-                class=""
-                size="sm"
-                flat
-                icon="info_outline"
-                data-test="dashboard-addpanel-config-drilldown-info"
-              >
-                <q-tooltip
-                  class="bg-grey-8"
-                  anchor="bottom middle"
-                  self="top right"
-                  max-width="250px"
-                >
-                  To use extracted VRL fields in the chart, write a VRL function
-                  and click on the Apply button. The fields will be extracted,
-                  allowing you to use them to build the chart.
-                </q-tooltip>
-              </q-btn>
             </div>
           </div>
           <query-editor
@@ -844,19 +825,20 @@ const getDefaultPromqlCondition = () => {
 };
 
 const onFunctionSelect = (_function: any) => {
-  selectedFunction.value = _function.value;
+  selectedFunction.value = _function.name;
   vrlFunctionContent.value = _function.function;
 };
 
-const functionOptions = computed(() => {
-  return store.state.organizationData.functions.map((fn: any) => {
-    return {
-      ...fn,
-      value: fn.name,
-      label: fn.name,
-    };
-  });
-});
+const functionsList = computed(() => store.state.organizationData.functions);
+
+const functionOptions = ref<any[]>([]);
+
+watch(
+  () => functionsList.value,
+  (functions: any[]) => {
+    functionOptions.value = [...functions];
+  },
+);
 
 const vrlFunctionContent = computed({
   get() {
@@ -956,6 +938,14 @@ const filterNumericColumns = (val: string, update: Function) => {
 const updateAggregationToggle = () => {
   _isAggregationEnabled.value =
     tab.value === "custom" && props.isAggregationEnabled;
+};
+
+const filterFunctionOptions = (val: string, update: any) => {
+  update(() => {
+    functionOptions.value = functionsList.value.filter((fn: any) => {
+      return fn.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
+    });
+  });
 };
 defineExpose({
   tab,
