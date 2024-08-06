@@ -50,6 +50,8 @@ pub struct Alert {
     /// Timezone offset in minutes.
     /// The negative secs means the Western Hemisphere
     pub tz_offset: i32,
+    #[serde(default)]
+    pub vrl_function: Option<String>,
 }
 
 impl PartialEq for Alert {
@@ -76,6 +78,7 @@ impl Default for Alert {
             description: "".to_string(),
             enabled: false,
             tz_offset: 0, // UTC
+            vrl_function: None,
         }
     }
 }
