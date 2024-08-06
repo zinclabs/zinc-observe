@@ -97,7 +97,6 @@
                 hide-selected
                 menu-anchor="top left"
                 fill-input
-                @filter="filterFunctionOptions"
                 option-label="label"
                 option-value="value"
                 @update:modelValue="onFunctionSelect"
