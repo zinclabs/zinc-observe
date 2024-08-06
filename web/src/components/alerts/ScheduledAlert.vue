@@ -63,7 +63,12 @@
             editor-id="alerts-query-editor"
             class="monaco-editor q-mb-md"
             v-model:query="query"
+            :class="
+              query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
+            "
             @update:query="updateQueryValue"
+            @focus="queryEditorPlaceholderFlag = false"
+            @blur="queryEditorPlaceholderFlag = true"
           />
         </template>
         <template v-if="tab === 'promql'">
@@ -117,8 +122,14 @@
             editor-id="fnEditor"
             class="monaco-editor"
             v-model:query="vrlFunctionContent"
-            :class="vrlFunctionContent == '' ? 'empty-function' : ''"
+            :class="
+              vrlFunctionContent == '' && functionEditorPlaceholderFlag
+                ? 'empty-function'
+                : ''
+            "
             language="ruby"
+            @focus="functionEditorPlaceholderFlag = false"
+            @blur="functionEditorPlaceholderFlag = true"
           />
         </div>
       </div>
@@ -749,6 +760,10 @@ const tab = ref(props.query_type || "custom");
 
 const store = useStore();
 
+const functionEditorPlaceholderFlag = ref(true);
+
+const queryEditorPlaceholderFlag = ref(true);
+
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
 const regularFunctions = ["avg", "max", "min", "sum", "count"];
 
@@ -987,6 +1002,18 @@ defineExpose({
     &.icon-dark {
       filter: none !important;
     }
+  }
+
+  .empty-query .monaco-editor-background {
+    background-image: url("../../assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
+  }
+
+  .empty-function .monaco-editor-background {
+    background-image: url("../../assets/images/common/vrl-function.png");
+    background-repeat: no-repeat;
+    background-size: 170px;
   }
 }
 </style>
