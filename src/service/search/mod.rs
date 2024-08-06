@@ -119,7 +119,6 @@ pub async fn search(
         && !req_clusters.is_empty()
         && (req_clusters == vec!["local"] || req_clusters == vec![config::get_cluster_name()]);
 
-    log::info!("in_req for search, {:#?}", in_req.query.query_fn);
     let mut req: cluster_rpc::SearchRequest = in_req.to_owned().into();
     req.job.as_mut().unwrap().trace_id = trace_id.clone();
     req.org_id = org_id.to_string();
