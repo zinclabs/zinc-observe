@@ -20,7 +20,7 @@ use std::{
 
 use actix_web::http;
 use arrow_schema::DataType;
-use chrono::{Duration, Local, TimeZone, Utc};
+use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     get_config, ider,
     meta::{search::SearchEventType, stream::StreamType},
@@ -86,6 +86,17 @@ pub async fn save(
     }
 
     if alert.trigger_condition.frequency_type == AlertFrequencyType::Cron {
+        let cron_exp = alert.trigger_condition.cron.clone();
+        if cron_exp.starts_with("* ") {
+            let (_, rest) = cron_exp.split_once(" ").unwrap();
+            let now = Utc::now().second().to_string();
+            alert.trigger_condition.cron = format!("{now} {rest}");
+            log::debug!(
+                "New cron expression for alert {}: {}",
+                alert.name,
+                alert.trigger_condition.cron
+            );
+        }
         // Check the cron expression
         Schedule::from_str(&alert.trigger_condition.cron)?;
     } else if alert.trigger_condition.frequency == 0 {
