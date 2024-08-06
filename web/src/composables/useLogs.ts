@@ -257,6 +257,7 @@ const useLogs = () => {
   const { getStreams, getStream, getMultiStreams } = useStreams();
   const router = useRouter();
   let parser: any;
+  let validator : any;
   const fieldValues = ref();
   const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
   const notificationMsg = ref("");
@@ -272,8 +273,11 @@ const useLogs = () => {
 
   const importSqlParser = async () => {
     const useSqlParser: any = await import("@/composables/useParser");
-    const { sqlParser }: any = useSqlParser.default();
+    const { sqlParser,sqlValidator }: any = useSqlParser.default();
     parser = await sqlParser();
+    validator =  await sqlValidator();
+  
+
   };
 
   searchObj.organizationIdetifier = store.state.selectedOrganization.identifier;
@@ -779,7 +783,7 @@ const useLogs = () => {
         req.aggs.histogram = histogramQuery;
 
         if (!parsedSQL?.columns?.length) {
-          notificationMsg.value = "No column found in selected stream.";
+          notificationMsg.value = parsedSQL.error;
           return false;
         }
 
@@ -1905,24 +1909,73 @@ const useLogs = () => {
     }
     return false; // No aggregation function or non-null groupby property found
   }
+  function printErrorDetails(sqlQuery : any, error :any) {
+    let errorMsg : any = "Invalid Sql Query"
+    if (error && error.hash ) {
+      const { token, loc } = error.hash;
+      const { first_line, first_column, last_column } = loc;
+      // Extract the line with the error
+      const lines = sqlQuery.split('\n');
+      const errorLine = lines[first_line - 1] || '';
+      // Extract the word or token around the error location
+      const errorSnippet = errorLine.slice(first_column, last_column);
+      errorMsg = `Error in SQL query at line ${first_line}, columns ${first_column}-${last_column}: ${errorSnippet.trim()}`;
 
-  const fnParsedSQL = () => {
-    try {
-      const filteredQuery = searchObj.data.query
-        .split("\n")
-        .filter((line: string) => !line.trim().startsWith("--"))
-        .join("\n");
-      return parser.astify(filteredQuery);
-    } catch (e: any) {
-      return {
-        columns: [],
-        orderby: null,
-        limit: null,
-        groupby: null,
-        where: null,
-      };
+      if(token) errorMsg +=  `\nError Occured due to : ${token ? `Unexpected token: ${token}` : 'Syntax error'}`;
+      console.log(errorMsg,"validator error");
+
+        } else {
+      console.error('Unknown error:', error);
     }
-  };
+    return errorMsg;
+  }
+  
+
+  const validateSql = () => {
+    function normalizeSQL(sql: string): string {
+      return sql.replace(/"(.*?)"/g, '$1');
+    }
+    console.log(searchObj,"search obj")
+    const sqlQuery = normalizeSQL(searchObj.data.query);  
+    try {
+        const ast = validator.parse(sqlQuery);
+        console.log(ast);
+        return { ast }; // Return the AST if successful
+    } catch (error) {
+        const errorMsg = printErrorDetails(sqlQuery, error);
+        // Return the error to the caller for further handling
+        throw new Error(errorMsg);
+    }
+}
+
+const fnParsedSQL = () => {
+    try {
+        const filteredQuery = searchObj.data.query
+            .split("\n")
+            .filter((line: string) => !line.trim().startsWith("--"))
+            .join("\n");
+
+        return parser.astify(filteredQuery);
+    } catch (e: any) {
+        try {
+            validateSql(); // This will throw an error if validation fails
+        } catch (error  :any) {
+          searchObj.data.errorMsg = error.message
+            return {
+                error: error.message, // Capture the error message returned
+            };
+        }
+        return {
+            error: {"Invalid Query" : e.message}, // Capture any error from the astify process
+            columns: [],
+            orderby: null,
+            limit: null,
+            groupby: null,
+            where: null,
+        };
+    }
+};
+
 
   const fnHistogramParsedSQL = (query: string) => {
     try {
@@ -3995,6 +4048,8 @@ const useLogs = () => {
     filterHitsColumns,
     getHistogramQueryData,
     fnParsedSQL,
+    validateSql,
+    printErrorDetails,
     addOrderByToQuery,
     getRegionInfo,
     validateFilterForMultiStream,
