@@ -32,12 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
-        <div v-if="beingUpdated"
-class="text-h6" data-test="add-alert-title">
+        <div v-if="beingUpdated" class="text-h6" data-test="add-alert-title">
           {{ t("alerts.updateTitle") }}
         </div>
-        <div v-else
-class="text-h6" data-test="add-alert-title">
+        <div v-else class="text-h6" data-test="add-alert-title">
           {{ t("alerts.addTitle") }}
         </div>
       </div>
@@ -55,8 +53,7 @@ class="text-h6" data-test="add-alert-title">
     >
       <div class="row justify-start items-start" style="width: 1024px">
         <div style="width: calc(100% - 401px)">
-          <q-form class="add-alert-form"
-ref="addAlertForm" @submit="onSubmit">
+          <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <div
               class="flex justify-start items-center q-pb-sm q-col-gutter-md flex-wrap"
             >
@@ -193,7 +190,9 @@ ref="addAlertForm" @submit="onSubmit">
                 v-model:promql_condition="
                   formData.query_condition.promql_condition
                 "
+                v-model:vrl_function="formData.query_condition.vrl_function"
                 v-model:isAggregationEnabled="isAggregationEnabled"
+                v-model:showVrlFunction="showVrlFunction"
                 @field:add="addField"
                 @field:remove="removeField"
                 @input:update="onInputUpdate"
@@ -443,11 +442,17 @@ import { useStore } from "vuex";
 import { useQuasar, debounce } from "quasar";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
-import { getUUID, getTimezoneOffset } from "@/utils/zincutils";
+import {
+  getUUID,
+  getTimezoneOffset,
+  b64EncodeUnicode,
+  b64DecodeUnicode,
+} from "@/utils/zincutils";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import useFunctions from "@/composables/useFunctions";
 
 const defaultValue: any = () => {
   return {
@@ -478,6 +483,7 @@ const defaultValue: any = () => {
         },
       },
       promql_condition: null,
+      vrl_function: "",
     },
     trigger_condition: {
       period: 10,
@@ -556,11 +562,13 @@ export default defineComponent({
       "Contains",
       "NotContains",
     ]);
+    const showVrlFunction = ref(false);
     const isFetchingStreams = ref(false);
     const streamTypes = ["logs", "metrics", "traces"];
     const editorUpdate = (e: any) => {
       formData.value.sql = e.target.value;
     };
+    const { getAllFunctions } = useFunctions();
 
     const { getStreams, getStream } = useStreams();
 
@@ -579,6 +587,7 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await importSqlParser();
+      await getAllFunctions();
     });
 
     const importSqlParser = async () => {
@@ -652,7 +661,7 @@ export default defineComponent({
       const selected_stream: any = await getStream(
         stream_name,
         formData.value.stream_type,
-        true
+        true,
       );
       selected_stream.schema.forEach(function (item: any) {
         triggerCols.value.push(item.name);
@@ -664,7 +673,7 @@ export default defineComponent({
       const streams: any = await getStream(
         stream_name,
         formData.value.stream_type,
-        true
+        true,
       );
 
       if (streams && Array.isArray(streams.schema)) {
@@ -686,7 +695,7 @@ export default defineComponent({
       () => {
         filteredColumns.value = [...triggerCols.value];
       },
-      { immediate: true }
+      { immediate: true },
     );
     const filterColumns = (options: any[], val: String, update: Function) => {
       let filteredOptions: any[] = [];
@@ -699,7 +708,7 @@ export default defineComponent({
       update(() => {
         const value = val.toLowerCase();
         filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1
+          (column: any) => column.toLowerCase().indexOf(value) > -1,
         );
       });
       return filteredOptions;
@@ -711,7 +720,7 @@ export default defineComponent({
         indexOptions.value = streams.value[formData.value.stream_type].map(
           (data: any) => {
             return data.name;
-          }
+          },
         );
         return;
       }
@@ -751,7 +760,7 @@ export default defineComponent({
     const removeField = (field: any) => {
       formData.value.query_condition.conditions =
         formData.value.query_condition.conditions.filter(
-          (_field: any) => _field.id !== field.id
+          (_field: any) => _field.id !== field.id,
         );
     };
 
@@ -766,7 +775,7 @@ export default defineComponent({
     const removeVariable = (variable: any) => {
       formData.value.context_attributes =
         formData.value.context_attributes.filter(
-          (_variable: any) => _variable.id !== variable.id
+          (_variable: any) => _variable.id !== variable.id,
         );
     };
 
@@ -795,7 +804,7 @@ export default defineComponent({
     const getFromattedCondition = (
       column: string,
       operator: string,
-      value: number | string
+      value: number | string,
     ) => {
       let condition = "";
       switch (operator) {
@@ -843,7 +852,7 @@ export default defineComponent({
             return getFromattedCondition(
               condition.column,
               condition.operator,
-              value
+              value,
             );
           }
         })
@@ -868,14 +877,14 @@ export default defineComponent({
         formData.value.query_condition.aggregation.group_by.forEach(
           (column: any) => {
             if (column.trim().length) groupByCols.push(column);
-          }
+          },
         );
 
         let concatGroupBy = "";
         if (groupByCols.length) {
           groupByAlias = ", x_axis_2";
           concatGroupBy = `, concat(${groupByCols.join(
-            ",' : ',"
+            ",' : ',",
           )}) as x_axis_2`;
         }
 
@@ -952,19 +961,19 @@ export default defineComponent({
       });
 
       payload.trigger_condition.threshold = parseInt(
-        formData.value.trigger_condition.threshold
+        formData.value.trigger_condition.threshold,
       );
 
       payload.trigger_condition.period = parseInt(
-        formData.value.trigger_condition.period
+        formData.value.trigger_condition.period,
       );
 
       payload.trigger_condition.frequency = parseInt(
-        formData.value.trigger_condition.frequency
+        formData.value.trigger_condition.frequency,
       );
 
       payload.trigger_condition.silence = parseInt(
-        formData.value.trigger_condition.silence
+        formData.value.trigger_condition.silence,
       );
 
       payload.description = formData.value.description.trim();
@@ -983,6 +992,10 @@ export default defineComponent({
       if (getSelectedTab.value === "promql") {
         payload.query_condition.sql = "";
       }
+
+      payload.query_condition.vrl_function = b64EncodeUnicode(
+        formData.value.query_condition.vrl_function,
+      );
 
       if (beingUpdated) {
         payload.updatedAt = new Date().toISOString();
@@ -1080,7 +1093,6 @@ export default defineComponent({
       relativePeriods,
       editorUpdate,
       updateCondtions,
-
       updateStreamFields,
       updateEditorContent,
       triggerCols,
@@ -1115,6 +1127,7 @@ export default defineComponent({
       previewAlertRef,
       outlinedInfo,
       getTimezoneOffset,
+      showVrlFunction,
     };
   },
 
@@ -1136,11 +1149,18 @@ export default defineComponent({
       this.disableColor = "grey-5";
       this.formData = cloneDeep(this.modelValue);
       this.isAggregationEnabled = !!this.formData.query_condition.aggregation;
+      this.formData.query_condition.vrl_function = b64DecodeUnicode(
+        this.formData.query_condition.vrl_function,
+      );
+
+      if (this.formData.query_condition.vrl_function?.trim()?.length) {
+        this.showVrlFunction = true;
+      }
     }
 
     this.formData.is_real_time = this.formData.is_real_time.toString();
     this.formData.context_attributes = Object.keys(
-      this.formData.context_attributes
+      this.formData.context_attributes,
     ).map((attr) => {
       return {
         key: attr,
@@ -1173,7 +1193,11 @@ export default defineComponent({
     },
 
     onSubmit() {
-      if (!this.formData.is_real_time && this.formData.query_condition.type == 'sql' && !this.getParser(this.formData.query_condition.sql)) {
+      if (
+        !this.formData.is_real_time &&
+        this.formData.query_condition.type == "sql" &&
+        !this.getParser(this.formData.query_condition.sql)
+      ) {
         this.q.notify({
           type: "negative",
           message: "Selecting all Columns in SQL query is not allowed.",
@@ -1216,7 +1240,7 @@ export default defineComponent({
             this.store.state.selectedOrganization.identifier,
             payload.stream_name,
             payload.stream_type,
-            payload
+            payload,
           );
           callAlert
             .then((res: { data: any }) => {
@@ -1251,7 +1275,7 @@ export default defineComponent({
             this.store.state.selectedOrganization.identifier,
             payload.stream_name,
             payload.stream_type,
-            payload
+            payload,
           );
 
           callAlert
