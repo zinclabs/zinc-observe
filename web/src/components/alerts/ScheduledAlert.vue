@@ -63,6 +63,7 @@
               ref="queryEditorRef"
               editor-id="alerts-query-editor"
               class="monaco-editor"
+              :debounceTime="300"
               v-model:query="query"
               :class="
                 query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
@@ -82,6 +83,7 @@
             ref="queryEditorRef"
             editor-id="alerts-query-editor"
             class="monaco-editor q-mb-md"
+            :debounceTime="300"
             v-model:query="promqlQuery"
             @update:query="updateQueryValue"
           />
@@ -126,6 +128,7 @@
             ref="fnEditorRef"
             editor-id="fnEditor"
             class="monaco-editor"
+            :debounceTime="300"
             v-model:query="vrlFunctionContent"
             :class="
               vrlFunctionContent == '' && functionEditorPlaceholderFlag
@@ -134,8 +137,41 @@
             "
             language="ruby"
             @focus="functionEditorPlaceholderFlag = false"
-            @blur="functionEditorPlaceholderFlag = true"
+            @blur="onBlurFunctionEditor"
           />
+
+          <div
+            class="text-subtitle2 q-pb-sm"
+            style="min-height: 21px; width: 500px"
+          >
+            <div v-if="vrlFunctionError">
+              <div class="text-negative q-mb-xs flex items-center">
+                <q-btn
+                  :icon="
+                    isFunctionErrorExpanded ? 'expand_more' : 'chevron_right'
+                  "
+                  dense
+                  size="xs"
+                  flat
+                  class="q-mr-xs"
+                  data-test="table-row-expand-menu"
+                  @click.stop="toggleExpandFunctionError"
+                />
+                <div>
+                  <span v-show="vrlFunctionError">Invalid VRL function</span>
+                </div>
+              </div>
+              <div
+                v-if="isFunctionErrorExpanded"
+                class="q-px-sm q-pb-sm"
+                style="background: #efefef"
+              >
+                <pre class="q-my-none" style="white-space: pre-wrap">{{
+                  vrlFunctionError
+                }}</pre>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -739,6 +775,7 @@ const props = defineProps([
   "vrl_function",
   "showVrlFunction",
   "isValidSqlQuery",
+  "vrlFunctionError",
 ]);
 
 const emits = defineEmits([
@@ -772,6 +809,8 @@ const store = useStore();
 const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
+
+const isFunctionErrorExpanded = ref(false);
 
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
 const regularFunctions = ["avg", "max", "min", "sum", "count"];
@@ -975,6 +1014,15 @@ const filterFunctionOptions = (val: string, update: any) => {
 const onBlurQueryEditor = () => {
   queryEditorPlaceholderFlag.value = true;
   emits("validate-sql");
+};
+
+const onBlurFunctionEditor = () => {
+  functionEditorPlaceholderFlag.value = true;
+  emits("validate-sql");
+};
+
+const toggleExpandFunctionError = () => {
+  isFunctionErrorExpanded.value = !isFunctionErrorExpanded.value;
 };
 
 defineExpose({
