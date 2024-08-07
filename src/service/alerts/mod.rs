@@ -112,6 +112,22 @@ pub async fn save(
         return Err(anyhow::anyhow!("Alert name cannot contain '/'"));
     }
 
+    if let Some(vrl) = alert.query_condition.vrl_function.as_ref() {
+        match base64::decode_url(vrl) {
+            Ok(vrl) => {
+                if !vrl.ends_with('.') {
+                    let vrl = base64::encode_url(&format!("{vrl} \n ."));
+                    alert.query_condition.vrl_function = Some(vrl);
+                }
+            }
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "Error decoding vrl function for alert: {e}"
+                ));
+            }
+        }
+    }
+
     // before saving alert check alert destination
     if alert.destinations.is_empty() {
         return Err(anyhow::anyhow!("Alert destinations is required"));
