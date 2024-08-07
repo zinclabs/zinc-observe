@@ -44,7 +44,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     )
     .await?;
 
-    log::debug!("Pulled {} jobs from scheduler", triggers.len());
+    log::info!("Pulled {} jobs from scheduler", triggers.len());
 
     for trigger in triggers {
         tokio::task::spawn(async move {
@@ -127,6 +127,13 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 
     // evaluate alert
     let ret = alert.evaluate(None).await?;
+    if ret.is_some() {
+        log::info!(
+            "Alert conditions satisfied, org: {}, module_key: {}",
+            &new_trigger.org,
+            &new_trigger.module_key
+        );
+    }
     if ret.is_some() && alert.trigger_condition.silence > 0 {
         new_trigger.next_run_at += Duration::try_minutes(alert.trigger_condition.silence)
             .unwrap()

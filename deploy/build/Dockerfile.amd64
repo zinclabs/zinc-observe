@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM public.ecr.aws/docker/library/node:18.19.0-bookworm AS webBuilder
+FROM public.ecr.aws/docker/library/node:18.20.4-bookworm AS webBuilder
 WORKDIR /web
 COPY ./web /web/
 

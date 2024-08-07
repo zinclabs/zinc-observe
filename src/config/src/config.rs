@@ -210,7 +210,10 @@ pub fn cache_instance_id(instance_id: &str) {
 }
 
 pub fn get_instance_id() -> String {
-    INSTANCE_ID.get("instance_id").unwrap().clone()
+    match INSTANCE_ID.get("instance_id") {
+        Some(id) => id.clone(),
+        None => "".to_string(),
+    }
 }
 
 static CHROME_LAUNCHER_OPTIONS: tokio::sync::OnceCell<Option<BrowserConfig>> =

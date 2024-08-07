@@ -44,7 +44,6 @@ pub async fn check_cache(
     rpc_req: &proto::cluster_rpc::SearchRequest,
     req: &mut config::meta::search::Request,
     origin_sql: &mut String,
-    parsed_sql: &config::meta::sql::Sql,
     file_path: &mut String,
     is_aggregate: bool,
     should_exec_query: &mut bool,
@@ -61,8 +60,8 @@ pub async fn check_cache(
     };
 
     // skip the queries with no timestamp column
-    let mut result_ts_col = get_ts_col(parsed_sql, &cfg.common.column_timestamp, is_aggregate);
-    if is_aggregate && result_ts_col.is_none() {
+    let mut result_ts_col = get_ts_col(&meta.meta, &cfg.common.column_timestamp, is_aggregate);
+    if result_ts_col.is_none() && (is_aggregate || !meta.meta.group_by.is_empty()) {
         return CachedQueryResponse::default();
     }
 
@@ -79,13 +78,18 @@ pub async fn check_cache(
     }
 
     // Hack select for _timestamp
-    if !is_aggregate && parsed_sql.order_by.is_empty() && !origin_sql.contains('*') {
+    if !is_aggregate
+        && meta.meta.group_by.is_empty()
+        && order_by.is_empty()
+        && !origin_sql.contains('*')
+    {
         let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
         let cap_str = caps.get(1).unwrap().as_str();
         if !cap_str.contains(&cfg.common.column_timestamp) {
-            *origin_sql = origin_sql.replace(
+            *origin_sql = origin_sql.replacen(
                 cap_str,
                 &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
+                1,
             );
         }
         req.query.sql = origin_sql.clone();
@@ -106,12 +110,12 @@ pub async fn check_cache(
         }
 
         let meta_time_range_is_empty =
-            parsed_sql.time_range.is_none() || parsed_sql.time_range == Some((0, 0));
+            meta.meta.time_range.is_none() || meta.meta.time_range == Some((0, 0));
         let q_time_range =
             if meta_time_range_is_empty && (req_time_range.0 > 0 || req_time_range.1 > 0) {
                 Some(req_time_range)
             } else {
-                parsed_sql.time_range
+                meta.meta.time_range
             };
         handle_historgram(origin_sql, q_time_range);
         req.query.sql = origin_sql.clone();

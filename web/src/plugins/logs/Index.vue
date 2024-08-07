@@ -515,6 +515,7 @@ export default defineComponent({
       // if search tab
       if (searchObj.meta.logsVisualizeToggle == "logs") {
         const queryParams: any = router.currentRoute.value.query;
+        searchObj.meta.refreshHistogram = true;
 
         const isStreamChanged =
           queryParams.stream_type !== searchObj.data.stream.streamType ||
@@ -552,6 +553,7 @@ export default defineComponent({
       if (searchObj.meta.logsVisualizeToggle == "logs") {
         // searchObj.loading = true;
         searchObj.meta.pageType = "logs";
+        searchObj.meta.refreshHistogram = true;
         if (
           config.isEnterprise == "true" &&
           store.state.zoConfig.super_cluster_enabled

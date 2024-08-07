@@ -148,9 +148,7 @@ impl ErrorCodes {
                 format!("Search field has no compatible data type: {field}")
             }
             ErrorCodes::SearchSQLExecuteError(_) => "Search SQL execute error".to_string(),
-            ErrorCodes::SearchCancelQuery(_) => {
-                "Search query was cancelled by the administrator".to_string()
-            }
+            ErrorCodes::SearchCancelQuery(_) => "Search query was cancelled".to_string(),
             ErrorCodes::SearchTimeout(_) => "Search query timed out".to_string(),
         }
     }

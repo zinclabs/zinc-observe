@@ -69,15 +69,9 @@ pub async fn search(
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);
 
     // hits
-    let empty_vec = vec![];
-    let batches_query = match merge_batches.get("query") {
-        Some(batches) => batches,
-        None => &empty_vec,
-    };
-
-    if !batches_query.is_empty() {
-        let schema = batches_query[0].schema();
-        let batches_query_ref: Vec<&RecordBatch> = batches_query.iter().collect();
+    if !merge_batches.is_empty() {
+        let schema = merge_batches[0].schema();
+        let batches_query_ref: Vec<&RecordBatch> = merge_batches.iter().collect();
         let json_rows = record_batches_to_json_rows(&batches_query_ref)
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
         let mut sources: Vec<json::Value> = if query_fn.is_empty() {

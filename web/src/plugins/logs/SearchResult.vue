@@ -746,6 +746,9 @@ export default defineComponent({
     updateTitle() {
       return this.searchObj.data.histogram.chartParams.title;
     },
+    reDrawChartData() {
+      return this.searchObj.data.histogram;
+    },
   },
   watch: {
     toggleWrapFlag() {
@@ -757,6 +760,12 @@ export default defineComponent({
     },
     updateTitle() {
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;
+    },
+    reDrawChartData: {
+      deep: true,
+      handler: function () {
+        this.reDrawChart();
+      },
     },
   },
 });

@@ -18,30 +18,27 @@ const alphaUuid = uuid.replace(/[^a-zA-Z]/g, "");
 // Construct function name
 const functionName = `automate${alphaUuid}`;
 
-
-
-
 async function login(page) {
-      await page.goto(process.env["ZO_BASE_URL"]);
-      await page.waitForTimeout(1000);
-      // await page.getByText('Login as internal user').click();
-      await page
-        .locator('[data-cy="login-user-id"]')
-        .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-      //Enter Password
-      await page
-        .locator('[data-cy="login-password"]')
-        .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-      await page.locator('[data-cy="login-sign-in"]').click();
-      await page.waitForTimeout(4000);
+  await page.goto(process.env["ZO_BASE_URL"]);
+  await page.waitForTimeout(1000);
+  // await page.getByText('Login as internal user').click();
+  await page
+    .locator('[data-cy="login-user-id"]')
+    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
+  //Enter Password
+  await page
+    .locator('[data-cy="login-password"]')
+    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+  await page.locator('[data-cy="login-sign-in"]').click();
+  await page.waitForTimeout(4000);
   await page.goto(process.env["ZO_BASE_URL"]);
 }
 
-
-const selectStreamAndStreamTypeForLogs = async (page,stream) => {await page.waitForTimeout(
-  4000);await page.locator(
-  '[data-test="log-search-index-list-select-stream"]').click({ force: true });await page.locator(
-  "div.q-item").getByText(`${stream}`).first().click({ force: true });
+const selectStreamAndStreamTypeForLogs = async (page, stream) => {
+  await page.waitForTimeout(
+    4000); await page.locator(
+      '[data-test="log-search-index-list-select-stream"]').click({ force: true }); await page.locator(
+        "div.q-item").getByText(`${stream}`).first().click({ force: true });
 };
 test.describe("Alerts testcases", () => {
   // let logData;
@@ -74,36 +71,36 @@ test.describe("Alerts testcases", () => {
     await page.waitForTimeout(5000)
 
     // ("ingests logs via API", () => {
-        const orgId = process.env["ORGNAME"];
-      const streamName = "e2e_automate";
-      const basicAuthCredentials = Buffer.from(
-        `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-      ).toString('base64');
-    
-      const headers = {
-        "Authorization": `Basic ${basicAuthCredentials}`,
-        "Content-Type": "application/json",
-      };
-    
-      // const logsdata = {}; // Fill this with your actual data
-    
-      // Making a POST request using fetch API
-      const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-        const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify(logsdata)
-        });
-        return await fetchResponse.json();
-      }, {
-        url: process.env.INGESTION_URL,
+    const orgId = process.env["ORGNAME"];
+    const streamName = "e2e_automate";
+    const basicAuthCredentials = Buffer.from(
+      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+    ).toString('base64');
+
+    const headers = {
+      "Authorization": `Basic ${basicAuthCredentials}`,
+      "Content-Type": "application/json",
+    };
+
+    // const logsdata = {}; // Fill this with your actual data
+
+    // Making a POST request using fetch API
+    const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+      const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+        method: 'POST',
         headers: headers,
-        orgId: orgId,
-        streamName: streamName,
-        logsdata: logsdata
+        body: JSON.stringify(logsdata)
       });
-    
-      console.log(response);
+      return await fetchResponse.json();
+    }, {
+      url: process.env.INGESTION_URL,
+      headers: headers,
+      orgId: orgId,
+      streamName: streamName,
+      logsdata: logsdata
+    });
+
+    console.log(response);
     //  });
     // const allorgs = page.waitForResponse("**/api/default/organizations**");
     // const functions = page.waitForResponse("**/api/default/functions**");
@@ -117,166 +114,175 @@ test.describe("Alerts testcases", () => {
 
 
   // test("should display Create template on destination page and clicking on it to navigate template page", async ({ page }) => {await page.waitForTimeout(
-//     2000);await page.locator(
-//     '[data-test="alert-destinations-tab"]').click({ force: true });await page.waitForTimeout(
-//     100);await expect(page.getByText(/Create Template/).first()).toBeVisible();await page.getByText(/Create Template/).first().click({
-//     force: true });await expect(page.getByText(/Add Template/).first()).toBeVisible();
+  //     2000);await page.locator(
+  //     '[data-test="alert-destinations-tab"]').click({ force: true });await page.waitForTimeout(
+  //     100);await expect(page.getByText(/Create Template/).first()).toBeVisible();await page.getByText(/Create Template/).first().click({
+  //     force: true });await expect(page.getByText(/Add Template/).first()).toBeVisible();
 
-// });
-
-// test("should display Create template on alerts page and clicking on it to navigate template page", async ({ page }) => {await page.waitForTimeout(
-//   2000);await page.locator(
-//   '[data-test="alert-alerts-tab"]').click({ force: true });await page.waitForTimeout(
-//   100);await expect(page.getByText(/Create Template/).first()).toBeVisible();await page.getByText(/Create Template/).first().click({
-//   force: true });await expect(page.getByText(/Add Template/).first()).toBeVisible();
-
-// });
-
-test("should display error when body not added under templates", async ({ page }) => {await page.waitForTimeout(
-  2000);
-  await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
-  // await page.waitForTimeout(1000);
-  await page.waitForSelector('[data-test="alert-template-list-add-alert-btn"]');
-  await page.locator('[data-test="alert-template-list-add-alert-btn"]').click({force: true });
-  await page.waitForSelector('[data-test="add-template-name-input"]');
-  await page.locator('[data-test="add-template-name-input"]').fill("test");
-  await page.locator('[data-test="add-template-submit-btn"]').click({ force: true });
-  await expect(page.locator( ".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
-
-});
-test("should display error when body added but name left blank under templates", async ({ page }) => {
-  await page.waitForTimeout(2000);
-  await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
-  await page.waitForTimeout(1000);
-  await page.waitForSelector('[data-test="alert-template-list-add-alert-btn"]')
-  await page.locator('[data-test="alert-template-list-add-alert-btn"]').click({force: true });
-  await page.waitForTimeout(100);
-  await page.waitForSelector(".view-line")
-  await page.click(".view-line")
-  await page.keyboard.type("oooo");
-  await page.locator('[data-test="add-template-submit-btn"]').click({ force: true });
-  await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
-});
-
-test("should display error only blank spaces added under  template name", async ({ page }) => {
-  await page.waitForTimeout(2000);
-  await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
-  await page.waitForTimeout(1000);
-  await page.waitForSelector('[data-test="alert-template-list-add-alert-btn"]');
-  await page.locator('[data-test="alert-template-list-add-alert-btn"]').click({force: true });
-  await page.waitForTimeout(100);
-  await page.click(".view-line")
-  await page.keyboard.type("   ");
-  await page.locator('[data-test="add-template-submit-btn"]').click({ force: true });
-  await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
-});
-
-// test("should saved template successfully", async ({ page }) => {
-//   await page.waitForTimeout(2000);
-//   await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
-//   await page.waitForTimeout(1000);
-//   await page.locator(
-//   '[data-test="alert-template-list-add-alert-btn"]').click({
-//   force: true });
-//   await page.waitForTimeout(100);
-//   await page.locator(
-//   '[data-test="add-template-name-input"]').fill("automationalert");
-//  const jsonString = '{"text": "{alert_name} is active"}';
-//  await page.click(".view-line")
-//  await page.keyboard.type(jsonString);
-//   await page.locator(
-//   '[data-test="add-template-submit-btn"]').click({ force: true });await expect(page.locator(
-//   ".q-notification__message").getByText(/Template Saved Successfully/).first()).toBeVisible();
-//   await page.waitForTimeout(1000);
-//   // await page.locator('[data-test="alert-template-list-automationalert-delete-template"]').click({ force: true });
-//   // await page.waitForTimeout(100);
-//   // await page.locator('[data-test="confirm-button"]').click();
-// });
-
-
-test("should display error when valid JSON not entered under template body", async ({ page }) => {
-  await page.waitForTimeout(
-  2000);
-
-  await page.waitForSelector('[data-test="alert-templates-tab"]');
-  await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
-  await page.waitForTimeout(1000);
-  // await page.route('**/*', route => {
-  //   if (route.request().url().includes('alerts/templates')) {
-  //     console.log('Alerts templates API request made.');
-  //   }
-  //   route.continue();
   // });
-  // await page.locator('[data-test="alert-list-create-template-btn"]').click({ force: true })
-  await page.waitForSelector('[data-test="alert-template-list-add-alert-btn"]');
-  await page.locator('[data-test="alert-template-list-add-alert-btn"]').click({
-   force: true });
-  await page.waitForTimeout(1000);await page.locator(
-  '[data-test="add-template-name-input"]').fill("test");
-  await page.click(".view-line")
-  await page.keyboard.type('test');
-  await page.locator(
-  '[data-test="add-template-submit-btn"]').click({ force: true });await expect(page.locator(
-  ".q-notification__message").getByText(/Please enter valid JSON/).first()).toBeVisible();
+
+  // test("should display Create template on alerts page and clicking on it to navigate template page", async ({ page }) => {await page.waitForTimeout(
+  //   2000);await page.locator(
+  //   '[data-test="alert-alerts-tab"]').click({ force: true });await page.waitForTimeout(
+  //   100);await expect(page.getByText(/Create Template/).first()).toBeVisible();await page.getByText(/Create Template/).first().click({
+  //   force: true });await expect(page.getByText(/Add Template/).first()).toBeVisible();
+
+  // });
+
+  test("should display error when body not added under templates", async ({ page }) => {
+    await page.waitForTimeout(
+      2000);
+    await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
+    // await page.waitForTimeout(1000);
+    await page.waitForSelector('[data-test="alert-template-list-add-alert-btn"]');
+    await page.locator('[data-test="alert-template-list-add-alert-btn"]').click({ force: true });
+    await page.waitForSelector('[data-test="add-template-name-input"]');
+    await page.locator('[data-test="add-template-name-input"]').fill("test");
+    await page.locator('[data-test="add-template-submit-btn"]').click({ force: true });
+    await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
+
+  });
+  test("should display error when body added but name left blank under templates", async ({ page }) => {
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
+    await page.waitForTimeout(1000);
+    await page.waitForSelector('[data-test="alert-template-list-add-alert-btn"]')
+    await page.locator('[data-test="alert-template-list-add-alert-btn"]').click({ force: true });
+    await page.waitForTimeout(100);
+    await page.waitForSelector(".view-line")
+    await page.click(".view-line")
+    await page.keyboard.type("oooo");
+    await page.locator('[data-test="add-template-submit-btn"]').click({ force: true });
+    await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
+  });
+
+  test("should display error only blank spaces added under  template name", async ({ page }) => {
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
+    await page.waitForTimeout(1000);
+    await page.waitForSelector('[data-test="alert-template-list-add-alert-btn"]');
+    await page.locator('[data-test="alert-template-list-add-alert-btn"]').click({ force: true });
+    await page.waitForTimeout(100);
+    await page.click(".view-line")
+    await page.keyboard.type("   ");
+    await page.locator('[data-test="add-template-submit-btn"]').click({ force: true });
+    await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
+  });
+
+  // test("should saved template successfully", async ({ page }) => {
+  //   await page.waitForTimeout(2000);
+  //   await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
+  //   await page.waitForTimeout(1000);
+  //   await page.locator(
+  //   '[data-test="alert-template-list-add-alert-btn"]').click({
+  //   force: true });
+  //   await page.waitForTimeout(100);
+  //   await page.locator(
+  //   '[data-test="add-template-name-input"]').fill("automationalert");
+  //  const jsonString = '{"text": "{alert_name} is active"}';
+  //  await page.click(".view-line")
+  //  await page.keyboard.type(jsonString);
+  //   await page.locator(
+  //   '[data-test="add-template-submit-btn"]').click({ force: true });await expect(page.locator(
+  //   ".q-notification__message").getByText(/Template Saved Successfully/).first()).toBeVisible();
+  //   await page.waitForTimeout(1000);
+  //   // await page.locator('[data-test="alert-template-list-automationalert-delete-template"]').click({ force: true });
+  //   // await page.waitForTimeout(100);
+  //   // await page.locator('[data-test="confirm-button"]').click();
+  // });
 
 
-});
+  test("should display error when valid JSON not entered under template body", async ({ page }) => {
+    await page.waitForTimeout(
+      2000);
 
-test.skip("should click on add destination button and display error if user clicks directly on save", async ({ page }) => {await page.waitForTimeout(
-  2000);
-  await page.waitForSelector('[data-test="alert-destinations-tab"]');
-  await page.locator(
-  '[data-test="alert-destinations-tab"]').click({ force: true });await page.waitForTimeout(
-  100);
-  await page.waitForSelector('[data-test="alert-destination-list-add-alert-btn"]');
-  await page.locator(
-  '[data-test="alert-destination-list-add-alert-btn"]').click({
-  force: true });await page.locator(
+    await page.waitForSelector('[data-test="alert-templates-tab"]');
+    await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
+    await page.waitForTimeout(1000);
+    // await page.route('**/*', route => {
+    //   if (route.request().url().includes('alerts/templates')) {
+    //     console.log('Alerts templates API request made.');
+    //   }
+    //   route.continue();
+    // });
+    // await page.locator('[data-test="alert-list-create-template-btn"]').click({ force: true })
+    await page.waitForSelector('[data-test="alert-template-list-add-alert-btn"]');
+    await page.locator('[data-test="alert-template-list-add-alert-btn"]').click({
+      force: true
+    });
+    await page.waitForTimeout(1000); await page.locator(
+      '[data-test="add-template-name-input"]').fill("test");
+    await page.click(".view-line")
+    await page.keyboard.type('test');
+    await page.locator(
+      '[data-test="add-template-submit-btn"]').click({ force: true }); await expect(page.locator(
+        ".q-notification__message").getByText(/Please enter valid JSON/).first()).toBeVisible();
 
-  '[data-test="add-destination-submit-btn"]').click({ force: true });await expect(page.locator(
-  ".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
+
+  });
+
+  test.skip("should click on add destination button and display error if user clicks directly on save", async ({ page }) => {
+    await page.waitForTimeout(
+      2000);
+    await page.waitForSelector('[data-test="alert-destinations-tab"]');
+    await page.locator(
+      '[data-test="alert-destinations-tab"]').click({ force: true }); await page.waitForTimeout(
+        100);
+    await page.waitForSelector('[data-test="alert-destination-list-add-alert-btn"]');
+    await page.locator(
+      '[data-test="alert-destination-list-add-alert-btn"]').click({
+        force: true
+      }); await page.locator(
+
+        '[data-test="add-destination-submit-btn"]').click({ force: true }); await expect(page.locator(
+          ".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
   })
 
-test.skip("should display error if name has only spaces under destination", async ({ page }) => {await page.waitForTimeout(
-    2000);
+  test.skip("should display error if name has only spaces under destination", async ({ page }) => {
+    await page.waitForTimeout(
+      2000);
     await page.waitForSelector('[data-test="alert-destinations-tab"]')
     await page.locator('[data-test="alert-destinations-tab"]').click({ force: true });
     await page.waitForTimeout(100);
     await page.waitForSelector('[data-test="alert-destination-list-add-alert-btn"]');
-    await page.locator('[data-test="alert-destination-list-add-alert-btn"]').click({force: true });
+    await page.locator('[data-test="alert-destination-list-add-alert-btn"]').click({ force: true });
     await page.locator('[data-test="add-destination-name-input"]').fill("    ");
     await page.locator('[data-test="add-destination-submit-btn"]').click({ force: true });
     await expect(page.getByText(/Field is required/).first()).toBeVisible();
     await expect(page.locator(".q-notification__message").getByText(/Please fill required fields/).first()).toBeVisible();
-});
+  });
 
-test.skip("should click cancel button under destinations", async ({ page }) => {await page.waitForTimeout(
-  2000);await page.locator(
-  '[data-test="alert-destinations-tab"]').click({ force: true });await page.waitForTimeout(
-  1000);
-  await page.waitForSelector('[data-test="alert-destination-list-add-alert-btn"]');
-  await page.locator(
-  '[data-test="alert-destination-list-add-alert-btn"]').click({
-  force: true });await page.locator(
+  test.skip("should click cancel button under destinations", async ({ page }) => {
+    await page.waitForTimeout(
+      2000); await page.locator(
+        '[data-test="alert-destinations-tab"]').click({ force: true }); await page.waitForTimeout(
+          1000);
+    await page.waitForSelector('[data-test="alert-destination-list-add-alert-btn"]');
+    await page.locator(
+      '[data-test="alert-destination-list-add-alert-btn"]').click({
+        force: true
+      }); await page.locator(
 
-  '[data-test="add-destination-name-input"]').fill("cy-destination");await page.locator(
-  '[data-test="add-destination-cancel-btn"]').click({ force: true });await expect(page.locator(
-  '[data-test="alert-destinations-tab"]')).toBeVisible();
-});
+        '[data-test="add-destination-name-input"]').fill("cy-destination"); await page.locator(
+          '[data-test="add-destination-cancel-btn"]').click({ force: true }); await expect(page.locator(
+            '[data-test="alert-destinations-tab"]')).toBeVisible();
+  });
 
-test.skip("should display error when stream name is not added under alerts", async ({ page }) => {await page.waitForTimeout(
-  2000);await page.locator(
-  '[data-test="alert-alerts-tab"]').click({ force: true });await page.locator(
-  '[data-test="alert-list-add-alert-btn"]').click({ force: true });
-  await page.locator('[data-test="add-alert-name-input"]').getByLabel('Name *').fill("cy-alert");await page.locator(
+  test.skip("should display error when stream name is not added under alerts", async ({ page }) => {
+    await page.waitForTimeout(
+      2000); await page.locator(
+        '[data-test="alert-alerts-tab"]').click({ force: true }); await page.locator(
+          '[data-test="alert-list-add-alert-btn"]').click({ force: true });
+    await page.locator('[data-test="add-alert-name-input"]').getByLabel('Name *').fill("cy-alert"); await page.locator(
 
-  ".alert-stream-type > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon").click({
-  force: true });
-// Find and click on the item with text 'logs'
-await page.locator(".q-item__label", { hasText: /logs/ }).first().click({ force: true });await page.locator(
-  '[data-test="add-alert-submit-btn"]').click({ force: true });await expect(page.getByText(/Field is required/).first()).toBeVisible();
+      ".alert-stream-type > .q-field > .q-field__inner > .q-field__control > .q-field__append > .q-icon").click({
+        force: true
+      });
+    // Find and click on the item with text 'logs'
+    await page.locator(".q-item__label", { hasText: /logs/ }).first().click({ force: true }); await page.locator(
+      '[data-test="add-alert-submit-btn"]').click({ force: true }); await expect(page.getByText(/Field is required/).first()).toBeVisible();
 
-});
+  });
 
 
 });

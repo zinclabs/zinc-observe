@@ -163,55 +163,76 @@ async fn main() -> Result<(), anyhow::Error> {
     let (job_stopped_tx, job_stopped_rx) = oneshot::channel();
     let job_rt_handle = std::thread::spawn(move || {
         let cfg = get_config();
-        let rt = tokio::runtime::Builder::new_multi_thread()
+        let Ok(rt) = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(cfg.limit.job_runtime_worker_num)
             .enable_all()
             .thread_name("job_runtime")
             .max_blocking_threads(cfg.limit.job_runtime_blocking_worker_num)
             .build()
-            .expect("job runtime init failed");
+        else {
+            job_init_tx.send(false).ok();
+            panic!("job runtime init failed")
+        };
         let _guard = rt.enter();
         rt.block_on(async move {
             // it must be initialized before the server starts
-            cluster::register_and_keepalive()
-                .await
-                .expect("cluster init failed");
+            if let Err(e) = cluster::register_and_keepalive().await {
+                job_init_tx.send(false).ok();
+                panic!("cluster init failed: {}", e);
+            }
             // init config
-            config::init().await.expect("config init failed");
+            if let Err(e) = config::init().await {
+                job_init_tx.send(false).ok();
+                panic!("config init failed: {}", e);
+            }
             // init infra
-            infra::init().await.expect("infra init failed");
-            common_infra::init()
-                .await
-                .expect("common infra init failed");
+            if let Err(e) = infra::init().await {
+                job_init_tx.send(false).ok();
+                panic!("infra init failed: {}", e);
+            }
+            if let Err(e) = common_infra::init().await {
+                job_init_tx.send(false).ok();
+                panic!("common infra init failed: {}", e);
+            }
 
             // init enterprise
             #[cfg(feature = "enterprise")]
-            o2_enterprise::enterprise::init()
-                .await
-                .expect("enerprise init failed");
+            if let Err(e) = o2_enterprise::enterprise::init().await {
+                job_init_tx.send(false).ok();
+                panic!("enerprise init failed: {}", e);
+            }
 
             // check version upgrade
             let old_version = db::version::get().await.unwrap_or("v0.0.0".to_string());
-            migration::check_upgrade(&old_version, VERSION)
-                .await
-                .expect("check upgrade failed");
+            if let Err(e) = migration::check_upgrade(&old_version, VERSION).await {
+                job_init_tx.send(false).ok();
+                panic!("check upgrade failed: {}", e);
+            }
             // migrate dashboards
-            migration::dashboards::run()
-                .await
-                .expect("migrate dashboards failed");
+            if let Err(e) = migration::dashboards::run().await {
+                job_init_tx.send(false).ok();
+                panic!("migrate dashboards failed: {}", e);
+            }
 
             // ingester init
-            ingester::init().await.expect("ingester init failed");
+            if let Err(e) = ingester::init().await {
+                job_init_tx.send(false).ok();
+                panic!("ingester init failed: {}", e);
+            }
 
             // init job
-            job::init().await.expect("job init failed");
+            if let Err(e) = job::init().await {
+                job_init_tx.send(false).ok();
+                panic!("job init failed: {}", e);
+            }
 
             // init meter provider
-            let meter_provider = job::metrics::init_meter_provider()
-                .await
-                .expect("meter provider init failed");
+            let Ok(meter_provider) = job::metrics::init_meter_provider().await else {
+                job_init_tx.send(false).ok();
+                panic!("meter provider init failed");
+            };
 
-            job_init_tx.send(()).ok();
+            job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
 
@@ -231,7 +252,15 @@ async fn main() -> Result<(), anyhow::Error> {
     });
 
     // wait for job init
-    job_init_rx.await.ok();
+    match job_init_rx.await {
+        Ok(true) => log::info!("backend job init success"),
+        Ok(false) => {
+            return Err(anyhow::anyhow!("backend job init failed, exiting"));
+        }
+        Err(e) => {
+            return Err(anyhow::anyhow!("backend job init failed: {}", e));
+        }
+    }
 
     // init gRPC server
     let (grpc_init_tx, grpc_init_rx) = oneshot::channel();

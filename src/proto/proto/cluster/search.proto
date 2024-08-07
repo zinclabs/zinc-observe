@@ -48,15 +48,15 @@ message SearchRequest {
 }
 
 message SearchResponse {
-    Job                         job = 1;
-    int32                      took = 2;
-    int64                     total = 3;
-    int32                      from = 4;
-    int32                      size = 5;
-    bytes                      hits = 6;
-    ScanStats            scan_stats = 8;
-    bool                 is_partial = 9;
-    int32                 idx_took = 10;
+    Job              job = 1;
+    int32           took = 2;
+    int64          total = 3;
+    int32           from = 4;
+    int32           size = 5;
+    bytes           hits = 6;
+    ScanStats scan_stats = 8;
+    bool      is_partial = 9;
+    int32      idx_took = 10;
 }
 
 enum AggregateMode {
@@ -72,15 +72,15 @@ message QueryStatusResponse {
 }
 
 message QueryStatus {
-    string  trace_id = 1;
-    int64 created_at = 2;
-    int64 started_at = 3;
-    bool    is_queue = 4;
-    optional string       user_id = 5;
-    optional string        org_id = 6;
-    optional string   stream_type = 7;
-    optional Query          query = 8;
-    optional ScanStats scan_stats = 9;
+    string                trace_id = 1;
+    int64               created_at = 2;
+    int64               started_at = 3;
+    bool                  is_queue = 4;
+    optional string        user_id = 5;
+    optional string         org_id = 6;
+    optional string    stream_type = 7;
+    optional Query           query = 8;
+    optional ScanStats  scan_stats = 9;
     optional WorkGroup work_group = 10;
 }
 

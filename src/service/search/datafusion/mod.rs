@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 pub mod exec;
 pub mod file_type;
-pub mod rewrite;
+pub mod plan;
 pub mod storage;
 pub mod table_provider;
 pub mod udf;

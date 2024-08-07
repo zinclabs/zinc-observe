@@ -24,7 +24,7 @@ use maxminddb::{
 };
 use serde::{Deserialize, Serialize};
 use vector_enrichment::{Case, Condition, IndexHandle, Table};
-use vrl::value::Value;
+use vrl::value::{ObjectMap, Value};
 
 // MaxMind GeoIP database files have a type field we can use to recognize
 // specific products. If we encounter one of these two types, we look for
@@ -146,14 +146,14 @@ impl Geoip {
         }
     }
 
-    fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<BTreeMap<String, Value>> {
-        let mut map = BTreeMap::new();
+    fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<ObjectMap> {
+        let mut map = ObjectMap::new();
         let mut add_field = |key: &str, value: Option<Value>| {
             if select
                 .map(|fields| fields.iter().any(|field| field == key))
                 .unwrap_or(true)
             {
-                map.insert(key.to_string(), value.unwrap_or(Value::Null));
+                map.insert(key.into(), value.unwrap_or(Value::Null));
             }
         };
 
@@ -248,7 +248,7 @@ impl Table for Geoip {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         index: Option<IndexHandle>,
-    ) -> Result<BTreeMap<String, Value>, String> {
+    ) -> Result<ObjectMap, String> {
         let mut rows = self.find_table_rows(case, condition, select, index)?;
 
         match rows.pop() {
@@ -267,7 +267,7 @@ impl Table for Geoip {
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
         _: Option<IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, Value>>, String> {
+    ) -> Result<Vec<ObjectMap>, String> {
         match condition.first() {
             Some(_) if condition.len() > 1 => Err("Only one condition is allowed".to_string()),
             Some(Condition::Equals { value, .. }) => {

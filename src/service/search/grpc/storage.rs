@@ -23,7 +23,6 @@ use config::{
     },
     utils::schema_ext::SchemaExt,
 };
-use datafusion::arrow::record_batch::RecordBatch;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
@@ -38,7 +37,7 @@ use crate::service::{
     db, file_list,
     search::{
         datafusion::{exec, file_type::FileType},
-        grpc::{generate_search_schema, generate_select_start_search_schema},
+        generate_search_schema, generate_select_start_search_schema,
         sql::{Sql, RE_SELECT_WILDCARD},
     },
 };
@@ -86,7 +85,7 @@ pub async fn search(
         schema_versions.len()
     );
     if schema_versions.is_empty() {
-        return Ok((HashMap::new(), ScanStats::new()));
+        return Ok((vec![], ScanStats::new()));
     }
     let schema_latest_id = schema_versions.len() - 1;
 
@@ -111,7 +110,7 @@ pub async fn search(
         false => file_list.to_vec(),
     };
     if files.is_empty() {
-        return Ok((HashMap::new(), ScanStats::default()));
+        return Ok((vec![], ScanStats::default()));
     }
     log::info!(
         "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load file_list num {}",
@@ -206,6 +205,13 @@ pub async fn search(
         cache_type,
     );
 
+    // set target partitions based on cache type
+    let target_partitions = if cache_type == file_data::CacheType::None {
+        cfg.limit.query_thread_num
+    } else {
+        cfg.limit.cpu_num
+    };
+
     // construct latest schema map
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
@@ -232,6 +238,7 @@ pub async fn search(
                 SearchType::Normal
             },
             work_group: Some(work_group.to_string()),
+            target_partitions,
         };
 
         // cacluate the diff between latest schema and group schema
@@ -277,7 +284,7 @@ pub async fn search(
                     ret = exec::sql(
                         &session,
                         schema.clone(),
-                        &diff_fields,
+                        diff_fields,
                         &sql,
                         &files,
                         None,
@@ -324,24 +331,13 @@ pub async fn search(
         tasks.push(task);
     }
 
-    let mut results: HashMap<String, Vec<RecordBatch>> = HashMap::new();
+    let mut results = vec![];
     let task_results = try_join_all(tasks)
         .await
         .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
     for ret in task_results {
         match ret {
-            Ok(ret) => {
-                for (k, v) in ret {
-                    let v = v
-                        .into_iter()
-                        .filter(|r| r.num_rows() > 0)
-                        .collect::<Vec<_>>();
-                    if !v.is_empty() {
-                        let group = results.entry(k).or_default();
-                        group.extend(v);
-                    }
-                }
-            }
+            Ok(v) => results.extend(v),
             Err(err) => match err {
                 datafusion::error::DataFusionError::ResourcesExhausted(e) => {
                     return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(e)));

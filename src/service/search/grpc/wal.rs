@@ -44,7 +44,7 @@ use crate::{
         db, file_list,
         search::{
             datafusion::{exec, file_type::FileType},
-            grpc::{generate_search_schema, generate_select_start_search_schema},
+            generate_search_schema, generate_select_start_search_schema,
             sql::{Sql, RE_SELECT_WILDCARD},
         },
     },
@@ -84,7 +84,7 @@ pub async fn search_parquet(
     )
     .await?;
     if files.is_empty() {
-        return Ok((HashMap::new(), ScanStats::new()));
+        return Ok((vec![], ScanStats::new()));
     }
 
     let mut scan_stats = ScanStats::new();
@@ -145,7 +145,7 @@ pub async fn search_parquet(
     if scan_stats.files == 0 {
         // release all files
         wal::release_files(&lock_files).await;
-        return Ok((HashMap::new(), scan_stats));
+        return Ok((vec![], scan_stats));
     }
 
     // fetch all schema versions, group files by version
@@ -166,7 +166,7 @@ pub async fn search_parquet(
         }
     };
     if schema_versions.is_empty() {
-        return Ok((HashMap::new(), ScanStats::new()));
+        return Ok((vec![], ScanStats::new()));
     }
     let schema_latest_id = schema_versions.len() - 1;
 
@@ -255,6 +255,7 @@ pub async fn search_parquet(
                 SearchType::Normal
             },
             work_group: Some(work_group.to_string()),
+            target_partitions: 0,
         };
 
         // cacluate the diff between latest schema and group schema
@@ -300,7 +301,7 @@ pub async fn search_parquet(
                     ret = exec::sql(
                         &session,
                         schema,
-                        &diff_fields,
+                        diff_fields,
                         &sql,
                         &files,
                         None,
@@ -331,7 +332,6 @@ pub async fn search_parquet(
         tasks.push(task);
     }
 
-    let mut results: HashMap<String, Vec<RecordBatch>> = HashMap::new();
     let task_results = match try_join_all(tasks).await {
         Ok(v) => v,
         Err(e) => {
@@ -342,19 +342,12 @@ pub async fn search_parquet(
             )));
         }
     };
+
+    let mut results = vec![];
     for ret in task_results {
         match ret {
-            Ok(ret) => {
-                for (k, v) in ret {
-                    let v = v
-                        .into_iter()
-                        .filter(|r| r.num_rows() > 0)
-                        .collect::<Vec<_>>();
-                    if !v.is_empty() {
-                        let group = results.entry(k).or_default();
-                        group.extend(v);
-                    }
-                }
+            Ok(v) => {
+                results.extend(v);
             }
             Err(err) => {
                 // release all files
@@ -416,7 +409,7 @@ pub async fn search_memtable(
     );
     scan_stats.files = batches.iter().map(|(_, k)| k.len()).sum::<usize>() as i64;
     if scan_stats.files == 0 {
-        return Ok((HashMap::new(), ScanStats::new()));
+        return Ok((vec![], ScanStats::new()));
     }
 
     let mut batch_groups: HashMap<Arc<Schema>, Vec<RecordBatch>> = HashMap::with_capacity(2);
@@ -469,6 +462,7 @@ pub async fn search_memtable(
                 SearchType::Normal
             },
             work_group: Some(work_group.to_string()),
+            target_partitions: 0,
         };
 
         // cacluate the diff between latest schema and group schema
@@ -519,7 +513,7 @@ pub async fn search_memtable(
                     ret = exec::sql(
                         &session,
                         schema,
-                        &diff_fields,
+                        diff_fields,
                         &sql,
                         &files,
                         Some(record_batches),
@@ -550,24 +544,13 @@ pub async fn search_memtable(
         tasks.push(task);
     }
 
-    let mut results: HashMap<String, Vec<RecordBatch>> = HashMap::new();
+    let mut results = vec![];
     let task_results = try_join_all(tasks)
         .await
         .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
     for ret in task_results {
         match ret {
-            Ok(ret) => {
-                for (k, v) in ret {
-                    let v = v
-                        .into_iter()
-                        .filter(|r| r.num_rows() > 0)
-                        .collect::<Vec<_>>();
-                    if !v.is_empty() {
-                        let group = results.entry(k).or_default();
-                        group.extend(v);
-                    }
-                }
-            }
+            Ok(v) => results.extend(v),
             Err(err) => {
                 log::error!(
                     "[trace_id {trace_id}] wal->mem->search: datafusion execute error: {}",

@@ -28,7 +28,7 @@ use config::{
         },
     },
     metrics,
-    utils::{inverted_index::split_token, json},
+    utils::{inverted_index::split_token, json, record_batch_ext::format_recordbatch_by_schema},
     INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
 };
 use hashbrown::{HashMap, HashSet};
@@ -47,7 +47,10 @@ use tonic::{
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{common::infra::cluster as infra_cluster, service::file_list};
+use crate::{
+    common::infra::cluster as infra_cluster,
+    service::{file_list, search::sql::RE_SELECT_WILDCARD},
+};
 
 pub mod cacher;
 pub mod grpc;
@@ -65,18 +68,13 @@ pub async fn search(
     trace_id: &str,
     meta: Arc<super::sql::Sql>,
     mut req: cluster_rpc::SearchRequest,
-) -> Result<(
-    HashMap<String, Vec<RecordBatch>>,
-    ScanStats,
-    usize,
-    bool,
-    usize,
-)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize)> {
     let start = std::time::Instant::now();
 
     let cfg = get_config();
     // if the request is a super cluster request, then forward it to the super cluster service
     let is_final_phase = req.stype != cluster_rpc::SearchType::SuperCluster as i32;
+    log::info!("[trace_id {trace_id}] is_final_phase: {}", is_final_phase);
     let stream_type = StreamType::from(req.stream_type.as_str());
     if req.timeout == 0 {
         req.timeout = cfg.limit.query_timeout as i64;
@@ -94,7 +92,7 @@ pub async fn search(
         .as_ref()
         .map(|v| SearchEventType::from_str(v).ok().map(RoleGroup::from))
         .unwrap_or(None);
-    let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
+    let mut nodes = match infra_cluster::get_cached_online_query_nodes(req_node_group).await {
         Some(nodes) => nodes,
         None => {
             log::error!("[trace_id {trace_id}] service:search:cluster:run: no querier node online");
@@ -684,10 +682,10 @@ async fn merge_grpc_result(
     sql: Arc<super::sql::Sql>,
     results: Vec<(Node, cluster_rpc::SearchResponse)>,
     is_final_phase: bool,
-) -> Result<(HashMap<String, Vec<RecordBatch>>, ScanStats, bool)> {
+) -> Result<(Vec<RecordBatch>, ScanStats, bool)> {
     // merge multiple instances data
     let mut scan_stats = search::ScanStats::new();
-    let mut batches: HashMap<String, Vec<RecordBatch>> = HashMap::new();
+    let mut batches: Vec<RecordBatch> = Vec::new();
     let mut is_partial = false;
     for (_, resp) in results {
         if resp.is_partial {
@@ -695,8 +693,7 @@ async fn merge_grpc_result(
             continue;
         }
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
-        // handle hits
-        let value = batches.entry("query".to_string()).or_default();
+        // handle partition data
         if !resp.hits.is_empty() {
             let buf = Cursor::new(resp.hits);
             let reader = ipc::reader::FileReader::try_new(buf, None).unwrap();
@@ -704,7 +701,7 @@ async fn merge_grpc_result(
                 .into_iter()
                 .map(std::result::Result::unwrap)
                 .collect::<Vec<_>>();
-            value.extend(batch);
+            batches.extend(batch);
         }
     }
 
@@ -721,62 +718,114 @@ async fn merge_grpc_result(
         })
         .collect::<Vec<_>>();
 
-    // merge all batches
-    let mut merge_batches = HashMap::new();
-    for (name, batch) in batches {
-        let merge_sql = sql.origin_sql.clone();
-        let select_fields = select_fields.clone();
-
-        #[cfg(feature = "enterprise")]
-        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        #[cfg(feature = "enterprise")]
-        if super::SEARCH_SERVER
-            .insert_sender(trace_id, abort_sender)
-            .await
-            .is_err()
-        {
-            let err = format!(
-                "[trace_id {trace_id}] search->grpc: search canceled after get result from remote node"
-            );
-            log::error!("{}", err);
-            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(err)));
-        }
-
-        let merge_batch;
-        tokio::select! {
-            res = super::datafusion::exec::merge(
-                &sql.org_id,
-                sql.meta.offset,
-                sql.meta.limit,
-                &merge_sql,
-                &batch,
-                &select_fields,
-                is_final_phase,
-                sql.meta.subquery.is_some()
-            ) => {
-                match res {
-                    Ok(res) => merge_batch = res,
-                    Err(err) => {
-                        return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
-                            err.to_string(),
-                        )));
-                    }
+    // format recordbatch with same schema
+    let mut schema_latest = Arc::new(sql.schema.clone());
+    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
+    if !batches.is_empty() {
+        let mut schema = batches[0].schema();
+        let schema_fields = schema
+            .fields()
+            .iter()
+            .map(|f| f.name())
+            .collect::<HashSet<_>>();
+        let mut new_fields = HashSet::new();
+        let mut need_format = false;
+        if select_wildcard {
+            for field in select_fields {
+                if !schema_fields.contains(field.name()) {
+                    new_fields.insert(field.clone());
+                    need_format = true;
                 }
             }
-            _ = async {
-                #[cfg(feature = "enterprise")]
-                let _ = abort_receiver.await;
-                #[cfg(not(feature = "enterprise"))]
-                futures::future::pending::<()>().await;
-            } => {
-                log::info!("[trace_id {trace_id}] search->cluster: final merge task is cancel");
-                return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: final merge task is cancel"))));
+        }
+        for batch in batches.iter() {
+            if batch.num_rows() == 0 {
+                continue;
+            }
+            if batch.schema().fields() != schema.fields() {
+                need_format = true;
+            }
+            for field in batch.schema().fields() {
+                if !schema_fields.contains(field.name()) {
+                    new_fields.insert(field.clone());
+                }
             }
         }
-
-        merge_batches.insert(name, merge_batch);
+        drop(schema_fields);
+        if !new_fields.is_empty() {
+            need_format = true;
+            let new_schema = Schema::new(new_fields.into_iter().collect::<Vec<_>>());
+            schema =
+                Arc::new(Schema::try_merge(vec![schema.as_ref().clone(), new_schema]).unwrap());
+        }
+        if need_format {
+            let mut new_batches = Vec::new();
+            for batch in batches {
+                if batch.num_rows() == 0 {
+                    continue;
+                }
+                new_batches.push(format_recordbatch_by_schema(schema.clone(), batch));
+            }
+            batches = new_batches;
+        }
+        // reset schema_latest only when select wildcard
+        if select_wildcard {
+            schema_latest = schema.clone();
+        }
     }
-    Ok((merge_batches, scan_stats, is_partial))
+
+    // only final phase need merge partitions
+    if !is_final_phase {
+        return Ok((batches, scan_stats, is_partial));
+    }
+
+    #[cfg(feature = "enterprise")]
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    #[cfg(feature = "enterprise")]
+    if super::SEARCH_SERVER
+        .insert_sender(trace_id, abort_sender)
+        .await
+        .is_err()
+    {
+        let err = format!(
+            "[trace_id {trace_id}] search->grpc: search canceled after get result from remote node"
+        );
+        log::error!("{}", err);
+        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(err)));
+    }
+
+    let merge_batch;
+    tokio::select! {
+        res = super::datafusion::exec::merge_partitions(
+            &sql.org_id,
+            sql.meta.offset,
+            sql.meta.limit,
+            &sql.origin_sql,
+            schema_latest,
+            batches,
+        ) => {
+            match res {
+                Ok(res) => merge_batch = res,
+                Err(err) => {
+                    log::error!("[trace_id {trace_id}] search->cluster: merge partitions error: {err}");
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        err.to_string(),
+                    )));
+                }
+            }
+        }
+        _ = async {
+            #[cfg(feature = "enterprise")]
+            let _ = abort_receiver.await;
+            #[cfg(not(feature = "enterprise"))]
+            futures::future::pending::<()>().await;
+        } => {
+            log::info!("[trace_id {trace_id}] search->cluster: final merge task is cancel");
+            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!("[trace_id {trace_id}] search->cluster: final merge task is cancel"))));
+        }
+    }
+
+    Ok((merge_batch, scan_stats, is_partial))
 }
 
 #[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]

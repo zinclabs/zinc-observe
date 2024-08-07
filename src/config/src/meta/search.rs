@@ -37,6 +37,7 @@ pub struct Session {
     pub storage_type: StorageType,
     pub search_type: SearchType,
     pub work_group: Option<String>,
+    pub target_partitions: usize,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

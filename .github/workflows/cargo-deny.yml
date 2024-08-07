@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v1.6.3
+      - uses: EmbarkStudios/cargo-deny-action@v2.0.1
         with:
           # The command to run with cargo-deny
           command: check licenses

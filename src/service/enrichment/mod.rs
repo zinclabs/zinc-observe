@@ -1,9 +1,22 @@
-use std::collections::BTreeMap;
+// Copyright 2024 Zinc Labs Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
 use config::utils::time::parse_str_to_time;
 use vector_enrichment::{Case, IndexHandle, Table};
-use vrl::value::Value;
+use vrl::value::{ObjectMap, Value};
 
 #[derive(Clone)]
 pub struct StreamTableConfig {}
@@ -24,11 +37,10 @@ impl Table for StreamTable {
         conditions: &[vector_enrichment::Condition],
         select: Option<&[String]>,
         _index: Option<vector_enrichment::IndexHandle>,
-    ) -> std::result::Result<BTreeMap<std::string::String, vrl::value::Value>, std::string::String>
-    {
+    ) -> Result<ObjectMap, String> {
         let resp = get_data(self, conditions, select, case);
         let record = if resp.is_empty() {
-            BTreeMap::new()
+            ObjectMap::new()
         } else {
             resp.first().unwrap().clone()
         };
@@ -42,7 +54,7 @@ impl Table for StreamTable {
         conditions: &[vector_enrichment::Condition],
         select: Option<&[String]>,
         _index: Option<vector_enrichment::IndexHandle>,
-    ) -> Result<Vec<BTreeMap<String, vrl::value::Value>>, String> {
+    ) -> Result<Vec<ObjectMap>, String> {
         let resp = get_data(self, conditions, select, case);
         Ok(resp)
     }
@@ -69,7 +81,7 @@ fn get_data(
     condition: &[vector_enrichment::Condition],
     select: Option<&[String]>,
     case: vector_enrichment::Case,
-) -> Vec<BTreeMap<String, vrl::value::Value>> {
+) -> Vec<ObjectMap> {
     let mut resp = vec![];
     let filtered: Vec<&vrl::value::Value> = table
         .data
@@ -125,10 +137,10 @@ fn get_data(
         Some(val) => {
             for value in filtered {
                 if let Some(map) = value.as_object() {
-                    let mut btree_map = BTreeMap::new();
+                    let mut btree_map = ObjectMap::new();
                     for field in val {
-                        if let Some(v) = map.get(field) {
-                            btree_map.insert(field.to_owned(), v.clone());
+                        if let Some(v) = map.get(field.as_str()) {
+                            btree_map.insert(field.to_owned().into(), v.clone());
                         }
                     }
                     resp.push(btree_map);
@@ -138,10 +150,10 @@ fn get_data(
         None => {
             for value in filtered {
                 if let Value::Object(map) = value {
-                    let btree_map: BTreeMap<String, Value> = map
+                    let btree_map: ObjectMap = map
                         .iter()
                         .map(|(k, v)| (k.to_owned(), v.clone()))
-                        .collect::<BTreeMap<String, vrl::value::Value>>();
+                        .collect::<ObjectMap>();
                     resp.push(btree_map);
                 };
             }

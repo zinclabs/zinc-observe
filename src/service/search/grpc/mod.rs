@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
-use arrow_schema::{DataType, Field, Schema};
+use arrow_schema::Schema;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
@@ -24,20 +24,20 @@ use config::{
         search::ScanStats,
         stream::{FileKey, StreamType},
     },
-    FxIndexSet,
+    utils::record_batch_ext::format_recordbatch_by_schema,
 };
 use futures::future::try_join_all;
-use hashbrown::HashMap;
+use hashbrown::HashSet;
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc;
 use tracing::Instrument;
 
-use super::{datafusion, sql::Sql};
+use super::datafusion;
 use crate::service::db;
 mod storage;
 mod wal;
 
-pub type SearchResult = Result<(HashMap<String, Vec<RecordBatch>>, ScanStats), Error>;
+pub type SearchResult = Result<(Vec<Vec<RecordBatch>>, ScanStats), Error>;
 
 #[tracing::instrument(name = "service:search:grpc:search", skip_all, fields(org_id = req.org_id))]
 pub async fn search(
@@ -85,7 +85,7 @@ pub async fn search(
                 .instrument(wal_parquet_span)
                 .await
         } else {
-            Ok((HashMap::new(), ScanStats::default()))
+            Ok((vec![], ScanStats::default()))
         }
     });
 
@@ -100,7 +100,7 @@ pub async fn search(
                 .instrument(wal_mem_span)
                 .await
         } else {
-            Ok((HashMap::new(), ScanStats::default()))
+            Ok((vec![], ScanStats::default()))
         }
     });
 
@@ -113,7 +113,7 @@ pub async fn search(
     let storage_span = tracing::span::Span::current();
     let task3 = tokio::task::spawn(async move {
         if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
-            Ok((HashMap::new(), ScanStats::default()))
+            Ok((vec![], ScanStats::default()))
         } else {
             storage::search(
                 &trace_id3,
@@ -129,7 +129,7 @@ pub async fn search(
     });
 
     // merge result
-    let mut results = HashMap::new();
+    let mut results = Vec::new();
     let mut scan_stats = ScanStats::new();
     let tasks = try_join_all(vec![task1, task2, task3])
         .await
@@ -137,107 +137,86 @@ pub async fn search(
     for task in tasks {
         let (batches, stats) = task?;
         scan_stats.add(&stats);
-        for (key, batch) in batches {
-            if !batch.is_empty() {
-                let value = results.entry(key).or_insert_with(Vec::new);
-                value.extend(batch);
-            }
-        }
+        results.extend(batches.into_iter().flatten().filter(|v| v.num_rows() > 0));
     }
 
-    // convert select field to schema::Field
-    let select_fields = sql
-        .meta
-        .fields
-        .iter()
-        .filter_map(|f| {
-            sql.schema
-                .field_with_name(f)
-                .ok()
-                .map(|f| Arc::new(f.clone()))
-        })
-        .collect::<Vec<_>>();
-
-    // merge all batches
-    let (offset, limit) = (0, sql.meta.offset + sql.meta.limit);
-    let mut merge_results = HashMap::new();
-    for (name, batches) in results {
-        let merge_sql = sql.origin_sql.clone();
-        let select_fields = select_fields.clone();
-
-        #[cfg(feature = "enterprise")]
-        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        #[cfg(feature = "enterprise")]
-        if crate::service::search::SEARCH_SERVER
-            .insert_sender(&trace_id, abort_sender)
-            .await
-            .is_err()
-        {
-            log::info!("[trace_id {trace_id}] task is cancel after get first stage result");
-            return Err(Error::Message(format!(
-                "[trace_id {trace_id}] task is cancel after get first stage result"
-            )));
-        }
-
-        let merge_batches;
-        tokio::select! {
-            result = super::datafusion::exec::merge(
-                &sql.org_id,
-                offset,
-                limit,
-                &merge_sql,
-                &batches,
-                &select_fields,
-                false,
-                sql.meta.subquery.is_some()
-            ) => {
-                match result {
-                    Ok(res) => merge_batches = res,
-                    Err(err) => {
-                        log::error!("[trace_id {trace_id}] datafusion merge error: {}", err);
-                        return Err(err.into());
-                    }
+    // format recordbatch with same schema
+    if !results.is_empty() {
+        let mut schema = results[0].schema();
+        let schema_fields = schema
+            .fields()
+            .iter()
+            .map(|f| f.name())
+            .collect::<HashSet<_>>();
+        let mut new_fields = HashSet::new();
+        let mut need_format = false;
+        for batch in results.iter() {
+            if batch.num_rows() == 0 {
+                continue;
+            }
+            if batch.schema().fields() != schema.fields() {
+                need_format = true;
+            }
+            for field in batch.schema().fields() {
+                if !schema_fields.contains(field.name()) {
+                    new_fields.insert(field.clone());
                 }
-            },
-            _ = async {
-                #[cfg(feature = "enterprise")]
-                let _ = abort_receiver.await;
-                #[cfg(not(feature = "enterprise"))]
-                futures::future::pending::<()>().await;
-            } => {
-                log::info!("[trace_id {trace_id}] in node merge task is cancel");
-                return Err(Error::Message(format!("[trace_id {trace_id}] in node merge task is cancel")));
             }
         }
-
-        merge_results.insert(name.to_string(), merge_batches);
+        drop(schema_fields);
+        if !new_fields.is_empty() {
+            need_format = true;
+            let new_schema = Schema::new(new_fields.into_iter().collect::<Vec<_>>());
+            schema =
+                Arc::new(Schema::try_merge(vec![schema.as_ref().clone(), new_schema]).unwrap());
+        }
+        if need_format {
+            let mut new_batches = Vec::new();
+            for batch in results {
+                if batch.num_rows() == 0 {
+                    continue;
+                }
+                new_batches.push(format_recordbatch_by_schema(schema.clone(), batch));
+            }
+            results = new_batches;
+        }
     }
+    log::info!("[trace_id {trace_id}] in node merge task finish");
 
     // clear session data
     datafusion::storage::file_list::clear(&trace_id);
 
-    log::info!("[trace_id {trace_id}] in node merge task finish");
-
     // final result
-    let mut hits_buf = Vec::new();
     let mut hits_total = 0;
-    let result_query = merge_results.get("query").cloned().unwrap_or_default();
-    if !result_query.is_empty() {
-        let schema = result_query[0].schema();
+    let mut hits_buf = vec![];
+    let results = results.into_iter().collect::<Vec<_>>();
+    if !results.is_empty() {
+        let schema = results[0].schema();
         let ipc_options = ipc::writer::IpcWriteOptions::default();
         let ipc_options = ipc_options
             .try_with_compression(Some(ipc::CompressionType::ZSTD))
             .unwrap();
+        let buf = Vec::new();
         let mut writer =
-            ipc::writer::FileWriter::try_new_with_options(hits_buf, &schema, ipc_options).unwrap();
-        for batch in result_query {
-            if batch.num_rows() > 0 {
-                hits_total += batch.num_rows();
-                writer.write(&batch).unwrap();
+            ipc::writer::FileWriter::try_new_with_options(buf, &schema, ipc_options).unwrap();
+        for batch in results {
+            hits_total += batch.num_rows();
+            if let Err(e) = writer.write(&batch) {
+                log::error!(
+                    "[trace_id {trace_id}] write record batch to ipc error: {}",
+                    e
+                );
             }
         }
-        writer.finish().unwrap();
-        hits_buf = writer.into_inner().unwrap();
+        if let Err(e) = writer.finish() {
+            log::error!(
+                "[trace_id {trace_id}] convert record batch to ipc error: {}",
+                e
+            );
+        }
+        if let Ok(v) = writer.into_inner() {
+            hits_buf = v;
+        }
     }
 
     scan_stats.format_to_mb();
@@ -284,130 +263,4 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
         }
     }
     Ok(())
-}
-
-// generate parquet file search schema
-fn generate_search_schema(
-    sql: &Arc<Sql>,
-    schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
-) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
-    // cacluate the diff between latest schema and group schema
-    let mut diff_fields = HashMap::new();
-    let mut new_fields = Vec::new();
-
-    for field in generate_used_fields_in_query(sql).iter() {
-        let group_field = schema.field_with_name(field).ok();
-        let latest_field = schema_latest_map.get(field).map(|f| f.as_ref());
-
-        match (group_field, latest_field) {
-            // When group_field is None and latest_field is Some, clone latest_field
-            (None, Some(field)) => new_fields.push(Arc::new(field.clone())),
-
-            // When both group_field and latest_field are Some, compare their data types
-            (Some(group_field), Some(latest_field)) => {
-                if group_field.data_type() != latest_field.data_type() {
-                    diff_fields.insert(field.to_string(), latest_field.data_type().clone());
-                }
-                new_fields.push(Arc::new(group_field.clone()));
-            }
-
-            // should we return error
-            _ => {}
-        }
-    }
-
-    for (field, alias) in sql.meta.field_alias.iter() {
-        if let Some(v) = diff_fields.get(field) {
-            diff_fields.insert(alias.to_string(), v.clone());
-        }
-    }
-
-    let mut schema = Schema::new(new_fields);
-    let timestamp = &get_config().common.column_timestamp;
-    if schema.field_with_name(timestamp).is_err() {
-        // self add timestamp column if no exist
-        let field = Arc::new(Field::new(timestamp, DataType::Int64, false));
-        schema = Schema::try_merge(vec![Schema::new(vec![field]), schema])?;
-    }
-
-    Ok((Arc::new(schema), diff_fields))
-}
-
-// generate parquet file search schema
-fn generate_select_start_search_schema(
-    sql: &Arc<Sql>,
-    schema: &Schema,
-    schema_latest_map: &HashMap<&String, &Arc<Field>>,
-    defined_schema_fields: &[String],
-) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
-    let schema_fields_map = schema
-        .fields()
-        .iter()
-        .map(|f| (f.name(), f))
-        .collect::<HashMap<_, _>>();
-    // cacluate the diff between latest schema and group schema
-    let mut diff_fields = HashMap::new();
-    for field in schema.fields().iter() {
-        if let Some(f) = schema_latest_map.get(field.name()) {
-            if f.data_type() != field.data_type() {
-                diff_fields.insert(field.name().clone(), f.data_type().clone());
-            }
-        }
-    }
-    for (field, alias) in sql.meta.field_alias.iter() {
-        if let Some(v) = diff_fields.get(field) {
-            diff_fields.insert(alias.to_string(), v.clone());
-        }
-    }
-    // add not exists field in group schema but used in sql
-    let mut new_fields = Vec::new();
-    for field in generate_used_fields_in_query(sql).iter() {
-        if schema_fields_map.get(field).is_none() {
-            if let Some(field) = schema_latest_map.get(field) {
-                new_fields.push(Arc::new(field.as_ref().clone()));
-            }
-        }
-    }
-    let cfg = get_config();
-    let schema = if !defined_schema_fields.is_empty() {
-        let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
-        if !fields.contains(&cfg.common.column_timestamp) {
-            fields.insert(cfg.common.column_timestamp.to_string());
-        }
-        if !cfg.common.feature_query_exclude_all && !fields.contains(&cfg.common.column_all) {
-            fields.insert(cfg.common.column_all.to_string());
-        }
-        let new_fields = fields
-            .iter()
-            .filter_map(|f| match schema_fields_map.get(f) {
-                Some(f) => Some((*f).clone()),
-                None => schema_latest_map.get(f).map(|f| (*f).clone()),
-            })
-            .collect::<Vec<_>>();
-        Schema::new(new_fields)
-    } else if !new_fields.is_empty() {
-        let new_schema = Schema::new(new_fields);
-        Schema::try_merge(vec![schema.to_owned(), new_schema])?
-    } else {
-        schema.clone()
-    };
-    Ok((Arc::new(schema), diff_fields))
-}
-
-fn generate_used_fields_in_query(sql: &Arc<Sql>) -> Vec<String> {
-    let alias_map: HashSet<&String> = sql.meta.field_alias.iter().map(|(_, v)| v).collect();
-
-    // note field name maybe equal to alias name
-    let used_fields: FxIndexSet<_> = sql
-        .meta
-        .group_by
-        .iter()
-        .chain(sql.meta.order_by.iter().map(|(f, _)| f))
-        .filter(|f| !alias_map.contains(*f))
-        .chain(&sql.meta.fields)
-        .cloned()
-        .collect();
-
-    used_fields.into_iter().collect()
 }

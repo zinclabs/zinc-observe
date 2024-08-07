@@ -40,18 +40,13 @@ use regex::Regex;
 use serde::Serialize;
 use sqlparser::ast::{BinaryOperator, Expr, Ident};
 
-use crate::{
-    common::meta::stream::StreamParams,
-    service::search::{self, match_source},
-};
+use crate::{common::meta::stream::StreamParams, service::search::match_source};
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',
 ];
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
-static RE_ONLY_GROUPBY: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?i) group[ ]+by[ ]+([a-zA-Z0-9'"._-]+)"#).unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
 pub static RE_SELECT_WILDCARD: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)select\s+\*\s+from").unwrap());
@@ -64,12 +59,6 @@ static RE_MATCH_ALL_RAW: Lazy<Regex> =
 static RE_MATCH_ALL_RAW_IGNORE_CASE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)match_all_raw_ignore_case\('([^']*)'\)").unwrap());
 static RE_MATCH_ALL: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)match_all\('([^']*)'\)").unwrap());
-
-pub static RE_COUNT_DISTINCT: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)count\s*\(\s*distinct\(.*?\)\)|count\s*\(\s*distinct\s+(\w+)\s*\)").unwrap()
-});
-pub static RE_FIELD_FN: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r#"(?i)([a-zA-Z0-9_]+)\((['"\ a-zA-Z0-9,._*]+)"#).unwrap());
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Sql {
@@ -142,52 +131,21 @@ impl Sql {
             return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(origin_sql)));
         }
         origin_sql = re.replace_all(&origin_sql, " FROM tbl ").to_string();
-        // replace table for subquery
-        if meta.subquery.is_some() {
-            meta.subquery = Some(
-                re.replace_all(&meta.subquery.clone().unwrap(), " FROM tbl ")
-                    .to_string(),
-            );
-        }
-
-        // remove subquery in from clause
-        if meta.subquery.is_some() {
-            origin_sql =
-                search::datafusion::rewrite::replace_data_source_to_tbl(origin_sql.as_str())?;
-        }
-
-        if meta.subquery.is_some() {
-            // Hack select in subquery for _timestamp, add _timestamp to select clause
-            let re = Regex::new(r"(?i)\b(avg|median|count|min|max|sum|group_concat)\b").unwrap();
-            let has_aggregate_function = re.is_match(meta.subquery.as_ref().unwrap());
-            if !has_aggregate_function && !RE_ONLY_GROUPBY.is_match(meta.subquery.as_ref().unwrap())
-            {
-                let caps = RE_SELECT_FROM
-                    .captures(meta.subquery.as_ref().unwrap())
-                    .unwrap();
-                let cap_str = caps.get(1).unwrap().as_str();
-                if !cap_str.contains(&cfg.common.column_timestamp) {
-                    meta.subquery = Some(meta.subquery.as_ref().unwrap().replace(
-                        cap_str,
-                        &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
-                    ));
-                }
-            } else {
-                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(
-                    "Subquery sql current not support aggregate function".to_string(),
-                )));
-            }
-        }
 
         // Hack select for _timestamp, add _timestamp to select clause
         let is_aggregate = is_aggregate_query(&origin_sql).unwrap_or_default();
-        if !is_aggregate && meta.order_by.is_empty() && !origin_sql.contains('*') {
+        if !is_aggregate
+            && meta.group_by.is_empty()
+            && meta.order_by.is_empty()
+            && !origin_sql.contains('*')
+        {
             let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
             let cap_str = caps.get(1).unwrap().as_str();
             if !cap_str.contains(&cfg.common.column_timestamp) {
-                origin_sql = origin_sql.replace(
+                origin_sql = origin_sql.replacen(
                     cap_str,
                     &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
+                    1,
                 );
             }
         }
@@ -228,10 +186,6 @@ impl Sql {
         };
 
         let mut rewrite_time_range_sql = origin_sql.clone();
-        if meta.subquery.is_some() {
-            rewrite_time_range_sql = meta.subquery.clone().unwrap();
-        }
-
         if let Some(time_range) = meta.time_range {
             let time_range_sql = if time_range.0 > 0 && time_range.1 > 0 {
                 format!(
@@ -272,13 +226,8 @@ impl Sql {
             }
         }
 
-        if meta.subquery.is_some() {
-            meta.subquery = Some(rewrite_time_range_sql);
-        } else {
-            origin_sql = rewrite_time_range_sql;
-        }
-
         // Hack offset limit and sort by for sql
+        origin_sql = rewrite_time_range_sql;
         if meta.limit == 0 && req_query.size > QUERY_WITH_NO_LIMIT {
             meta.offset = req_query.from as i64;
             // If `size` is negative, use the backend's default limit setting
@@ -462,6 +411,13 @@ impl Sql {
             let index_fields = index_fields.iter().collect::<HashSet<_>>();
             for (key, value) in filters {
                 if !index_fields.contains(&key.to_string()) {
+                    continue;
+                }
+                let value = value
+                    .into_iter()
+                    .filter(|v| !v.is_empty())
+                    .collect::<Vec<_>>();
+                if value.is_empty() {
                     continue;
                 }
                 let entry = index_terms
@@ -801,11 +757,31 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
     Ok(Some(where_str))
 }
 
+fn closing_brace_index(opening_brace_index: usize, expr: &str) -> Option<usize> {
+    let mut brace_count = 0;
+    for (i, c) in expr[opening_brace_index..].chars().enumerate() {
+        if c == '(' {
+            brace_count += 1;
+        }
+        if c == ')' {
+            brace_count -= 1;
+        }
+        if brace_count == 0 {
+            return Some(opening_brace_index + i);
+        }
+    }
+
+    None
+}
+
 fn split_sql_token_unwrap_brace(token: &str) -> Vec<String> {
     if token.is_empty() {
         return vec![];
     }
-    if token.starts_with('(') && token.ends_with(')') {
+    if token.starts_with('(')
+        && token.ends_with(')')
+        && closing_brace_index(0, token) == Some(token.len() - 1)
+    {
         return split_sql_token_unwrap_brace(&token[1..token.len() - 1]);
     }
     let tokens = split_sql_token(token);

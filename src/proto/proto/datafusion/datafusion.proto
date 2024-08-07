@@ -1,0 +1,1237 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+
+package datafusion;
+
+option java_multiple_files = true;
+option java_package = "org.apache.arrow.datafusion.protobuf";
+option java_outer_classname = "DatafusionProto";
+
+import "datafusion_common/datafusion_common.proto";
+
+// logical plan
+// LogicalPlan is a nested type
+message LogicalPlanNode {
+  oneof LogicalPlanType {
+    ListingTableScanNode listing_scan = 1;
+    ProjectionNode projection = 3;
+    SelectionNode selection = 4;
+    LimitNode limit = 5;
+    AggregateNode aggregate = 6;
+    JoinNode join = 7;
+    SortNode sort = 8;
+    RepartitionNode repartition = 9;
+    EmptyRelationNode empty_relation = 10;
+    CreateExternalTableNode create_external_table = 11;
+    ExplainNode explain = 12;
+    WindowNode window = 13;
+    AnalyzeNode analyze = 14;
+    CrossJoinNode cross_join = 15;
+    ValuesNode values = 16;
+    LogicalExtensionNode extension = 17;
+    CreateCatalogSchemaNode create_catalog_schema = 18;
+    UnionNode union = 19;
+    CreateCatalogNode create_catalog = 20;
+    SubqueryAliasNode subquery_alias = 21;
+    CreateViewNode create_view = 22;
+    DistinctNode distinct = 23;
+    ViewTableScanNode view_scan = 24;
+    CustomTableScanNode custom_scan = 25;
+    PrepareNode prepare = 26;
+    DropViewNode drop_view = 27;
+    DistinctOnNode distinct_on = 28;
+    CopyToNode copy_to = 29;
+    UnnestNode unnest = 30;
+  }
+}
+
+message LogicalExtensionNode {
+  bytes node = 1;
+  repeated LogicalPlanNode inputs = 2;
+}
+
+message ProjectionColumns {
+  repeated string columns = 1;
+}
+
+message LogicalExprNodeCollection {
+  repeated LogicalExprNode logical_expr_nodes = 1;
+}
+
+message ListingTableScanNode {
+  reserved 1; // was string table_name
+  TableReference table_name = 14;
+  repeated string paths = 2;
+  string file_extension = 3;
+  ProjectionColumns projection = 4;
+  datafusion_common.Schema schema = 5;
+  repeated LogicalExprNode filters = 6;
+  repeated string table_partition_cols = 7;
+  bool collect_stat = 8;
+  uint32 target_partitions = 9;
+  oneof FileFormatType {
+    datafusion_common.CsvFormat csv = 10;
+    datafusion_common.ParquetFormat parquet = 11;
+    datafusion_common.AvroFormat avro = 12;
+  }
+  repeated LogicalExprNodeCollection file_sort_order = 13;
+}
+
+message ViewTableScanNode {
+  reserved 1; // was string table_name
+  TableReference table_name = 6;
+  LogicalPlanNode input = 2;
+  datafusion_common.Schema schema = 3;
+  ProjectionColumns projection = 4;
+  string definition = 5;
+}
+
+// Logical Plan to Scan a CustomTableProvider registered at runtime
+message CustomTableScanNode {
+  reserved 1; // was string table_name
+  TableReference table_name = 6;
+  ProjectionColumns projection = 2;
+  datafusion_common.Schema schema = 3;
+  repeated LogicalExprNode filters = 4;
+  bytes custom_table_data = 5;
+}
+
+message ProjectionNode {
+  LogicalPlanNode input = 1;
+  repeated LogicalExprNode expr = 2;
+  oneof optional_alias {
+    string alias = 3;
+  }
+}
+
+message SelectionNode {
+  LogicalPlanNode input = 1;
+  LogicalExprNode expr = 2;
+}
+
+message SortNode {
+  LogicalPlanNode input = 1;
+  repeated LogicalExprNode expr = 2;
+  // Maximum number of highest/lowest rows to fetch; negative means no limit
+  int64 fetch = 3;
+}
+
+message RepartitionNode {
+  LogicalPlanNode input = 1;
+  oneof partition_method {
+    uint64 round_robin = 2;
+    HashRepartition hash = 3;
+  }
+}
+
+message HashRepartition {
+  repeated LogicalExprNode hash_expr = 1;
+  uint64 partition_count = 2;
+}
+
+message EmptyRelationNode {
+  bool produce_one_row = 1;
+}
+
+message CreateExternalTableNode {
+  reserved 1; // was string name
+  TableReference name = 9;
+  string location = 2;
+  string file_type = 3;
+  datafusion_common.DfSchema schema = 4;
+  repeated string table_partition_cols = 5;
+  bool if_not_exists = 6;
+  string definition = 7;
+  repeated LogicalExprNodeCollection order_exprs = 10;
+  bool unbounded = 11;
+  map<string, string> options = 8;
+  datafusion_common.Constraints constraints = 12;
+  map<string, LogicalExprNode> column_defaults = 13;
+ }
+
+message PrepareNode {
+  string name = 1;
+  repeated datafusion_common.ArrowType data_types = 2;
+  LogicalPlanNode input = 3;
+}
+
+message CreateCatalogSchemaNode {
+  string schema_name = 1;
+  bool if_not_exists = 2;
+  datafusion_common.DfSchema schema = 3;
+}
+
+message CreateCatalogNode {
+  string catalog_name = 1;
+  bool if_not_exists = 2;
+  datafusion_common.DfSchema schema = 3;
+}
+
+message DropViewNode {
+  TableReference name = 1;
+  bool if_exists = 2;
+  datafusion_common.DfSchema schema = 3;
+}
+
+message CreateViewNode {
+  reserved 1; // was string name
+  TableReference name = 5;
+  LogicalPlanNode input = 2;
+  bool or_replace = 3;
+  string definition = 4;
+}
+
+// a node containing data for defining values list. unlike in SQL where it's two dimensional, here
+// the list is flattened, and with the field n_cols it can be parsed and partitioned into rows
+message ValuesNode {
+  uint64 n_cols = 1;
+  repeated LogicalExprNode values_list = 2;
+}
+
+message AnalyzeNode {
+  LogicalPlanNode input = 1;
+  bool verbose = 2;
+}
+
+message ExplainNode {
+  LogicalPlanNode input = 1;
+  bool verbose = 2;
+}
+
+message AggregateNode {
+  LogicalPlanNode input = 1;
+  repeated LogicalExprNode group_expr = 2;
+  repeated LogicalExprNode aggr_expr = 3;
+}
+
+message WindowNode {
+  LogicalPlanNode input = 1;
+  repeated LogicalExprNode window_expr = 2;
+}
+
+message JoinNode {
+  LogicalPlanNode left = 1;
+  LogicalPlanNode right = 2;
+  datafusion_common.JoinType join_type = 3;
+  datafusion_common.JoinConstraint join_constraint = 4;
+  repeated LogicalExprNode left_join_key = 5;
+  repeated LogicalExprNode right_join_key = 6;
+  bool null_equals_null = 7;
+  LogicalExprNode filter = 8;
+}
+
+message DistinctNode {
+  LogicalPlanNode input = 1;
+}
+
+message DistinctOnNode {
+  repeated LogicalExprNode on_expr = 1;
+  repeated LogicalExprNode select_expr = 2;
+  repeated LogicalExprNode sort_expr = 3;
+  LogicalPlanNode input = 4;
+}
+
+message CopyToNode {
+    LogicalPlanNode input = 1;
+    string output_url = 2;
+    bytes file_type = 3;
+    repeated string partition_by = 7;
+}
+
+message UnnestNode {
+    LogicalPlanNode input = 1;
+    repeated datafusion_common.Column exec_columns = 2;
+    repeated uint64 list_type_columns = 3;
+    repeated uint64 struct_type_columns = 4;
+    repeated uint64 dependency_indices = 5;
+    datafusion_common.DfSchema schema = 6;
+    UnnestOptions options = 7;
+}
+
+message UnnestOptions {
+    bool preserve_nulls = 1;
+}
+
+message UnionNode {
+  repeated LogicalPlanNode inputs = 1;
+}
+
+message CrossJoinNode {
+  LogicalPlanNode left = 1;
+  LogicalPlanNode right = 2;
+}
+
+message LimitNode {
+  LogicalPlanNode input = 1;
+  // The number of rows to skip before fetch; non-positive means don't skip any
+  int64 skip = 2;
+  // Maximum number of rows to fetch; negative means no limit
+  int64 fetch = 3;
+}
+
+message SelectionExecNode {
+  LogicalExprNode expr = 1;
+}
+
+message SubqueryAliasNode {
+  reserved 2; // Was string alias
+  LogicalPlanNode input = 1;
+  TableReference alias = 3;
+}
+
+// logical expressions
+message LogicalExprNode {
+  oneof ExprType {
+    // column references
+    datafusion_common.Column column = 1;
+
+    // alias
+    AliasNode alias = 2;
+
+    datafusion_common.ScalarValue literal = 3;
+
+    // binary expressions
+    BinaryExprNode binary_expr = 4;
+
+    // aggregate expressions
+    AggregateExprNode aggregate_expr = 5;
+
+    // null checks
+    IsNull is_null_expr = 6;
+    IsNotNull is_not_null_expr = 7;
+    Not not_expr = 8;
+
+    BetweenNode between = 9;
+    CaseNode case_ = 10;
+    CastNode cast = 11;
+    SortExprNode sort = 12;
+    NegativeNode negative = 13;
+    InListNode in_list = 14;
+    Wildcard wildcard = 15;
+    // was  ScalarFunctionNode scalar_function = 16;
+    TryCastNode try_cast = 17;
+
+    // window expressions
+    WindowExprNode window_expr = 18;
+
+    // AggregateUDF expressions
+    AggregateUDFExprNode aggregate_udf_expr = 19;
+
+    // Scalar UDF expressions
+    ScalarUDFExprNode scalar_udf_expr = 20;
+
+    // GetIndexedField get_indexed_field = 21;
+
+    GroupingSetNode grouping_set = 22;
+
+    CubeNode cube = 23;
+
+    RollupNode rollup = 24;
+
+    IsTrue is_true = 25;
+    IsFalse is_false = 26;
+    IsUnknown is_unknown = 27;
+    IsNotTrue is_not_true = 28;
+    IsNotFalse is_not_false = 29;
+    IsNotUnknown is_not_unknown = 30;
+    LikeNode like = 31;
+    ILikeNode ilike = 32;
+    SimilarToNode similar_to = 33;
+
+    PlaceholderNode placeholder = 34;
+
+    Unnest unnest = 35;
+
+  }
+}
+
+message Wildcard {
+  TableReference qualifier = 1;
+}
+
+message PlaceholderNode {
+  string id = 1;
+  datafusion_common.ArrowType data_type = 2;
+}
+
+message LogicalExprList {
+  repeated LogicalExprNode expr = 1;
+}
+
+message GroupingSetNode {
+  repeated LogicalExprList expr = 1;
+}
+
+message CubeNode {
+  repeated LogicalExprNode expr = 1;
+}
+
+message RollupNode {
+  repeated LogicalExprNode expr = 1;
+}
+
+message NamedStructField {
+  datafusion_common.ScalarValue name = 1;
+}
+
+message ListIndex {
+  LogicalExprNode key = 1;
+}
+
+message ListRange {
+  LogicalExprNode start = 1;
+  LogicalExprNode stop = 2;
+  LogicalExprNode stride = 3;
+}
+
+message IsNull {
+  LogicalExprNode expr = 1;
+}
+
+message IsNotNull {
+  LogicalExprNode expr = 1;
+}
+
+message IsTrue {
+  LogicalExprNode expr = 1;
+}
+
+message IsFalse {
+  LogicalExprNode expr = 1;
+}
+
+message IsUnknown {
+  LogicalExprNode expr = 1;
+}
+
+message IsNotTrue {
+  LogicalExprNode expr = 1;
+}
+
+message IsNotFalse {
+  LogicalExprNode expr = 1;
+}
+
+message IsNotUnknown {
+  LogicalExprNode expr = 1;
+}
+
+message Not {
+  LogicalExprNode expr = 1;
+}
+
+message AliasNode {
+  LogicalExprNode expr = 1;
+  string alias = 2;
+  repeated TableReference relation = 3;
+}
+
+message BinaryExprNode {
+  // Represents the operands from the left inner most expression
+  // to the right outer most expression where each of them are chained
+  // with the operator 'op'.
+  repeated LogicalExprNode operands = 1;
+  string op = 3;
+}
+
+message NegativeNode {
+  LogicalExprNode expr = 1;
+}
+
+message Unnest {
+  repeated LogicalExprNode exprs = 1;
+}
+
+message InListNode {
+  LogicalExprNode expr = 1;
+  repeated LogicalExprNode list = 2;
+  bool negated = 3;
+}
+
+enum AggregateFunction {
+  MIN = 0;
+  MAX = 1;
+  // SUM = 2;
+  // AVG = 3;
+  // COUNT = 4;
+  // APPROX_DISTINCT = 5;
+  ARRAY_AGG = 6;
+  // VARIANCE = 7;
+  // VARIANCE_POP = 8;
+  // COVARIANCE = 9;
+  // COVARIANCE_POP = 10;
+  // STDDEV = 11;
+  // STDDEV_POP = 12;
+  // CORRELATION = 13;
+  // APPROX_PERCENTILE_CONT = 14;
+  // APPROX_MEDIAN = 15;
+  // APPROX_PERCENTILE_CONT_WITH_WEIGHT = 16;
+  // GROUPING = 17;
+  // MEDIAN = 18;
+  // BIT_AND = 19;
+  // BIT_OR = 20;
+  // BIT_XOR = 21;
+//  BOOL_AND = 22;
+//  BOOL_OR = 23;
+  // REGR_SLOPE = 26;
+  // REGR_INTERCEPT = 27;
+  // REGR_COUNT = 28;
+  // REGR_R2 = 29;
+  // REGR_AVGX = 30;
+  // REGR_AVGY = 31;
+  // REGR_SXX = 32;
+  // REGR_SYY = 33;
+  // REGR_SXY = 34;
+  // STRING_AGG = 35;
+  // NTH_VALUE_AGG = 36;
+}
+
+message AggregateExprNode {
+  AggregateFunction aggr_function = 1;
+  repeated LogicalExprNode expr = 2;
+  bool distinct = 3;
+  LogicalExprNode filter = 4;
+  repeated LogicalExprNode order_by = 5;
+}
+
+message AggregateUDFExprNode {
+  string fun_name = 1;
+  repeated LogicalExprNode args = 2;
+  bool distinct = 5;
+  LogicalExprNode filter = 3;
+  repeated LogicalExprNode order_by = 4;
+}
+
+message ScalarUDFExprNode {
+  string fun_name = 1;
+  repeated LogicalExprNode args = 2;
+  optional bytes fun_definition = 3;
+}
+
+enum BuiltInWindowFunction {
+  ROW_NUMBER = 0;
+  RANK = 1;
+  DENSE_RANK = 2;
+  PERCENT_RANK = 3;
+  CUME_DIST = 4;
+  NTILE = 5;
+  LAG = 6;
+  LEAD = 7;
+  FIRST_VALUE = 8;
+  LAST_VALUE = 9;
+  NTH_VALUE = 10;
+}
+
+message WindowExprNode {
+  oneof window_function {
+    AggregateFunction aggr_function = 1;
+    BuiltInWindowFunction built_in_function = 2;
+    string udaf = 3;
+    string udwf = 9;
+  }
+  LogicalExprNode expr = 4;
+  repeated LogicalExprNode partition_by = 5;
+  repeated LogicalExprNode order_by = 6;
+  // repeated LogicalExprNode filter = 7;
+  WindowFrame window_frame = 8;
+}
+
+message BetweenNode {
+  LogicalExprNode expr = 1;
+  bool negated = 2;
+  LogicalExprNode low = 3;
+  LogicalExprNode high = 4;
+}
+
+message LikeNode {
+  bool negated = 1;
+  LogicalExprNode expr = 2;
+  LogicalExprNode pattern = 3;
+  string escape_char = 4;
+}
+
+message ILikeNode {
+  bool negated = 1;
+  LogicalExprNode expr = 2;
+  LogicalExprNode pattern = 3;
+  string escape_char = 4;
+}
+
+message SimilarToNode {
+  bool negated = 1;
+  LogicalExprNode expr = 2;
+  LogicalExprNode pattern = 3;
+  string escape_char = 4;
+}
+
+message CaseNode {
+  LogicalExprNode expr = 1;
+  repeated WhenThen when_then_expr = 2;
+  LogicalExprNode else_expr = 3;
+}
+
+message WhenThen {
+  LogicalExprNode when_expr = 1;
+  LogicalExprNode then_expr = 2;
+}
+
+message CastNode {
+  LogicalExprNode expr = 1;
+  datafusion_common.ArrowType arrow_type = 2;
+}
+
+message TryCastNode {
+  LogicalExprNode expr = 1;
+  datafusion_common.ArrowType arrow_type = 2;
+}
+
+message SortExprNode {
+  LogicalExprNode expr = 1;
+  bool asc = 2;
+  bool nulls_first = 3;
+}
+
+enum WindowFrameUnits {
+  ROWS = 0;
+  RANGE = 1;
+  GROUPS = 2;
+}
+
+message WindowFrame {
+  WindowFrameUnits window_frame_units = 1;
+  WindowFrameBound start_bound = 2;
+  // "optional" keyword is stable in protoc 3.15 but prost is still on 3.14 (see https://github.com/tokio-rs/prost/issues/430 and https://github.com/tokio-rs/prost/pull/455)
+  // this syntax is ugly but is binary compatible with the "optional" keyword (see https://stackoverflow.com/questions/42622015/how-to-define-an-optional-field-in-protobuf-3)
+  oneof end_bound {
+    WindowFrameBound bound = 3;
+  }
+}
+
+enum WindowFrameBoundType {
+  CURRENT_ROW = 0;
+  PRECEDING = 1;
+  FOLLOWING = 2;
+}
+
+message WindowFrameBound {
+  WindowFrameBoundType window_frame_bound_type = 1;
+  datafusion_common.ScalarValue bound_value = 2;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+// Arrow Data Types
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+message FixedSizeBinary{
+  int32 length = 1;
+}
+
+enum DateUnit{
+  Day = 0;
+  DateMillisecond = 1;
+}
+
+message AnalyzedLogicalPlanType {
+  string analyzer_name = 1;
+}
+
+message OptimizedLogicalPlanType {
+  string optimizer_name = 1;
+}
+
+message OptimizedPhysicalPlanType {
+  string optimizer_name = 1;
+}
+
+message PlanType {
+  oneof plan_type_enum {
+    datafusion_common.EmptyMessage InitialLogicalPlan = 1;
+    AnalyzedLogicalPlanType AnalyzedLogicalPlan = 7;
+    datafusion_common.EmptyMessage FinalAnalyzedLogicalPlan = 8;
+    OptimizedLogicalPlanType OptimizedLogicalPlan = 2;
+    datafusion_common.EmptyMessage FinalLogicalPlan = 3;
+    datafusion_common.EmptyMessage InitialPhysicalPlan = 4;
+    datafusion_common.EmptyMessage InitialPhysicalPlanWithStats = 9;
+    datafusion_common.EmptyMessage InitialPhysicalPlanWithSchema = 11;
+    OptimizedPhysicalPlanType OptimizedPhysicalPlan = 5;
+    datafusion_common.EmptyMessage FinalPhysicalPlan = 6;
+    datafusion_common.EmptyMessage FinalPhysicalPlanWithStats = 10;
+    datafusion_common.EmptyMessage FinalPhysicalPlanWithSchema = 12;
+  }
+}
+
+message StringifiedPlan {
+  PlanType plan_type = 1;
+  string plan = 2;
+}
+
+message BareTableReference {
+  string table = 1;
+}
+
+message PartialTableReference {
+  string schema = 1;
+  string table = 2;
+}
+
+message FullTableReference {
+  string catalog = 1;
+  string schema = 2;
+  string table = 3;
+}
+
+message TableReference {
+  oneof table_reference_enum {
+    BareTableReference bare = 1;
+    PartialTableReference partial = 2;
+    FullTableReference full = 3;
+  }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+// PhysicalPlanNode is a nested type
+message PhysicalPlanNode {
+  oneof PhysicalPlanType {
+    ParquetScanExecNode parquet_scan = 1;
+    CsvScanExecNode csv_scan = 2;
+    EmptyExecNode empty = 3;
+    ProjectionExecNode projection = 4;
+    GlobalLimitExecNode global_limit = 6;
+    LocalLimitExecNode local_limit = 7;
+    AggregateExecNode aggregate = 8;
+    HashJoinExecNode hash_join = 9;
+    SortExecNode sort = 10;
+    CoalesceBatchesExecNode coalesce_batches = 11;
+    FilterExecNode filter = 12;
+    CoalescePartitionsExecNode merge = 13;
+    RepartitionExecNode repartition = 14;
+    WindowAggExecNode window = 15;
+    CrossJoinExecNode cross_join = 16;
+    AvroScanExecNode avro_scan = 17;
+    PhysicalExtensionNode extension = 18;
+    UnionExecNode union = 19;
+    ExplainExecNode explain = 20;
+    SortPreservingMergeExecNode sort_preserving_merge = 21;
+    NestedLoopJoinExecNode nested_loop_join = 22;
+    AnalyzeExecNode analyze = 23;
+    JsonSinkExecNode json_sink = 24;
+    SymmetricHashJoinExecNode symmetric_hash_join = 25;
+    InterleaveExecNode  interleave = 26;
+    PlaceholderRowExecNode placeholder_row = 27;
+    CsvSinkExecNode csv_sink = 28;
+    ParquetSinkExecNode parquet_sink = 29;
+  }
+}
+
+message PartitionColumn {
+  string name = 1;
+  datafusion_common.ArrowType arrow_type = 2;
+}
+
+
+message FileSinkConfig {
+  reserved 6; // writer_mode
+
+  string object_store_url = 1;
+  repeated PartitionedFile file_groups = 2;
+  repeated string table_paths = 3;
+  datafusion_common.Schema output_schema = 4;
+  repeated PartitionColumn table_partition_cols = 5;
+  bool overwrite = 8;
+  bool keep_partition_by_columns = 9;
+}
+
+message JsonSink {
+  FileSinkConfig config = 1;
+  datafusion_common.JsonWriterOptions writer_options = 2;
+}
+
+message JsonSinkExecNode {
+  PhysicalPlanNode input = 1;
+  JsonSink sink = 2;
+  datafusion_common.Schema sink_schema = 3;
+  PhysicalSortExprNodeCollection sort_order = 4;
+}
+
+message CsvSink {
+  FileSinkConfig config = 1;
+  datafusion_common.CsvWriterOptions writer_options = 2;
+}
+
+message CsvSinkExecNode {
+  PhysicalPlanNode input = 1;
+  CsvSink sink = 2;
+  datafusion_common.Schema sink_schema = 3;
+  PhysicalSortExprNodeCollection sort_order = 4;
+}
+
+message ParquetSink {
+  FileSinkConfig config = 1;
+  datafusion_common.TableParquetOptions parquet_options = 2;
+}
+
+message ParquetSinkExecNode {
+  PhysicalPlanNode input = 1;
+  ParquetSink sink = 2;
+  datafusion_common.Schema sink_schema = 3;
+  PhysicalSortExprNodeCollection sort_order = 4;
+}
+
+message PhysicalExtensionNode {
+  bytes node = 1;
+  repeated PhysicalPlanNode inputs = 2;
+}
+
+// physical expressions
+message PhysicalExprNode {
+  // Was date_time_interval_expr
+  reserved 17;
+
+  oneof ExprType {
+    // column references
+    PhysicalColumn column = 1;
+
+    datafusion_common.ScalarValue literal = 2;
+
+    // binary expressions
+    PhysicalBinaryExprNode binary_expr = 3;
+
+    // aggregate expressions
+    PhysicalAggregateExprNode aggregate_expr = 4;
+
+    // null checks
+    PhysicalIsNull is_null_expr = 5;
+    PhysicalIsNotNull is_not_null_expr = 6;
+    PhysicalNot not_expr = 7;
+
+    PhysicalCaseNode case_ = 8;
+    PhysicalCastNode cast = 9;
+    PhysicalSortExprNode sort = 10;
+    PhysicalNegativeNode negative = 11;
+    PhysicalInListNode in_list = 12;
+    //  was PhysicalScalarFunctionNode scalar_function = 13;
+    PhysicalTryCastNode try_cast = 14;
+    // window expressions
+    PhysicalWindowExprNode window_expr = 15;
+
+    PhysicalScalarUdfNode scalar_udf = 16;
+    // was PhysicalDateTimeIntervalExprNode date_time_interval_expr = 17;
+
+    PhysicalLikeExprNode like_expr = 18;
+  }
+}
+
+message PhysicalScalarUdfNode {
+  string name = 1;
+  repeated PhysicalExprNode args = 2;
+  optional bytes fun_definition = 3;
+  datafusion_common.ArrowType return_type = 4;
+}
+
+message PhysicalAggregateExprNode {
+  oneof AggregateFunction {
+    AggregateFunction aggr_function = 1;
+    string user_defined_aggr_function = 4;
+  }
+  repeated PhysicalExprNode expr = 2;
+  repeated PhysicalSortExprNode ordering_req = 5;
+  bool distinct = 3;
+}
+
+message PhysicalWindowExprNode {
+  oneof window_function {
+    AggregateFunction aggr_function = 1;
+    BuiltInWindowFunction built_in_function = 2;
+    string user_defined_aggr_function = 3;
+  }
+  repeated PhysicalExprNode args = 4;
+  repeated PhysicalExprNode partition_by = 5;
+  repeated PhysicalSortExprNode order_by = 6;
+  WindowFrame window_frame = 7;
+  string name = 8;
+}
+
+message PhysicalIsNull {
+  PhysicalExprNode expr = 1;
+}
+
+message PhysicalIsNotNull {
+  PhysicalExprNode expr = 1;
+}
+
+message PhysicalNot {
+  PhysicalExprNode expr = 1;
+}
+
+message PhysicalAliasNode {
+  PhysicalExprNode expr = 1;
+  string alias = 2;
+}
+
+message PhysicalBinaryExprNode {
+  PhysicalExprNode l = 1;
+  PhysicalExprNode r = 2;
+  string op = 3;
+}
+
+message PhysicalDateTimeIntervalExprNode {
+  PhysicalExprNode l = 1;
+  PhysicalExprNode r = 2;
+  string op = 3;
+}
+
+message PhysicalLikeExprNode {
+  bool negated = 1;
+  bool case_insensitive = 2;
+  PhysicalExprNode expr = 3;
+  PhysicalExprNode pattern = 4;
+}
+
+message PhysicalSortExprNode {
+  PhysicalExprNode expr = 1;
+  bool asc = 2;
+  bool nulls_first = 3;
+}
+
+message PhysicalWhenThen {
+  PhysicalExprNode when_expr = 1;
+  PhysicalExprNode then_expr = 2;
+}
+
+message PhysicalInListNode {
+  PhysicalExprNode expr = 1;
+  repeated PhysicalExprNode list = 2;
+  bool negated = 3;
+}
+
+message PhysicalCaseNode {
+  PhysicalExprNode expr = 1;
+  repeated PhysicalWhenThen when_then_expr = 2;
+  PhysicalExprNode else_expr = 3;
+}
+
+message PhysicalTryCastNode {
+  PhysicalExprNode expr = 1;
+  datafusion_common.ArrowType arrow_type = 2;
+}
+
+message PhysicalCastNode {
+  PhysicalExprNode expr = 1;
+  datafusion_common.ArrowType arrow_type = 2;
+}
+
+message PhysicalNegativeNode {
+  PhysicalExprNode expr = 1;
+}
+
+message FilterExecNode {
+  PhysicalPlanNode input = 1;
+  PhysicalExprNode expr = 2;
+  uint32 default_filter_selectivity = 3;
+}
+
+message FileGroup {
+  repeated PartitionedFile files = 1;
+}
+
+message ScanLimit {
+  // wrap into a message to make it optional
+  uint32 limit = 1;
+}
+
+message PhysicalSortExprNodeCollection {
+  repeated PhysicalSortExprNode physical_sort_expr_nodes = 1;
+}
+
+message FileScanExecConf {
+  // Was repeated ConfigOption options = 10;
+  reserved 10;
+
+  repeated FileGroup file_groups = 1;
+  datafusion_common.Schema schema = 2;
+  repeated uint32 projection = 4;
+  ScanLimit limit = 5;
+  datafusion_common.Statistics statistics = 6;
+  repeated string table_partition_cols = 7;
+  string object_store_url = 8;
+  repeated PhysicalSortExprNodeCollection output_ordering = 9;
+}
+
+message ParquetScanExecNode {
+  FileScanExecConf base_conf = 1;
+
+  // Was pruning predicate based on a logical expr.
+  reserved 2;
+
+  PhysicalExprNode predicate = 3;
+}
+
+message CsvScanExecNode {
+  FileScanExecConf base_conf = 1;
+  bool has_header = 2;
+  string delimiter = 3;
+  string quote = 4;
+  oneof optional_escape {
+    string escape = 5;
+  }
+  oneof optional_comment {
+    string comment = 6;
+  }
+}
+
+message AvroScanExecNode {
+  FileScanExecConf base_conf = 1;
+}
+
+enum PartitionMode {
+  COLLECT_LEFT = 0;
+  PARTITIONED = 1;
+  AUTO = 2;
+}
+
+message HashJoinExecNode {
+  PhysicalPlanNode left = 1;
+  PhysicalPlanNode right = 2;
+  repeated JoinOn on = 3;
+  datafusion_common.JoinType join_type = 4;
+  PartitionMode partition_mode = 6;
+  bool null_equals_null = 7;
+  JoinFilter filter = 8;
+  repeated uint32 projection = 9;
+}
+
+enum StreamPartitionMode {
+  SINGLE_PARTITION = 0;
+  PARTITIONED_EXEC = 1;
+}
+
+message SymmetricHashJoinExecNode {
+  PhysicalPlanNode left = 1;
+  PhysicalPlanNode right = 2;
+  repeated JoinOn on = 3;
+  datafusion_common.JoinType join_type = 4;
+  StreamPartitionMode partition_mode = 6;
+  bool null_equals_null = 7;
+  JoinFilter filter = 8;
+  repeated PhysicalSortExprNode left_sort_exprs = 9;
+  repeated PhysicalSortExprNode right_sort_exprs = 10;
+}
+
+message InterleaveExecNode {
+  repeated PhysicalPlanNode inputs = 1;
+}
+
+message UnionExecNode {
+  repeated PhysicalPlanNode inputs = 1;
+}
+
+message ExplainExecNode {
+  datafusion_common.Schema schema = 1;
+  repeated StringifiedPlan stringified_plans = 2;
+  bool verbose = 3;
+}
+
+message AnalyzeExecNode {
+  bool verbose = 1;
+  bool show_statistics = 2;
+  PhysicalPlanNode input = 3;
+  datafusion_common.Schema schema = 4;
+}
+
+message CrossJoinExecNode {
+  PhysicalPlanNode left = 1;
+  PhysicalPlanNode right = 2;
+}
+
+message PhysicalColumn {
+  string name = 1;
+  uint32 index = 2;
+}
+
+message JoinOn {
+  PhysicalExprNode left = 1;
+  PhysicalExprNode right = 2;
+}
+
+message EmptyExecNode {
+  datafusion_common.Schema schema = 1;
+}
+
+message PlaceholderRowExecNode {
+  datafusion_common.Schema schema = 1;
+}
+
+message ProjectionExecNode {
+  PhysicalPlanNode input = 1;
+  repeated PhysicalExprNode expr = 2;
+  repeated string expr_name = 3;
+}
+
+enum AggregateMode {
+  PARTIAL = 0;
+  FINAL = 1;
+  FINAL_PARTITIONED = 2;
+  SINGLE = 3;
+  SINGLE_PARTITIONED = 4;
+}
+
+message PartiallySortedInputOrderMode {
+  repeated uint64 columns = 6;
+}
+
+message WindowAggExecNode {
+  PhysicalPlanNode input = 1;
+  repeated PhysicalWindowExprNode window_expr = 2;
+  repeated PhysicalExprNode partition_keys = 5;
+  // Set optional to `None` for `BoundedWindowAggExec`.
+  oneof input_order_mode {
+    datafusion_common.EmptyMessage linear = 7;
+    PartiallySortedInputOrderMode partially_sorted = 8;
+    datafusion_common.EmptyMessage sorted = 9;
+  }
+}
+
+message MaybeFilter {
+  PhysicalExprNode expr = 1;
+}
+
+message MaybePhysicalSortExprs {
+  repeated PhysicalSortExprNode sort_expr = 1;
+}
+
+message AggLimit {
+  // wrap into a message to make it optional
+  uint64 limit = 1;
+}
+
+message AggregateExecNode {
+  repeated PhysicalExprNode group_expr = 1;
+  repeated PhysicalExprNode aggr_expr = 2;
+  AggregateMode mode = 3;
+  PhysicalPlanNode input = 4;
+  repeated string group_expr_name = 5;
+  repeated string aggr_expr_name = 6;
+  // we need the input schema to the partial aggregate to pass to the final aggregate
+  datafusion_common.Schema input_schema = 7;
+  repeated PhysicalExprNode null_expr = 8;
+  repeated bool groups = 9;
+  repeated MaybeFilter filter_expr = 10;
+  AggLimit limit = 11;
+}
+
+message GlobalLimitExecNode {
+  PhysicalPlanNode input = 1;
+  // The number of rows to skip before fetch
+  uint32 skip = 2;
+  // Maximum number of rows to fetch; negative means no limit
+  int64 fetch = 3;
+}
+
+message LocalLimitExecNode {
+  PhysicalPlanNode input = 1;
+  uint32 fetch = 2;
+}
+
+message SortExecNode {
+  PhysicalPlanNode input = 1;
+  repeated PhysicalExprNode expr = 2;
+  // Maximum number of highest/lowest rows to fetch; negative means no limit
+  int64 fetch = 3;
+  bool preserve_partitioning = 4;
+}
+
+message SortPreservingMergeExecNode {
+  PhysicalPlanNode input = 1;
+  repeated PhysicalExprNode expr = 2;
+  // Maximum number of highest/lowest rows to fetch; negative means no limit
+  int64 fetch = 3;
+}
+
+message NestedLoopJoinExecNode {
+  PhysicalPlanNode left = 1;
+  PhysicalPlanNode right = 2;
+  datafusion_common.JoinType join_type = 3;
+  JoinFilter filter = 4;
+}
+
+message CoalesceBatchesExecNode {
+  PhysicalPlanNode input = 1;
+  uint32 target_batch_size = 2;
+}
+
+message CoalescePartitionsExecNode {
+  PhysicalPlanNode input = 1;
+}
+
+message PhysicalHashRepartition {
+  repeated PhysicalExprNode hash_expr = 1;
+  uint64 partition_count = 2;
+}
+
+message RepartitionExecNode{
+  PhysicalPlanNode input = 1;
+  // oneof partition_method {
+  //   uint64 round_robin = 2;
+  //   PhysicalHashRepartition hash = 3;
+  //   uint64 unknown = 4;
+  // }
+  Partitioning partitioning = 5;
+}
+
+message Partitioning {
+  oneof partition_method {
+    uint64 round_robin = 1;
+    PhysicalHashRepartition hash = 2;
+    uint64 unknown = 3;
+  }
+}
+
+message JoinFilter{
+  PhysicalExprNode expression = 1;
+  repeated ColumnIndex column_indices = 2;
+  datafusion_common.Schema schema = 3;
+}
+
+message ColumnIndex{
+  uint32 index = 1;
+  datafusion_common.JoinSide side = 2;
+}
+
+message PartitionedFile {
+  string path = 1;
+  uint64 size = 2;
+  uint64 last_modified_ns = 3;
+  repeated datafusion_common.ScalarValue partition_values = 4;
+  FileRange range = 5;
+  datafusion_common.Statistics statistics = 6;
+}
+
+message FileRange {
+  int64 start = 1;
+  int64 end = 2;
+}
+
+message PartitionStats {
+  int64 num_rows = 1;
+  int64 num_batches = 2;
+  int64 num_bytes = 3;
+  repeated datafusion_common.ColumnStats column_stats = 4;
+}

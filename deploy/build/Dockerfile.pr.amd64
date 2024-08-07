@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM public.ecr.aws/debian/debian:bookworm-20240513-slim AS runtime
+FROM public.ecr.aws/debian/debian:bookworm-20240722-slim AS runtime
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libatk1.0-0 libnss3 libglib2.0-0/stable ca-certificates curl htop iftop sysstat procps lsof net-tools sqlite3 && \
     update-ca-certificates

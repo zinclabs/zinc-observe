@@ -1,0 +1,554 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto3";
+
+package datafusion_common;
+
+message ColumnRelation {
+  string relation = 1;
+}
+
+message Column {
+  string name = 1;
+  ColumnRelation relation = 2;
+}
+
+message DfField{
+  Field field = 1;
+  ColumnRelation qualifier = 2;
+}
+
+message DfSchema {
+  repeated DfField columns = 1;
+  map<string, string> metadata = 2;
+}
+
+message CsvFormat {
+  CsvOptions options = 5;
+}
+
+message ParquetFormat {
+  // Used to be bool enable_pruning = 1;
+  reserved 1;
+  TableParquetOptions options = 2;
+}
+
+message AvroFormat {}
+
+message PrimaryKeyConstraint{
+  repeated uint64 indices = 1;
+}
+
+message UniqueConstraint{
+  repeated uint64 indices = 1;
+}
+
+message Constraint{
+  oneof constraint_mode{
+    PrimaryKeyConstraint primary_key = 1;
+    UniqueConstraint unique = 2;
+  }
+}
+
+message Constraints{
+  repeated Constraint constraints = 1;
+}
+
+enum JoinType {
+  INNER = 0;
+  LEFT = 1;
+  RIGHT = 2;
+  FULL = 3;
+  LEFTSEMI = 4;
+  LEFTANTI = 5;
+  RIGHTSEMI = 6;
+  RIGHTANTI = 7;
+}
+
+enum JoinConstraint {
+  ON = 0;
+  USING = 1;
+}
+
+message AvroOptions {}
+message ArrowOptions {}
+
+message Schema {
+  repeated Field columns = 1;
+  map<string, string> metadata = 2;
+}
+
+message Field {
+  // name of the field
+  string name = 1;
+  ArrowType arrow_type = 2;
+  bool nullable = 3;
+  // for complex data types like structs, unions
+  repeated Field children = 4;
+  map<string, string> metadata = 5;
+  int64 dict_id = 6;
+  bool dict_ordered = 7;
+}
+
+message Timestamp{
+  TimeUnit time_unit = 1;
+  string timezone = 2;
+}
+
+enum TimeUnit{
+  Second = 0;
+  Millisecond = 1;
+  Microsecond = 2;
+  Nanosecond = 3;
+}
+
+enum IntervalUnit{
+  YearMonth = 0;
+  DayTime = 1;
+  MonthDayNano = 2;
+}
+
+message Decimal{
+  reserved 1, 2;
+  uint32 precision = 3;
+  int32 scale = 4;
+}
+
+message List{
+  Field field_type = 1;
+}
+
+message FixedSizeList{
+  Field field_type = 1;
+  int32 list_size = 2;
+}
+
+message Dictionary{
+  ArrowType key = 1;
+  ArrowType value = 2;
+}
+
+message Struct{
+  repeated Field sub_field_types = 1;
+}
+
+message Map {
+  Field field_type = 1;
+  bool keys_sorted = 2;
+}
+
+enum UnionMode{
+  sparse = 0;
+  dense = 1;
+}
+
+message Union{
+  repeated Field union_types = 1;
+  UnionMode union_mode = 2;
+  repeated int32 type_ids = 3;
+}
+
+// Used for List/FixedSizeList/LargeList/Struct/Map
+message ScalarNestedValue {
+  message Dictionary {
+    bytes ipc_message = 1;
+    bytes arrow_data = 2;
+  }
+
+  bytes ipc_message = 1;
+  bytes arrow_data = 2;
+  Schema schema = 3;
+  repeated Dictionary dictionaries = 4;
+}
+
+message ScalarTime32Value {
+  oneof value {
+    int32 time32_second_value = 1;
+    int32 time32_millisecond_value = 2;
+  };
+}
+
+message ScalarTime64Value {
+  oneof value {
+    int64 time64_microsecond_value = 1;
+    int64 time64_nanosecond_value = 2;
+  };
+}
+
+message ScalarTimestampValue {
+  oneof value {
+    int64 time_microsecond_value = 1;
+    int64 time_nanosecond_value = 2;
+    int64 time_second_value = 3;
+    int64 time_millisecond_value = 4;
+  };
+  string timezone = 5;
+}
+
+message ScalarDictionaryValue {
+  ArrowType index_type = 1;
+  ScalarValue value = 2;
+}
+
+message IntervalDayTimeValue {
+  int32 days = 1;
+  int32 milliseconds = 2;
+}
+
+message IntervalMonthDayNanoValue {
+  int32 months = 1;
+  int32 days = 2;
+  int64 nanos = 3;
+}
+
+message UnionField {
+  int32 field_id = 1;
+  Field field = 2;
+}
+
+message UnionValue {
+  // Note that a null union value must have one or more fields, so we
+  // encode a null UnionValue as one with value_id == 128
+  int32 value_id = 1;
+  ScalarValue value = 2;
+  repeated UnionField fields = 3;
+  UnionMode mode = 4;
+}
+
+message ScalarFixedSizeBinary{
+  bytes values = 1;
+  int32 length = 2;
+}
+
+message ScalarValue{
+  // was PrimitiveScalarType null_value = 19;
+  reserved 19;
+
+  oneof value {
+    // was PrimitiveScalarType null_value = 19;
+    // Null value of any type
+    ArrowType null_value = 33;
+
+    bool   bool_value = 1;
+    string utf8_value = 2;
+    string large_utf8_value = 3;
+    string utf8_view_value = 23;
+    int32  int8_value = 4;
+    int32  int16_value = 5;
+    int32  int32_value = 6;
+    int64  int64_value = 7;
+    uint32 uint8_value = 8;
+    uint32 uint16_value = 9;
+    uint32 uint32_value = 10;
+    uint64 uint64_value = 11;
+    float  float32_value = 12;
+    double float64_value = 13;
+    // Literal Date32 value always has a unit of day
+    int32  date_32_value = 14;
+    ScalarTime32Value time32_value = 15;
+    ScalarNestedValue large_list_value = 16;
+    ScalarNestedValue list_value = 17;
+    ScalarNestedValue fixed_size_list_value = 18;
+    ScalarNestedValue struct_value = 32;
+    ScalarNestedValue map_value = 41;
+
+    Decimal128 decimal128_value = 20;
+    Decimal256 decimal256_value = 39;
+
+    int64 date_64_value = 21;
+    int32 interval_yearmonth_value = 24;
+
+    int64 duration_second_value = 35;
+    int64 duration_millisecond_value = 36;
+    int64 duration_microsecond_value = 37;
+    int64 duration_nanosecond_value = 38;
+
+    ScalarTimestampValue timestamp_value = 26;
+    ScalarDictionaryValue dictionary_value = 27;
+    bytes binary_value = 28;
+    bytes large_binary_value = 29;
+    bytes binary_view_value = 22;
+    ScalarTime64Value time64_value = 30;
+    IntervalDayTimeValue interval_daytime_value = 25;
+    IntervalMonthDayNanoValue interval_month_day_nano = 31;
+    ScalarFixedSizeBinary fixed_size_binary_value = 34;
+    UnionValue union_value = 42;
+  }
+}
+
+message Decimal128{
+  bytes value = 1;
+  int64 p = 2;
+  int64 s = 3;
+}
+
+message Decimal256{
+  bytes value = 1;
+  int64 p = 2;
+  int64 s = 3;
+}
+
+// Serialized data type
+message ArrowType{
+  oneof arrow_type_enum {
+    EmptyMessage NONE = 1;     // arrow::Type::NA
+    EmptyMessage BOOL = 2;     // arrow::Type::BOOL
+    EmptyMessage UINT8 = 3;    // arrow::Type::UINT8
+    EmptyMessage INT8 = 4;     // arrow::Type::INT8
+    EmptyMessage UINT16 = 5;   // represents arrow::Type fields in src/arrow/type.h
+    EmptyMessage INT16 = 6;
+    EmptyMessage UINT32 = 7;
+    EmptyMessage INT32 = 8;
+    EmptyMessage UINT64 = 9;
+    EmptyMessage INT64 = 10 ;
+    EmptyMessage FLOAT16 = 11 ;
+    EmptyMessage FLOAT32 = 12 ;
+    EmptyMessage FLOAT64 = 13 ;
+    EmptyMessage UTF8 = 14 ;
+    EmptyMessage UTF8_VIEW = 35;
+    EmptyMessage LARGE_UTF8 = 32;
+    EmptyMessage BINARY = 15 ;
+    EmptyMessage BINARY_VIEW = 34;
+    int32 FIXED_SIZE_BINARY = 16 ;
+    EmptyMessage LARGE_BINARY = 31;
+    EmptyMessage DATE32 = 17 ;
+    EmptyMessage DATE64 = 18 ;
+    TimeUnit DURATION = 19;
+    Timestamp TIMESTAMP = 20 ;
+    TimeUnit TIME32 = 21 ;
+    TimeUnit TIME64 = 22 ;
+    IntervalUnit INTERVAL = 23 ;
+    Decimal DECIMAL = 24 ;
+    List LIST = 25;
+    List LARGE_LIST = 26;
+    FixedSizeList FIXED_SIZE_LIST = 27;
+    Struct STRUCT = 28;
+    Union UNION = 29;
+    Dictionary DICTIONARY = 30;
+    Map MAP = 33;
+  }
+}
+
+//Useful for representing an empty enum variant in rust
+// E.G. enum example{One, Two(i32)}
+// maps to
+// message example{
+//    oneof{
+//        EmptyMessage One = 1;
+//        i32 Two = 2;
+//   }
+//}
+message EmptyMessage{}
+
+enum CompressionTypeVariant {
+  GZIP = 0;
+  BZIP2 = 1;
+  XZ = 2;
+  ZSTD = 3;
+  UNCOMPRESSED = 4;
+}
+
+message JsonWriterOptions {
+  CompressionTypeVariant compression = 1;
+}
+
+
+message CsvWriterOptions {
+  // Compression type
+  CompressionTypeVariant compression = 1;
+  // Optional column delimiter. Defaults to `b','`
+  string delimiter = 2;
+  // Whether to write column names as file headers. Defaults to `true`
+  bool has_header = 3;
+  // Optional date format for date arrays
+  string date_format = 4;
+  // Optional datetime format for datetime arrays
+  string datetime_format = 5;
+  // Optional timestamp format for timestamp arrays
+  string timestamp_format = 6;
+  // Optional time format for time arrays
+  string time_format = 7;
+  // Optional value to represent null
+  string null_value = 8;
+  // Optional quote. Defaults to `b'"'`
+  string quote = 9;
+  // Optional escape. Defaults to `'\\'`
+  string escape = 10;
+  // Optional flag whether to double quotes, instead of escaping. Defaults to `true`
+  bool double_quote = 11;
+}
+
+// Options controlling CSV format
+message CsvOptions {
+  bytes has_header = 1; // Indicates if the CSV has a header row
+  bytes delimiter = 2; // Delimiter character as a byte
+  bytes quote = 3; // Quote character as a byte
+  bytes escape = 4; // Optional escape character as a byte
+  CompressionTypeVariant compression = 5; // Compression type
+  uint64 schema_infer_max_rec = 6; // Max records for schema inference
+  string date_format = 7; // Optional date format
+  string datetime_format = 8; // Optional datetime format
+  string timestamp_format = 9; // Optional timestamp format
+  string timestamp_tz_format = 10; // Optional timestamp with timezone format
+  string time_format = 11; // Optional time format
+  string null_value = 12; // Optional representation of null value
+  bytes comment = 13; // Optional comment character as a byte
+  bytes double_quote = 14; // Indicates if quotes are doubled
+}
+
+// Options controlling CSV format
+message JsonOptions {
+  CompressionTypeVariant compression = 1; // Compression type
+  uint64 schema_infer_max_rec = 2; // Max records for schema inference
+}
+
+message TableParquetOptions {
+  ParquetOptions global = 1;
+  repeated ColumnSpecificOptions column_specific_options = 2;
+}
+
+message ColumnSpecificOptions {
+  string column_name = 1;
+  ColumnOptions options = 2;
+}
+
+message ColumnOptions {
+  oneof bloom_filter_enabled_opt {
+    bool bloom_filter_enabled = 1;
+  }
+
+  oneof encoding_opt {
+    string encoding = 2;
+  }
+
+  oneof dictionary_enabled_opt {
+    bool dictionary_enabled = 3;
+  }
+
+  oneof compression_opt {
+    string compression = 4;
+  }
+
+  oneof statistics_enabled_opt {
+    string statistics_enabled = 5;
+  }
+
+  oneof bloom_filter_fpp_opt {
+    double bloom_filter_fpp = 6;
+  }
+
+  oneof bloom_filter_ndv_opt {
+    uint64 bloom_filter_ndv = 7;
+  }
+
+  oneof max_statistics_size_opt {
+    uint32 max_statistics_size = 8;
+  }
+}
+
+message ParquetOptions {
+  // Regular fields
+  bool enable_page_index = 1; // default = true
+  bool pruning = 2; // default = true
+  bool skip_metadata = 3; // default = true
+  bool pushdown_filters = 5; // default = false
+  bool reorder_filters = 6; // default = false
+  uint64 data_pagesize_limit = 7; // default = 1024 * 1024
+  uint64 write_batch_size = 8; // default = 1024
+  string writer_version = 9; // default = "1.0"
+  // bool bloom_filter_enabled = 20; // default = false
+  bool allow_single_file_parallelism = 23; // default = true
+  uint64 maximum_parallel_row_group_writers = 24; // default = 1
+  uint64 maximum_buffered_record_batches_per_stream = 25; // default = 2
+  bool bloom_filter_on_read = 26; // default = true
+  bool bloom_filter_on_write = 27; // default = false
+
+  oneof metadata_size_hint_opt {
+    uint64 metadata_size_hint = 4;
+  }
+
+  oneof compression_opt {
+    string compression = 10;
+  }
+
+  oneof dictionary_enabled_opt {
+    bool dictionary_enabled = 11;
+  }
+
+  oneof statistics_enabled_opt {
+    string statistics_enabled = 13;
+  }
+
+  oneof max_statistics_size_opt {
+    uint64 max_statistics_size = 14;
+  }
+
+  oneof column_index_truncate_length_opt {
+    uint64 column_index_truncate_length = 17;
+  }
+
+  oneof encoding_opt {
+    string encoding = 19;
+  }
+
+  oneof bloom_filter_fpp_opt {
+    double bloom_filter_fpp = 21;
+  }
+
+  oneof bloom_filter_ndv_opt {
+    uint64 bloom_filter_ndv = 22;
+  }
+
+  uint64 dictionary_page_size_limit = 12;
+
+  uint64 data_page_row_count_limit = 18;
+
+  uint64 max_row_group_size = 15;
+
+  string created_by = 16;
+}
+
+enum JoinSide{
+  LEFT_SIDE = 0;
+  RIGHT_SIDE = 1;
+}
+
+message Precision{
+  PrecisionInfo precision_info = 1;
+  ScalarValue val = 2;
+}
+
+enum PrecisionInfo {
+  EXACT = 0;
+  INEXACT = 1;
+  ABSENT = 2;
+}
+
+message Statistics {
+  Precision num_rows = 1;
+  Precision total_byte_size = 2;
+  repeated ColumnStats column_stats = 3;
+}
+
+message ColumnStats {
+  Precision min_value = 1;
+  Precision max_value = 2;
+  Precision null_count = 3;
+  Precision distinct_count = 4;
+}

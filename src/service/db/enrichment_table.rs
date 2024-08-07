@@ -82,7 +82,7 @@ fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
         }
         json::Value::Object(obj) => vrl::value::Value::Object(
             obj.iter()
-                .map(|(k, v)| (k.to_string(), convert_to_vrl(v)))
+                .map(|(k, v)| (k.to_string().into(), convert_to_vrl(v)))
                 .collect(),
         ),
     }

@@ -26,7 +26,10 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use uaparser::{Parser, UserAgentParser};
 
-use crate::{common::infra::config::MAXMIND_DB_CLIENT, USER_AGENT_REGEX_FILE};
+use crate::{
+    common::{infra::config::MAXMIND_DB_CLIENT, utils::http::parse_ip_addr},
+    USER_AGENT_REGEX_FILE,
+};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct GeoInfoData<'a> {
@@ -109,12 +112,10 @@ impl RumExtraData {
 
             user_agent_hashmap.insert("ip".into(), ip_address.into());
 
-            let ip: IpAddr = match ip_address.split(':').next().unwrap().parse() {
-                Ok(ip) => ip,
-                Err(e) => {
-                    log::error!("Error parsing IP address: {}, {}", ip_address, e);
-                    IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))
-                }
+            let ip = match parse_ip_addr(ip_address) {
+                Ok((ip, _)) => ip,
+                // Default to ipv4 loopback address
+                Err(_) => IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
             };
 
             let geo_info = if let Some(client) = &(*maxminddb_client) {

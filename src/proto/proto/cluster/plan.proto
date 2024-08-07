@@ -1,0 +1,19 @@
+  syntax = "proto3";
+
+  option java_multiple_files = true;
+  option java_package = "org.openobserve.cluster";
+  option java_outer_classname = "planProto";
+  
+  package cluster;
+ 
+ import "datafusion_common/datafusion_common.proto";
+ import "datafusion/datafusion.proto";
+ 
+ message NewEmptyExecNode {
+   datafusion_common.Schema schema = 1;
+   repeated uint64 projection = 2;
+   repeated datafusion.LogicalExprNode filters = 3;
+   optional uint64 limit = 4;
+ }
+ 
+ 

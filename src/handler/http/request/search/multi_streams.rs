@@ -311,8 +311,8 @@ pub async fn search_multi(
                 multi_res.file_count += res.file_count;
                 multi_res.scan_size += res.scan_size;
                 multi_res.scan_records += res.scan_records;
-                multi_res.columns.append(&mut res.columns);
-                multi_res.hits.append(&mut res.hits);
+                multi_res.columns.extend(res.columns);
+                multi_res.hits.extend(res.hits);
                 multi_res.response_type = res.response_type;
                 multi_res.trace_id = res.trace_id;
                 multi_res.cached_ratio = res.cached_ratio;
@@ -354,10 +354,14 @@ pub async fn search_multi(
         }
     }
 
+    let column_timestamp = get_config().common.column_timestamp.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
-        let a_ts = a.get("_timestamp").unwrap().as_i64().unwrap();
-        let b_ts = b.get("_timestamp").unwrap().as_i64().unwrap();
+        if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
+            return std::cmp::Ordering::Equal;
+        }
+        let a_ts = a.get(&column_timestamp).unwrap().as_i64().unwrap();
+        let b_ts = b.get(&column_timestamp).unwrap().as_i64().unwrap();
         b_ts.cmp(&a_ts)
     });
     Ok(HttpResponse::Ok().json(multi_res))

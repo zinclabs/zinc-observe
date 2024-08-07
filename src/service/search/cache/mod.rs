@@ -101,7 +101,6 @@ pub async fn search(
             &rpc_req,
             &mut req,
             &mut origin_sql,
-            &parsed_sql,
             &mut file_path,
             is_aggregate,
             &mut should_exec_query,

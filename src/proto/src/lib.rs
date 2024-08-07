@@ -13,13 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod cluster_rpc {
-    tonic::include_proto!("cluster");
-}
+mod datafusion;
+mod generated;
 
-pub mod prometheus_rpc {
-    include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
-}
+pub use generated::{cluster as cluster_rpc, prometheus as prometheus_rpc};
 
 impl From<Vec<serde_json::Value>> for cluster_rpc::UsageData {
     fn from(usages: Vec<serde_json::Value>) -> Self {

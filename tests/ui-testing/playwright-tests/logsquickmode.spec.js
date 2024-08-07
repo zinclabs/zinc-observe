@@ -5,30 +5,57 @@ import logsdata from "../../test-data/logs_data.json";
 
 test.describe.configure({ mode: 'parallel' });
 
-
 async function login(page) {
-      await page.goto(process.env["ZO_BASE_URL"]);
-      // await page.getByText('Login as internal user').click();
-      console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
-      await page.waitForTimeout(1000);
-      await page
-        .locator('[data-cy="login-user-id"]')
-        .fill(process.env["ZO_ROOT_USER_EMAIL"]);
-      //Enter Password
-      await page
-        .locator('[data-cy="login-password"]')
-        .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
-      await page.locator('[data-cy="login-sign-in"]').click();
-      await page.waitForTimeout(4000);
+  await page.goto(process.env["ZO_BASE_URL"]);
+  // await page.getByText('Login as internal user').click();
+  console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
+  await page.waitForTimeout(1000);
+  await page
+    .locator('[data-cy="login-user-id"]')
+    .fill(process.env["ZO_ROOT_USER_EMAIL"]);
+  //Enter Password
+  await page
+    .locator('[data-cy="login-password"]')
+    .fill(process.env["ZO_ROOT_USER_PASSWORD"]);
+  await page.locator('[data-cy="login-sign-in"]').click();
+  await page.waitForTimeout(4000);
   await page.goto(process.env["ZO_BASE_URL"]);
 }
 
+async function ingestion(page) {
+  const orgId = process.env["ORGNAME"];
+  const streamName = "e2e_automate";
+  const basicAuthCredentials = Buffer.from(
+    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+  ).toString('base64');
 
-const selectStreamAndStreamTypeForLogs = async (page,stream) => {await page.waitForTimeout(
-  4000);await page.locator(
-  '[data-test="log-search-index-list-select-stream"]').click({ force: true });await page.locator(
-  "div.q-item").getByText(`${stream}`).first().click({ force: true });
+  const headers = {
+    "Authorization": `Basic ${basicAuthCredentials}`,
+    "Content-Type": "application/json",
+  };
+  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(logsdata)
+    });
+    return await fetchResponse.json();
+  }, {
+    url: process.env.INGESTION_URL,
+    headers: headers,
+    orgId: orgId,
+    streamName: streamName,
+    logsdata: logsdata
+  });
+  console.log(response);
+}
+
+const selectStreamAndStreamTypeForLogs = async (page, stream) => {
+  await page.waitForTimeout(4000);
+  await page.locator('[data-test="log-search-index-list-select-stream"]').click({ force: true });
+  await page.locator("div.q-item").getByText(`${stream}`).first().click({ force: true });
 };
+
 test.describe("Logs Quickmode testcases", () => {
   // let logData;
   function removeUTFCharacters(text) {
@@ -48,56 +75,18 @@ test.describe("Logs Quickmode testcases", () => {
     await expect.poll(async () => (await search).status()).toBe(200);
     // await search.hits.FIXME_should("be.an", "array");
   }
-  // tebefore(async function () {
-  //   // logData("log");
-  //   // const data = page;
-  //   // logData = data;
 
-  //   console.log("--logData--", logData);
-  // });
   test.beforeEach(async ({ page }) => {
     await login(page);
-    await page.waitForTimeout(5000)
+    await page.waitForTimeout(1000)
+    await ingestion(page);
+    await page.waitForTimeout(2000)
 
-    // ("ingests logs via API", () => {
-      const orgId = process.env["ORGNAME"];
-      const streamName = "e2e_automate";
-      const basicAuthCredentials = Buffer.from(
-        `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-      ).toString('base64');
-    
-      const headers = {
-        "Authorization": `Basic ${basicAuthCredentials}`,
-        "Content-Type": "application/json",
-      };
-    
-      // const logsdata = {}; // Fill this with your actual data
-    
-      // Making a POST request using fetch API
-      const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-        const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify(logsdata)
-        });
-        return await fetchResponse.json();
-      }, {
-        url: process.env.INGESTION_URL,
-        headers: headers,
-        orgId: orgId,
-        streamName: streamName,
-        logsdata: logsdata
-      });
-    
-      console.log(response);
-    //  });
-    // const allorgs = page.waitForResponse("**/api/default/organizations**");
-    // const functions = page.waitForResponse("**/api/default/functions**");
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
     const allsearch = page.waitForResponse("**/api/default/_search**");
-    await selectStreamAndStreamTypeForLogs(page,logData.Stream);
+    await selectStreamAndStreamTypeForLogs(page, logData.Stream);
     await applyQueryButton(page);
     await page.waitForSelector('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
     // Get the toggle button element
@@ -106,7 +95,7 @@ test.describe("Logs Quickmode testcases", () => {
     const isSwitchedOff = await toggleButton.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
     // If the toggle is switched off, click on it to switch it on
     if (isSwitchedOff) {
-        await toggleButton.click();
+      await toggleButton.click();
     }
     // const streams = page.waitForResponse("**/api/default/streams**");
   });
@@ -115,22 +104,20 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("kubernetes_pod_id");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
       )
-      .last()
-      .click({
-        force: true,
-      });
+      .first()
+      .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.waitForTimeout(2000);
     await expect(
       page
         .locator('[data-test="logs-search-bar-query-editor"]')
-        .getByText(/_timestamp/)
+        .getByText(/kubernetes_pod_id/)
         .first()
     ).toBeVisible();
   });
@@ -145,20 +132,18 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("kubernetes_pod_id");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
       )
-      .last()
-      .click({
-        force: true,
-      });
+      .first()
+      .click();
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click();
+    await page.waitForTimeout(2000);
     await expect(
       page
         .locator('[data-test="log-table-column-0-source"]')
@@ -170,15 +155,15 @@ test.describe("Logs Quickmode testcases", () => {
   test("should display error on entering random text in histogram mode when quick mode is on", async ({ page }) => {
     // Click on the Monaco Editor to focus it
     await page.click('[data-test="logs-search-bar-query-editor"]');
-  
+
     // Type into the Monaco Editor
     await page.keyboard.type("oooo");
     await page.waitForTimeout(1000)
     await page.waitForSelector('[data-cy="search-bar-refresh-button"] > .q-btn__content', { visible: true, timeout: 5000 });
-  
+
     // Click on the refresh button
-    await page.click('[data-cy="search-bar-refresh-button"] > .q-btn__content',{ force: true });
-  
+    await page.click('[data-cy="search-bar-refresh-button"] > .q-btn__content', { force: true });
+
     await page.waitForTimeout(2000)
     // Wait for the error message to appear and ensure it is visible
     await expect(page.locator('[data-test="logs-search-error-message"]').first()).toBeVisible({ timeout: 10000 });
@@ -188,20 +173,21 @@ test.describe("Logs Quickmode testcases", () => {
     page,
   }) => {
     await page
-      .locator(".field-container")
+      .locator('[data-cy="index-field-search-input"]')
+      .fill("kubernetes_pod_id");
+    await page.waitForTimeout(2000);
+    await page
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
       )
-      .last()
-      .click({
-        force: true,
-      });
+      .first()
+      .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
     await expect(
-      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=_timestamp FROM "e2e_automate" ORDER BY _timestamp DESC')
+      page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate" ORDER BY _timestamp DESC')
     ).toBeVisible();
-    
-   
+
+
   });
 
   test("should adding/removing interesting field removes it from editor and results too", async ({
@@ -209,17 +195,14 @@ test.describe("Logs Quickmode testcases", () => {
   }) => {
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("kubernetes_container_name");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-kubernetes_container_name-field-btn"]'
       )
-      .last()
-      .click({
-        force: true,
-      });
+      .first()
+      .click();
     await page.locator('[data-cy="index-field-search-input"]').clear();
     await page
       .locator('[data-cy="index-field-search-input"]')
@@ -259,48 +242,13 @@ test.describe("Logs Quickmode testcases", () => {
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click();
     await expect(
-      page.locator('[data-test="log-table-column-0-source"]')
-    ).not.toHaveText(/kubernetes_pod_id/);
+      page.locator('[data-test="log-table-column-1-source"]')
+    ).not.toHaveText(/source/);
   });
 
   test("should display order by in sql mode by default even after page reload", async ({
     page,
   }) => {
-    await page
-      .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
-    await page.waitForTimeout(2000);
-    await page
-      .locator(".field-container")
-      .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
-      )
-      .last()
-      .click({
-        force: true,
-      });
-    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
-    await page
-      .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
-      .click({
-        force: true,
-      });
-    await page.reload();
-    await page.waitForTimeout(2000);
-    await expect(
-      page
-        .locator('[data-test="logs-search-bar-query-editor"]')
-        .locator(
-          'text=SELECT _timestamp FROM "e2e_automate" ORDER BY _timestamp DESC'
-        )
-    ).toBeVisible();
-  });
-
-  test("should display results without adding timestamp in quick mode", async ({
-    page,
-  }) => {
-  
-    await page.locator('[data-cy="index-field-search-input"]').clear();
     await page
       .locator('[data-cy="index-field-search-input"]')
       .fill("kubernetes_pod_id");
@@ -319,12 +267,45 @@ test.describe("Logs Quickmode testcases", () => {
       .click({
         force: true,
       });
-      await expect(
-        page
-          .locator('[data-test="log-table-column-0-source"]')
-          .getByText(/_timestamp/)
-          .first()
-      ).toBeVisible();
+    await page.reload();
+    await page.waitForTimeout(2000);
+    await expect(
+      page
+        .locator('[data-test="logs-search-bar-query-editor"]')
+        .locator(
+          'text=SELECT kubernetes_pod_id FROM "e2e_automate" ORDER BY _timestamp DESC'
+        )
+    ).toBeVisible();
+  });
 
- });
+  test("should display results without adding timestamp in quick mode", async ({
+    page,
+  }) => {
+
+    await page.locator('[data-cy="index-field-search-input"]').clear();
+    await page
+      .locator('[data-cy="index-field-search-input"]')
+      .fill("kubernetes_pod_id");
+    await page.waitForTimeout(2000);
+    await page
+      .locator(
+        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
+      )
+      .last()
+      .click({
+        force: true,
+      });
+    await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.waitForTimeout(2000);
+    await page
+      .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
+      .click({
+        force: true,
+      });
+    await page.waitForTimeout(2000);
+    await expect(
+      page
+        .locator('[data-test="log-search-result-table-th-source"]')
+    ).toHaveText(/source/);
+  });
 });

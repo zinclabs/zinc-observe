@@ -13,11 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Result;
+use std::io::{Result, Write};
 
 fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=proto");
+
+    let out = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
 
     tonic_build::configure()
         .type_attribute("FileList", "#[derive(Eq)]")
@@ -47,6 +49,8 @@ fn main() -> Result<()> {
         .type_attribute("MetricsQueryResponse", "#[derive(serde::Serialize)]")
         .type_attribute("ScanStats", "#[derive(Eq)]")
         .type_attribute("ScanStats", "#[derive(serde::Serialize)]")
+        .extern_path(".datafusion_common", "::datafusion_proto::protobuf")
+        .extern_path(".datafusion", "::datafusion_proto::protobuf")
         .compile(
             &[
                 "proto/cluster/common.proto",
@@ -56,13 +60,25 @@ fn main() -> Result<()> {
                 "proto/cluster/search.proto",
                 "proto/cluster/usage.proto",
                 "proto/cluster/querycache.proto",
+                "proto/cluster/plan.proto",
             ],
             &["proto"],
         )
         .unwrap();
 
-    let mut config = prost_build::Config::new();
-    config
+    let path = "src/generated/cluster.rs";
+    let generated_source_path = out.join("cluster.rs");
+    println!("generated_source_path: {:?}", generated_source_path);
+    let code = std::fs::read_to_string(generated_source_path).unwrap();
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(path)
+        .unwrap();
+    file.write_all(code.as_str().as_ref()).unwrap();
+
+    tonic_build::configure()
         .type_attribute(
             "MetricMetadata",
             "#[derive(serde::Deserialize,serde::Serialize)]",
@@ -104,14 +120,26 @@ fn main() -> Result<()> {
             "zero_count",
             "#[derive(serde::Deserialize,serde::Serialize)]",
         )
-        .type_attribute("count", "#[derive(serde::Deserialize,serde::Serialize)]");
-    config.compile_protos(
-        &[
-            "proto/prometheus/remote.proto",
-            "proto/prometheus/types.proto",
-        ],
-        &["proto"],
-    )?;
+        .type_attribute("count", "#[derive(serde::Deserialize,serde::Serialize)]")
+        .compile(
+            &[
+                "proto/prometheus/remote.proto",
+                "proto/prometheus/types.proto",
+            ],
+            &["proto"],
+        )
+        .unwrap();
+
+    let path = "src/generated/prometheus.rs";
+    let generated_source_path = out.join("prometheus.rs");
+    let code = std::fs::read_to_string(generated_source_path).unwrap();
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .create(true)
+        .open(path)
+        .unwrap();
+    file.write_all(code.as_str().as_ref()).unwrap();
 
     Ok(())
 }

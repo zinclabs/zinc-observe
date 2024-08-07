@@ -166,7 +166,7 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
 
     // remove entry
     let mut rw = IMMUTABLES.write().await;
-    rw.remove(&path);
+    rw.swap_remove(&path);
     drop(rw);
 
     // update metrics

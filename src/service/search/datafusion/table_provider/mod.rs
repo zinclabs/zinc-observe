@@ -32,7 +32,7 @@
 
 use std::{any::Any, sync::Arc};
 
-use arrow_schema::{Field, Schema, SchemaBuilder, SchemaRef, SortOptions};
+use arrow_schema::{DataType, Field, Schema, SchemaBuilder, SchemaRef, SortOptions};
 use async_trait::async_trait;
 use datafusion::{
     common::{plan_err, project_schema, Result, Statistics, ToDFSchema},
@@ -48,14 +48,21 @@ use datafusion::{
         context::SessionState,
     },
     physical_expr::{create_physical_expr, expressions, LexOrdering, PhysicalSortExpr},
-    physical_plan::{empty::EmptyExec, ExecutionPlan},
+    physical_plan::{
+        empty::EmptyExec,
+        expressions::{CastExpr, Column},
+        projection::ProjectionExec,
+        ExecutionPlan, PhysicalExpr,
+    },
 };
 use datafusion_expr::{utils::conjunction, Expr, TableProviderFilterPushDown, TableType};
 use futures::{future, stream, StreamExt};
+use hashbrown::HashMap;
 use helpers::*;
 use object_store::ObjectStore;
 
 mod helpers;
+pub mod memtable;
 
 pub(crate) struct NewListingTable {
     table_paths: Vec<ListingTableUrl>,
@@ -63,6 +70,7 @@ pub(crate) struct NewListingTable {
     file_schema: SchemaRef,
     /// File fields + partition columns
     table_schema: SchemaRef,
+    diff_rules: HashMap<String, DataType>,
     options: ListingOptions,
     collected_statistics: FileStatisticsCache,
 }
@@ -77,7 +85,7 @@ impl NewListingTable {
     /// If the schema is provided then it must be resolved before creating the table
     /// and should contain the fields of the file without the table
     /// partitioning columns.
-    pub fn try_new(config: ListingTableConfig) -> Result<Self> {
+    pub fn try_new(config: ListingTableConfig, rules: HashMap<String, DataType>) -> Result<Self> {
         let file_schema = config
             .file_schema
             .ok_or_else(|| DataFusionError::Internal("No schema provided.".into()))?;
@@ -96,6 +104,7 @@ impl NewListingTable {
             table_paths: config.table_paths,
             file_schema,
             table_schema: Arc::new(builder.finish()),
+            diff_rules: rules,
             options,
             collected_statistics: Arc::new(DefaultFileStatisticsCache::default()),
         };
@@ -306,7 +315,8 @@ impl TableProvider for NewListingTable {
         };
 
         // create the execution plan
-        self.options
+        let parquet_exec = self
+            .options
             .format
             .create_physical_plan(
                 state,
@@ -319,7 +329,25 @@ impl TableProvider for NewListingTable {
                     .with_table_partition_cols(table_partition_cols),
                 filters.as_ref(),
             )
-            .await
+            .await?;
+
+        // add the diff rules to the execution plan
+        if self.diff_rules.is_empty() {
+            return Ok(parquet_exec);
+        }
+        let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> =
+            Vec::with_capacity(projected_schema.fields().len());
+        for (idx, field) in projected_schema.fields().iter().enumerate() {
+            let name = field.name().to_string();
+            let col = Arc::new(Column::new(&name, idx));
+            if let Some(data_type) = self.diff_rules.get(&name) {
+                exprs.push((Arc::new(CastExpr::new(col, data_type.clone(), None)), name));
+            } else {
+                exprs.push((col, name));
+            }
+        }
+        let projection_exec = ProjectionExec::try_new(exprs, parquet_exec)?;
+        Ok(Arc::new(projection_exec))
     }
 
     fn supports_filters_pushdown(

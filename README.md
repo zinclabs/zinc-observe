@@ -116,10 +116,10 @@ OpenObserve is available in three different editions:
 | Query management | ❌ | ✅ | ❌ |
 | Workload management (QoS) | ❌ | ✅ | ❌ |
 | Audit trail | ❌ | ✅ | ❌ |
+| Ability to influence roadmap | ❌ | ✅ | ✅ on enterprise plan |
 | License | AGPL | Enterprise | Cloud |
 | Support | Community | Enterprise | Cloud |
-| Cost | Free | Paid | Paid |
-
+| Cost | Free | If self hosted, free for up to 200 GB/Day data ingested <br> Paid thereafter  | Free 200 GB/Month data ingested <br> Paid thereafter |
 
 
 ## 📷 Screenshots

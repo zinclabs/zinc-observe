@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::{
-    is_local_disk_storage,
+    get_config, is_local_disk_storage,
     meta::{
         search::{ScanStats, SearchType, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
@@ -139,6 +139,14 @@ pub(crate) async fn create_context(
         cache_type
     );
 
+    // set target partitions based on cache type
+    let cfg = get_config();
+    let target_partitions = if cache_type == file_data::CacheType::None {
+        cfg.limit.query_thread_num
+    } else {
+        cfg.limit.cpu_num
+    };
+
     let schema = Arc::new(
         schema
             .to_owned()
@@ -150,6 +158,7 @@ pub(crate) async fn create_context(
         storage_type: StorageType::Memory,
         search_type: SearchType::Normal,
         work_group: None,
+        target_partitions,
     };
 
     let ctx = register_table(
@@ -158,6 +167,7 @@ pub(crate) async fn create_context(
         stream_name,
         &files,
         FileType::PARQUET,
+        HashMap::default(),
         false,
         &[],
         None,

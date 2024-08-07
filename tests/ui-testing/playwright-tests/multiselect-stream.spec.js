@@ -213,12 +213,11 @@ await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-search-bar-quick-mode-toggle-btn"] div').first().click();
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("_timestamp");
+      .fill("job");
     await page.waitForTimeout(2000);
     await page
-      .locator(".field-container")
       .locator(
-        '[data-test="log-search-index-list-interesting-_timestamp-field-btn"]'
+        '[data-test="log-search-index-list-interesting-job-field-btn"]'
       )
       .last()
       .click({

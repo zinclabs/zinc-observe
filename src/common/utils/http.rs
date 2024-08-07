@@ -16,6 +16,7 @@
 use std::{
     collections::HashMap,
     io::{Error, ErrorKind},
+    net::{AddrParseError, IpAddr, SocketAddr},
 };
 
 use actix_http::header::HeaderName;
@@ -130,6 +131,25 @@ pub(crate) fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) 
     }
 }
 
+/// This function can handle IPv4 and IPv6 addresses which may have port numbers appended
+pub fn parse_ip_addr(ip_address: &str) -> Result<(IpAddr, Option<u16>), AddrParseError> {
+    let mut port: Option<u16> = None;
+    let ip = ip_address.parse::<IpAddr>().or_else(|_| {
+        ip_address
+            .parse::<SocketAddr>()
+            .map(|sock_addr| {
+                port = Some(sock_addr.port());
+                sock_addr.ip()
+            })
+            .map_err(|e| {
+                log::error!("Error parsing IP address: {}, {}", &ip_address, e);
+                e
+            })
+    })?;
+
+    Ok((ip, port))
+}
+
 // Extractor for request headers
 pub struct RequestHeaderExtractor<'a> {
     headers: &'a HeaderMap,
@@ -180,5 +200,31 @@ mod tests {
         map.insert(key.clone(), "TRACES".to_string());
         let resp = get_stream_type_from_request(&Query(map.clone()));
         assert_eq!(resp.unwrap(), Some(StreamType::Traces));
+    }
+
+    /// Test logic for IP parsing
+    #[test]
+    fn test_ip_parsing() {
+        let valid_addressses = vec![
+            "127.0.0.1",
+            "127.0.0.1:8080",
+            "::1",
+            "192.168.0.1:8080",
+            "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+            "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:8080",
+        ];
+
+        let parsed_addresses: Vec<IpAddr> = valid_addressses
+            .iter()
+            .map(|ip_addr| parse_ip_addr(ip_addr).unwrap().0)
+            .collect();
+
+        assert!(
+            parsed_addresses
+                .iter()
+                .zip(valid_addressses)
+                .map(|(parsed, original)| original.contains(parsed.to_string().as_str()))
+                .fold(true, |acc, x| { acc | x })
+        );
     }
 }

@@ -7,8 +7,9 @@ test.describe.configure({ mode: "parallel" });
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
+  // await page.getByText('Login as internal user').click();
+  console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-// await page.getByText('Login as internal user').click();
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -19,6 +20,34 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
   await page.waitForTimeout(4000);
   await page.goto(process.env["ZO_BASE_URL"]);
+}
+
+async function ingestion(page) {
+  const orgId = process.env["ORGNAME"];
+  const streamName = "e2e_automate";
+  const basicAuthCredentials = Buffer.from(
+    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+  ).toString('base64');
+
+  const headers = {
+    "Authorization": `Basic ${basicAuthCredentials}`,
+    "Content-Type": "application/json",
+  };
+  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
+    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(logsdata)
+    });
+    return await fetchResponse.json();
+  }, {
+    url: process.env.INGESTION_URL,
+    headers: headers,
+    orgId: orgId,
+    streamName: streamName,
+    logsdata: logsdata
+  });
+  console.log(response);
 }
 
 const selectStreamAndStreamTypeForLogs = async (page, stream) => {
@@ -60,48 +89,10 @@ test.describe("Logs UI testcases", () => {
   // });
   test.beforeEach(async ({ page }) => {
     await login(page);
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(1000)
+    await ingestion(page);
+    await page.waitForTimeout(2000)
 
-    // ("ingests logs via API", () => {
-    const orgId = process.env["ORGNAME"];
-    const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(
-      `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-    ).toString("base64");
-
-    const headers = {
-      Authorization: `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-
-    // const logsdata = {}; // Fill this with your actual data
-
-    // Making a POST request using fetch API
-    const response = await page.evaluate(
-      async ({ url, headers, orgId, streamName, logsdata }) => {
-        const fetchResponse = await fetch(
-          `${url}/api/${orgId}/${streamName}/_json`,
-          {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify(logsdata),
-          }
-        );
-        return await fetchResponse.json();
-      },
-      {
-        url: process.env.INGESTION_URL,
-        headers: headers,
-        orgId: orgId,
-        streamName: streamName,
-        logsdata: logsdata,
-      }
-    );
-
-    console.log(response);
-    //  });
-    // const allorgs = page.waitForResponse("**/api/default/organizations**");
-    // const functions = page.waitForResponse("**/api/default/functions**");
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
     );
@@ -165,9 +156,9 @@ test.describe("Logs UI testcases", () => {
     await page
       .locator('[data-test="logs-search-bar-show-query-toggle-btn"]')
       .click({ force: true });
-       await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
-       await page.waitForTimeout(1000)
-       await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
+    await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
+    await page.waitForTimeout(1000)
+    await page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
     // await page
     //   .locator(".bg-primary > .q-btn__content > .q-icon")
     //   .click({ force: true });
@@ -508,7 +499,7 @@ test.describe("Logs UI testcases", () => {
     // Assert that ".a=2" is visible
     const logsPage = await page.locator('.q-page-container');
     await expect(logsPage).toContainText(".a=2");
-   
+
   });
 
   test('should display bar chart when histogram toggle is on', async ({ page }) => {
@@ -538,7 +529,7 @@ test.describe("Logs UI testcases", () => {
     const element = await page.locator('[data-test="log-table-column-0-source"]');
     const isVisible = await element.isVisible();
     expect(isVisible).toBeTruthy();
-    
+
   });
 
 
@@ -554,9 +545,9 @@ test.describe("Logs UI testcases", () => {
     const element = await page.locator('[data-test="log-table-column-0-source"]');
     const isVisible = await element.isVisible();
     expect(isVisible).toBeTruthy();
-    
+
   });
-  
+
   test('should display search around in SQL mode', async ({ page }) => {
     await page.waitForTimeout(1000);
     await page.getByLabel('SQL Mode').locator('div').nth(2).click();
@@ -566,13 +557,13 @@ test.describe("Logs UI testcases", () => {
     const element = await page.locator('[data-test="log-table-column-0-source"]');
     const isVisible = await element.isVisible();
     expect(isVisible).toBeTruthy();
-    
+
   });
 
   test("should display results for search around with limit query", async ({ page }) => {
     await page.waitForTimeout(2000);
     await page.locator('[data-cy="date-time-button"]').click({ force: true });
-    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
     await page.click('[data-test="logs-search-bar-query-editor"]')
     await page.keyboard.type("match_all('code') limit 5");
     await page.waitForTimeout(2000);

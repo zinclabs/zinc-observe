@@ -63,7 +63,7 @@ jobs:
         run: cd web && npm install && npm run build
       
       - name: Build and run binary
-        run: cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu
+        run: cargo build --release --target x86_64-unknown-linux-gnu
         
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -84,26 +84,26 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: 
-         ["logsquickmode.spec.js","logspage.spec.js", "sanity.spec.js","alerts.spec.js", "logsqueries.spec.js", "pipeline.spec.js","schema.spec.js","dashboardtype.spec.js", "multiselect-stream.spec.js"]
-       
+          ["sanity.spec.js", "alerts.spec.js", "schema.spec.js", "logspage.spec.js", "logsqueries.spec.js", "logsquickmode.spec.js", "multiselect-stream.spec.js", "pipeline.spec.js", "dashboardtype.spec.js", "dashboard.spec.js", "visualize.spec.js"]
+          
     steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v4
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
       - name: Display structure of downloaded files
-        run: ls -R
+        run: ls -la .
 
       - name: Start OpenObserve
-        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve &
+        run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
 
       - name: Wait for start
-        run: sleep 10
+        run: sleep 15
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
-
-      - name: Clone the current repo
-        uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
@@ -112,18 +112,20 @@ jobs:
         run: |
           touch .env
           echo "ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL}" >> .env
-          echo "ZO_ROOT_USER_PASSWORD"=${ZO_ROOT_USER_PASSWORD} >> .env
-          echo "ZO_BASE_URL"=${ZO_BASE_URL} >> .env
-          echo "INGESTION_URL"=${INGESTION_URL} >> .env
-          echo "ORGNAME"=${ORGNAME} >> .env
+          echo "ZO_ROOT_USER_PASSWORD=${ZO_ROOT_USER_PASSWORD}" >> .env
+          echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
+          echo "INGESTION_URL=${INGESTION_URL}" >> .env
+          echo "ORGNAME=${ORGNAME}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
+
+      - name: Check OpenObserve logs
+        if: always()
+        run: cat o2.log
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
             name: playwright-report
             path: playwright-report/
             retention-days: 30
-
-
- 

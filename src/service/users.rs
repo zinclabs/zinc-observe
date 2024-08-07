@@ -209,8 +209,11 @@ pub async fn update_user(
                         log::info!("Password self updated for user: {}", email);
                         is_updated = true;
                     } else {
-                        message =
-                            "Existing/old password mismatch, please provide valid existing password"
+                        message = "Existing/old password mismatch, please provide valid existing password";
+                        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::message(
+                            http::StatusCode::BAD_REQUEST.into(),
+                            message.to_string(),
+                        )));
                     }
                 } else if self_update && user.old_password.is_none() {
                     message = "Please provide existing password"
@@ -242,6 +245,9 @@ pub async fn update_user(
                     && (!self_update
                         || (local_user.role.eq(&UserRole::Admin)
                             || local_user.role.eq(&UserRole::Root)))
+                    // if the User Role is Root, we do not change the Role
+                    // Admins Role can still be mutable.
+                    && !local_user.role.eq(&UserRole::Root)
                 {
                     old_role = Some(new_user.role);
                     new_user.role = user.role.unwrap();
@@ -473,37 +479,41 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
 }
 
 pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
-    let root_user = USERS_RUM_TOKEN.get(&format!("{DEFAULT_ORG}/{token}"));
-    if let Some(user) = root_user {
+    let rum_tokens = USERS_RUM_TOKEN.clone();
+    let key = format!("{DEFAULT_ORG}/{token}");
+    if let Some(user) = rum_tokens.get(&key) {
         return Some(user.value().clone());
     }
 
     let key = format!("{org_id}/{token}");
-    let cached_user = USERS_RUM_TOKEN
-        .get(&key)
-        .map(|loc_user| loc_user.value().clone());
+    if let Some(user) = rum_tokens.get(&key) {
+        return Some(user.value().clone());
+    }
 
-    match cached_user {
-        Some(user) => Some(user),
-        None => {
-            log::info!("get_user_by_token: User not found in cache, fetching from db");
-            if let Some(user_from_db) = db::user::get_by_token(Some(org_id), token)
-                .await
-                .ok()
-                .flatten()
-            {
-                log::info!("get_user_by_token: User found updating cache");
-                USERS_RUM_TOKEN.insert(key, user_from_db.clone());
-                Some(user_from_db)
-            } else {
-                log::info!(
-                    "get_user_by_token: User not found even in db {} {}",
-                    org_id,
-                    token
-                );
-                None
-            }
+    // need to drop the reference to rum_tokens to avoid deadlock of dashmap
+    drop(rum_tokens);
+
+    log::info!("get_user_by_token: User not found in cache, fetching from db");
+    if let Some(user_from_db) = db::user::get_by_token(Some(org_id), token)
+        .await
+        .ok()
+        .flatten()
+    {
+        log::info!("get_user_by_token: User found updating cache");
+        if is_root_user(&user_from_db.email) {
+            USERS_RUM_TOKEN
+                .clone()
+                .insert(format!("{DEFAULT_ORG}/{token}"), user_from_db.clone());
         }
+        USERS_RUM_TOKEN.clone().insert(key, user_from_db.clone());
+        Some(user_from_db)
+    } else {
+        log::info!(
+            "get_user_by_token: User not found even in db {} {}",
+            org_id,
+            token
+        );
+        None
     }
 }
 

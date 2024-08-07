@@ -927,9 +927,8 @@ async fn values_v1(
         for row in ret.hits {
             let key = row
                 .get("zo_sql_key")
-                .map(|v| v.as_str().unwrap_or(""))
-                .unwrap_or("")
-                .to_string();
+                .map(json::get_string_value)
+                .unwrap_or("".to_string());
             let num = row
                 .get("zo_sql_num")
                 .map(|v| v.as_i64().unwrap_or(0))
