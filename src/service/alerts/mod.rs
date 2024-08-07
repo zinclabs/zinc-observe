@@ -469,7 +469,18 @@ impl QueryCondition {
                 query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: false,
-                query_fn: alert.query_condition.vrl_function.clone(),
+                query_fn: if alert.query_condition.vrl_function.is_some() {
+                    match base64::decode_url(alert.query_condition.vrl_function.as_ref().unwrap()) {
+                        Ok(query_fn) => Some(query_fn),
+                        Err(e) => {
+                            return Err(anyhow::anyhow!(
+                                "Error decoding alert vrl query function: {e}"
+                            ));
+                        }
+                    }
+                } else {
+                    None
+                },
                 skip_wal: false,
             },
             encoding: config::meta::search::RequestEncoding::Empty,
