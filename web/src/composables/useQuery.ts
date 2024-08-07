@@ -4,18 +4,18 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { onBeforeMount } from "vue";
 
 interface BuildQueryPayload {
-  from: number;
-  size: number;
-  timestamp_column: string;
-  timestamps: {
+  from?: number;
+  size?: number;
+  timestamp_column?: string;
+  timestamps?: {
     startTime: number | "Invalid Date";
     endTime: number | "Invalid Date";
   };
-  timeInterval: string;
+  timeInterval?: string;
   sqlMode: boolean;
-  currentPage: number;
-  selectedStream: string;
-  parsedQuery: {
+  currentPage?: number;
+  selectedStream?: string;
+  parsedQuery?: {
     queryFunctions: string;
     whereClause: string;
     limit: number;
