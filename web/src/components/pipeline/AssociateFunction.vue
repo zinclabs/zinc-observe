@@ -1,3 +1,19 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
   <div
     data-test="add-stream-routing-section"
@@ -78,7 +94,9 @@
               filled
               dense
               type="number"
-              :rules="[(val: any) => (!!val && val > -1) || 'Field is required!']"
+              :rules="[
+                (val: any) => (!!val && val > -1) || 'Field is required!',
+              ]"
               tabindex="0"
               style="min-width: 220px"
             />
@@ -169,7 +187,7 @@ interface StreamRoute {
 }
 
 const AddFunction = defineAsyncComponent(
-  () => import("../functions/AddFunction.vue")
+  () => import("../functions/AddFunction.vue"),
 );
 
 const props = defineProps({
@@ -251,7 +269,7 @@ watch(
   {
     deep: true,
     immediate: true,
-  }
+  },
 );
 
 onBeforeMount(() => {
