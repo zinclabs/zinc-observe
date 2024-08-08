@@ -736,6 +736,7 @@ import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
+import { useQuasar } from "quasar";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -782,6 +783,8 @@ const query = ref(props.sql);
 const promqlQuery = ref(props.promql);
 
 const tab = ref(props.query_type || "custom");
+
+const q = useQuasar();
 
 const store = useStore();
 
@@ -993,8 +996,58 @@ const onBlurQueryEditor = () => {
   emits("validate-sql");
 };
 
+const validateInputs = (notify: boolean = true) => {
+  if (
+    Number(triggerData.value.period) < 1 ||
+    isNaN(Number(triggerData.value.period))
+  ) {
+    notify &&
+      q.notify({
+        type: "negative",
+        message: "Period should be greater than 0",
+        timeout: 1500,
+      });
+    return false;
+  }
+
+  if (aggregationData.value) {
+    if (
+      isNaN(triggerData.value.threshold) ||
+      !aggregationData.value.having.value.toString().trim().length ||
+      !aggregationData.value.having.column ||
+      !aggregationData.value.having.operator
+    ) {
+      notify &&
+        q.notify({
+          type: "negative",
+          message: "Threshold should not be empty",
+          timeout: 1500,
+        });
+      return false;
+    }
+
+    return true;
+  }
+
+  if (
+    isNaN(triggerData.value.threshold) ||
+    triggerData.value.threshold < 1 ||
+    !triggerData.value.operator
+  ) {
+    notify &&
+      q.notify({
+        type: "negative",
+        message: "Threshold should not be empty",
+        timeout: 1500,
+      });
+    return false;
+  }
+
+  return true;
+};
 defineExpose({
   tab,
+  validateInputs,
 });
 </script>
 

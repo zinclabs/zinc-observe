@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
-      <q-form @submit="saveRouting">
+      <q-form ref="routeFormRef" @submit="saveRouting">
         <div
           data-test="stream-routing-name-input"
           class="o2-input"
@@ -223,12 +223,12 @@ interface StreamRoute {
     // should be part of payload
     org_id: string;
     stream_name: string;
-    stream_type: "logs" | "enrichment_tables";
+    stream_type: string;
   };
   is_real_time: boolean;
   query_condition: {
     sql: string;
-    type: "custom" | "sql";
+    type: string;
     aggregation: string | null;
     conditions: RouteCondition[];
   };
@@ -240,7 +240,7 @@ interface StreamRoute {
     frequency: number;
     cron: string;
   };
-  context_attributes: { key: string; value: string; id: string }[];
+  context_attributes: any;
   description: string;
   enabled: boolean;
 }
@@ -282,11 +282,9 @@ const isUpdating = ref(false);
 
 const filteredColumns: any = ref([]);
 
-const isFetchingStreams = ref(false);
+const scheduledAlertRef = ref<any>(null);
 
 const filteredStreams: Ref<any[]> = ref([]);
-
-const streams: any = ref({});
 
 const indexOptions = ref([]);
 
@@ -296,7 +294,7 @@ const isValidName: Ref<boolean> = ref(true);
 
 const isAggregationEnabled = ref(false);
 
-let existingStreamNames: any;
+const routeFormRef = ref<any>(null);
 
 const nodeLink = ref({
   from: "",
@@ -362,7 +360,7 @@ onMounted(() => {
       // If context attributes are present, convert them to array
       streamRoute.value.context_attributes = Object.keys(
         streamRoute.value.context_attributes,
-      ).map((attr) => {
+      ).map((attr: string) => {
         return {
           key: attr,
           value: streamRoute.value.context_attributes[attr],
@@ -382,11 +380,6 @@ onMounted(() => {
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
-
-  existingStreamNames = new Set(
-    ...Object.values(props.streamRoutes).map((route: any) => route.name),
-    props.streamName,
-  );
 
   updateStreamFields();
 });
@@ -502,6 +495,18 @@ const saveRouting = () => {
   if (!isValidName.value) {
     return;
   }
+
+  if (!streamRoute.value.is_real_time) {
+    if (!scheduledAlertRef.value.validateInputs()) {
+      return false;
+    }
+  }
+
+  routeFormRef.value.validate().then((valid: any) => {
+    if (!valid) {
+      return false;
+    }
+  });
 
   // Save routing
   emit("update:node", {
