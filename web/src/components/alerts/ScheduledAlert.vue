@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ tab === "promql" ? "Promql" : "SQL" }}
         </div>
         <q-toggle
+          v-if="!disableVrlFunction"
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="isVrlFunctionEnabled"
           :icon="'img:' + getImageURL('images/common/function.svg')"
@@ -105,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           data-test="logs-vrl-function-editor"
-          v-show="isVrlFunctionEnabled && tab === 'sql'"
+          v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'"
         >
           <div style="height: 40px; width: 100%">
             <div style="display: flex; height: 40px">
@@ -296,7 +297,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div class="flex justify-start items-center q-mb-xs no-wrap q-pb-md">
+      <div
+        v-if="!disableThreshold"
+        class="flex justify-start items-center q-mb-xs no-wrap q-pb-md"
+      >
         <div
           data-test="scheduled-alert-threshold-title"
           class="text-bold flex items-center"
@@ -756,6 +760,8 @@ const props = defineProps([
   "vrl_function",
   "showVrlFunction",
   "isValidSqlQuery",
+  "disableThreshold",
+  "disableVrlFunction",
 ]);
 
 const emits = defineEmits([
@@ -1012,10 +1018,11 @@ const validateInputs = (notify: boolean = true) => {
 
   if (aggregationData.value) {
     if (
-      isNaN(triggerData.value.threshold) ||
-      !aggregationData.value.having.value.toString().trim().length ||
-      !aggregationData.value.having.column ||
-      !aggregationData.value.having.operator
+      !props.disableThreshold &&
+      (isNaN(triggerData.value.threshold) ||
+        !aggregationData.value.having.value.toString().trim().length ||
+        !aggregationData.value.having.column ||
+        !aggregationData.value.having.operator)
     ) {
       notify &&
         q.notify({
@@ -1030,9 +1037,10 @@ const validateInputs = (notify: boolean = true) => {
   }
 
   if (
-    isNaN(triggerData.value.threshold) ||
-    triggerData.value.threshold < 1 ||
-    !triggerData.value.operator
+    !props.disableThreshold &&
+    (isNaN(triggerData.value.threshold) ||
+      triggerData.value.threshold < 1 ||
+      !triggerData.value.operator)
   ) {
     notify &&
       q.notify({

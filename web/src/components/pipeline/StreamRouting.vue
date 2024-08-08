@@ -128,6 +128,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="filteredColumns"
             :conditions="streamRoute.query_condition.conditions"
             :alertData="streamRoute"
+            :disableThreshold="true"
+            :disableVrlFunction="true"
+            :isValidSqlQuery="isValidSqlQuery"
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
             v-model:query_type="streamRoute.query_condition.type"
@@ -135,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:isAggregationEnabled="isAggregationEnabled"
             @field:add="addField"
             @field:remove="removeField"
+            @validate-sql="validateSqlQuery"
             class="q-mt-sm"
           />
 
@@ -204,6 +208,8 @@ import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useQuasar } from "quasar";
 import ScheduledAlert from "@/components/alerts/ScheduledAlert.vue";
+import useQuery from "@/composables/useQuery";
+import searchService from "@/services/search";
 
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
@@ -276,11 +282,17 @@ const store = useStore();
 
 const { getStream, getStreams } = useStreams();
 
+const { buildQueryPayload } = useQuery();
+
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
 const isUpdating = ref(false);
 
 const filteredColumns: any = ref([]);
+
+const isValidSqlQuery = ref(true);
+
+const validateSqlQueryPromise = ref<Promise<unknown>>(null);
 
 const scheduledAlertRef = ref<any>(null);
 
@@ -487,7 +499,7 @@ const openCancelDialog = () => {
 };
 
 // TODO OK : Add check for duplicate routing name
-const saveRouting = () => {
+const saveRouting = async () => {
   isValidName.value = true;
 
   if (!isUpdating.value) validateStreamName();
@@ -500,6 +512,12 @@ const saveRouting = () => {
     if (!scheduledAlertRef.value.validateInputs()) {
       return false;
     }
+  }
+
+  try {
+    await validateSqlQueryPromise.value;
+  } catch (e) {
+    return false;
   }
 
   routeFormRef.value.validate().then((valid: any) => {
@@ -636,6 +654,43 @@ const getRoutePayload = () => {
   }
 
   return payload;
+};
+
+const validateSqlQuery = () => {
+  const query = buildQueryPayload({
+    sqlMode: true,
+    streamName: streamRoute.value.name as string,
+  });
+
+  delete query.aggs;
+
+  query.query.sql = streamRoute.value.query_condition.sql;
+
+  validateSqlQueryPromise.value = new Promise((resolve, reject) => {
+    searchService
+      .search({
+        org_identifier: store.state.selectedOrganization.identifier,
+        query,
+        page_type: "logs",
+      })
+      .then((res: any) => {
+        isValidSqlQuery.value = true;
+        resolve("");
+      })
+      .catch((err: any) => {
+        if (err.response.data.code === 500) {
+          isValidSqlQuery.value = false;
+          q.notify({
+            type: "negative",
+            message: "Invalid SQL Query : " + err.response.data.message,
+            timeout: 3000,
+          });
+          reject("");
+        } else isValidSqlQuery.value = true;
+
+        resolve("");
+      });
+  });
 };
 </script>
 

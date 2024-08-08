@@ -22,7 +22,7 @@ interface BuildQueryPayload {
     query: string;
     offset: number;
   };
-  streamName: "";
+  streamName: string;
 }
 
 const getTimeInterval = (start_time: number, end_time: number) => {
