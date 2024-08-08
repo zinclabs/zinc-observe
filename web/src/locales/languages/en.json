@@ -405,7 +405,8 @@
     "search": "Search Pipeline",
     "routing": "Routing",
     "nodes": "Nodes",
-    "associateFunction": "Associate Function"
+    "associateFunction": "Associate Function",
+    "derivedStream": "Derived Stream"
   },
   "function": {
     "header": "Functions",

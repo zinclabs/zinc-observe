@@ -1,3 +1,19 @@
+<!-- Copyright 2023 Zinc Labs Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
   <div>
     <div data-test="alert-conditions-text" class="text-bold">
@@ -23,7 +39,7 @@
     </template>
     <template v-else>
       <div
-        v-for="(field, index) in (fields as any)"
+        v-for="(field, index) in fields as any"
         :key="field.uuid"
         class="flex justify-start items-end q-col-gutter-sm q-pb-sm"
         :data-test="`alert-conditions-${index + 1}`"
@@ -187,7 +203,7 @@ const filterColumns = (val: string, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredFields.value = props.streamFields.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
     );
   });
 };

@@ -17,11 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="add-stream-routing-section"
-    class="full-width stream-routing-section"
+    class="full-width full-height"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">
-      {{ t("pipeline.routing") }}
+      {{ t("pipeline.derivedStream") }}
     </div>
     <q-separator />
 
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="padding-top: 12px"
         >
           <q-input
-            v-model="streamRoute.name"
+            v-model="derivedStream.name"
             :label="t('function.stream_name') + ' *'"
             color="input-border"
             bg-color="input-bg"
@@ -52,9 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : t('common.nameRequired'),
             ]"
             tabindex="0"
-            style="width: 400px"
+            style="width: 480px"
             :error-message="
-              streamRoute.name && isValidStreamName
+              derivedStream.name && isValidStreamName
                 ? 'Stream name already exists'
                 : ''
             "
@@ -62,51 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="validateStreamName"
           />
         </div>
-
-        <div class="q-gutter-sm">
-          <q-radio
-            data-test="add-alert-realtime-alert-radio"
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            v-model="streamRoute.is_real_time"
-            :checked="!streamRoute.is_real_time"
-            :val="true"
-            :label="t('alerts.realTime')"
-            class="q-ml-none"
-          />
-          <q-radio
-            data-test="add-alert-scheduled-alert-radio"
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            v-model="streamRoute.is_real_time"
-            :checked="streamRoute.is_real_time"
-            :val="false"
-            :label="t('alerts.standard')"
-            class="q-ml-none"
-          />
-        </div>
-
-        <div
-          v-if="streamRoute.is_real_time"
-          class="q-py-sm showLabelOnTop text-bold text-h7"
-          data-test="add-alert-query-input-title"
-        >
-          <real-time-alert
-            v-if="streamRoute.is_real_time"
-            :columns="filteredColumns"
-            :conditions="streamRoute.conditions"
-            @field:add="addField"
-            @field:remove="removeField"
-          />
-        </div>
-        <div v-else>
+        <div class="flex justify-start items-center" style="padding-top: 0px">
           <div
-            data-test="stream-route-stream-type-select"
-            class="stream-route-stream-type o2-input q-mr-sm q-my-md"
+            data-test="add-alert-stream-type-select"
+            class="alert-stream-type o2-input q-mr-sm"
             style="padding-top: 0"
           >
             <q-select
-              v-model="streamRoute.destination.stream_type"
+              v-model="derivedStream.destination.stream_type"
               :options="streamTypes"
               :label="t('alerts.streamType') + ' *'"
               :popup-content-style="{ textTransform: 'lowercase' }"
@@ -119,35 +82,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               v-bind:readonly="isUpdating"
               v-bind:disable="isUpdating"
+              @update:model-value="updateStreams()"
               :rules="[(val: any) => !!val || 'Field is required!']"
-              style="width: 400px"
+              style="min-width: 220px"
             />
           </div>
-          <scheduled-alert
-            ref="scheduledAlertRef"
-            :columns="filteredColumns"
-            :conditions="streamRoute.query_condition.conditions"
-            :alertData="streamRoute"
-            v-model:trigger="streamRoute.trigger_condition"
-            v-model:sql="streamRoute.query_condition.sql"
-            v-model:query_type="streamRoute.query_condition.type"
-            v-model:aggregation="streamRoute.query_condition.aggregation"
-            v-model:isAggregationEnabled="isAggregationEnabled"
-            @field:add="addField"
-            @field:remove="removeField"
-            class="q-mt-sm"
-          />
-
-          <div class="q-mt-md">
-            <div class="text-bold">{{ t("alerts.additionalVariables") }}</div>
-            <variables-input
-              class="o2-input"
-              :variables="streamRoute.context_attributes"
-              @add:variable="addVariable"
-              @remove:variable="removeVariable"
+          <div
+            data-test="add-alert-stream-select"
+            class="o2-input"
+            style="padding-top: 0"
+          >
+            <q-select
+              v-model="derivedStream.destination.stream_name"
+              :options="filteredStreams"
+              :label="t('alerts.stream_name') + ' *'"
+              :loading="isFetchingStreams"
+              :popup-content-style="{ textTransform: 'lowercase' }"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-sm showLabelOnTop no-case"
+              filled
+              stack-label
+              dense
+              use-input
+              hide-selected
+              fill-input
+              :input-debounce="400"
+              v-bind:readonly="isUpdating"
+              v-bind:disable="isUpdating"
+              @filter="filterStreams"
+              behavior="menu"
+              :rules="[(val: any) => !!val || 'Field is required!']"
+              style="min-width: 250px !important; width: 250px !important"
             />
           </div>
         </div>
+
+        <!-- 
+
+        Destination Stream
+
+            Org id
+
+            Stream name
+
+            Stream Type 
+
+        -->
+
+        <real-time-alert
+          :columns="filteredColumns"
+          :conditions="derivedStream.queryConditions"
+          @field:add="addField"
+          @field:remove="removeField"
+        />
 
         <div
           class="flex justify-start q-mt-lg q-py-sm full-width"
@@ -194,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import { computed, defineAsyncComponent, onMounted, ref, type Ref } from "vue";
+import { computed, onMounted, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import RealTimeAlert from "../alerts/RealTimeAlert.vue";
 import { getUUID } from "@/utils/zincutils";
@@ -203,44 +191,26 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useQuasar } from "quasar";
-import ScheduledAlert from "@/components/alerts/ScheduledAlert.vue";
 
-const VariablesInput = defineAsyncComponent(
-  () => import("@/components/alerts/VariablesInput.vue"),
-);
-
-interface RouteCondition {
+interface QueryCondition {
   column: string;
   operator: string;
   value: any;
   id: string;
 }
 
-interface StreamRoute {
+interface DerivedStream {
   name: string;
-  conditions: RouteCondition[];
   destination: {
     // should be part of payload
     org_id: string;
     stream_name: string;
-    stream_type: "logs" | "enrichment_tables";
+    stream_type: "logs" | "metrics" | "traces" | "index";
   };
-  is_real_time: boolean;
-  query_condition: {
-    sql: string;
-    type: "custom" | "sql";
-    aggregation: string | null;
-    conditions: RouteCondition[];
-  };
-  trigger_condition: {
-    operator: string;
-    threshold: number;
-    period: number;
-    frequency_type: string;
-    frequency: number;
-    cron: string;
-  };
-  context_attributes: { key: string; value: string; id: string }[];
+  isRealTime: false;
+  queryConditions: QueryCondition[];
+  triggerConditions: {};
+  contextAttributes: {};
   description: string;
   enabled: boolean;
 }
@@ -259,7 +229,7 @@ const props = defineProps({
     required: false,
     default: () => null,
   },
-  streamRoutes: {
+  derivedStreams: {
     type: Object,
     required: true,
     default: () => ({}),
@@ -294,8 +264,6 @@ const originalStreamFields: Ref<any[]> = ref([]);
 
 const isValidName: Ref<boolean> = ref(true);
 
-const isAggregationEnabled = ref(false);
-
 let existingStreamNames: any;
 
 const nodeLink = ref({
@@ -310,37 +278,22 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const getDefaultStreamRoute = () => {
+const getDefaultDerivedStream = () => {
+  //   return {
+  //     name: "",
+  //     conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
+  //   };
   return {
     name: "",
-    conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
     destination: {
       org_id: "",
       stream_name: "",
       stream_type: "logs",
     },
-    is_real_time: true,
-    query_condition: {
-      sql: "",
-      type: "custom",
-      aggregation: "",
-      conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
-    },
-    trigger_condition: {
-      operator: "=",
-      threshold: 2,
-      period: 10,
-      frequency_type: "minutes",
-      cron: "",
-      frequency: 2,
-    },
-    context_attributes: [
-      {
-        key: "",
-        value: "",
-        id: getUUID(),
-      },
-    ],
+    is_real_time: false,
+    query_condition: {},
+    trigger_condition: {},
+    context_attributes: {},
     description: "",
     enabled: true,
   };
@@ -349,53 +302,28 @@ const getDefaultStreamRoute = () => {
 onMounted(() => {
   if (props.editingRoute) {
     isUpdating.value = true;
-
-    streamRoute.value = JSON.parse(
+    derivedStream.value = JSON.parse(
       JSON.stringify(props.editingRoute),
-    ) as StreamRoute;
-
-    if (!streamRoute.value.is_real_time) {
-      // If aggregation was present enable aggregation toggle
-      isAggregationEnabled.value =
-        !!props.editingRoute.query_condition.aggregation;
-
-      // If context attributes are present, convert them to array
-      streamRoute.value.context_attributes = Object.keys(
-        streamRoute.value.context_attributes,
-      ).map((attr) => {
-        return {
-          key: attr,
-          value: streamRoute.value.context_attributes[attr],
-          id: getUUID(),
-        };
-      });
-
-      // If query conditions are present, add uuid to each condition
-      streamRoute.value.query_condition.conditions =
-        streamRoute.value.query_condition.conditions.map((condition: any) => {
-          return {
-            ...condition,
-            id: getUUID(),
-          };
-        });
-    }
+    ) as DerivedStream;
   }
 
-  originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
+  originalDerivedStream.value = JSON.parse(JSON.stringify(derivedStream.value));
 
   existingStreamNames = new Set(
-    ...Object.values(props.streamRoutes).map((route: any) => route.name),
+    ...Object.values(props.derivedStreams).map((route: any) => route.name),
     props.streamName,
   );
 
   updateStreamFields();
 });
 
-const streamTypes = ["logs", "enrichment_tables"];
+const streamTypes = ["logs", "metrics", "traces"];
 
-const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
+const derivedStream: Ref<DerivedStream> = ref(getDefaultDerivedStream());
 
-const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
+const originalDerivedStream: Ref<DerivedStream> = ref(
+  getDefaultDerivedStream(),
+);
 
 const filterColumns = (options: any[], val: String, update: Function) => {
   let filteredOptions: any[] = [];
@@ -421,7 +349,7 @@ const filterStreams = (val: string, update: any) => {
 const isValidStreamName = computed(() => {
   const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
   // Check if the role name is valid
-  return roleNameRegex.test(streamRoute.value.name);
+  return roleNameRegex.test(derivedStream.value.name);
 });
 
 const updateStreamFields = async () => {
@@ -444,34 +372,19 @@ const updateStreamFields = async () => {
 };
 
 const addField = () => {
-  if (streamRoute.value.is_real_time) {
-    streamRoute.value.conditions.push({
-      column: "",
-      operator: "",
-      value: "",
-      id: getUUID(),
-    });
-  } else {
-    streamRoute.value.query_condition.conditions.push({
-      column: "",
-      operator: "",
-      value: "",
-      id: getUUID(),
-    });
-  }
+  derivedStream.value.queryConditions.push({
+    column: "",
+    operator: "=",
+    value: "",
+    id: getUUID(),
+  });
 };
 
 const removeField = (field: any) => {
-  if (streamRoute.value.is_real_time) {
-    streamRoute.value.conditions = streamRoute.value.conditions.filter(
+  derivedStream.value.queryConditions =
+    derivedStream.value.queryConditions.filter(
       (_field: any) => _field.id !== field.id,
     );
-  } else {
-    streamRoute.value.query_condition.conditions =
-      streamRoute.value.query_condition.conditions.filter(
-        (_field: any) => _field.id !== field.id,
-      );
-  }
 };
 
 const closeDialog = () => {
@@ -480,8 +393,8 @@ const closeDialog = () => {
 
 const openCancelDialog = () => {
   if (
-    JSON.stringify(originalStreamRouting.value) ===
-    JSON.stringify(streamRoute.value)
+    JSON.stringify(originalDerivedStream.value) ===
+    JSON.stringify(derivedStream.value)
   ) {
     closeDialog();
     return;
@@ -506,13 +419,17 @@ const saveRouting = () => {
   // Save routing
   emit("update:node", {
     data: {
-      ...getRoutePayload(),
-      name: streamRoute.value.name,
+      ...derivedStream.value,
+      name: derivedStream.value.name,
     },
     link: nodeLink.value,
   });
 
   emit("cancel:hideform");
+};
+
+const saveUpdatedLink = (link: { from: string; to: string }) => {
+  nodeLink.value = link;
 };
 
 const openDeleteDialog = () => {
@@ -528,7 +445,7 @@ const deleteRoute = () => {
       ...props.editingRoute,
       name: props.editingRoute.name,
     },
-    type: "streamRoute",
+    type: "derivedStream",
   });
 
   emit("delete:node", {
@@ -544,9 +461,9 @@ const deleteRoute = () => {
 
 const validateStreamName = () => {
   isValidName.value = true;
-  Object.values(props.streamRoutes).forEach((route: any) => {
+  Object.values(props.derivedStreams).forEach((route: any) => {
     if (
-      route.name === streamRoute.value.name ||
+      route.name === derivedStream.value.name ||
       route.name === props.streamName
     ) {
       isValidName.value = false;
@@ -554,84 +471,7 @@ const validateStreamName = () => {
   });
 };
 
-const addVariable = () => {
-  streamRoute.value.context_attributes.push({
-    key: "",
-    value: "",
-    id: getUUID(),
-  });
-};
-
-const removeVariable = (variable: any) => {
-  streamRoute.value.context_attributes =
-    streamRoute.value.context_attributes.filter(
-      (_variable: any) => _variable.id !== variable.id,
-    );
-};
-
-const getRoutePayload = () => {
-  let payload = JSON.parse(JSON.stringify(streamRoute.value));
-
-  if (payload.uuid) delete payload.uuid;
-
-  if (payload.is_real_time) {
-    payload = {
-      name: payload.name,
-      conditions: payload.conditions,
-      is_real_time: payload.is_real_time,
-    };
-  } else {
-    // Deleting uuid from payload as it was added for reference of frontend
-    payload.destination.org_id = store.state.selectedOrganization.identifier;
-
-    payload.destination.stream_name = payload.name;
-
-    payload.context_attributes = {};
-
-    payload.query_condition.type = payload.is_real_time
-      ? "custom"
-      : streamRoute.value.query_condition.type;
-
-    streamRoute.value.context_attributes.forEach((attr: any) => {
-      if (attr.key?.trim() && attr.value?.trim())
-        payload.context_attributes[attr.key] = attr.value;
-    });
-
-    payload.trigger_condition.threshold = Number(
-      streamRoute.value.trigger_condition.threshold,
-    );
-
-    payload.trigger_condition.period = Number(
-      streamRoute.value.trigger_condition.period,
-    );
-
-    payload.trigger_condition.frequency = Number(
-      streamRoute.value.trigger_condition.frequency,
-    );
-
-    payload.description = streamRoute.value.description.trim();
-
-    if (
-      !isAggregationEnabled.value ||
-      streamRoute.value.query_condition.type !== "custom"
-    ) {
-      payload.query_condition.aggregation = null;
-    }
-  }
-
-  if (isUpdating.value) {
-    payload.updatedAt = new Date().toISOString();
-    payload.lastEditedBy = store.state.userInfo.email;
-  } else {
-    payload.createdAt = new Date().toISOString();
-    payload.owner = store.state.userInfo.email;
-    payload.lastTriggeredAt = new Date().getTime();
-    payload.lastEditedBy = store.state.userInfo.email;
-    payload.updatedAt = new Date().toISOString();
-  }
-
-  return payload;
-};
+const updateStreams = () => {};
 </script>
 
 <style scoped>
@@ -640,12 +480,8 @@ const getRoutePayload = () => {
   padding-top: 16px;
 }
 .stream-routing-container {
-  width: 720px;
+  width: fit-content;
   border-radius: 8px;
   /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
-}
-
-.stream-routing-section {
-  min-height: 100%;
 }
 </style>
