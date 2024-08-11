@@ -389,14 +389,15 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let stream_name = keys[2];
 
                 if stream_type.eq(&StreamType::EnrichmentTables) {
+                    let data = super::enrichment_table::get(org_id, stream_name)
+                        .await
+                        .unwrap();
                     ENRICHMENT_TABLES.insert(
                         item_key.to_owned(),
                         StreamTable {
                             org_id: org_id.to_string(),
                             stream_name: stream_name.to_string(),
-                            data: super::enrichment_table::get(org_id, stream_name)
-                                .await
-                                .unwrap(),
+                            data,
                         },
                     );
                 }

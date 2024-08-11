@@ -68,7 +68,7 @@ impl Ingest for Ingester {
                     &org_id,
                     &stream_name,
                     json_records,
-                    false,
+                    true,
                 )
                 .await
                 .map_or_else(

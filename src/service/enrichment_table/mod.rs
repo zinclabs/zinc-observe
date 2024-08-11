@@ -44,7 +44,8 @@ use crate::{
     common::meta::{self, http::HttpResponse as MetaHttpResponse, stream::SchemaRecords},
     service::{
         compact::retention,
-        db, format_stream_name,
+        db::{self, enrichment_table},
+        format_stream_name,
         ingestion::write_file,
         schema::{check_for_schema, stream_schema_exists},
         usage::report_request_usage_stats,
@@ -184,6 +185,13 @@ pub async fn save_enrichment_data(
         log::error!("ingestion error while syncing writer: {}", e);
     }
 
+    // notifiy update
+    if stream_schema.has_fields {
+        if let Err(e) = super::db::enrichment_table::notify_update(org_id, stream_name).await {
+            log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
+        };
+    }
+
     req_stats.response_time = start.elapsed().as_secs_f64();
     // metric + data usage
     report_request_usage_stats(
@@ -230,6 +238,9 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     let mut w = STREAM_SETTINGS.write().await;
     w.remove(&key);
     drop(w);
+
+    // delete stream key
+    let _ = enrichment_table::delete(org_id, stream_name).await;
 
     // delete stream stats cache
     stats::remove_stream_stats(org_id, stream_name, stream_type);

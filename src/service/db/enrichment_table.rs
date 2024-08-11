@@ -13,15 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use chrono::Utc;
 use config::{
     meta::stream::StreamType,
     utils::{json, time::BASE_TIME},
 };
-use infra::cache::stats;
+use infra::{cache::stats, db};
 use vrl::prelude::NotNan;
 
-use crate::service::search as SearchService;
+use crate::{
+    common::infra::config::ENRICHMENT_TABLES,
+    service::{enrichment::StreamTable, search as SearchService},
+};
 
 pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
     let stats = stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
@@ -86,4 +91,65 @@ fn convert_to_vrl(value: &json::Value) -> vrl::value::Value {
                 .collect(),
         ),
     }
+}
+
+pub async fn notify_update(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
+    let cluster_coordinator = db::get_coordinator().await;
+    let key: String = format!(
+        "/enrichment_table/{org_id}/{}/{}",
+        StreamType::EnrichmentTables,
+        name
+    );
+    cluster_coordinator.put(&key, "".into(), true, None).await
+}
+
+pub async fn delete(org_id: &str, name: &str) -> Result<(), infra::errors::Error> {
+    let cluster_coordinator = db::get_coordinator().await;
+    let key: String = format!(
+        "/enrichment_table/{org_id}/{}/{}",
+        StreamType::EnrichmentTables,
+        name
+    );
+    cluster_coordinator.delete(&key, false, false, None).await
+}
+
+pub async fn watch() -> Result<(), anyhow::Error> {
+    let key = "/enrichment_table/";
+    let cluster_coordinator = db::get_coordinator().await;
+    let mut events = cluster_coordinator.watch(key).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("Start watching stream enrichment_table");
+    loop {
+        let ev = match events.recv().await {
+            Some(ev) => ev,
+            None => {
+                log::error!("watch_stream_enrichment_table: event channel closed");
+                break;
+            }
+        };
+        match ev {
+            db::Event::Put(ev) => {
+                let item_key = ev.key.strip_prefix(key).unwrap();
+                let keys = item_key.split('/').collect::<Vec<&str>>();
+                let org_id = keys[0];
+                let stream_name = keys[2];
+
+                let data = super::enrichment_table::get(org_id, stream_name)
+                    .await
+                    .unwrap();
+                println!("data len : {:?}", data.len());
+                ENRICHMENT_TABLES.insert(
+                    item_key.to_owned(),
+                    StreamTable {
+                        org_id: org_id.to_string(),
+                        stream_name: stream_name.to_string(),
+                        data,
+                    },
+                );
+            }
+            db::Event::Delete(_) => {}
+            db::Event::Empty => {}
+        }
+    }
+    Ok(())
 }
