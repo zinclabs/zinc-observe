@@ -137,7 +137,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let data = super::enrichment_table::get(org_id, stream_name)
                     .await
                     .unwrap();
-                println!("data len : {:?}", data.len());
                 ENRICHMENT_TABLES.insert(
                     item_key.to_owned(),
                     StreamTable {
