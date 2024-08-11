@@ -91,6 +91,20 @@ pub async fn save_enrichment_data(
         );
     }
 
+    let stats = stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables);
+    let max_enrichment_table_size = get_config().limit.max_enrichment_table_size;
+    if stats.storage_size > max_enrichment_table_size as f64 {
+        return Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                format!(
+                    "enrichment table [{stream_name}] storage size {} exceeds max storage size {}",
+                    stats.storage_size, max_enrichment_table_size
+                ),
+            )),
+        );
+    }
+
     let mut schema_evolved = false;
     let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
     let stream_schema = stream_schema_exists(

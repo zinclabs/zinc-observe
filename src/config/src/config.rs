@@ -918,6 +918,12 @@ pub struct Limit {
     pub consistent_hash_vnodes: usize,
     #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
     pub datafusion_file_stat_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_ENRICHMENT_TABLE_LIMIT",
+        default = 256,
+        help = "Maximum size of a single enrichment table in mb"
+    )]
+    pub max_enrichment_table_size: usize,
 }
 
 #[derive(EnvConfig)]
