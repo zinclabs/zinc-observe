@@ -86,10 +86,9 @@ impl Ingest for Ingester {
                             );
                             Err(anyhow::anyhow!(
                                 "Internal gPRC ingestion service errors saving enrichment data: {}",
-                                res.error().unwrap().to_string()
+                                res.error().map_or("".to_string(), |err| err.to_string())
                             ))
                         } else {
-
                             Ok(())
                         }
                     },
