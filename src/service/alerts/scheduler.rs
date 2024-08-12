@@ -581,16 +581,17 @@ async fn handle_derived_stream_triggers(
             ingestion_type: Some(cluster_rpc::IngestionType::Json.into()), /* TODO(taiming): finalize IngestionType for derived_stream */
         };
         match ingestion_service::ingest(&org_id, req).await {
-            Ok(_) => {
+            Ok(resp) if resp.status_code == 200 => {
                 log::info!(
                     "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
                 );
                 db::scheduler::update_trigger(new_trigger).await?;
             }
-            Err(e) => {
+            error => {
+                let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
                 log::error!(
                     "Error in ingesting DerivedStream result to destination {:?}, org: {}, module_key: {}",
-                    e,
+                    err,
                     new_trigger.org,
                     new_trigger.module_key
                 );
@@ -615,8 +616,9 @@ async fn handle_derived_stream_triggers(
                     .await?;
                 }
                 trigger_data_stream.status = TriggerDataStatus::Failed;
-                trigger_data_stream.error =
-                    Some(format!("error sending notification for alert: {e}"));
+                trigger_data_stream.error = Some(format!(
+                    "error saving enrichment table for DerivedStream: {err}"
+                ));
             }
         }
     } else {
