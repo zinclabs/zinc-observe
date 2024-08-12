@@ -2571,113 +2571,115 @@ export default defineComponent({
     },
   },
   watch: {
-    addSearchTerm() {
-      if (this.searchObj.data.stream.addToFilter != "") {
-        let currentQuery = this.searchObj.data.editorValue.split("|");
-        let filter = this.searchObj.data.stream.addToFilter;
+    addSearchTerm: {
+      handler() {
+        if (this.searchObj.data.stream.addToFilter != "") {
+          let currentQuery = this.searchObj.data.editorValue.split("|");
+          let filter = this.searchObj.data.stream.addToFilter;
 
-        const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
+          const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
 
-        if (isFilterValueNull) {
-          filter = filter
-            .replace(/=|!=/, (match) => {
-              return match === "=" ? " is " : " is not ";
-            })
-            .replace(/'null'/, "null");
-        }
-
-        if (currentQuery.length > 1) {
-          if (currentQuery[1].trim() != "") {
-            currentQuery[1] += " and " + filter;
-          } else {
-            currentQuery[1] = filter;
+          if (isFilterValueNull) {
+            filter = filter
+              .replace(/=|!=/, (match) => {
+                return match === "=" ? " is " : " is not ";
+              })
+              .replace(/'null'/, "null");
           }
-          this.searchObj.data.query = currentQuery.join("| ");
-        } else {
-          // if (currentQuery != "") {
-          //   if (
-          //     this.searchObj.meta.sqlMode == true &&
-          //     currentQuery.toString().toLowerCase().indexOf("where") == -1
-          //   ) {
-          //     currentQuery += " where " + filter;
-          //   } else {
-          //     currentQuery += " and " + filter;
-          //   }
-          // } else {
-          //   if (this.searchObj.meta.sqlMode == true) {
-          //     currentQuery = "where " + filter;
-          //   } else {
-          //     currentQuery = filter;
-          //   }
-          // }
 
-          if (this.searchObj.meta.sqlMode == true) {
-            // if query contains order by clause or limit clause then add where clause before that
-            // if query contains where clause then add filter after that with and operator and keep order by or limit after that
-            // if query does not contain where clause then add where clause before filter
-            let query = currentQuery[0];
-            if (query.toLowerCase().includes("where")) {
-              if (query.toLowerCase().includes("order by")) {
-                const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
-                  query,
-                  "order by"
-                );
-                query =
-                  beforeOrderBy.trim() +
-                  " AND " +
-                  filter +
-                  " order by" +
-                  afterOrderBy;
-              } else if (query.toLowerCase().includes("limit")) {
-                const [beforeLimit, afterLimit] = queryIndexSplit(
-                  query,
-                  "limit"
-                );
-                query =
-                  beforeLimit.trim() + " AND " + filter + " limit" + afterLimit;
-              } else {
-                query = query + " AND " + filter;
-              }
+          if (currentQuery.length > 1) {
+            if (currentQuery[1].trim() != "") {
+              currentQuery[1] += " and " + filter;
             } else {
-              if (query.toLowerCase().includes("order by")) {
-                const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
-                  query,
-                  "order by"
-                );
-                query =
-                  beforeOrderBy.trim() +
-                  " where " +
-                  filter +
-                  " order by" +
-                  afterOrderBy;
-              } else if (query.toLowerCase().includes("limit")) {
-                const [beforeLimit, afterLimit] = queryIndexSplit(
-                  query,
-                  "limit"
-                );
-                query =
-                  beforeLimit.trim() +
-                  " where " +
-                  filter +
-                  " limit" +
-                  afterLimit;
-              } else {
-                query = query + " where " + filter;
-              }
+              currentQuery[1] = filter;
             }
-            currentQuery[0] = query;
+            this.searchObj.data.query = currentQuery.join("| ");
           } else {
-            currentQuery[0].length == 0
-              ? (currentQuery[0] = filter)
-              : (currentQuery[0] += " and " + filter);
-          }
+            // if (currentQuery != "") {
+            //   if (
+            //     this.searchObj.meta.sqlMode == true &&
+            //     currentQuery.toString().toLowerCase().indexOf("where") == -1
+            //   ) {
+            //     currentQuery += " where " + filter;
+            //   } else {
+            //     currentQuery += " and " + filter;
+            //   }
+            // } else {
+            //   if (this.searchObj.meta.sqlMode == true) {
+            //     currentQuery = "where " + filter;
+            //   } else {
+            //     currentQuery = filter;
+            //   }
+            // }
 
-          this.searchObj.data.query = currentQuery[0];
+            if (this.searchObj.meta.sqlMode == true) {
+              // if query contains order by clause or limit clause then add where clause before that
+              // if query contains where clause then add filter after that with and operator and keep order by or limit after that
+              // if query does not contain where clause then add where clause before filter
+              let query = currentQuery[0];
+              if (query.toLowerCase().includes("where")) {
+                if (query.toLowerCase().includes("order by")) {
+                  const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
+                    query,
+                    "order by"
+                  );
+                  query =
+                    beforeOrderBy.trim() +
+                    " AND " +
+                    filter +
+                    " order by" +
+                    afterOrderBy;
+                } else if (query.toLowerCase().includes("limit")) {
+                  const [beforeLimit, afterLimit] = queryIndexSplit(
+                    query,
+                    "limit"
+                  );
+                  query =
+                    beforeLimit.trim() + " AND " + filter + " limit" + afterLimit;
+                } else {
+                  query = query + " AND " + filter;
+                }
+              } else {
+                if (query.toLowerCase().includes("order by")) {
+                  const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
+                    query,
+                    "order by"
+                  );
+                  query =
+                    beforeOrderBy.trim() +
+                    " where " +
+                    filter +
+                    " order by" +
+                    afterOrderBy;
+                } else if (query.toLowerCase().includes("limit")) {
+                  const [beforeLimit, afterLimit] = queryIndexSplit(
+                    query,
+                    "limit"
+                  );
+                  query =
+                    beforeLimit.trim() +
+                    " where " +
+                    filter +
+                    " limit" +
+                    afterLimit;
+                } else {
+                  query = query + " where " + filter;
+                }
+              }
+              currentQuery[0] = query;
+            } else {
+              currentQuery[0].length == 0
+                ? (currentQuery[0] = filter)
+                : (currentQuery[0] += " and " + filter);
+            }
+
+            this.searchObj.data.query = currentQuery[0];
+          }
+          this.searchObj.data.stream.addToFilter = "";
+          if (this.queryEditorRef?.setValue)
+            this.queryEditorRef.setValue(this.searchObj.data.query);
         }
-        this.searchObj.data.stream.addToFilter = "";
-        if (this.queryEditorRef?.setValue)
-          this.queryEditorRef.setValue(this.searchObj.data.query);
-      }
+      }, immediate: false,
     },
     toggleFunction(newVal) {
       if (newVal == false) {
