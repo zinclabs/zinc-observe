@@ -242,14 +242,14 @@ export default defineComponent({
           "username",
           false,
           "",
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res) => {
           resultTotal.value = res.data.data.length;
 
           let counter = 1;
           orgMembers.value = res.data.data.map((data: any) => {
-            if (store.state.userInfo.email == data.email) {
+            if (store.state.userInfo.username == data.username) {
               currentUserRole.value = data.role;
             }
 
@@ -261,14 +261,14 @@ export default defineComponent({
               role: data.role,
               member_created: date.formatDate(
                 parseInt(data.member_created),
-                "YYYY-MM-DDTHH:mm:ssZ"
+                "YYYY-MM-DDTHH:mm:ssZ",
               ),
               member_updated: date.formatDate(
                 parseInt(data.member_updated),
-                "YYYY-MM-DDTHH:mm:ssZ"
+                "YYYY-MM-DDTHH:mm:ssZ",
               ),
               org_member_id: data.org_member_id,
-              isLoggedinUser: store.state.userInfo.email == data.email,
+              isLoggedinUser: store.state.userInfo.username == data.username,
               status: data.status,
             };
           });
@@ -314,7 +314,7 @@ export default defineComponent({
         .filter((email: any) => email.trim().length > 0)
         .map((email: any) => email.trim().toLowerCase());
       const validationArray = emailArray.map((email: any) =>
-        validateEmail(email)
+        validateEmail(email),
       );
 
       if (!validationArray.includes(false)) {
@@ -327,7 +327,7 @@ export default defineComponent({
         organizationsService
           .add_members(
             { member_lists: emailArray, role: selectedRole.value },
-            store.state.selectedOrganization.identifier
+            store.state.selectedOrganization.identifier,
           )
           .then((res: { data: any }) => {
             const data = res.data;
@@ -390,7 +390,7 @@ export default defineComponent({
             username: row.username,
             organization_id: parseInt(store.state.selectedOrganization.id),
           },
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {

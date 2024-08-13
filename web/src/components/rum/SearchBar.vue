@@ -244,8 +244,6 @@ export default defineComponent({
           button: "Date Change",
           tab: value.tab,
           value: value,
-          //user_org: this.store.state.selectedOrganization.identifier,
-          //user_id: this.store.state.userInfo.email,
           stream_name: searchObj.data.stream.selectedStream.value,
           page: "Search Logs",
         });

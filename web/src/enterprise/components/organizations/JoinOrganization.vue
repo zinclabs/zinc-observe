@@ -119,13 +119,13 @@ export default defineComponent({
         .then((res) => {
           let counter = 1;
           this.associatedMembers = res.data.data.map(
-            (data: { email: any; status: any }) => {
+            (data: { username: any; status: any }) => {
               return {
                 "#": counter++,
-                email: data.email,
+                username: data.username,
                 status: data.status,
                 owner:
-                  data.email == this.store.state.userInfo.email ? true : false,
+                  data.username == this.store.state.userInfo.username ? true : false,
               };
             }
           );

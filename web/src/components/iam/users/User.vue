@@ -424,8 +424,6 @@ export default defineComponent({
       }
     });
 
-    const currentUser = computed(() => store.state.userInfo.email);
-
     const updateUserActions = () => {
       usersState.users.forEach((member: any) => {
         member.enableEdit = shouldAllowEdit(member);

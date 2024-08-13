@@ -372,9 +372,7 @@ export default defineComponent({
             identifier: data.identifier,
             type: convertToTitleCase(data.type),
             owner:
-              data.UserObj.first_name != ""
-                ? data.UserObj.first_name
-                : data.UserObj.email,
+              data.data.username,
             created: date.formatDate(data.created_at, "YYYY-MM-DDTHH:mm:ssZ"),
             role: convertToTitleCase(role),
             status: convertToTitleCase(data.status),

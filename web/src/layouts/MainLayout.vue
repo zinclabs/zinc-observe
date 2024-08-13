@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{
                       user.given_name
                         ? user.given_name + " " + user.family_name
-                        : user.email
+                        : user.username
                     }}
                   </div>
                 </div>
@@ -812,7 +812,7 @@ export default defineComponent({
               label: data.name,
               id: data.id,
               identifier: data.identifier,
-              user_email: store.state.userInfo.email,
+              username: store.state.userInfo.username,
               ingest_threshold: data.ingest_threshold,
               search_threshold: data.search_threshold,
               subscription_type: data.hasOwnProperty("CustomerBillingObj")
@@ -842,7 +842,7 @@ export default defineComponent({
             if (
               ((selectedOrg.value == "" || selectedOrg.value == undefined) &&
                 data.type == "default" &&
-                store.state.userInfo.email == data.UserObj.email &&
+                store.state.userInfo.username == data.UserObj.username &&
                 (customOrganization == "" ||
                   customOrganization == undefined)) ||
               (store.state.organizations?.length == 1 &&

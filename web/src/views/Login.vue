@@ -93,7 +93,7 @@ export default defineComponent({
             if (
               (selectedOrg.value == "" &&
                 (data.type == "default" || data.id == "1") &&
-                store.state.userInfo.email == data.UserObj.email) ||
+                store.state.userInfo.username == data.UserObj.username) ||
               res.data.data.length == 1
             ) {
               selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
@@ -101,7 +101,7 @@ export default defineComponent({
               store.dispatch("setSelectedOrganization", selectedOrg.value);
             }
             return optiondata;
-          }
+          },
         );
         redirectUser();
       });

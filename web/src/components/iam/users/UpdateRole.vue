@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-body1 text-bold text-dark">
             {{ t("user.editUser") }}
           </div>
-          <!-- <div>({{ orgMemberData.first_name }}: {{ orgMemberData.email }})</div> -->
         </div>
         <div class="col-auto">
           <q-btn v-close-popup="true" round flat icon="cancel" />
@@ -34,21 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-form ref="updateUserForm" @submit.prevent="onSubmit">
         <q-input v-model="orgMemberData.first_name" :label="t('user.name')" color="input-border" bg-color="input-bg"
           class="q-py-md showLabelOnTop" stack-label outlined readonly filled dense />
-
-        <!--
-        <q-input
-          v-model="orgMemberData.email"
-          :label="t('user.email')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          readonly
-          filled
-          dense
-        />
-        -->
 
         <q-select v-model="orgMemberData.role" :label="t('user.role')" :options="roleOptions" color="input-border"
           bg-color="input-bg" class="q-pt-md q-pb-sm showLabelOnTop" stack-label outlined filled dense />
@@ -78,7 +62,7 @@ const defaultValue: any = () => {
     org_member_id: "",
     role: "",
     first_name: "",
-    email: "",
+    username: "",
   };
 };
 let callOrgMember: any;
@@ -115,7 +99,7 @@ export default defineComponent({
         org_member_id: this.modelValue.org_member_id,
         role: this.modelValue.role,
         first_name: this.modelValue.first_name,
-        email: this.modelValue.email,
+        username: this.modelValue.username,
       };
     }
   },

@@ -25,12 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-list bordered separator style="overflow: auto; max-height: calc(800vh)">
       <q-item
         v-for="member in memberData"
-        :key="member.email"
+        :key="member.username"
         v-ripple
         bordered
         clickable
       >
-        <q-item-section>{{ member.email }}</q-item-section>
+        <q-item-section>{{ member.username }}</q-item-section>
         <q-item-section side
           ><q-item-label caption> {{ member.status }}</q-item-label>
         </q-item-section>

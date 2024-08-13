@@ -67,7 +67,7 @@ export default defineComponent({
           const localOrg: any = useLocalOrganization();
           if (
             localOrg.value != null &&
-            localOrg.value.user_email !== store.state.userInfo.email
+            localOrg.value.username !== store.state.userInfo.username
           ) {
             localOrg.value = null;
             useLocalOrganization("");
@@ -86,7 +86,7 @@ export default defineComponent({
                 label: data.name,
                 id: data.id,
                 identifier: data.identifier,
-                user_email: store.state.userInfo.email,
+                username: store.state.userInfo.username,
                 ingest_threshold: data.ingest_threshold,
                 search_threshold: data.search_threshold,
                 subscription_type: data.hasOwnProperty("CustomerBillingObj")
@@ -101,7 +101,7 @@ export default defineComponent({
               if (
                 (selectedOrg.value == "" &&
                   (data.type == "default" || data.id == "1") &&
-                  store.state.userInfo.email == data.UserObj.email) ||
+                  store.state.userInfo.username == data.UserObj.username) ||
                 res.data.data.length == 1
               ) {
                 selectedOrg.value = localOrg.value
