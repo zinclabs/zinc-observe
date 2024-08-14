@@ -51,18 +51,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('user.isExistingUser')"
           />
 
-          <q-input v-if="(!beingUpdated && !existingUser)" v-model="formData.email" :label="t('user.email') + ' *'" color="input-border"
-            bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense :rules="[
-            (val, rules) =>
-              rules.email(val) || 'Please enter a valid email address',
-          ]" />
+          <q-input
+            v-if="!beingUpdated && !existingUser"
+            v-model="formData.email"
+            :label="t('user.email') + ' *'"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            :rules="[
+              (val: string, rules: any) =>
+                rules.email(val) || 'Please enter a valid email address',
+            ]"
+          />
 
-          <q-input v-if="(!beingUpdated && existingUser)" v-model="formData.username" :label="t('user.username') + ' *'" color="input-border"
-            bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense :rules="[
-            // TODO(omkar): new rule to validate username exists
-            // (val, rules) =>
-            //   rules.email(val) || 'Please enter a valid email address',
-          ]" />
+          <q-input
+            v-if="!beingUpdated && existingUser"
+            v-model="formData.username"
+            :label="t('user.username') + ' *'"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-md showLabelOnTop"
+            stack-label
+            outlined
+            filled
+            dense
+            :rules="[(val: string) => !!val || 'Field is required']"
+          />
 
           <div v-if="!beingUpdated && !existingUser">
             <q-input
@@ -279,8 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="logout_confirm" persistent>
     <q-card>
       <q-card-section class="row items-center">
-        <q-avatar icon="info"
-color="primary" text-color="white" />
+        <q-avatar icon="info" color="primary" text-color="white" />
         <span class="q-ml-sm"
           >As you've chosen to change your password, you'll be automatically
           logged out.</span
@@ -288,8 +305,7 @@ color="primary" text-color="white" />
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="Ok"
-color="primary" @click="signout" />
+        <q-btn flat label="Ok" color="primary" @click="signout" />
       </q-card-actions>
     </q-card>
   </q-dialog>
@@ -377,7 +393,7 @@ export default defineComponent({
     watch(
       () => store.state.organizations,
       () => setOrganizationOptions(),
-      { deep: true }
+      { deep: true },
     );
 
     const setOrganizationOptions = () => {
@@ -498,7 +514,7 @@ export default defineComponent({
             .updateexistinguser(
               { role: this.formData.role },
               selectedOrg,
-              username
+              username,
             )
             .then((res: any) => {
               dismiss();
