@@ -151,16 +151,22 @@ export default defineConfig({
         "o2cs-date-fns": ["date-fns", "date-fns-tz"],
       },
       output: {
-        chunkFileNames: ({ name }) => {
-          if (name.startsWith("o2cs-")) {
-            return `assets/vendor/${name}.[hash].js`;
-          }
-          
-          if (name.includes("editor.api")) {
-            return `assets/${name}.v1.js`;
+        entryFileNames: (data) => {
+          console.log(data);
+          return `assets/${data.name}_entry.js`;
+        },
+        chunkFileNames: (data) => {
+          if (data.name.startsWith("o2cs-")) {
+            // return `assets/vendor/${name}.[hash].js`;
+            return `assets/vendor/${data.name}.js`;
           }
 
-          return `assets/${name}.[hash].js`;
+          if (data.name.includes("editor.api")) {
+            return `assets/${data.name}.v1.js`;
+          }
+
+          return `assets/${data.name}.js`;
+          // return `assets/${name}.[hash].js`;
         },
       },
     },
