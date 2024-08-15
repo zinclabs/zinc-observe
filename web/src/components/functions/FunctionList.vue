@@ -73,7 +73,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="q-table__title">
             {{ t("function.header") }}
           </div>
-          <div class="q-ml-auto" data-test="functions-list-search-input">
+          <div v-if="function_tutorial_url" class="q-ml-auto  items-end">
+              <q-btn
+                outline
+                :label="t('settings.FunctionTutorialUrl')"
+                :href="function_tutorial_url"
+                target="_blank"
+                class="q-mx-md  q-mb-xs "
+                padding="sm md"
+                no-caps
+                rel="noopener noreferrer"
+              />
+            </div>
+
+          <div :class="{ 'q-ml-auto': !function_tutorial_url }"
+          data-test="functions-list-search-input">
+
             <q-input
               v-model="filterQuery"
               borderless
@@ -87,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
           </div>
+          
           <q-btn
             class="q-ml-md q-mb-xs text-bold no-border"
             padding="sm lg"
@@ -464,6 +480,9 @@ export default defineComponent({
     };
   },
   computed: {
+    function_tutorial_url() {
+      return this.store.state.zoConfig.function_tutorial_url;
+    },
     // selectedOrg() {
     //   return this.store.state.selectedOrganization.identifier;
     // },

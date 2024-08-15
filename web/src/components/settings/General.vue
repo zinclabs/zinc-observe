@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <div class="q-px-md q-py-md">
       <div class="text-body1 text-bold">
+
         {{ t("settings.generalPageTitle") }}
       </div>
     </div>
@@ -172,6 +173,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-file>
         </div>
       </div>
+
+      <div class="q-my-lg q-mx-md">
+        <q-separator class="q-my-sm"></q-separator>
+        <div
+    v-if="editingFunctionUrl || store.state.zoConfig.function_tutorial_url == '' "
+    class="q-gutter-md row items-start"
+  >
+    <q-input
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-md showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      data-test="settings_ent_function_url"
+      :label="t('settings.FunctionUrl')"
+      v-model="functionTutorialUrl"
+      :error="!!functionUrlError"
+      :error-message="functionUrlError"
+    />
+    <div
+      class="btn-group relative-position vertical-middle"
+      style="margin-top: 55px"
+    >
+      <q-btn
+        data-test="settings_ent_function_url_save_btn"
+        :loading="onSubmit.isLoading.value"
+        :label="t('dashboard.save')"
+        class="text-bold no-border q-mr-sm"
+        color="secondary"
+        size="sm"
+        type="submit"
+        no-caps
+        @click="updateFunctionUrl"
+      />
+
+      <q-btn
+        type="button"
+        size="sm"
+        :label="t('common.cancel')"
+        @click="editingFunctionUrl = !editingFunctionUrl"
+      ></q-btn>
+    </div>
+  </div>
+  <div v-else style="margin-top: 17px">
+    <div class="q-pt-md text-bold">{{ t("settings.FunctionUrl") }}</div>
+    <br />
+    {{ store.state.zoConfig.function_tutorial_url || "No URL Available" }}
+    <q-btn
+      data-test="settings_ent_function_url_edit_btn"
+      :loading="onSubmit.isLoading.value"
+      icon="edit"
+      size="sm"
+      class="text-bold"
+      type="submit"
+      @click="editingFunctionUrl = !editingFunctionUrl"
+    />
+  </div>
+      </div>
     </div>
   </div>
   <q-spinner-hourglass
@@ -241,10 +302,15 @@ export default defineComponent({
     );
     const loadingState = ref(false);
     const customText = ref("");
+    const functionTutorialUrl = ref("");
     const editingText = ref(false);
+    const functionUrlError =  ref("");
+    const editingFunctionUrl = ref(false);
     const files = ref(null);
 
     customText.value = store.state.zoConfig.custom_logo_text;
+    functionTutorialUrl.value = store.state.zoConfig.function_tutorial_url ;
+
 
     onActivated(() => {
       scrapeIntereval.value =
@@ -417,6 +483,73 @@ export default defineComponent({
           loadingState.value = false;
         });
     };
+    const updateFunctionUrl = () => {
+      loadingState.value = true;
+      let orgIdentifier = "default";
+      functionUrlError.value = "";
+
+      for (let item of store.state.organizations) {
+        if (item.type == "default") {
+          orgIdentifier = item.identifier;
+        }
+      }
+      const urlPattern = new RegExp(
+        "^(https?:\\/\\/)" + // protocol
+        "((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.)+[a-z]{2,}|" + // domain name
+        "((\\d{1,3}\\.){3}\\d{1,3}))" + // OR ip (v4) address
+        "(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*" + // port and path
+        "(\\?[;&a-z\\d%_.~+=-]*)?" + // query string
+        "(\\#[-a-z\\d_]*)?$", // fragment locator
+        "i"
+      );
+
+      if(functionTutorialUrl.value.length > 0 ){
+        if (!urlPattern.test(functionTutorialUrl.value)) {
+        functionUrlError.value = "URL not valid";
+        loadingState.value = false;
+        return;
+      }
+      }
+      //backend work need to have a route 
+      // settingsService
+      //   .updateCustomText(store.state.selectedOrganization?.identifier || orgIdentifier, "function_tutorial_url", functionTutorialUrl.value)
+      //   .then(async (res: any) => {
+      //     if (res.status == 200) {
+      //       q.notify({
+      //         type: "positive",
+      //         message: "URL updated successfully.",
+      //         timeout: 2000,
+      //       });
+
+      //       let stateConfig = JSON.parse(JSON.stringify(store.state.zoConfig));
+      //       stateConfig.function_tutorial_url = functionTutorialUrl.value;
+      //       store.dispatch("setConfig", stateConfig);
+      //       editingFunctionUrl.value = false;
+      //       loadingState.value = false;
+      //     } else {
+      //       q.notify({
+      //         type: "negative",
+      //         message: res?.message || "Error while updating URL.",
+      //         timeout: 2000,
+      //       });
+      //     }
+      //   })
+      //   .catch((err) => {
+      //     q.notify({
+      //       type: "negative",
+      //       message: err?.message || "Something went wrong.",
+      //       timeout: 2000,
+      //     });
+      //   })
+      //   .finally(() => {
+      //     loadingState.value = false;
+      //   });   
+      let stateConfig = JSON.parse(JSON.stringify(store.state.zoConfig));
+            stateConfig.function_tutorial_url = functionTutorialUrl.value;
+            store.dispatch("setConfig", stateConfig);
+            editingFunctionUrl.value = false;
+            loadingState.value = false; 
+      }
 
     interface CounterLabelParams {
       totalSize: string;
@@ -451,8 +584,12 @@ export default defineComponent({
       deleteLogo,
       loadingState,
       customText,
+      functionTutorialUrl,
+      functionUrlError,
       editingText,
+      editingFunctionUrl,
       updateCustomText,
+      updateFunctionUrl,
       confirmDeleteImage: ref(false),
     };
   },

@@ -859,6 +859,8 @@
     "deleteLogo": "Delete Logo",
     "logo": "Logo",
     "customLogoText": "Custom Logo Text",
+    "FunctionUrl": "Function Tutorial URL",
+    "FunctionTutorialUrl": "Function Tutorial",
     "orgLabel": "Organization Parameters",
     "logDetails": "Log Details",
     "traceIdFieldName": "Trace ID Field Name",

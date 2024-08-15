@@ -17,12 +17,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div class="add-function-header row items-center no-wrap">
-      <div class="col">
+      <div class="col ">
         <div v-if="beingUpdated" class="text-h6">
           {{ t("function.updateTitle") }}
         </div>
         <div v-else class="text-h6">{{ t("function.addTitle") }}</div>
+       
       </div>
+      <div v-if="function_tutorial_url" class="q-ml-auto   text-white  items-end">
+        <q-btn
+                outline
+                :label="t('settings.FunctionTutorialUrl')"
+                :href="function_tutorial_url"
+                target="_blank"
+                class="q-mx-md  q-mb-xs "
+                padding="sm md"
+                no-caps
+                rel="noopener noreferrer"
+              />
+            </div>
+          
     </div>
 
     <q-separator />
@@ -182,6 +196,9 @@ export default defineComponent({
     let compilationErr = ref("");
 
     const beingUpdated = computed(() => props.isUpdated);
+
+
+
 
     const streamTypes = ["logs", "metrics"];
 
@@ -373,7 +390,13 @@ end`;
       this.formData = this.modelValue;
     }
   },
+  computed: {
+  function_tutorial_url() {
+      return this.store.state.zoConfig.function_tutorial_url;
+    },
+  },
 });
+
 </script>
 
 <style scoped>
