@@ -500,13 +500,13 @@ async fn handle_derived_stream_triggers(
 
     // evaluate trigger and configure trigger next run time
     let (ret, _) = derived_stream.evaluate(None).await?;
-    if ret.is_some() {
-        log::info!(
-            "DerivedStream conditions satisfied, org: {}, module_key: {}",
-            new_trigger.org,
-            new_trigger.module_key
-        );
-    }
+
+    log::info!(
+        "DerivedStream conditions satisfied, org: {}, module_key: {}, ret: {:#?}",
+        new_trigger.org,
+        new_trigger.module_key,
+        ret
+    );
     if ret.is_some() && derived_stream.trigger_condition.silence > 0 {
         if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
             let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
@@ -559,6 +559,7 @@ async fn handle_derived_stream_triggers(
         error: None,
     };
 
+    log::info!("We are here before condition, module_key: {}", name);
     // ingest evaluation result into destination
     if let Some(data) = ret {
         let local_val = data
@@ -566,14 +567,15 @@ async fn handle_derived_stream_triggers(
             .map(json::Value::Object)
             .collect::<Vec<_>>();
         if local_val.is_empty() {
-            log::debug!(
-                "DerivedStream conditions not satisfied, org: {}, module_key: {}",
+            log::info!(
+                "DerivedStream conditions not satisfied inside if, org: {}, module_key: {}",
                 &new_trigger.org,
                 &new_trigger.module_key
             );
             db::scheduler::update_trigger(new_trigger).await?;
             trigger_data_stream.status = TriggerDataStatus::Completed;
         } else {
+            log::info!("We are in else name: {name}");
             // Ingest result into destination stream
             let (org_id, stream_name, stream_type): (String, String, i32) = {
                 (
