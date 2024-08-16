@@ -100,6 +100,20 @@ export const getUnitValue = (
   decimals: number = 2
 ) => {
   // console.time("getUnitValue:");
+  let formattedValue;
+  if (unit === "$" || unit === "£" || unit === "€" || unit === "¥" || unit === "₹") {
+    const numericValue = parseFloat(value) || 0;
+  
+    const formattedNumber = numericValue.toFixed(decimals);
+    
+    formattedValue = new Intl.NumberFormat('en-IN', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    }).format(Number(formattedNumber));
+    
+  }
+  
+  
   // value sign: positive = 1, negative = -1
   const sign = Math.sign(value);
   // abs value
@@ -162,6 +176,36 @@ export const getUnitValue = (
         unit: "%",
       };
     }
+    case "£":{
+      return {
+        value: `${formattedValue}`,
+        unit: `${unit ?? ""}`,
+      };
+    }
+    case "$":{
+      return {
+        value: `${formattedValue}`,
+        unit: `${unit ?? ""}`,
+      };
+    }
+    case "€":{
+      return {
+        value: `${formattedValue}`,
+        unit: `${unit ?? ""}`,
+      };
+    }
+    case "¥":{
+      return {
+        value: `${formattedValue}`,
+        unit: `${unit ?? ""}`,
+      };
+    }
+    case "₹":{
+      return {
+        value: `${formattedValue}`,
+        unit: `${unit ?? ""}`,
+      };
+    }
     case "default":
     default: {
       return {
@@ -183,6 +227,11 @@ export const getUnitValue = (
  * @return {string} The formatted unit value.
  */
 export const formatUnitValue = (obj: any) => {
+const {unit} = obj;
+
+  if (unit === "$" || unit === "£" || unit === "€" || unit === "¥" || unit === "₹") {
+    return `${obj.unit}${obj.value}`;
+  }
   return `${obj.value}${obj.unit}`;
 };
 
