@@ -860,6 +860,8 @@ const updateTrigger = () => {
 };
 
 const updateTab = () => {
+  if (tab.value === "promql") isVrlFunctionEnabled.value = false;
+
   updateQuery();
   updateAggregationToggle();
   emits("update:query_type", tab.value);
