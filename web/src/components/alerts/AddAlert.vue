@@ -1251,8 +1251,7 @@ export default defineComponent({
 
     async onSubmit() {
       if (
-        !this.formData.is_real_time &&
-        this.formData.query_condition.type == "sql" &&
+        this.formData.is_real_time == "false" && this.formData.query_condition.type == 'sql' && 
         !this.getParser(this.formData.query_condition.sql)
       ) {
         this.q.notify({
