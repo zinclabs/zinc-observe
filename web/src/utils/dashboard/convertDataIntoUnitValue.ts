@@ -97,23 +97,29 @@ export const getUnitValue = (
   value: any,
   unit: string,
   customUnit: string,
-  decimals: number = 2
+  decimals: number = 2,
 ) => {
   // console.time("getUnitValue:");
   let formattedValue;
-  if (unit === "$" || unit === "£" || unit === "€" || unit === "¥" || unit === "₹") {
+  if (
+    [
+      "currency-dollar",
+      "currency-euro",
+      "currency-pound",
+      "currency-yen",
+      "currency-rupee",
+    ].includes(unit)
+  ) {
     const numericValue = parseFloat(value) || 0;
-  
+
     const formattedNumber = numericValue.toFixed(decimals);
-    
-    formattedValue = new Intl.NumberFormat('en-IN', {
+
+    formattedValue = new Intl.NumberFormat("en-IN", {
       minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals
+      maximumFractionDigits: decimals,
     }).format(Number(formattedNumber));
-    
   }
-  
-  
+
   // value sign: positive = 1, negative = -1
   const sign = Math.sign(value);
   // abs value
@@ -176,34 +182,34 @@ export const getUnitValue = (
         unit: "%",
       };
     }
-    case "£":{
+    case "currency-pound": {
       return {
         value: `${formattedValue}`,
-        unit: `${unit ?? ""}`,
+        unit: "£",
       };
     }
-    case "$":{
+    case "currency-dollar": {
       return {
         value: `${formattedValue}`,
-        unit: `${unit ?? ""}`,
+        unit: "$",
       };
     }
-    case "€":{
+    case "currency-euro": {
       return {
         value: `${formattedValue}`,
-        unit: `${unit ?? ""}`,
+        unit: "€",
       };
     }
-    case "¥":{
+    case "currency-yen": {
       return {
         value: `${formattedValue}`,
-        unit: `${unit ?? ""}`,
+        unit: "¥",
       };
     }
-    case "₹":{
+    case "currency-rupee": {
       return {
         value: `${formattedValue}`,
-        unit: `${unit ?? ""}`,
+        unit: "₹",
       };
     }
     case "default":
@@ -212,8 +218,8 @@ export const getUnitValue = (
         value: isNaN(value)
           ? value
           : value === ""
-          ? "-"
-          : (+value)?.toFixed(decimals) ?? 0,
+            ? "-"
+            : ((+value)?.toFixed(decimals) ?? 0),
         unit: "",
       };
     }
@@ -227,9 +233,19 @@ export const getUnitValue = (
  * @return {string} The formatted unit value.
  */
 export const formatUnitValue = (obj: any) => {
-const {unit} = obj;
+  const { unit } = obj;
 
-  if (unit === "$" || unit === "£" || unit === "€" || unit === "¥" || unit === "₹") {
+  if (
+    [
+      "currency-dollar",
+      "currency-euro",
+      "currency-pound",
+      "currency-yen",
+      "currency-rupee",
+    ].includes(unit)
+  ) {
+    console.log(obj);
+
     return `${obj.unit}${obj.value}`;
   }
   return `${obj.value}${obj.unit}`;
@@ -264,6 +280,6 @@ export const isTimeSeries = (sample: any) => {
 export const isTimeStamp = (sample: any) => {
   const microsecondsPattern = /^\d{16}$/;
   return sample.every((value: any) =>
-    microsecondsPattern.test(value?.toString())
+    microsecondsPattern.test(value?.toString()),
   );
 };

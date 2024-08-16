@@ -982,23 +982,23 @@ export default defineComponent({
       },
       {
         label: t("dashboard.currencyDollar"),
-        value: "$",
+        value: "currency-dollar",
       },
       {
         label: t("dashboard.currencyEuro"),
-        value: "€",
+        value: "currency-euro",
       },
       {
         label: t("dashboard.currencyPound"),
-        value: "£",
+        value: "currency-pound",
       },
       {
         label: t("dashboard.currencyYen"),
-        value: "¥",
+        value: "currency-yen",
       },
       {
         label: t("dashboard.currencyRupees"),
-        value: "₹",
+        value: "currency-rupee",
       },
 
       {
