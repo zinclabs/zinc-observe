@@ -111,10 +111,17 @@ export const getUnitValue = (
     ].includes(unit)
   ) {
     const numericValue = parseFloat(value) || 0;
-
     const formattedNumber = numericValue.toFixed(decimals);
-
-    formattedValue = new Intl.NumberFormat("en-IN", {
+  
+    const localeMap :any = {
+      "currency-dollar": "en-US",  // US Dollar
+      "currency-euro": "de-DE",    // Euro
+      "currency-pound": "en-GB",   // British Pound
+      "currency-yen": "ja-JP",     // Japanese Yen
+      "currency-rupee": "en-IN",   // Indian Rupee
+    };
+  
+    formattedValue = new Intl.NumberFormat(localeMap[unit], {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     }).format(Number(formattedNumber));
@@ -237,11 +244,11 @@ export const formatUnitValue = (obj: any) => {
 
   if (
     [
-      "currency-dollar",
-      "currency-euro",
-      "currency-pound",
-      "currency-yen",
-      "currency-rupee",
+      "$",
+      "€",
+      "£",
+      "¥",
+      "₹",
     ].includes(unit)
   ) {
     console.log(obj);
