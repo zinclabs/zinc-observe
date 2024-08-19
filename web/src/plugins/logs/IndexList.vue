@@ -979,6 +979,11 @@ export default defineComponent({
             })
             .catch((err: any) => {
               fieldValues.value[name]["isLoading"] = false;
+              $q.notify({
+              type: "negative",
+              message: `${err.response.data.message}`,
+            });
+              
             })
             .finally(() => {
               if (countTotal == 0) fieldValues.value[name]["isLoading"] = false;
