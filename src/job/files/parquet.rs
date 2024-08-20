@@ -676,20 +676,19 @@ async fn merge_files(
         start.elapsed().as_millis(),
     );
 
-    // generate inverted index RecordBatch
-    let inverted_idx_batches = generate_inverted_idx_recordbatch(
-        new_schema.clone(),
-        &new_batches,
-        stream_type,
-        &full_text_search_fields,
-        &index_fields,
-    );
-
     // upload file
     let buf = Bytes::from(buf);
     match storage::put(&new_file_key, buf).await {
         Ok(_) => {
             if cfg.common.inverted_index_enabled && stream_type.create_inverted_index() {
+                // generate inverted index RecordBatch
+                let inverted_idx_batches = generate_inverted_idx_recordbatch(
+                    new_schema.clone(),
+                    &new_batches,
+                    stream_type,
+                    &full_text_search_fields,
+                    &index_fields,
+                );
                 generate_index_on_ingester(
                     inverted_idx_batches,
                     new_file_key.clone(),

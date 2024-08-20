@@ -205,7 +205,6 @@ ingester = { path = "src/ingester" }
 wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
-
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = "4.8"
 actix-web-prometheus = { version = "0.1", features = ["process"] }
@@ -240,6 +239,7 @@ etcd-client = { version = "0.12", features = ["tls"] }
 faststr = "0.2"
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
+fst = { version = "0.4.7", features = ["levenshtein"] }
 get_if_addrs = "0.5"
 getrandom = "0.2.11"
 hashlink = "0.9.1"

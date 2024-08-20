@@ -970,7 +970,7 @@ async fn get_file_list_by_inverted_index(
         .fts_terms
         .iter()
         .map(|t| {
-            let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
+            let tokens = split_token(t, &cfg.common.inverted_index_split_chars); // QUESTION(taiming): shouldn't this be empty delimiter?
             tokens
                 .into_iter()
                 .max_by_key(|key| key.len())

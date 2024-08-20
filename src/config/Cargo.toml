@@ -30,6 +30,7 @@ dashmap.workspace = true
 dotenv_config.workspace = true
 dotenvy.workspace = true
 futures.workspace = true
+fst.workspace = true
 get_if_addrs.workspace = true
 getrandom.workspace = true
 gxhash = { version = "~3.4.1", optional = true }

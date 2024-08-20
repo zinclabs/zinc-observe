@@ -40,6 +40,20 @@ pub fn split_token(s: &str, delimiter: &str) -> Vec<String> {
         .collect()
 }
 
+/// Packs two u32 values into a single u64 value.
+/// Used to cast (offset: u32, size: u32) to u64 that's acceptable by FSTMap
+pub fn pack_u32_pair(offset: u32, size: u32) -> u64 {
+    let packed: u64 = (offset as u64) | ((size as u64) << 32);
+    packed
+}
+
+/// Unpacks u64 read from FSTMap to (offset: u32, size: u32)
+pub fn unpack_u32_pair(packed: u64) -> (u32, u32) {
+    let offset = (packed & 0xFFFFFFFF) as u32;
+    let size = ((packed >> 32) & 0xFFFFFFFF) as u32;
+    (offset, size)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,5 +168,48 @@ mod tests {
                 "test".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn test_pack_unpack_u32_pair() {
+        // Test with random values
+        let offset = 123456;
+        let size = 789012;
+        let packed = pack_u32_pair(offset, size);
+        let (unpacked_offset, unpacked_size) = unpack_u32_pair(packed);
+        assert_eq!(offset, unpacked_offset);
+        assert_eq!(size, unpacked_size);
+
+        // Test with 0 values
+        let packed_zero = pack_u32_pair(0, 0);
+        let (unpacked_zero_offset, unpacked_zero_size) = unpack_u32_pair(packed_zero);
+        assert_eq!(0, unpacked_zero_offset);
+        assert_eq!(0, unpacked_zero_size);
+
+        // Test with maximum values
+        let max_offset = u32::MAX;
+        let max_size = u32::MAX;
+        let packed_max = pack_u32_pair(max_offset, max_size);
+        let (unpacked_max_offset, unpacked_max_size) = unpack_u32_pair(packed_max);
+        assert_eq!(max_offset, unpacked_max_offset);
+        assert_eq!(max_size, unpacked_max_size);
+    }
+
+    #[test]
+    fn test_pack_unpack_u32_pair_overflow() {
+        // Test with values that would cause overflow
+        let offset = u32::MAX;
+        let size = 1;
+        let packed = pack_u32_pair(offset, size);
+        let (unpacked_offset, unpacked_size) = unpack_u32_pair(packed);
+        assert_eq!(offset, unpacked_offset);
+        assert_eq!(size, unpacked_size);
+
+        let offset = 1;
+        let size = u32::MAX;
+        let packed = pack_u32_pair(offset, size);
+        let (unpacked_offset, unpacked_size) = unpack_u32_pair(packed);
+        assert_eq!(offset, unpacked_offset);
+        assert_eq!(size, unpacked_size);
     }
 }
