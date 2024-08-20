@@ -66,9 +66,9 @@ impl IndexFileMetas {
 /// Given the column data within a parquet file, [`ColumnIndexer`] indexes a `term`
 /// to the `SegmentIDs` that term appears in within the file.
 /// 1. Maps all terms to their corresponding SegmentIDs:
-///   a. terms are lexicographically sorted via a [`BTreeMap`]
-///   b. SegmentIDs(= row_id / SEGMENT_LENGTH) are represented as a BitVec<u8>
-///   c. {term: bitmap} is mapped through an [`FSTMap`], (Finite State Transducers)
+///  a. terms are lexicographically sorted via a [`BTreeMap`]
+///  b. SegmentIDs(= row_id / SEGMENT_LENGTH) are represented as a BitVec<u8>
+///  c. {term: bitmap} is mapped through an [`FSTMap`], (Finite State Transducers)
 /// 2. Writes bitmaps, fst_map, and meta into in-memory buffer
 ///
 /// ```text
@@ -145,6 +145,12 @@ impl ColumnIndexer {
     }
 }
 
+impl Default for ColumnIndexer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct ColumnIndexMeta {
     // base byte offset for this column index date within the index file (multiple column indices)
@@ -197,7 +203,7 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> IndexReader<R> {
         let index_file_metas_buf = &mut vec![0u8; index_file_metas_size as usize];
         self.source.read_exact(index_file_metas_buf).await?;
 
-        let index_file_metas: IndexFileMetas = serde_json::from_slice(&index_file_metas_buf)?;
+        let index_file_metas: IndexFileMetas = serde_json::from_slice(index_file_metas_buf)?;
         Self::validate_meta(&index_file_metas, index_file_metas_size, end_offset)?;
 
         Ok(Arc::new(index_file_metas))
