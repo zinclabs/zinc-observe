@@ -13,9 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{io::Read, path::PathBuf};
+
+use anyhow::{Context, Result};
+use futures::io::Cursor;
 use itertools::Itertools;
 
-use crate::INDEX_MIN_CHAR_LEN;
+use crate::{meta::inverted_index::IndexReader, INDEX_MIN_CHAR_LEN};
 
 /// Split a string into tokens based on a delimiter. if delimiter is empty, split by whitespace and
 /// punctuation. also filter out tokens that are less than INDEX_MIN_CHAR_LEN characters long.
@@ -47,11 +51,24 @@ pub fn pack_u32_pair(offset: u32, size: u32) -> u64 {
     packed
 }
 
-/// Unpacks u64 read from FSTMap to (offset: u32, size: u32)
+/// Unpacks a u64 value read from FSTMap to (offset: u32, size: u32)
 pub fn unpack_u32_pair(packed: u64) -> (u32, u32) {
     let offset = (packed & 0xFFFFFFFF) as u32;
     let size = ((packed >> 32) & 0xFFFFFFFF) as u32;
     (offset, size)
+}
+
+/// Compressed finished InvertedIndex bytes before writing to file system
+pub async fn create_index_reader(file_path: &PathBuf) -> Result<IndexReader<Cursor<Vec<u8>>>> {
+    let buf = tokio::fs::read(file_path)
+        .await
+        .context("Failed to read file")?;
+    let mut decoder = zstd::Decoder::new(&buf[..]).context("Failed to create zstd decoder")?;
+    let mut decompressed = Vec::new();
+    decoder
+        .read_to_end(&mut decompressed)
+        .context("Failed to decompress file")?;
+    Ok(IndexReader::new(Cursor::new(decompressed)))
 }
 
 #[cfg(test)]

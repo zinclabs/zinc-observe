@@ -2085,6 +2085,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "utoipa",
+ "zstd",
 ]
 
 [[package]]

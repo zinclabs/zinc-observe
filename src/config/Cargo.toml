@@ -61,3 +61,4 @@ tracing.workspace = true
 tracing-log.workspace = true
 tracing-subscriber.workspace = true
 utoipa.workspace = true
+zstd.workspace = true

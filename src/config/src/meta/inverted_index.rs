@@ -15,11 +15,13 @@
 
 use std::{
     collections::{BTreeMap, HashMap},
-    io::Write,
+    io::{SeekFrom, Write},
+    sync::Arc,
 };
 
-use anyhow::Result;
+use anyhow::{anyhow, ensure, Result};
 use fst::MapBuilder;
+use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -27,40 +29,46 @@ use crate::{
     utils::inverted_index::{pack_u32_pair, unpack_u32_pair},
 };
 
+const INDEX_FILE_METAS_SIZE_SIZE: u64 = 4;
+
 type Bytes = Vec<u8>;
 type BytesRef<'a> = &'a [u8];
 
-/// Tracks and consumes ColumnIndexMeta after selected columns within a parquet file
-/// is indexed via ColumnIndexer.
-/// The aggregated metas is then written to file
+/// Tracks and consumes [`ColumnIndexMeta`] after each selected column within a parquet file
+/// is indexed via [`ColumnIndexer`].
+/// The aggregated metas is then compressed and written to buffer for writing to file system.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct FileIndexer {
+pub struct IndexFileMetas {
     #[serde(default)]
     pub metas: HashMap<String, ColumnIndexMeta>,
 }
 
-impl FileIndexer {
+impl IndexFileMetas {
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Writes aggregated ColumnIndexMeta into writer and records total length
-    pub fn finish(&self, writer: &mut Vec<u8>) -> Result<()> {
+    /// Writes aggregated [`ColumnIndexMeta`] into writer and compresses all written bytes.
+    /// Returns compressed data to write into file system
+    pub fn finish(&self, mut writer: Vec<u8>) -> Result<Vec<u8>> {
         let meta_bytes = serde_json::to_vec(&self.metas)?;
         writer.write_all(&meta_bytes)?;
-        let total_size = meta_bytes.len() as u32;
-        writer.write_all(&total_size.to_le_bytes())?;
+        let metas_size = meta_bytes.len() as u32;
+        writer.write_all(&metas_size.to_le_bytes())?;
         writer.flush()?;
-        Ok(())
+
+        let mut encoder = zstd::Encoder::new(vec![], 3)?;
+        encoder.write_all(&writer)?;
+        Ok(encoder.finish()?)
     }
 }
 
-/// Given the column data within a parquet file, ColumnIndexer indexes a `term`
+/// Given the column data within a parquet file, [`ColumnIndexer`] indexes a `term`
 /// to the `SegmentIDs` that term appears in within the file.
 /// 1. Maps all terms to their corresponding SegmentIDs:
-///   a. terms are lexicographically sorted via a BTreeMap
+///   a. terms are lexicographically sorted via a [`BTreeMap`]
 ///   b. SegmentIDs(= row_id / SEGMENT_LENGTH) are represented as a BitVec<u8>
-///   c. {term: bitmap} is mapped through an FSTMap, (Finite State Transducers)
+///   c. {term: bitmap} is mapped through an [`FSTMap`], (Finite State Transducers)
 /// 2. Writes bitmaps, fst_map, and meta into in-memory buffer
 ///
 /// ```text
@@ -84,7 +92,7 @@ impl ColumnIndexer {
         }
     }
 
-    /// Pushes the bytes of a term that is being indexed onto the BTreeMap and its segment_id
+    /// Pushes the bytes of a term that is being indexed onto the [`BTreeMap`] and its segment_id
     /// for sorting purposes.
     /// It term always in the map, update its bitmap with the new segment_id
     pub fn push(&mut self, value: BytesRef<'_>, segment_id: usize) {
@@ -117,7 +125,7 @@ impl ColumnIndexer {
 
     /// 1. writes all inserted value-bitmap pairs into buffer
     /// 2. maps each inserted value to their BitVec's (offset, size) within writer buffer to the
-    ///    FSTMap
+    ///    [`FSTMap`]
     fn append_value(&mut self, value: Bytes, bitmap: BitVec, writer: &mut Vec<u8>) -> Result<()> {
         // 1
         let bitmap_bytes = bitmap.into_vec();
@@ -157,4 +165,100 @@ pub struct ColumnIndexMeta {
     // the maximum timestamp found within this column
     #[serde(default)]
     pub max_ts: u32,
+}
+
+/// Reader to parse decompressed raw bytes read from file system into memory for the search
+/// interface
+pub struct IndexReader<R> {
+    source: R,
+}
+
+impl<R: AsyncRead + AsyncSeek + Unpin + Send> IndexReader<R> {
+    pub fn new(source: R) -> Self {
+        Self { source }
+    }
+
+    /// Reads and parse the bytes read from source to construct [`IndexFileMetas`].
+    /// IndexFileMetas is used to find and read ColumnIndex for a particular column.
+    pub async fn metadata(&mut self) -> Result<Arc<IndexFileMetas>> {
+        let end_offset = self.source.seek(SeekFrom::End(0)).await?;
+
+        // read index_size
+        let index_file_metas_size_offset = SeekFrom::Start(end_offset - INDEX_FILE_METAS_SIZE_SIZE);
+        self.source.seek(index_file_metas_size_offset).await?;
+        let index_file_metas_size_buf = &mut [0u8; INDEX_FILE_METAS_SIZE_SIZE as usize];
+        self.source.read_exact(index_file_metas_size_buf).await?;
+        let index_file_metas_size = u32::from_le_bytes(*index_file_metas_size_buf) as u64;
+
+        // read index_file_metas
+        let index_file_metas_offset =
+            SeekFrom::Start(end_offset - INDEX_FILE_METAS_SIZE_SIZE - index_file_metas_size);
+        self.source.seek(index_file_metas_offset).await?;
+        let index_file_metas_buf = &mut vec![0u8; index_file_metas_size as usize];
+        self.source.read_exact(index_file_metas_buf).await?;
+
+        let index_file_metas: IndexFileMetas = serde_json::from_slice(&index_file_metas_buf)?;
+        Self::validate_meta(&index_file_metas, index_file_metas_size, end_offset)?;
+
+        Ok(Arc::new(index_file_metas))
+    }
+
+    pub async fn fst(&mut self, offset: u64, size: u32) -> Result<fst::Map<Vec<u8>>> {
+        let fst_buf = self.seek_read(offset, size).await?;
+        fst::Map::new(fst_buf).map_err(|e| {
+            anyhow!(
+                "Error constructing FST Map from read bytes {}",
+                e.to_string()
+            )
+        })
+    }
+
+    pub async fn get_bitmap(
+        &mut self,
+        column_index_mea: &ColumnIndexMeta,
+        fst_val: u64,
+    ) -> Result<BitVec> {
+        let (relative_offset, size) = unpack_u32_pair(fst_val);
+        self.bitmap(column_index_mea.base_offset + relative_offset as u64, size)
+            .await
+    }
+
+    async fn bitmap(&mut self, offset: u64, size: u32) -> Result<BitVec> {
+        self.seek_read(offset, size).await.map(BitVec::from_vec)
+    }
+
+    async fn seek_read(&mut self, offset: u64, size: u32) -> Result<Vec<u8>> {
+        self.source.seek(SeekFrom::Start(offset)).await?;
+        let mut buf = vec![0u8; size as usize];
+        self.source.read_exact(&mut buf).await?;
+        Ok(buf)
+    }
+}
+
+impl<R> IndexReader<R> {
+    fn validate_meta(
+        index_file_metas: &IndexFileMetas,
+        index_file_metas_size: u64,
+        end_offset: u64,
+    ) -> Result<()> {
+        for col_meta in index_file_metas.metas.values() {
+            let ColumnIndexMeta {
+                base_offset,
+                index_size,
+                ..
+            } = col_meta;
+
+            let limit = end_offset - INDEX_FILE_METAS_SIZE_SIZE - index_file_metas_size;
+            ensure!(
+                *base_offset + *index_size <= limit,
+                anyhow!(
+                    "ColumnIndexMeta unexpected offset: {} and size: {}. IndexFileMetas size {}",
+                    base_offset,
+                    index_size,
+                    index_file_metas_size
+                )
+            );
+        }
+        Ok(())
+    }
 }
