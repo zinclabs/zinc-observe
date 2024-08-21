@@ -60,6 +60,7 @@ pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
+pub const FILE_EXT_IDX: &str = ".idx";
 
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
@@ -693,6 +694,12 @@ pub struct Common {
         help = "Use old format for inverted index, it will generate same stream name for index."
     )]
     pub inverted_index_old_format: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_PARQUET_FORMAT",
+        default = false,
+        help = "Generate inverted index in parquet format for testing purposes."
+    )]
+    pub inverted_index_parquet_format: bool,
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,

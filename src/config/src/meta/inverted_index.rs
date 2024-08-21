@@ -50,7 +50,10 @@ impl IndexFileMetas {
 
     /// Writes aggregated [`ColumnIndexMeta`] into writer and compresses all written bytes.
     /// Returns compressed data to write into file system
-    pub fn finish(&self, mut writer: Vec<u8>) -> Result<Vec<u8>> {
+    pub fn finish(&self, mut writer: Vec<u8>) -> Result<Option<Vec<u8>>> {
+        if self.metas.is_empty() {
+            return Ok(None);
+        }
         let meta_bytes = serde_json::to_vec(&self.metas)?;
         writer.write_all(&meta_bytes)?;
         let metas_size = meta_bytes.len() as u32;
@@ -59,7 +62,7 @@ impl IndexFileMetas {
 
         let mut encoder = zstd::Encoder::new(vec![], 3)?;
         encoder.write_all(&writer)?;
-        Ok(encoder.finish()?)
+        Ok(Some(encoder.finish()?))
     }
 }
 
@@ -78,9 +81,9 @@ impl IndexFileMetas {
 /// └───────────────────────────────────────────────────────────────┘
 /// ```
 pub struct ColumnIndexer {
-    pub sorter: BTreeMap<Bytes, BitVec>,
-    pub fst: MapBuilder<Vec<u8>>,
-    pub meta: ColumnIndexMeta,
+    sorter: BTreeMap<Bytes, BitVec>,
+    fst: MapBuilder<Vec<u8>>,
+    meta: ColumnIndexMeta,
 }
 
 impl ColumnIndexer {
@@ -95,12 +98,20 @@ impl ColumnIndexer {
     /// Pushes the bytes of a term that is being indexed onto the [`BTreeMap`] and its segment_id
     /// for sorting purposes.
     /// It term always in the map, update its bitmap with the new segment_id
-    pub fn push(&mut self, value: BytesRef<'_>, segment_id: usize) {
+    pub fn push(&mut self, value: BytesRef<'_>, segment_id: usize, term_time: i64) {
         let bitmap = self.sorter.entry(value.into()).or_default();
         if segment_id >= bitmap.len() {
             bitmap.resize(segment_id + 1, false);
         }
         bitmap.set(segment_id, true);
+
+        // update min_max timestamp
+        if term_time < self.meta.min_ts {
+            self.meta.min_ts = term_time;
+        }
+        if term_time > self.meta.max_ts {
+            self.meta.max_ts = term_time;
+        }
     }
 
     /// Appends all inserted value-bitmap pairs into buffer and constructs fst_map and
@@ -121,6 +132,10 @@ impl ColumnIndexer {
         self.meta.index_size += self.meta.fst_size as u64;
 
         Ok(self.meta)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sorter.is_empty()
     }
 
     /// 1. writes all inserted value-bitmap pairs into buffer
@@ -167,10 +182,10 @@ pub struct ColumnIndexMeta {
     pub fst_size: u32,
     // the minimum timestamp found within this column
     #[serde(default)]
-    pub min_ts: u32,
+    pub min_ts: i64,
     // the maximum timestamp found within this column
     #[serde(default)]
-    pub max_ts: u32,
+    pub max_ts: i64,
 }
 
 /// Reader to parse decompressed raw bytes read from file system into memory for the search

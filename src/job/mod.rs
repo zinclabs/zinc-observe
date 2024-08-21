@@ -32,7 +32,6 @@ mod compactor;
 pub(crate) mod file_list;
 pub(crate) mod files;
 mod flatten_compactor;
-pub(crate) mod inverted_index;
 pub mod metrics;
 mod mmdb_downloader;
 mod prom;

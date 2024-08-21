@@ -51,7 +51,7 @@ use tokio::{
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
-    job::files::parquet::generate_index_on_compactor,
+    job::files::parquet::{generate_fst_index_on_compactor, generate_index_on_compactor},
     service::{
         db, file_list,
         schema::generate_schema_for_defined_schema_fields,
@@ -608,6 +608,8 @@ pub async fn merge_files(
                         );
                     }
                 }
+                // QUESTION(taiming): since parquet files deleted, should we delete previously
+                // created fst index files as well if there's any?
                 deleted_files.push(file.key.clone());
                 total_records -= file.meta.records;
                 new_file_size -= file.meta.original_size;
@@ -793,19 +795,19 @@ pub async fn merge_files(
     match storage::put(&new_file_key, buf.clone()).await {
         Ok(_) => {
             if cfg.common.inverted_index_enabled && stream_type.create_inverted_index() {
-                let (index_file_name, filemeta) = {
-                    // generate inverted index RecordBatch
-                    match generate_inverted_idx_recordbatch(
-                        schema_latest.clone(),
-                        &new_batches,
-                        stream_type,
-                        &full_text_search_fields,
-                        &index_fields,
-                    )? {
-                        None => (String::new(), FileMeta::default()),
-                        Some(inverted_idx_batch) => generate_index_on_compactor(
+                // generate inverted index RecordBatch
+                if let Some(inverted_idx_batch) = generate_inverted_idx_recordbatch(
+                    schema_latest.clone(),
+                    &new_batches,
+                    stream_type,
+                    &full_text_search_fields,
+                    &index_fields,
+                )? {
+                    if cfg.common.inverted_index_parquet_format {
+                        // for testing purposes
+                        let (index_file_name, filemeta) = generate_index_on_compactor(
                             &retain_file_list,
-                            inverted_idx_batch,
+                            inverted_idx_batch.clone(),
                             new_file_key.clone(),
                             org_id,
                             stream_name,
@@ -820,32 +822,65 @@ pub async fn merge_files(
                                 e,
                                 retain_file_list
                             )
-                        })?,
+                        })?;
+                        if !index_file_name.is_empty() {
+                            log::info!("Created index file during compaction {}", index_file_name);
+                            // Notify that we wrote the index file to the db.
+                            if let Err(e) = write_file_list(
+                                org_id,
+                                &[FileKey {
+                                    key: index_file_name.clone(),
+                                    meta: filemeta,
+                                    deleted: false,
+                                    segment_ids: None,
+                                }],
+                            )
+                            .await
+                            {
+                                log::error!(
+                                    "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
+                                    index_file_name,
+                                    e.to_string(),
+                                    retain_file_list
+                                );
+                            }
+                        }
                     }
-                };
-                if index_file_name.is_empty() {
-                    // there is no index file generated,
-                    // it means there is no inverted index terms can be generated
-                } else {
-                    log::info!("Created index file during compaction {}", index_file_name);
-                    // Notify that we wrote the index file to the db.
-                    if let Err(e) = write_file_list(
+
+                    // generate fst inverted index
+                    if let Some(index_file_name) = generate_fst_index_on_compactor(
+                        &retain_file_list,
+                        inverted_idx_batch,
+                        new_file_key.clone(),
                         org_id,
-                        &[FileKey {
-                            key: index_file_name.clone(),
-                            meta: filemeta,
-                            deleted: false,
-                            segment_ids: None,
-                        }],
+                        stream_name,
+                        &full_text_search_fields,
+                        &index_fields,
                     )
-                    .await
+                    .await?
                     {
-                        log::error!(
-                            "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
-                            index_file_name,
-                            e.to_string(),
-                            retain_file_list
-                        );
+                        log::info!("Created index file during compaction {}", index_file_name);
+                        // TODO(taiming): update file_list
+                        // Notify that we wrote the index file to the db.
+                        // if let Err(e) = write_file_list(
+                        //     org_id,
+                        //     &[FileKey {
+                        //         key: index_file_name.clone(),
+                        //         meta: filemeta,
+                        //         deleted: false,
+                        //         segment_ids: None,
+                        //     }],
+                        // )
+                        // .await
+                        // {
+                        //     log::error!(
+                        //         "generate_index_on_compactor write to file list: {}, error: {},
+                        // need delete files: {:?}",
+                        //         index_file_name,
+                        //         e.to_string(),
+                        //         retain_file_list
+                        //     );
+                        // }
                     }
                 }
             }

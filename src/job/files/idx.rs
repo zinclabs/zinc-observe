@@ -17,7 +17,7 @@ use config::{
     ider,
     meta::stream::{FileMeta, StreamType},
     utils::parquet::new_parquet_writer,
-    FILE_EXT_PARQUET,
+    FILE_EXT_IDX, FILE_EXT_PARQUET,
 };
 use infra::storage;
 use tokio::task;
@@ -29,6 +29,7 @@ fn generate_index_file_name_from_compacted_file(
     stream_type: StreamType,
     stream_name: &str,
     compacted_file_name: &str,
+    ext: &str,
 ) -> String {
     // eg: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
     let file_columns = compacted_file_name.split('/').collect::<Vec<&str>>();
@@ -37,11 +38,64 @@ fn generate_index_file_name_from_compacted_file(
         "{}/{}/{}/{}",
         file_columns[4], file_columns[5], file_columns[6], file_columns[7]
     );
-    let file_name = ider::generate();
-    format!("files/{stream_key}/{file_date}/{file_name}{FILE_EXT_PARQUET}")
+    let file_name = if ext == FILE_EXT_PARQUET {
+        ider::generate()
+    } else {
+        // same file_name for fst searching (parquet:idx 1:1 mapping)
+        file_columns[8].to_string()
+    };
+    format!("files/{stream_key}/{file_date}/{file_name}{ext}")
 }
 
-pub(crate) async fn write_to_disk(
+pub(crate) async fn write_fst_index_to_disk(
+    compressed_bytes: Vec<u8>,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    file_name: &str,
+    caller: &str,
+) -> Result<String, anyhow::Error> {
+    let new_idx_file_name = generate_index_file_name_from_compacted_file(
+        org_id,
+        stream_type,
+        stream_name,
+        file_name,
+        FILE_EXT_IDX,
+    );
+    log::info!(
+        "[JOB] FST IDX: write_to_disk: {}/{}/{} {} {} {}",
+        org_id,
+        stream_name,
+        stream_type,
+        new_idx_file_name,
+        file_name,
+        caller,
+    );
+
+    let store_file_name = new_idx_file_name.clone();
+    match task::spawn_blocking(move || async move {
+        storage::put(&store_file_name, bytes::Bytes::from(compressed_bytes)).await
+    })
+    .await
+    {
+        Ok(output) => match output.await {
+            Ok(_) => {
+                log::info!("[JOB] disk file upload succeeded: {}", &new_idx_file_name);
+                Ok(new_idx_file_name)
+            }
+            Err(err) => {
+                log::error!("[JOB] disk file upload error: {:?}", err);
+                Err(anyhow::anyhow!(err))
+            }
+        },
+        Err(err) => {
+            log::error!("[JOB] disk file upload error: {:?}", err);
+            Err(anyhow::anyhow!(err))
+        }
+    }
+}
+
+pub(crate) async fn write_parquet_index_to_disk(
     batches: Vec<arrow::record_batch::RecordBatch>,
     file_size: u64,
     org_id: &str,
@@ -83,8 +137,13 @@ pub(crate) async fn write_to_disk(
     writer.close().await?;
     file_meta.compressed_size = buf_parquet.len() as i64;
 
-    let new_idx_file_name =
-        generate_index_file_name_from_compacted_file(org_id, stream_type, stream_name, file_name);
+    let new_idx_file_name = generate_index_file_name_from_compacted_file(
+        org_id,
+        stream_type,
+        stream_name,
+        file_name,
+        FILE_EXT_PARQUET,
+    );
     log::info!(
         "[JOB] IDX: write_to_disk: {}/{}/{} {} {} {}",
         org_id,
