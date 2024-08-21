@@ -50,7 +50,7 @@ impl IndexFileMetas {
 
     /// Writes aggregated [`ColumnIndexMeta`] into writer and compresses all written bytes.
     /// Returns compressed data to write into file system
-    pub fn finish(&self, mut writer: Vec<u8>) -> Result<Option<Vec<u8>>> {
+    pub fn finish(&self, mut writer: Vec<u8>) -> Result<Option<(Vec<u8>, u64)>> {
         if self.metas.is_empty() {
             return Ok(None);
         }
@@ -59,10 +59,11 @@ impl IndexFileMetas {
         let metas_size = meta_bytes.len() as u32;
         writer.write_all(&metas_size.to_le_bytes())?;
         writer.flush()?;
+        let total_size = writer.len() as u64;
 
         let mut encoder = zstd::Encoder::new(vec![], 3)?;
         encoder.write_all(&writer)?;
-        Ok(Some(encoder.finish()?))
+        Ok(Some((encoder.finish()?, total_size)))
     }
 }
 

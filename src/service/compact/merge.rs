@@ -824,7 +824,10 @@ pub async fn merge_files(
                             )
                         })?;
                         if !index_file_name.is_empty() {
-                            log::info!("Created index file during compaction {}", index_file_name);
+                            log::info!(
+                                "Created parquet index file during compaction {}",
+                                index_file_name
+                            );
                             // Notify that we wrote the index file to the db.
                             if let Err(e) = write_file_list(
                                 org_id,
@@ -848,7 +851,7 @@ pub async fn merge_files(
                     }
 
                     // generate fst inverted index
-                    if let Some(index_file_name) = generate_fst_index_on_compactor(
+                    if let Some((index_file_name, filemeta)) = generate_fst_index_on_compactor(
                         &retain_file_list,
                         inverted_idx_batch,
                         new_file_key.clone(),
@@ -859,28 +862,29 @@ pub async fn merge_files(
                     )
                     .await?
                     {
-                        log::info!("Created index file during compaction {}", index_file_name);
-                        // TODO(taiming): update file_list
+                        log::info!(
+                            "Created fst index file during compaction {}",
+                            index_file_name
+                        );
                         // Notify that we wrote the index file to the db.
-                        // if let Err(e) = write_file_list(
-                        //     org_id,
-                        //     &[FileKey {
-                        //         key: index_file_name.clone(),
-                        //         meta: filemeta,
-                        //         deleted: false,
-                        //         segment_ids: None,
-                        //     }],
-                        // )
-                        // .await
-                        // {
-                        //     log::error!(
-                        //         "generate_index_on_compactor write to file list: {}, error: {},
-                        // need delete files: {:?}",
-                        //         index_file_name,
-                        //         e.to_string(),
-                        //         retain_file_list
-                        //     );
-                        // }
+                        if let Err(e) = write_file_list(
+                            org_id,
+                            &[FileKey {
+                                key: index_file_name.clone(),
+                                meta: filemeta,
+                                deleted: false,
+                                segment_ids: None,
+                            }],
+                        )
+                        .await
+                        {
+                            log::error!(
+                                "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
+                                index_file_name,
+                                e.to_string(),
+                                retain_file_list
+                            );
+                        }
                     }
                 }
             }

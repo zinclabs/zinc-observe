@@ -29,7 +29,6 @@ fn generate_index_file_name_from_compacted_file(
     stream_type: StreamType,
     stream_name: &str,
     compacted_file_name: &str,
-    ext: &str,
 ) -> String {
     // eg: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
     let file_columns = compacted_file_name.split('/').collect::<Vec<&str>>();
@@ -38,13 +37,42 @@ fn generate_index_file_name_from_compacted_file(
         "{}/{}/{}/{}",
         file_columns[4], file_columns[5], file_columns[6], file_columns[7]
     );
-    let file_name = if ext == FILE_EXT_PARQUET {
-        ider::generate()
+    let file_name = ider::generate();
+    format!("files/{stream_key}/{file_date}/{file_name}{FILE_EXT_PARQUET}")
+}
+
+/// FST inverted index solution has a 1:1 mapping between parquet and idx files.
+/// This is a helper function to convert the file names between the two by changing
+/// both the stream_type and extension parts of the file_name
+/// e.g.
+/// from: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
+/// to:   files/default/index/quickstart1/2024/02/16/16/7164299619311026293.idx
+/// and vice versa
+pub fn convert_parquet_idx_file_name(from: &str) -> String {
+    let mut parts: Vec<&str> = from.split('/').collect();
+    let stream_type_index = parts
+        .iter()
+        .position(|part| *part == "logs" || *part == "index")
+        .unwrap();
+
+    // Replace the stream_type part
+    parts[stream_type_index] = if parts[stream_type_index] == "logs" {
+        "index"
     } else {
-        // same file_name for fst searching (parquet:idx 1:1 mapping)
-        file_columns[8].to_string()
+        "logs"
     };
-    format!("files/{stream_key}/{file_date}/{file_name}{ext}")
+
+    // Replace the file extension
+    let file_name_index = parts.len() - 1;
+    let file_name = parts[file_name_index];
+    let new_file_name = if file_name.ends_with(FILE_EXT_PARQUET) {
+        file_name.replace(FILE_EXT_PARQUET, FILE_EXT_IDX)
+    } else {
+        file_name.replace(FILE_EXT_IDX, FILE_EXT_PARQUET)
+    };
+    parts[file_name_index] = &new_file_name;
+
+    parts.join("/")
 }
 
 pub(crate) async fn write_fst_index_to_disk(
@@ -55,15 +83,9 @@ pub(crate) async fn write_fst_index_to_disk(
     file_name: &str,
     caller: &str,
 ) -> Result<String, anyhow::Error> {
-    let new_idx_file_name = generate_index_file_name_from_compacted_file(
-        org_id,
-        stream_type,
-        stream_name,
-        file_name,
-        FILE_EXT_IDX,
-    );
+    let new_idx_file_name = convert_parquet_idx_file_name(file_name);
     log::info!(
-        "[JOB] FST IDX: write_to_disk: {}/{}/{} {} {} {}",
+        "[JOB] FST IDX: write_to_disk: {}/{}/{} idx_file:{}, parquet_file:{}, caller: {}",
         org_id,
         stream_name,
         stream_type,
@@ -137,13 +159,8 @@ pub(crate) async fn write_parquet_index_to_disk(
     writer.close().await?;
     file_meta.compressed_size = buf_parquet.len() as i64;
 
-    let new_idx_file_name = generate_index_file_name_from_compacted_file(
-        org_id,
-        stream_type,
-        stream_name,
-        file_name,
-        FILE_EXT_PARQUET,
-    );
+    let new_idx_file_name =
+        generate_index_file_name_from_compacted_file(org_id, stream_type, stream_name, file_name);
     log::info!(
         "[JOB] IDX: write_to_disk: {}/{}/{} {} {} {}",
         org_id,
@@ -173,6 +190,28 @@ pub(crate) async fn write_parquet_index_to_disk(
         Err(err) => {
             log::error!("[JOB] disk file upload error: {:?}", err);
             Err(anyhow::anyhow!(err))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_convert_parquet_idx_file_name() {
+        let test_cases = vec![
+            (
+                "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.idx",
+            ),
+            (
+                "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.idx",
+                "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+            ),
+        ];
+        for (input, expected) in test_cases {
+            assert_eq!(convert_parquet_idx_file_name(input), expected);
         }
     }
 }

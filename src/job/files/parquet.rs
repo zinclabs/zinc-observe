@@ -74,7 +74,9 @@ use crate::{
         infra::wal,
         meta::{authz::Authz, stream::SchemaRecords},
     },
-    job::files::idx::{write_fst_index_to_disk, write_parquet_index_to_disk},
+    job::files::idx::{
+        convert_parquet_idx_file_name, write_fst_index_to_disk, write_parquet_index_to_disk,
+    },
     service::{
         compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
         db,
@@ -706,13 +708,14 @@ async fn merge_files(
                             anyhow::anyhow!("generate_parquet_index_on_ingester error: {}", e)
                         })?;
                     }
-                    // generate fst inverted index
+                    // generate fst inverted index and write to storage
                     generate_fst_index_on_ingester(
                         inverted_idx_batch,
-                        new_file_key.clone(),
+                        &new_file_key,
                         &full_text_search_fields,
                         &index_fields,
-                    )?;
+                    )
+                    .await?;
                 }
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
@@ -946,6 +949,7 @@ pub(crate) async fn generate_index_on_compactor(
         deleted,
         empty_segment,
     ];
+    // QUESTION(taiming): what is RecordBatch used for? to indicate files are deleted?
     let batch = RecordBatch::try_new(schema, columns)
         .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
     record_batches.push(batch);
@@ -1209,68 +1213,81 @@ fn prepare_index_record_batches(
 }
 
 /// Creates fst inverted index bytes and writes to file on ingester
-pub(crate) fn generate_fst_index_on_ingester(
+pub(crate) async fn generate_fst_index_on_ingester(
     inverted_idx_batch: RecordBatch,
-    _new_file_key: String, // replace ext from .parquet to .idx as idx filename
+    parquet_file_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<(), anyhow::Error> {
-    let Some(_comrpessed_bytes) =
+    let Some((compressed_bytes, _)) =
         prepare_fst_index_bytes(inverted_idx_batch, full_text_search_fields, index_fields)?
     else {
         log::info!("generate_fst_index_on_ingester creates empty index. skip");
         return Ok(());
     };
 
-    // TODO(taiming): write compressed_bytes to file system with
-    // fst_file_name
-    log::info!("[INGESTER:JOB] Written fst index wal file successfully");
-
-    Ok(())
+    // QUESTION(taiming): okay to directly put into storage, instead of using ingester::writer?
+    // convert parquet file_key to idx file_key and write to disk
+    let idx_file_name = convert_parquet_idx_file_name(parquet_file_name);
+    match storage::put(&idx_file_name, Bytes::from(compressed_bytes)).await {
+        Ok(_) => {
+            log::info!("[INGESTER:JOB] Written fst index idx file successfully");
+            Ok(())
+        }
+        Err(e) => {
+            log::error!(
+                "[INGESTER:JOB] Written fst index idx file error: {}",
+                e.to_string()
+            );
+            Err(e)
+        }
+    }
 }
 
 /// Creates fst inverted index bytes and writes to file on compactor
 pub(crate) async fn generate_fst_index_on_compactor(
-    file_list_to_invalidate: &[FileKey], // delete corresponding small .idx files
+    file_list_to_invalidate: &[FileKey], // to delete corresponding small .idx files
     inverted_idx_batch: RecordBatch,
-    new_file_key: String, // replace extension from .parquet to .idx
+    parquet_file_name: String, // to create new idx file_name
     org_id: &str,
     stream_name: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
-) -> Result<Option<String>, anyhow::Error> {
-    let Some(comrpessed_bytes) =
+) -> Result<Option<(String, FileMeta)>, anyhow::Error> {
+    let Some((compressed_bytes, file_meta)) =
         prepare_fst_index_bytes(inverted_idx_batch, full_text_search_fields, index_fields)?
     else {
         log::info!("generate_fst_index_on_compactor creates empty index. skip");
         return Ok(None);
     };
 
-    // delete previous small .idx files
-    for old_file in file_list_to_invalidate {
+    // QUESTION(taiming): idx files wouldn't be handled by infra::file_list, correct?
+    // delete corresponding small .idx files
+    for old_parquet_file in file_list_to_invalidate {
         // CONFIRM(taiming): is this file.key the correct path?
-        if let Err(e) = tokio::fs::remove_file(&old_file.key).await {
+        let old_idx_file = convert_parquet_idx_file_name(&old_parquet_file.key);
+        if let Err(e) = tokio::fs::remove_file(&old_idx_file).await {
             log::error!(
                 "[COMPACTOR:JOB] Failed to remove merged fst idx file from disk: {}, {}",
-                old_file.key,
+                old_idx_file,
                 e
             );
         }
     }
 
     // write fst bytes into disk
-    let new_file_name = write_fst_index_to_disk(
-        comrpessed_bytes,
+    let new_idx_file_name = write_fst_index_to_disk(
+        compressed_bytes,
         org_id,
         stream_name,
         StreamType::Index,
-        &new_file_key,
+        &parquet_file_name,
         "index_creator",
     )
     .await?;
     log::debug!("[COMPACTOR:JOB] Written index file successfully");
 
-    Ok(Some(new_file_name))
+    Ok(Some((new_idx_file_name, file_meta)))
 }
 
 /// Create an compressed inverted index bytes using FST solution for the given RecordBatch
@@ -1278,7 +1295,7 @@ pub(crate) fn prepare_fst_index_bytes(
     inverted_idx_batch: RecordBatch,
     full_text_search_fields: &[String],
     index_fields: &[String],
-) -> Result<Option<Vec<u8>>, anyhow::Error> {
+) -> Result<Option<(Vec<u8>, FileMeta)>, anyhow::Error> {
     let cfg = get_config();
     let schema = inverted_idx_batch.schema();
 
@@ -1388,7 +1405,30 @@ pub(crate) fn prepare_fst_index_bytes(
         }
     }
 
-    index_file_metas.finish(writer)
+    let mut file_meta = FileMeta {
+        min_ts: 0,
+        max_ts: 0,
+        records: 0,
+        original_size: 0,
+        compressed_size: 0,
+        flattened: false,
+    };
+    for idx_meta in index_file_metas.metas.values() {
+        if idx_meta.min_ts < file_meta.min_ts {
+            file_meta.min_ts = idx_meta.min_ts;
+        }
+        if idx_meta.max_ts > file_meta.max_ts {
+            file_meta.max_ts = idx_meta.max_ts;
+        }
+    }
+
+    Ok(index_file_metas
+        .finish(writer)?
+        .map(|(compressed_bytes, original_size)| {
+            file_meta.original_size = original_size as _;
+            file_meta.compressed_size = compressed_bytes.len() as _;
+            (compressed_bytes, file_meta)
+        }))
 }
 
 #[allow(clippy::too_many_arguments)]
