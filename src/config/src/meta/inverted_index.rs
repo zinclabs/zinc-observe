@@ -66,15 +66,15 @@ impl IndexFileMetas {
 /// Given the column data within a parquet file, [`ColumnIndexer`] indexes a `term`
 /// to the `SegmentIDs` that term appears in within the file.
 /// 1. Maps all terms to their corresponding SegmentIDs:
-///  a. terms are lexicographically sorted via a [`BTreeMap`]
-///  b. SegmentIDs(= row_id / SEGMENT_LENGTH) are represented as a BitVec<u8>
-///  c. {term: bitmap} is mapped through an [`FSTMap`], (Finite State Transducers)
+///    - terms are lexicographically sorted via a [`BTreeMap`]
+///    - SegmentIDs(= row_id / SEGMENT_LENGTH) are represented as a BitVec<u8>
+///    - {term: bitmap} is mapped through an [`FSTMap`], (Finite State Transducers)
 /// 2. Writes bitmaps, fst_map, and meta into in-memory buffer
 ///
 /// ```text
 /// components of the resulting buffer of one ColumnIndexer
 /// ┌───────────────────────────────────────────────────────────────┐
-/// │ bitvec0 | bitvec1 | ... | fst_bytes | column_index_meta_bytes │
+/// │ bitmap0 | bitmap1 | ... | fst_bytes | column_index_meta_bytes │
 /// └───────────────────────────────────────────────────────────────┘
 /// ```
 pub struct ColumnIndexer {
@@ -333,13 +333,11 @@ impl<'a> fst::automaton::Automaton for Contains<'a> {
             if self.string.get(pos).cloned() == Some(byte) {
                 // then move forward
                 return Some(pos + 1);
+            } else if pos >= self.string.len() {
+                // if we're past the end, then we're done
+                return Some(i32::MAX as usize);
             } else {
-                if pos >= self.string.len() {
-                    // if we're past the end, then we're done
-                    return Some(i32::MAX as usize);
-                } else {
-                    return Some(0);
-                }
+                return Some(0);
             }
         }
         // otherwise we're either past the end or didn't match the byte

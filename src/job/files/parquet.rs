@@ -47,7 +47,6 @@ use config::{
         parquet::{
             read_metadata_from_file, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
         },
-        record_batch_ext::concat_batches,
         schema_ext::SchemaExt,
     },
     FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH,
@@ -682,24 +681,25 @@ async fn merge_files(
         Ok(_) => {
             if cfg.common.inverted_index_enabled && stream_type.create_inverted_index() {
                 // generate inverted index RecordBatch
-                let inverted_idx_batches = generate_inverted_idx_recordbatch(
+                if let Some(inverted_idx_batch) = generate_inverted_idx_recordbatch(
                     new_schema.clone(),
                     &new_batches,
                     stream_type,
                     &full_text_search_fields,
                     &index_fields,
-                );
-                generate_index_on_ingester(
-                    inverted_idx_batches,
-                    new_file_key.clone(),
-                    &org_id,
-                    &stream_name,
-                    stream_type,
-                    &full_text_search_fields,
-                    &index_fields,
-                )
-                .await
-                .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
+                )? {
+                    generate_index_on_ingester(
+                        inverted_idx_batch,
+                        new_file_key.clone(),
+                        &org_id,
+                        &stream_name,
+                        stream_type,
+                        &full_text_search_fields,
+                        &index_fields,
+                    )
+                    .await
+                    .map_err(|e| anyhow::anyhow!("generate_index_on_ingester error: {}", e))?;
+                }
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
         }
@@ -710,7 +710,7 @@ async fn merge_files(
 /// Create an inverted index file for the given file
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn generate_index_on_ingester(
-    batches: Vec<RecordBatch>,
+    inverted_idx_batch: RecordBatch,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
@@ -725,7 +725,7 @@ pub(crate) async fn generate_index_on_ingester(
             format!("{}_{}", stream_name, stream_type)
         };
     let record_batches = prepare_index_record_batches(
-        batches,
+        inverted_idx_batch,
         org_id,
         stream_name,
         &new_file_key,
@@ -854,7 +854,7 @@ pub(crate) async fn generate_index_on_ingester(
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn generate_index_on_compactor(
     file_list_to_invalidate: &[FileKey],
-    batches: Vec<RecordBatch>,
+    inverted_idx_batch: RecordBatch,
     new_file_key: String,
     org_id: &str,
     stream_name: &str,
@@ -869,7 +869,7 @@ pub(crate) async fn generate_index_on_compactor(
             format!("{}_{}", stream_name, stream_type)
         };
     let mut record_batches = prepare_index_record_batches(
-        batches,
+        inverted_idx_batch,
         org_id,
         stream_name,
         &new_file_key,
@@ -955,41 +955,15 @@ pub(crate) async fn generate_index_on_compactor(
 }
 
 async fn prepare_index_record_batches(
-    mut batches: Vec<RecordBatch>,
+    new_batch: RecordBatch,
     org_id: &str,
     stream_name: &str,
     new_file_key: &str,
     full_text_search_fields: &[String],
     index_fields: &[String],
 ) -> Result<Vec<RecordBatch>, anyhow::Error> {
-    if batches.is_empty() {
-        return Ok(vec![]);
-    }
-
     let cfg = get_config();
-    // filter null columns
-    let mut new_batch = if batches.len() == 1 {
-        batches.remove(0)
-    } else {
-        let schema = batches.first().unwrap().schema();
-        concat_batches(schema, batches)
-            .map_err(|e| anyhow::anyhow!("concat_batches error: {}", e))?
-    };
-
-    let mut null_columns = 0;
-    for i in 0..new_batch.num_columns() {
-        let ni = i - null_columns;
-        if new_batch.column(ni).null_count() == new_batch.num_rows() {
-            new_batch.remove_column(ni);
-            null_columns += 1;
-        }
-    }
     let schema = new_batch.schema();
-    if schema.fields().is_empty()
-        || (schema.fields().len() == 1 && schema.field(0).name() == &cfg.common.column_timestamp)
-    {
-        return Ok(vec![]);
-    }
 
     let new_schema = Arc::new(Schema::new(vec![
         Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
