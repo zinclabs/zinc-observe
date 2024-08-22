@@ -111,7 +111,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
     for dest in ALERTS_DESTINATIONS.iter() {
         if dest.key().starts_with(org_id) && dest.value().template.eq(&name) {
             return Err((
-                http::StatusCode::FORBIDDEN,
+                http::StatusCode::CONFLICT,
                 anyhow::anyhow!(
                     "Alert template is in use for destination {}",
                     &dest.value().name.clone()
