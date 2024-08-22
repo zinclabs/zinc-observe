@@ -45,17 +45,6 @@ message SearchRequest {
     string                  work_group = 9;
     optional string           user_id = 10;
     optional string search_event_type = 11;
-    optional FullTextTerms   ft_terms = 12;
-    optional IndexTermMap index_terms = 13;
-}
-
-
-message IndexTermMap {
-    map<string, FullTextTerms> entires = 1;
-}
-
-message FullTextTerms {
-    repeated string terms = 1;
 }
 
 message SearchResponse {

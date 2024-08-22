@@ -18,17 +18,22 @@ use std::sync::Arc;
 use config::{
     get_config, is_local_disk_storage,
     meta::{
+        bitvec::BitVec,
+        inverted_index::{Contains, IndexReader},
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
-    utils::schema_ext::SchemaExt,
+    utils::{inverted_index::convert_parquet_idx_file_name, schema_ext::SchemaExt},
+    INDEX_FIELD_NAME_FOR_ALL,
 };
-use futures::future::try_join_all;
+use fst::{automaton::Str, IntoStreamer, Streamer};
+use futures::{future::try_join_all, io::Cursor};
 use hashbrown::HashMap;
 use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    storage,
 };
 use tokio::{sync::Semaphore, time::Duration};
 use tracing::{info_span, Instrument};
@@ -54,7 +59,6 @@ pub async fn search(
     work_group: &str,
     timeout: u64,
 ) -> super::SearchResult {
-    // TODO(taiming): update file_list here through inverted index
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {trace_id}] search->storage: enter");
     let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
@@ -96,7 +100,7 @@ pub async fn search(
     let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
     // get file list
-    let files = match file_list.is_empty() {
+    let mut files = match file_list.is_empty() {
         true => {
             get_file_list(
                 trace_id,
@@ -120,6 +124,19 @@ pub async fn search(
         &sql.stream_name,
         files.len(),
     );
+
+    // filter file_list if is an inverted index search
+    if !sql.fts_terms.is_empty() || !sql.index_terms.is_empty() {
+        let prev_file_list_len = files.len();
+        filter_file_list_by_inverted_index(&mut files, &sql).await?;
+        log::info!(
+            "[trace_id {trace_id}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num reduced by {}",
+            &sql.org_id,
+            &stream_type,
+            &sql.stream_name,
+            prev_file_list_len - files.len(),
+        );
+    }
 
     let cfg = get_config();
     let mut files_group: HashMap<usize, Vec<FileKey>> =
@@ -526,4 +543,166 @@ async fn cache_parquet_files(
         delete_files,
         (mem_cached_files, disk_cached_files),
     ))
+}
+
+/// Filter file list using inverted index
+/// This function will load the index file corresponding to each file in the file list.
+/// FSTs in those files are used to match the incoming query in `SearchRequest`.
+/// If the query does not match any FST in the index file, the file will be filtered out.
+/// If the query does match then the segment IDs for the file will be updated.
+async fn filter_file_list_by_inverted_index(
+    file_list: &mut Vec<FileKey>,
+    sql: &Sql,
+) -> Result<(), Error> {
+    // iterate through file list
+    // Fetch the FSTs from the corresponding index files
+    let mut tasks = Vec::new();
+
+    let full_text_terms = Arc::new(sql.fts_terms.clone());
+    let index_terms = Arc::new(sql.index_terms.clone());
+    // we can be iterating over a lot of files
+    for (file_id, file) in file_list.iter().enumerate() {
+        let full_text_term_clone = full_text_terms.clone();
+        let index_terms_clone = index_terms.clone();
+        let file_name = file.key.clone();
+        // Spawn a task for each file, wherein full text search and
+        // index search queries are executed
+        let task = tokio::task::spawn(async move {
+            inverted_index_search_in_file(
+                file_id,
+                &file_name,
+                full_text_term_clone,
+                index_terms_clone,
+            )
+            .await
+        });
+        tasks.push(task)
+    }
+
+    for result in try_join_all(tasks)
+        .await
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?
+    {
+        // Each result corresponds to a file in the file list
+        match result {
+            Ok((file_id, bitvec)) => {
+                if let Some(res) = bitvec {
+                    // Replace the segment IDs in the existing `FileKey` with the new found segments
+                    file_list[file_id].segment_ids = Some(res.into_vec());
+                } else {
+                    file_list.remove(file_id);
+                }
+            }
+            Err(_) => {
+                // didn't find the index file. retain parquet file to search
+                continue;
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn inverted_index_search_in_file(
+    file_id: usize,
+    parquet_file_name: &str,
+    fts_terms: Arc<Vec<String>>,
+    index_terms: Arc<Vec<(String, Vec<String>)>>,
+) -> anyhow::Result<(usize, Option<BitVec>)> {
+    let index_file_name = convert_parquet_idx_file_name(parquet_file_name);
+    let index_bytes = match storage::get(&index_file_name).await {
+        Err(e) => {
+            log::info!(
+                "Unable to load corresponding FST index file for parquet file {}",
+                parquet_file_name
+            );
+            return Err(e);
+        }
+        Ok(bytes) => bytes,
+    };
+
+    let mut res = BitVec::new();
+    let mut index_reader = IndexReader::new(Cursor::new(index_bytes));
+    let file_meta = index_reader.metadata().await.unwrap();
+
+    // filter through full text terms
+    if !fts_terms.is_empty() {
+        if let Some(column_index_meta) = file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
+            let fst_offset =
+                column_index_meta.base_offset + column_index_meta.relative_fst_offset as u64;
+            let fst_size = column_index_meta.fst_size;
+            match index_reader.fst(fst_offset, fst_size).await {
+                Err(e) => {
+                    log::warn!(
+                        "Error loading FST map from index file {} for column {} with error {}. Keep the file",
+                        index_file_name,
+                        INDEX_FIELD_NAME_FOR_ALL,
+                        e.to_string()
+                    );
+                }
+                Ok(fst_map) => {
+                    // construct automatons for multiple full text search terms
+                    let matchers = fts_terms
+                        .iter()
+                        .map(|term| Contains::new(term))
+                        .collect::<Vec<Contains>>();
+
+                    for matcher in matchers {
+                        // Stream for matched keys and their bitmap offsets
+                        let mut stream = fst_map.search(matcher).into_stream();
+                        // We do not care about the key at this point, only the offset
+                        while let Some((_, value)) = stream.next() {
+                            let bitmap = index_reader.get_bitmap(column_index_meta, value).await?;
+                            // here we are doing bitwise OR to combine the bitmaps of all the terms
+                            res |= bitmap;
+                        }
+                    }
+                }
+            };
+        }
+    }
+
+    if !index_terms.is_empty() {
+        for (col, index_terms) in index_terms.iter() {
+            if let Some(column_index_meta) = file_meta.metas.get(col) {
+                let fst_offset =
+                    column_index_meta.base_offset + column_index_meta.relative_fst_offset as u64;
+                let fst_size = column_index_meta.fst_size;
+                match index_reader.fst(fst_offset, fst_size).await {
+                    Err(e) => {
+                        log::warn!(
+                            "Error loading FST map from index file {} for column {} with error {}. Keep the file",
+                            index_file_name,
+                            col,
+                            e.to_string()
+                        );
+                    }
+                    Ok(fst_map) => {
+                        // construct automatons for multiple full text search terms
+                        let matchers = index_terms
+                            .iter()
+                            .map(|term| Str::new(term))
+                            .collect::<Vec<Str>>();
+
+                        for matcher in matchers {
+                            // Stream for matched keys and their bitmap offsets
+                            let mut stream = fst_map.search(matcher).into_stream();
+                            // We do not care about the key at this point, only the offset
+                            while let Some((_, value)) = stream.next() {
+                                let bitmap =
+                                    index_reader.get_bitmap(column_index_meta, value).await?;
+                                // here we are doing bitwise OR to combine the bitmaps of all the
+                                // terms
+                                res |= bitmap;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(if res.is_empty() {
+        (file_id, None) // no match -> skip the file in search
+    } else {
+        (file_id, Some(res)) // match -> search only segments of the file
+    })
 }

@@ -21,30 +21,19 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        bitvec::BitVec,
-        inverted_index::{Contains, IndexReader},
         search::ScanStats,
         stream::{FileKey, StreamType},
     },
     utils::record_batch_ext::format_recordbatch_by_schema,
-    INDEX_FIELD_NAME_FOR_ALL,
 };
-use fst::{automaton::Str, IntoStreamer, Streamer};
 use futures::future::try_join_all;
 use hashbrown::HashSet;
-use infra::{
-    errors::{Error, ErrorCodes},
-    storage as object_store,
-};
-use itertools::Itertools;
-use proto::cluster_rpc::{self, FullTextTerms};
+use infra::errors::{Error, ErrorCodes};
+use proto::cluster_rpc;
 use tracing::Instrument;
 
 use super::datafusion;
-use crate::{
-    job::files::idx::convert_parquet_idx_file_name,
-    service::db::{self},
-};
+use crate::service::db::{self};
 mod storage;
 mod wal;
 
@@ -120,10 +109,7 @@ pub async fn search(
     let work_group3 = work_group.clone();
     let trace_id3 = trace_id.clone();
     let sql3 = sql.clone();
-    let mut file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
-    // update file_list here through inverted index
-    filter_file_list_by_inverted_index(&mut file_list, req).await?;
-
+    let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
     let storage_span = tracing::span::Span::current();
     let task3 = tokio::task::spawn(async move {
         if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
@@ -132,7 +118,7 @@ pub async fn search(
             storage::search(
                 &trace_id3,
                 sql3,
-                &file_list, // update file_list here through inverted index
+                &file_list,
                 stream_type,
                 &work_group3,
                 timeout,
@@ -277,149 +263,4 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
         }
     }
     Ok(())
-}
-
-/// Filter file list using inverted index
-/// This function will load the index file corresponding to each file in the file list.
-/// FSTs in those files are used to match the incoming query in `SearchRequest`.
-/// If the query does not match any FST in the index file, the file will be filtered out.
-/// If the query does match then the segment IDs for the file will be updated.
-///
-/// ! WARNING: all the files in the file list must have an corresponding index file.
-/// ! If the index file is missing, the file will be filtered out.
-async fn filter_file_list_by_inverted_index(
-    file_list: &mut Vec<FileKey>,
-    req: &cluster_rpc::SearchRequest,
-) -> Result<(), Error> {
-    // iterate through file list
-    // Fetch the FSTs from the corresponding index files
-    let mut tasks = Vec::new();
-
-    // Return if there are not terms to be searched for
-    if req.ft_terms.is_none() && req.index_terms.is_none() {
-        return Ok(());
-    }
-    let full_text_terms = Arc::new(req.ft_terms.clone());
-    let index_terms = Arc::new(req.index_terms.clone());
-    // we can be iterating over a lot of files
-    for (file_id, file) in file_list.iter().enumerate() {
-        let full_text_term_clone = full_text_terms.clone();
-        let index_terms_clone = index_terms.clone();
-        let file_name = file.key.clone();
-        // Spawn a task for each file, wherein full text search and
-        // index search queries are executed
-        let task = tokio::task::spawn(async move {
-            inverted_index_search_in_file(
-                file_id,
-                &file_name,
-                full_text_term_clone,
-                index_terms_clone,
-            )
-            .await
-        });
-        tasks.push(task)
-    }
-
-    for result in futures::future::try_join_all(tasks).await.map_err(|e| {
-        Error::Message(format!(
-            "Error while filtering file list by inverted index: {}",
-            e
-        ))
-    })? {
-        if let Err(e) = result {
-            log::error!("Error while filtering file list by inverted index: {}", e);
-            continue;
-        }
-
-        // Each result corresponds to a file in the file list
-        match result {
-            Ok((file_id, bitvec)) => {
-                if let Some(res) = bitvec {
-                    // TODO: Confirm: Is this right?
-                    // Replace the segment IDs in the existing `FileKey` with the new found segments
-                    file_list[file_id].segment_ids =
-                        Some(res.iter_ones().map(|x| x as u8).collect_vec());
-                } else {
-                    file_list.remove(file_id);
-                    continue;
-                }
-            }
-            Err(e) => {
-                log::error!("Error while filtering file list by inverted index: {}", e);
-                continue;
-            }
-        }
-    }
-    Ok(())
-}
-
-async fn inverted_index_search_in_file(
-    file_id: usize,
-    parquet_file_name: &str,
-    ft_terms: Arc<Option<FullTextTerms>>,
-    index_terms_map: Arc<Option<cluster_rpc::IndexTermMap>>,
-) -> anyhow::Result<(usize, Option<BitVec>)> {
-    let mut res = BitVec::new();
-    let index_file_name = convert_parquet_idx_file_name(parquet_file_name);
-    let index_bytes = object_store::get(&index_file_name).await?;
-    let mut index_reader = IndexReader::new(futures::io::Cursor::new(index_bytes));
-    let file_meta = index_reader.metadata().await.unwrap();
-
-    if let Some(full_text_terms) = ft_terms.as_ref() {
-        if let Some(column_index_meta) = file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
-            let fst_offset =
-                column_index_meta.base_offset + column_index_meta.relative_fst_offset as u64;
-            let fst_size = column_index_meta.fst_size;
-            let fst_map = index_reader.fst(fst_offset, fst_size).await.unwrap();
-
-            // construct automatons for multiple full text search terms
-            let matchers = full_text_terms
-                .terms
-                .iter()
-                .map(|term| Contains::new(term))
-                .collect::<Vec<Contains>>();
-
-            for matcher in matchers {
-                // Stream for matched keys and their bitmap offsets
-                let mut stream = fst_map.search(matcher).into_stream();
-                // We do not care about the key at this point, only the offset
-                while let Some((_, value)) = stream.next() {
-                    let bitmap = index_reader.get_bitmap(column_index_meta, value).await?;
-                    // here we are doing bitwise OR to combine the bitmaps of all the terms
-                    res |= bitmap;
-                }
-            }
-        }
-    }
-
-    if let Some(index_term_map) = index_terms_map.as_ref() {
-        for (col, index_terms) in index_term_map.entires.iter() {
-            if let Some(column_index_meta) = file_meta.metas.get(col) {
-                let fst_offset =
-                    column_index_meta.base_offset + column_index_meta.relative_fst_offset as u64;
-                let fst_size = column_index_meta.fst_size;
-                let fst_map = index_reader.fst(fst_offset, fst_size).await.unwrap();
-
-                // construct automatons for multiple full text search terms
-                let matchers = index_terms
-                    .terms
-                    .iter()
-                    .map(|term| Str::new(term))
-                    .collect::<Vec<Str>>();
-
-                for matcher in matchers {
-                    // Stream for matched keys and their bitmap offsets
-                    let mut stream = fst_map.search(matcher).into_stream();
-                    // We do not care about the key at this point, only the offset
-                    while let Some((_, value)) = stream.next() {
-                        let bitmap = index_reader.get_bitmap(column_index_meta, value).await?;
-                        // here we are doing bitwise OR to combine the bitmaps of all the terms
-                        res |= bitmap;
-                    }
-                }
-            }
-        }
-    }
-
-    Ok((file_id, Some(res)))
 }

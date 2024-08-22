@@ -44,7 +44,7 @@ use config::{
         arrow::record_batches_to_json_rows,
         asynchronism::file::{get_file_contents, get_file_meta},
         file::scan_files_with_channel,
-        inverted_index::split_token,
+        inverted_index::{convert_parquet_idx_file_name, split_token},
         json,
         parquet::{
             read_metadata_from_file, read_recordbatch_from_bytes, write_recordbatch_to_parquet,
@@ -74,9 +74,7 @@ use crate::{
         infra::wal,
         meta::{authz::Authz, stream::SchemaRecords},
     },
-    job::files::idx::{
-        convert_parquet_idx_file_name, write_fst_index_to_disk, write_parquet_index_to_disk,
-    },
+    job::files::idx::{write_fst_index_to_disk, write_parquet_index_to_disk},
     service::{
         compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
         db,

@@ -35,8 +35,6 @@ fn main() -> Result<()> {
         .type_attribute("Partition", "#[derive(Eq)]")
         .type_attribute("SearchQuery", "#[derive(Eq)]")
         .type_attribute("SearchRequest", "#[derive(Eq)]")
-        .type_attribute("FullTextTerms", "#[derive(Eq)]")
-        .type_attribute("IndexTermMap", "#[derive(Eq)]")
         .type_attribute("SearchResponse", "#[derive(Eq)]")
         .type_attribute("SearchResponse", "#[derive(serde::Serialize)]")
         .type_attribute("SearchAggRequest", "#[derive(Eq)]")

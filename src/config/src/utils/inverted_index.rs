@@ -19,7 +19,9 @@ use anyhow::{Context, Result};
 use futures::io::Cursor;
 use itertools::Itertools;
 
-use crate::{meta::inverted_index::IndexReader, INDEX_MIN_CHAR_LEN};
+use crate::{
+    meta::inverted_index::IndexReader, FILE_EXT_IDX, FILE_EXT_PARQUET, INDEX_MIN_CHAR_LEN,
+};
 
 /// Split a string into tokens based on a delimiter. if delimiter is empty, split by whitespace and
 /// punctuation. also filter out tokens that are less than INDEX_MIN_CHAR_LEN characters long.
@@ -69,6 +71,40 @@ pub async fn create_index_reader(file_path: &PathBuf) -> Result<IndexReader<Curs
         .read_to_end(&mut decompressed)
         .context("Failed to decompress file")?;
     Ok(IndexReader::new(Cursor::new(decompressed)))
+}
+
+/// FST inverted index solution has a 1:1 mapping between parquet and idx files.
+/// This is a helper function to convert the file names between the two by changing
+/// both the stream_type and extension parts of the file_name
+/// e.g.
+/// from: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
+/// to:   files/default/index/quickstart1/2024/02/16/16/7164299619311026293.idx
+/// and vice versa
+pub fn convert_parquet_idx_file_name(from: &str) -> String {
+    let mut parts: Vec<&str> = from.split('/').collect();
+    let stream_type_index = parts
+        .iter()
+        .position(|part| *part == "logs" || *part == "index")
+        .unwrap();
+
+    // Replace the stream_type part
+    parts[stream_type_index] = if parts[stream_type_index] == "logs" {
+        "index"
+    } else {
+        "logs"
+    };
+
+    // Replace the file extension
+    let file_name_index = parts.len() - 1;
+    let file_name = parts[file_name_index];
+    let new_file_name = if file_name.ends_with(FILE_EXT_PARQUET) {
+        file_name.replace(FILE_EXT_PARQUET, FILE_EXT_IDX)
+    } else {
+        file_name.replace(FILE_EXT_IDX, FILE_EXT_PARQUET)
+    };
+    parts[file_name_index] = &new_file_name;
+
+    parts.join("/")
 }
 
 #[cfg(test)]
@@ -228,5 +264,22 @@ mod tests {
         let (unpacked_offset, unpacked_size) = unpack_u32_pair(packed);
         assert_eq!(offset, unpacked_offset);
         assert_eq!(size, unpacked_size);
+    }
+
+    #[test]
+    fn test_convert_parquet_idx_file_name() {
+        let test_cases = vec![
+            (
+                "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.idx",
+            ),
+            (
+                "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.idx",
+                "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+            ),
+        ];
+        for (input, expected) in test_cases {
+            assert_eq!(convert_parquet_idx_file_name(input), expected);
+        }
     }
 }

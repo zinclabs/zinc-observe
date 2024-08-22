@@ -468,8 +468,6 @@ impl From<Request> for cluster_rpc::SearchRequest {
             work_group: "".to_string(),
             user_id: None,
             search_event_type: req.search_type.map(|event| event.to_string()),
-            ft_terms: None,
-            index_terms: None,
         }
     }
 }
