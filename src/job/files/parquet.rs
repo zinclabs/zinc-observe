@@ -1261,11 +1261,11 @@ pub(crate) async fn generate_fst_index_on_compactor(
         return Ok(None);
     };
 
-    // QUESTION(taiming): idx files wouldn't be handled by infra::file_list, correct?
+    // TODO(taiming): parquet file might not have corresponding idx file
     // delete corresponding small .idx files
     for old_parquet_file in file_list_to_invalidate {
-        // CONFIRM(taiming): is this file.key the correct path?
         let old_idx_file = convert_parquet_idx_file_name(&old_parquet_file.key);
+        // TODO(taiming): use storage to delete file
         if let Err(e) = tokio::fs::remove_file(&old_idx_file).await {
             log::error!(
                 "[COMPACTOR:JOB] Failed to remove merged fst idx file from disk: {}, {}",
@@ -1275,6 +1275,7 @@ pub(crate) async fn generate_fst_index_on_compactor(
         }
     }
 
+    // TODO(taiming): no need to update file_list for .idx files. write to fs directly like ingester
     // write fst bytes into disk
     let new_idx_file_name = write_fst_index_to_disk(
         compressed_bytes,

@@ -54,6 +54,7 @@ pub async fn search(
     work_group: &str,
     timeout: u64,
 ) -> super::SearchResult {
+    // TODO(taiming): update file_list here through inverted index
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {trace_id}] search->storage: enter");
     let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)

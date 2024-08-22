@@ -132,7 +132,7 @@ pub async fn search(
             storage::search(
                 &trace_id3,
                 sql3,
-                &file_list,
+                &file_list, // update file_list here through inverted index
                 stream_type,
                 &work_group3,
                 timeout,
