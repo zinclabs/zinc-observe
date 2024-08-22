@@ -220,11 +220,14 @@ async fn recursive_process_multiple_metas(
                 let remaining_metas: Vec<ResultCacheMeta> = sorted_metas.clone()
                     .into_iter()
                     .filter(|meta| {
-                        meta.end_time <= largest_meta.start_time || meta.start_time >= largest_meta.end_time
+                       !largest_meta.eq(meta) &&  (meta.end_time <= largest_meta.start_time || meta.start_time >= largest_meta.end_time)
                     })
                     .collect();
-
-                let _ = recursive_process_multiple_metas(&remaining_metas[..], trace_id, cache_req, results, query_key, file_path).await;
+                if !remaining_metas.is_empty() {
+                     return Ok(());
+                };
+                let _ = recursive_process_multiple_metas(&remaining_metas[..], trace_id, cache_req, results, query_key, file_path).await;                    
     }
     Ok(())
 }
+

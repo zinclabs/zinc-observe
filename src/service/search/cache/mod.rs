@@ -368,6 +368,7 @@ fn merge_response(
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
         files_cache_ratio += res.cached_ratio;
+        cache_response.histogram_interval = res.histogram_interval;
 
         result_cache_len += res.total;
 

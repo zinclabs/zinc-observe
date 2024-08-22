@@ -264,11 +264,15 @@ fn recursive_process_muliple_metas(
         let remaining_metas: Vec<_> = sorted_metas
             .into_iter()
             .filter(|meta| {
-                meta.response_end_time <= largest_meta.response_start_time
-                    || meta.response_start_time >= largest_meta.response_end_time
+                !(largest_meta.response_start_time == meta.response_start_time
+                    && meta.response_end_time <= largest_meta.response_end_time)
+                    && (meta.response_end_time <= largest_meta.response_start_time
+                        || meta.response_start_time >= largest_meta.response_end_time)
             })
             .collect();
-
+        if remaining_metas.is_empty() {
+            return;
+        }
         recursive_process_muliple_metas(&remaining_metas, cache_req, results);
     }
 }
