@@ -99,7 +99,7 @@ impl ColumnIndexer {
     /// Pushes the bytes of a term that is being indexed onto the [`BTreeMap`] and its segment_id
     /// for sorting purposes.
     /// It term always in the map, update its bitmap with the new segment_id
-    pub fn push(&mut self, value: BytesRef<'_>, segment_id: usize, term_time: i64) {
+    pub fn push(&mut self, value: BytesRef<'_>, segment_id: usize, term_len: usize) {
         let bitmap = self.sorter.entry(value.into()).or_default();
         if segment_id >= bitmap.len() {
             bitmap.resize(segment_id + 1, false);
@@ -107,11 +107,11 @@ impl ColumnIndexer {
         bitmap.set(segment_id, true);
 
         // update min_max timestamp
-        if term_time < self.meta.min_ts {
-            self.meta.min_ts = term_time;
+        if term_len < self.meta.min_len {
+            self.meta.min_len = term_len;
         }
-        if term_time > self.meta.max_ts {
-            self.meta.max_ts = term_time;
+        if term_len > self.meta.max_len {
+            self.meta.max_len = term_len;
         }
     }
 
@@ -181,12 +181,16 @@ pub struct ColumnIndexMeta {
     // total byte size of fst bytes
     #[serde(default)]
     pub fst_size: u32,
-    // the minimum timestamp found within this column
+    // the minimum term length indexed in this column
+    #[serde(default = "default_min_len")]
+    pub min_len: usize,
+    // the maximum term length indexed in this column
     #[serde(default)]
-    pub min_ts: i64,
-    // the maximum timestamp found within this column
-    #[serde(default)]
-    pub max_ts: i64,
+    pub max_len: usize,
+}
+
+const fn default_min_len() -> usize {
+    usize::MAX
 }
 
 /// Reader to parse decompressed raw bytes read from file system into memory for the search

@@ -1277,24 +1277,12 @@ pub(crate) fn prepare_fst_index_bytes(
     full_text_search_fields: &Vec<String>,
     index_fields: &Vec<String>,
 ) -> Result<Option<(Vec<u8>, FileMeta)>, anyhow::Error> {
-    let cfg = get_config();
     let schema = inverted_idx_batch.schema();
-
-    // get _timestamp column
-    let Some(time_data) = inverted_idx_batch
-        .column_by_name(&cfg.common.column_timestamp)
-        .unwrap()
-        .as_any()
-        .downcast_ref::<Int64Array>()
-    else {
-        return Ok(None);
-    };
 
     let mut writer = Vec::new();
     let mut index_file_metas = IndexFileMetas::new();
 
     let num_rows = inverted_idx_batch.num_rows();
-
     // Process full text search fields
     let mut ft_indexer = ColumnIndexer::new();
     for column in schema.fields() {
@@ -1327,9 +1315,8 @@ pub(crate) fn prepare_fst_index_bytes(
         }
 
         for (term, row_id) in terms {
-            let term_time = time_data.value(row_id);
             let segment_id = row_id / INDEX_SEGMENT_LENGTH;
-            ft_indexer.push(term.as_bytes(), segment_id, term_time);
+            ft_indexer.push(term.as_bytes(), segment_id, term.len());
         }
     }
     // finish ft_indexer
@@ -1368,9 +1355,8 @@ pub(crate) fn prepare_fst_index_bytes(
 
         let mut col_indexer = ColumnIndexer::new();
         for (term, row_id) in terms {
-            let term_time = time_data.value(row_id);
             let segment_id = row_id / INDEX_SEGMENT_LENGTH;
-            col_indexer.push(term.as_bytes(), segment_id, term_time);
+            col_indexer.push(term.as_bytes(), segment_id, term.len());
         }
 
         // finish col_indexer
@@ -1396,14 +1382,6 @@ pub(crate) fn prepare_fst_index_bytes(
         compressed_size: 0,
         flattened: false,
     };
-    for idx_meta in index_file_metas.metas.values() {
-        if idx_meta.min_ts < file_meta.min_ts {
-            file_meta.min_ts = idx_meta.min_ts;
-        }
-        if idx_meta.max_ts > file_meta.max_ts {
-            file_meta.max_ts = idx_meta.max_ts;
-        }
-    }
 
     Ok(index_file_metas
         .finish(writer)?

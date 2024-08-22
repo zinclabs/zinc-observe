@@ -625,8 +625,14 @@ async fn inverted_index_search_in_file(
     let file_meta = index_reader.metadata().await.unwrap();
 
     // filter through full text terms
-    if !fts_terms.is_empty() {
-        if let Some(column_index_meta) = file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
+    if let Some(column_index_meta) = file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
+        let valid_terms = fts_terms
+            .iter()
+            .filter(|term| {
+                term.len() >= column_index_meta.min_len && term.len() <= column_index_meta.max_len
+            })
+            .collect::<Vec<_>>();
+        if !valid_terms.is_empty() {
             let fst_offset =
                 column_index_meta.base_offset + column_index_meta.relative_fst_offset as u64;
             let fst_size = column_index_meta.fst_size;
@@ -641,7 +647,7 @@ async fn inverted_index_search_in_file(
                 }
                 Ok(fst_map) => {
                     // construct automatons for multiple full text search terms
-                    let matchers = fts_terms
+                    let matchers = valid_terms
                         .iter()
                         .map(|term| Contains::new(term))
                         .collect::<Vec<Contains>>();
@@ -664,35 +670,44 @@ async fn inverted_index_search_in_file(
     if !index_terms.is_empty() {
         for (col, index_terms) in index_terms.iter() {
             if let Some(column_index_meta) = file_meta.metas.get(col) {
-                let fst_offset =
-                    column_index_meta.base_offset + column_index_meta.relative_fst_offset as u64;
-                let fst_size = column_index_meta.fst_size;
-                match index_reader.fst(fst_offset, fst_size).await {
-                    Err(e) => {
-                        log::warn!(
-                            "Error loading FST map from index file {} for column {} with error {}. Keep the file",
-                            index_file_name,
-                            col,
-                            e.to_string()
-                        );
-                    }
-                    Ok(fst_map) => {
-                        // construct automatons for multiple full text search terms
-                        let matchers = index_terms
-                            .iter()
-                            .map(|term| Str::new(term))
-                            .collect::<Vec<Str>>();
+                let valid_terms = index_terms
+                    .iter()
+                    .filter(|term| {
+                        term.len() >= column_index_meta.min_len
+                            && term.len() <= column_index_meta.max_len
+                    })
+                    .collect::<Vec<_>>();
+                if !valid_terms.is_empty() {
+                    let fst_offset = column_index_meta.base_offset
+                        + column_index_meta.relative_fst_offset as u64;
+                    let fst_size = column_index_meta.fst_size;
+                    match index_reader.fst(fst_offset, fst_size).await {
+                        Err(e) => {
+                            log::warn!(
+                                "Error loading FST map from index file {} for column {} with error {}. Keep the file",
+                                index_file_name,
+                                col,
+                                e.to_string()
+                            );
+                        }
+                        Ok(fst_map) => {
+                            // construct automatons for multiple full text search terms
+                            let matchers = valid_terms
+                                .iter()
+                                .map(|term| Str::new(term))
+                                .collect::<Vec<Str>>();
 
-                        for matcher in matchers {
-                            // Stream for matched keys and their bitmap offsets
-                            let mut stream = fst_map.search(matcher).into_stream();
-                            // We do not care about the key at this point, only the offset
-                            while let Some((_, value)) = stream.next() {
-                                let bitmap =
-                                    index_reader.get_bitmap(column_index_meta, value).await?;
-                                // here we are doing bitwise OR to combine the bitmaps of all the
-                                // terms
-                                res |= bitmap;
+                            for matcher in matchers {
+                                // Stream for matched keys and their bitmap offsets
+                                let mut stream = fst_map.search(matcher).into_stream();
+                                // We do not care about the key at this point, only the offset
+                                while let Some((_, value)) = stream.next() {
+                                    let bitmap =
+                                        index_reader.get_bitmap(column_index_meta, value).await?;
+                                    // here we are doing bitwise OR to combine the bitmaps of all
+                                    // the terms
+                                    res |= bitmap;
+                                }
                             }
                         }
                     }
@@ -703,6 +718,6 @@ async fn inverted_index_search_in_file(
     Ok(if res.is_empty() {
         (file_id, None) // no match -> skip the file in search
     } else {
-        (file_id, Some(res)) // match -> search only segments of the file
+        (file_id, Some(res)) // match -> take the file in search
     })
 }
