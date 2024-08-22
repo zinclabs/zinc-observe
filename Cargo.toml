@@ -94,6 +94,7 @@ etcd-client.workspace = true
 faststr.workspace = true
 flate2.workspace = true
 futures.workspace = true
+fst.workspace = true
 hex.workspace = true
 hashbrown.workspace = true
 http-auth-basic = "0.3"

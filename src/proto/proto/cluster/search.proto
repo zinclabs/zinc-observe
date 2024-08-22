@@ -34,27 +34,27 @@ message SearchQuery {
 
 // Search request
 message SearchRequest {
-    Job                                    job = 1;
-    string                              org_id = 2;
-    string                         stream_type = 3;
-    SearchType                           stype = 4;
-    SearchQuery                          query = 5;
-    AggregateMode                     agg_mode = 6;
-    repeated FileKey                 file_list = 7;
-    int64                              timeout = 8;
-    string                          work_group = 9;
-    optional string                   user_id = 10;
-    optional string         search_event_type = 11;
-    optional InvertedIndexTerms      ft_terms = 12;
-    optional InvertedIndexTermMap index_terms = 13;
+    Job                            job = 1;
+    string                      org_id = 2;
+    string                 stream_type = 3;
+    SearchType                   stype = 4;
+    SearchQuery                  query = 5;
+    AggregateMode             agg_mode = 6;
+    repeated FileKey         file_list = 7;
+    int64                      timeout = 8;
+    string                  work_group = 9;
+    optional string           user_id = 10;
+    optional string search_event_type = 11;
+    optional FullTextTerms   ft_terms = 12;
+    optional IndexTermMap index_terms = 13;
 }
 
 
-message InvertedIndexTermMap {
-    map<string, InvertedIndexTerms> entires = 1;
+message IndexTermMap {
+    map<string, FullTextTerms> entires = 1;
 }
 
-message InvertedIndexTerms {
+message FullTextTerms {
     repeated string terms = 1;
 }
 

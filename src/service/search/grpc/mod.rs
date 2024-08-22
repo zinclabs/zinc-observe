@@ -21,10 +21,13 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        bitvec::BitVec,
+        inverted_index::IndexReader,
         search::ScanStats,
         stream::{FileKey, StreamType},
     },
     utils::record_batch_ext::format_recordbatch_by_schema,
+    INDEX_FIELD_NAME_FOR_ALL,
 };
 use futures::future::try_join_all;
 use hashbrown::HashSet;
@@ -33,7 +36,7 @@ use proto::cluster_rpc;
 use tracing::Instrument;
 
 use super::datafusion;
-use crate::service::db;
+use crate::{job::files::idx::convert_parquet_idx_file_name, service::db};
 mod storage;
 mod wal;
 
@@ -109,7 +112,9 @@ pub async fn search(
     let work_group3 = work_group.clone();
     let trace_id3 = trace_id.clone();
     let sql3 = sql.clone();
-    let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
+    let mut file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
+    // update file_list here through inverted index
+
     let storage_span = tracing::span::Span::current();
     let task3 = tokio::task::spawn(async move {
         if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
@@ -263,4 +268,39 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
         }
     }
     Ok(())
+}
+
+async fn filter_file_list_by_inverted_index(
+    file_list: &mut Vec<FileKey>,
+    req: &cluster_rpc::SearchRequest,
+) {
+    if let Some(inverted_index_term) = &req.ft_terms {}
+}
+
+async fn inverted_index_search_in_file(
+    parquet_file_name: &str,
+    req: &cluster_rpc::SearchRequest,
+) -> anyhow::Result<Option<Vec<u8>>> {
+    if req.ft_terms.is_none() || req.index_terms.is_none() {
+        return Ok(None);
+    }
+
+    let mut res = BitVec::new();
+    let index_file_name = convert_parquet_idx_file_name(parquet_file_name);
+    let index_bytes = tokio::fs::read(index_file_name).await.unwrap();
+    let mut index_reader = IndexReader::new(futures::io::Cursor::new(index_bytes));
+    let file_meta = index_reader.metadata().await.unwrap();
+
+    if let Some(full_text_terms) = &req.ft_terms {
+        if let Some(column_index_meta) = file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
+            let fst_offset =
+                column_index_meta.base_offset + column_index_meta.relative_fst_offset as u64;
+            let fst_size = column_index_meta.fst_size as u32;
+            let fst_map = index_reader.fst(fst_offset, fst_size).await.unwrap();
+
+            // construct automation union based on the full_text_terms.terms and do the search
+        }
+    }
+
+    Ok(Some(res.into_vec()))
 }

@@ -1131,7 +1131,7 @@ fn populate_inverted_index_terms(
                     .unwrap_or_default()
             })
             .collect::<Vec<String>>();
-        let ft_terms = cluster_rpc::InvertedIndexTerms { terms };
+        let ft_terms = cluster_rpc::FullTextTerms { terms };
         req.ft_terms = Some(ft_terms);
     }
 
@@ -1142,11 +1142,11 @@ fn populate_inverted_index_terms(
             .clone()
             .drain(..)
             .map(|(filed_name, terms)| {
-                let terms = cluster_rpc::InvertedIndexTerms { terms };
+                let terms = cluster_rpc::FullTextTerms { terms };
                 (filed_name, terms)
             })
-            .collect::<std::collections::HashMap<String, cluster_rpc::InvertedIndexTerms>>();
-        let index_terms = cluster_rpc::InvertedIndexTermMap {
+            .collect::<std::collections::HashMap<String, cluster_rpc::FullTextTerms>>();
+        let index_terms = cluster_rpc::IndexTermMap {
             entires: index_terms,
         };
         req.index_terms = Some(index_terms);

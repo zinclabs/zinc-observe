@@ -1373,24 +1373,24 @@ pub struct SearchRequest {
     #[prost(string, optional, tag = "11")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "12")]
-    pub ft_terms: ::core::option::Option<InvertedIndexTerms>,
+    pub ft_terms: ::core::option::Option<FullTextTerms>,
     #[prost(message, optional, tag = "13")]
-    pub index_terms: ::core::option::Option<InvertedIndexTermMap>,
+    pub index_terms: ::core::option::Option<IndexTermMap>,
 }
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct InvertedIndexTermMap {
+pub struct IndexTermMap {
     #[prost(map = "string, message", tag = "1")]
     pub entires: ::std::collections::HashMap<
         ::prost::alloc::string::String,
-        InvertedIndexTerms,
+        FullTextTerms,
     >,
 }
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct InvertedIndexTerms {
+pub struct FullTextTerms {
     #[prost(string, repeated, tag = "1")]
     pub terms: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }

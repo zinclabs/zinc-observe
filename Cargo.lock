@@ -5402,6 +5402,7 @@ dependencies = [
  "faststr",
  "flate2",
  "float-cmp",
+ "fst",
  "futures",
  "getrandom",
  "hashbrown 0.14.5",
