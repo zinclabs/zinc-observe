@@ -119,7 +119,7 @@ pub async fn search(
     let sql3 = sql.clone();
     let mut file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
     // update file_list here through inverted index
-    filter_file_list_by_inverted_index(&mut file_list, &req).await;
+    filter_file_list_by_inverted_index(&mut file_list, &req).await?;
 
     let storage_span = tracing::span::Span::current();
     let task3 = tokio::task::spawn(async move {
@@ -280,33 +280,31 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
 /// This function will load the index file corresponding to each file in the file list.
 /// FSTs in those files are used to match the incoming query in `SearchRequest`.
 /// If the query does not match any FST in the index file, the file will be filtered out.
+/// If the query does match then the segment IDs for the file will be updated.
 ///
 /// ! WARNING: all the files in the file list must have an corresponding index file.
 /// ! If the index file is missing, the file will be filtered out.
 async fn filter_file_list_by_inverted_index(
     file_list: &mut Vec<FileKey>,
     req: &cluster_rpc::SearchRequest,
-) {
-    // Prepare the matchers for the query
-    // For each FST there is one type of matcher. If _all then you can have multiple contains
-    // matcher and if secondary index you have multiple Str matchers
-    // we can have a query in with both match_all and secondary index query but both these queries
-    // are to be executed on different columns resulting in different bitmaps
-    //
+) -> Result<(), Error> {
     // iterate through file list
     // Fetch the FSTs from the corresponding index files
     let mut tasks = Vec::new();
 
     // Return if there are not terms to be searched for
     if req.ft_terms.is_none() && req.index_terms.is_none() {
-        return;
+        return Ok(());
     }
     let full_text_terms = Arc::new(req.ft_terms.clone());
     let index_terms = Arc::new(req.index_terms.clone());
+    // we can be iterating over a lot of files
     for (file_id, file) in file_list.iter().enumerate() {
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
         let file_name = file.key.clone();
+        // Spawn a task for each file, wherein full text search and
+        // index search queries are executed
         let task = tokio::task::spawn(async move {
             let res = inverted_index_search_in_file(
                 file_id,
@@ -320,7 +318,12 @@ async fn filter_file_list_by_inverted_index(
         tasks.push(task)
     }
 
-    for result in futures::future::try_join_all(tasks).await.unwrap() {
+    for result in futures::future::try_join_all(tasks).await.map_err(|e| {
+        Error::Message(format!(
+            "Error while filtering file list by inverted index: {}",
+            e
+        ))
+    })? {
         if let Err(e) = result {
             log::error!("Error while filtering file list by inverted index: {}", e);
             continue;
@@ -345,6 +348,7 @@ async fn filter_file_list_by_inverted_index(
             }
         }
     }
+    Ok(())
 }
 
 async fn inverted_index_search_in_file(
