@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <date-time
     ref="dateTimePicker"
-    auto-apply
+    :auto-apply="false"
     :default-type="modelValue.valueType"
     :default-absolute-time="{
       startTime: modelValue.startTime,
