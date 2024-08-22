@@ -172,6 +172,8 @@ pub async fn search(
             idx_scan_size,
             idx_took,
         );
+        // populate SearchRequest with full text fields and index fields
+        populate_inverted_index_terms(&meta, &mut req);
     }
 
     metrics::QUERY_PENDING_NUMS
@@ -1106,6 +1108,49 @@ async fn get_file_list_by_inverted_index(
         idx_resp.scan_size,
         start.elapsed().as_millis() as usize,
     ))
+}
+
+/// For InvertedIndexSearch with FST solution, full text fields and index fields need to populated
+/// in SearchRequest for querier follower node to search through FST index files.
+fn populate_inverted_index_terms(
+    meta: &Arc<super::sql::Sql>,
+    req: &mut cluster_rpc::SearchRequest,
+) {
+    let cfg = get_config();
+
+    // Get all the unique terms which the user has searched.
+    if !meta.fts_terms.is_empty() {
+        let terms = meta
+            .fts_terms
+            .iter()
+            .map(|t| {
+                let tokens = split_token(t, &cfg.common.inverted_index_split_chars); // QUESTION(taiming): shouldn't this be empty delimiter?
+                tokens
+                    .into_iter()
+                    .max_by_key(|key| key.len())
+                    .unwrap_or_default()
+            })
+            .collect::<Vec<String>>();
+        let ft_terms = cluster_rpc::InvertedIndexTerms { terms };
+        req.ft_terms = Some(ft_terms);
+    }
+
+    // Process index terms
+    if !meta.index_terms.is_empty() {
+        let index_terms = meta
+            .index_terms
+            .clone()
+            .drain(..)
+            .map(|(filed_name, terms)| {
+                let terms = cluster_rpc::InvertedIndexTerms { terms };
+                (filed_name, terms)
+            })
+            .collect::<std::collections::HashMap<String, cluster_rpc::InvertedIndexTerms>>();
+        let index_terms = cluster_rpc::InvertedIndexTermMap {
+            entires: index_terms,
+        };
+        req.index_terms = Some(index_terms);
+    }
 }
 
 #[cfg(test)]

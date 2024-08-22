@@ -879,7 +879,7 @@ pub async fn merge_files(
                         .await
                         {
                             log::error!(
-                                "generate_index_on_compactor write to file list: {}, error: {}, need delete files: {:?}",
+                                "generate_index_on_compactor write to file list: {}, error: {}, deleted files: {:?}",
                                 index_file_name,
                                 e.to_string(),
                                 retain_file_list
