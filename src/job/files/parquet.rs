@@ -707,11 +707,12 @@ async fn merge_files(
                         })?;
                     }
                     // generate fst inverted index and write to storage
-                    generate_fst_index_on_ingester(
+                    generate_fst_inverted_index(
                         inverted_idx_batch,
                         &new_file_key,
                         &full_text_search_fields,
                         &index_fields,
+                        None,
                     )
                     .await?;
                 }
@@ -1210,23 +1211,51 @@ fn prepare_index_record_batches(
     Ok(indexed_record_batches_to_merge)
 }
 
-/// Creates fst inverted index bytes and writes to file on ingester
-pub(crate) async fn generate_fst_index_on_ingester(
+/// Creates fst inverted index bytes and writes to storage.
+/// Called by both ingester and compactor. Compactor needs to provide `file_list_to_invalidate`
+/// to delete previously created small index files
+pub(crate) async fn generate_fst_inverted_index(
     inverted_idx_batch: RecordBatch,
     parquet_file_name: &str,
-    full_text_search_fields: &[String],
-    index_fields: &[String],
+    full_text_search_fields: &Vec<String>,
+    index_fields: &Vec<String>,
+    file_list_to_invalidate: Option<&[FileKey]>, /* for compactor to delete corresponding small
+                                                  * .idx files */
 ) -> Result<(), anyhow::Error> {
     let Some((compressed_bytes, _)) =
         prepare_fst_index_bytes(inverted_idx_batch, full_text_search_fields, index_fields)?
     else {
-        log::info!("generate_fst_index_on_ingester creates empty index. skip");
+        log::info!("generate_fst_index_on_compactor creates empty index. skip");
         return Ok(());
     };
 
-    // QUESTION(taiming): okay to directly put into storage, instead of using ingester::writer?
-    // convert parquet file_key to idx file_key and write to disk
-    let idx_file_name = convert_parquet_idx_file_name(parquet_file_name);
+    // delete corresponding small .idx files
+    if let Some(file_list) = file_list_to_invalidate {
+        for old_parquet_file in file_list {
+            let old_idx_file = convert_parquet_idx_file_name(&old_parquet_file.key);
+            if let Err(e) = storage::del(&[&old_idx_file]).await {
+                log::info!(
+                    "[COMPACTOR:JOB] Failed to remove merged fst idx file from disk: {}, {}",
+                    old_idx_file,
+                    e
+                );
+            }
+        }
+    }
+
+    // TODO(taiming): future improvement. write index files into file_list to show total index size
+    // on UI let new_idx_file_name = write_fst_index_to_disk(
+    //         compressed_bytes,
+    //         org_id,
+    //         stream_name,
+    //         StreamType::Index,
+    //         &parquet_file_name,
+    //         "index_creator",
+    //     )
+    //     .await?;
+
+    // write fst bytes into disk
+    let idx_file_name = convert_parquet_idx_file_name(&parquet_file_name);
     match storage::put(&idx_file_name, Bytes::from(compressed_bytes)).await {
         Ok(_) => {
             log::info!("[INGESTER:JOB] Written fst index idx file successfully");
@@ -1242,58 +1271,11 @@ pub(crate) async fn generate_fst_index_on_ingester(
     }
 }
 
-/// Creates fst inverted index bytes and writes to file on compactor
-pub(crate) async fn generate_fst_index_on_compactor(
-    file_list_to_invalidate: &[FileKey], // to delete corresponding small .idx files
-    inverted_idx_batch: RecordBatch,
-    parquet_file_name: String, // to create new idx file_name
-    org_id: &str,
-    stream_name: &str,
-    full_text_search_fields: &[String],
-    index_fields: &[String],
-) -> Result<Option<(String, FileMeta)>, anyhow::Error> {
-    let Some((compressed_bytes, file_meta)) =
-        prepare_fst_index_bytes(inverted_idx_batch, full_text_search_fields, index_fields)?
-    else {
-        log::info!("generate_fst_index_on_compactor creates empty index. skip");
-        return Ok(None);
-    };
-
-    // TODO(taiming): parquet file might not have corresponding idx file
-    // delete corresponding small .idx files
-    for old_parquet_file in file_list_to_invalidate {
-        let old_idx_file = convert_parquet_idx_file_name(&old_parquet_file.key);
-        // TODO(taiming): use storage to delete file
-        if let Err(e) = tokio::fs::remove_file(&old_idx_file).await {
-            log::error!(
-                "[COMPACTOR:JOB] Failed to remove merged fst idx file from disk: {}, {}",
-                old_idx_file,
-                e
-            );
-        }
-    }
-
-    // TODO(taiming): no need to update file_list for .idx files. write to fs directly like ingester
-    // write fst bytes into disk
-    let new_idx_file_name = write_fst_index_to_disk(
-        compressed_bytes,
-        org_id,
-        stream_name,
-        StreamType::Index,
-        &parquet_file_name,
-        "index_creator",
-    )
-    .await?;
-    log::debug!("[COMPACTOR:JOB] Written index file successfully");
-
-    Ok(Some((new_idx_file_name, file_meta)))
-}
-
-/// Create an compressed inverted index bytes using FST solution for the given RecordBatch
+/// Create and compressed inverted index bytes using FST solution for the given RecordBatch
 pub(crate) fn prepare_fst_index_bytes(
     inverted_idx_batch: RecordBatch,
-    full_text_search_fields: &[String],
-    index_fields: &[String],
+    full_text_search_fields: &Vec<String>,
+    index_fields: &Vec<String>,
 ) -> Result<Option<(Vec<u8>, FileMeta)>, anyhow::Error> {
     let cfg = get_config();
     let schema = inverted_idx_batch.schema();
@@ -1404,6 +1386,8 @@ pub(crate) fn prepare_fst_index_bytes(
         }
     }
 
+    // TODO(taiming): left for future improvement - write index files into file_list to show total
+    // index size
     let mut file_meta = FileMeta {
         min_ts: 0,
         max_ts: 0,

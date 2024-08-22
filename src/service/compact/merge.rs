@@ -51,7 +51,7 @@ use tokio::{
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
-    job::files::parquet::{generate_fst_index_on_compactor, generate_index_on_compactor},
+    job::files::parquet::{generate_fst_inverted_index, generate_index_on_compactor},
     service::{
         db, file_list,
         schema::generate_schema_for_defined_schema_fields,
@@ -850,42 +850,15 @@ pub async fn merge_files(
                         }
                     }
 
-                    // generate fst inverted index
-                    if let Some((index_file_name, filemeta)) = generate_fst_index_on_compactor(
-                        &retain_file_list,
+                    // generate fst inverted index and write to storage
+                    generate_fst_inverted_index(
                         inverted_idx_batch,
-                        new_file_key.clone(),
-                        org_id,
-                        stream_name,
+                        &new_file_key,
                         &full_text_search_fields,
                         &index_fields,
+                        Some(&retain_file_list),
                     )
-                    .await?
-                    {
-                        log::info!(
-                            "Created fst index file during compaction {}",
-                            index_file_name
-                        );
-                        // Notify that we wrote the index file to the db.
-                        if let Err(e) = write_file_list(
-                            org_id,
-                            &[FileKey {
-                                key: index_file_name.clone(),
-                                meta: filemeta,
-                                deleted: false,
-                                segment_ids: None,
-                            }],
-                        )
-                        .await
-                        {
-                            log::error!(
-                                "generate_index_on_compactor write to file list: {}, error: {}, deleted files: {:?}",
-                                index_file_name,
-                                e.to_string(),
-                                retain_file_list
-                            );
-                        }
-                    }
+                    .await?;
                 }
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
