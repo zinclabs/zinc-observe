@@ -32,7 +32,10 @@ use config::{
 use fst::{automaton::Str, IntoStreamer, Streamer};
 use futures::future::try_join_all;
 use hashbrown::HashSet;
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    errors::{Error, ErrorCodes},
+    storage as object_store,
+};
 use itertools::Itertools;
 use proto::cluster_rpc::{self, FullTextTerms};
 use tracing::Instrument;
@@ -119,7 +122,7 @@ pub async fn search(
     let sql3 = sql.clone();
     let mut file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
     // update file_list here through inverted index
-    filter_file_list_by_inverted_index(&mut file_list, &req).await?;
+    filter_file_list_by_inverted_index(&mut file_list, req).await?;
 
     let storage_span = tracing::span::Span::current();
     let task3 = tokio::task::spawn(async move {
@@ -306,14 +309,13 @@ async fn filter_file_list_by_inverted_index(
         // Spawn a task for each file, wherein full text search and
         // index search queries are executed
         let task = tokio::task::spawn(async move {
-            let res = inverted_index_search_in_file(
+            inverted_index_search_in_file(
                 file_id,
                 &file_name,
                 full_text_term_clone,
                 index_terms_clone,
             )
-            .await;
-            res
+            .await
         });
         tasks.push(task)
     }
@@ -353,13 +355,13 @@ async fn filter_file_list_by_inverted_index(
 
 async fn inverted_index_search_in_file(
     file_id: usize,
-    parquet_file_name: &String,
+    parquet_file_name: &str,
     ft_terms: Arc<Option<FullTextTerms>>,
     index_terms_map: Arc<Option<cluster_rpc::IndexTermMap>>,
 ) -> anyhow::Result<(usize, Option<BitVec>)> {
     let mut res = BitVec::new();
-    let index_file_name = convert_parquet_idx_file_name(parquet_file_name.as_str());
-    let index_bytes = tokio::fs::read(index_file_name).await?;
+    let index_file_name = convert_parquet_idx_file_name(parquet_file_name);
+    let index_bytes = object_store::get(&index_file_name).await?;
     let mut index_reader = IndexReader::new(futures::io::Cursor::new(index_bytes));
     let file_meta = index_reader.metadata().await.unwrap();
 
@@ -367,7 +369,7 @@ async fn inverted_index_search_in_file(
         if let Some(column_index_meta) = file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
             let fst_offset =
                 column_index_meta.base_offset + column_index_meta.relative_fst_offset as u64;
-            let fst_size = column_index_meta.fst_size as u32;
+            let fst_size = column_index_meta.fst_size;
             let fst_map = index_reader.fst(fst_offset, fst_size).await.unwrap();
 
             // construct automatons for multiple full text search terms
@@ -395,7 +397,7 @@ async fn inverted_index_search_in_file(
             if let Some(column_index_meta) = file_meta.metas.get(col) {
                 let fst_offset =
                     column_index_meta.base_offset + column_index_meta.relative_fst_offset as u64;
-                let fst_size = column_index_meta.fst_size as u32;
+                let fst_size = column_index_meta.fst_size;
                 let fst_map = index_reader.fst(fst_offset, fst_size).await.unwrap();
 
                 // construct automatons for multiple full text search terms
