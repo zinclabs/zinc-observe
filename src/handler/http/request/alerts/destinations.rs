@@ -194,7 +194,7 @@ async fn delete_destination(path: web::Path<(String, String)>) -> Result<HttpRes
     match destinations::delete(&org_id, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert destination deleted")),
         Err(e) => match e {
-            (http::StatusCode::CONFLICT, e) => Ok(MetaHttpResponse::conflict(e)),
+            (http::StatusCode::FORBIDDEN, e) => Ok(MetaHttpResponse::forbidden(e)),
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
             (_, e) => Ok(MetaHttpResponse::internal_error(e)),
         },
