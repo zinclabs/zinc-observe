@@ -15,7 +15,7 @@
 
 use std::io::Error as StdErr;
 
-use actix_web::{delete, get, post, web, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpResponse};
 use config::utils::json;
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
@@ -24,6 +24,8 @@ use {
     futures::{StreamExt, TryStreamExt},
     o2_enterprise::enterprise::common::settings,
 };
+#[cfg(feature = "enterprise")]
+use std::collections::HashMap;
 
 use crate::{
     common::meta::{
@@ -182,4 +184,87 @@ async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
 #[delete("/{org_id}/settings/logo/text")]
 async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+// custom settings api
+
+#[cfg(not(feature = "enterprise"))]
+#[get("/{org_id}/settings/custom")]
+pub async fn get_custom_settings()->Result<HttpResponse,StdErr>{
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[post("/{org_id}/settings/custom")]
+pub async fn set_custom_settings()->Result<HttpResponse,StdErr>{
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[put("/{org_id}/settings/custom")]
+pub async fn update_custom_settings()->Result<HttpResponse,StdErr>{
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[delete("/{org_id}/settings/custom")]
+pub async fn delete_custom_settings()->Result<HttpResponse,StdErr>{
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}
+
+/// This will retrieve the custom settings for the specified org
+/// and return them as a json object
+#[cfg(feature = "enterprise")]
+#[get("/{org_id}/settings/custom")]
+pub async fn get_custom_settings(path: web::Path<String>)->Result<HttpResponse,StdErr>{
+    let org_id = path.into_inner();
+    match settings::get_custom_settings(&org_id).await {
+        Ok(settings) => Ok(HttpResponse::Ok().json(serde_json::json!(settings))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+
+/// This expects the settings as object with string kv pairs
+/// and will store those in db as is.
+#[cfg(feature = "enterprise")]
+#[post("/{org_id}/settings/custom")]
+pub async fn set_custom_settings(
+    path: web::Path<String>, 
+    settings: web::Json<HashMap<String, settings::CustomSettingEntry>>
+)->Result<HttpResponse,StdErr>{
+    let org_id = path.into_inner();
+    let settings = settings.into_inner();
+    match settings::set_custom_settings(&org_id, &settings).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[put("/{org_id}/settings/custom")]
+pub async fn update_custom_settings(
+    path: web::Path<String>, 
+    settings: web::Json<HashMap<String, settings::CustomSettingEntry>>
+)->Result<HttpResponse,StdErr>{
+    let org_id = path.into_inner();
+    let settings = settings.into_inner();
+    match settings::update_custom_settings(&org_id, settings).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[delete("/{org_id}/settings/custom")]
+pub async fn delete_custom_settings(
+    path: web::Path<String>, 
+    keys: web::Json<Vec<String>>
+)->Result<HttpResponse,StdErr>{
+    let org_id = path.into_inner();
+    let keys = keys.into_inner();
+    match settings::delete_custom_settings(&org_id, &keys).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
 }
