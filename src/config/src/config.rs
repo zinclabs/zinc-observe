@@ -60,7 +60,7 @@ pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
 pub const FILE_EXT_JSON: &str = ".json";
 pub const FILE_EXT_ARROW: &str = ".arrow";
 pub const FILE_EXT_PARQUET: &str = ".parquet";
-pub const FILE_EXT_IDX: &str = ".idx";
+pub const FILE_EXT_PUFFIN: &str = ".puffin";
 
 pub const INDEX_FIELD_NAME_FOR_ALL: &str = "_all";
 
@@ -695,11 +695,17 @@ pub struct Common {
     )]
     pub inverted_index_old_format: bool,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_PARQUET_FORMAT",
-        default = false,
-        help = "Generate inverted index in parquet format for testing purposes."
+        name = "ZO_INVERTED_INDEX_STORE_FORMAT",
+        default = "parquet",
+        help = "InvertedIndex store format, parquet(default), fst, or both."
     )]
-    pub inverted_index_parquet_format: bool,
+    pub inverted_index_store_format: String,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
+        default = "parquet",
+        help = "InvertedIndex search format. Can only be configured when store format is both. Otherwise, it's set by store format"
+    )]
+    pub inverted_index_search_format: String,
     #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
@@ -1439,6 +1445,12 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.common.bloom_filter_ndv_ratio == 0 {
         cfg.common.bloom_filter_ndv_ratio = 100;
     }
+
+    // check default inverted index search format
+    if cfg.common.inverted_index_store_format != "both" {
+        cfg.common.inverted_index_search_format = cfg.common.inverted_index_search_format.clone();
+    }
+
     Ok(())
 }
 

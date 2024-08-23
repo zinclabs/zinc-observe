@@ -126,7 +126,7 @@ pub async fn search(
     );
 
     // filter file_list if is an inverted index search
-    if !sql.fts_terms.is_empty() || !sql.index_terms.is_empty() {
+    if (!sql.fts_terms.is_empty() || !sql.index_terms.is_empty()) && sql.index_type == "fst" {
         let prev_file_list_len = files.len();
         filter_file_list_by_inverted_index(&mut files, &sql).await?;
         log::info!(

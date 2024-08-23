@@ -21,7 +21,10 @@ use std::{
 
 use actix_web::{http::header::HeaderName, web::Query};
 use awc::http::header::HeaderMap;
-use config::meta::{search::SearchEventType, stream::StreamType};
+use config::{
+    get_config,
+    meta::{search::SearchEventType, stream::StreamType},
+};
 use opentelemetry::{global, propagation::Extractor, trace::TraceContextExt};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -74,6 +77,30 @@ pub(crate) fn get_search_type_from_request(
     };
 
     Ok(event_type)
+}
+
+/// Index type for a search can be either `parquet` or `fst`. It's only effective when env
+/// `ZO_INVERTED_INDEX_STORE_FORMAT` is set as `both`.
+/// Otherwise 'index_type' is set by env `ZO_INVERTED_INDEX_SEARCH_FORMAT`, which is also
+/// the same as store format if store format is not `both`.
+#[inline(always)]
+pub(crate) fn get_index_type_from_request(
+    query: &Query<HashMap<String, String>>,
+) -> Result<String, Error> {
+    let cfg = get_config();
+    match query.get("index_type") {
+        Some(typ) if cfg.common.inverted_index_store_format == "both" => {
+            match typ.to_lowercase().as_str() {
+                "parquet" => Ok("parquet".to_string()),
+                "fst" => Ok("fst".to_string()),
+                _ => Err(Error::new(
+                    ErrorKind::Other,
+                    "'index_type' query param with value 'parquet' or 'fst' allowed",
+                )),
+            }
+        }
+        _ => Ok(cfg.common.inverted_index_search_format.to_string()),
+    }
 }
 
 #[inline(always)]

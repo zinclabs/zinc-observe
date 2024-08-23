@@ -20,7 +20,7 @@ use futures::io::Cursor;
 use itertools::Itertools;
 
 use crate::{
-    meta::inverted_index::IndexReader, FILE_EXT_IDX, FILE_EXT_PARQUET, INDEX_MIN_CHAR_LEN,
+    meta::inverted_index::IndexReader, FILE_EXT_PARQUET, FILE_EXT_PUFFIN, INDEX_MIN_CHAR_LEN,
 };
 
 /// Split a string into tokens based on a delimiter. if delimiter is empty, split by whitespace and
@@ -98,9 +98,9 @@ pub fn convert_parquet_idx_file_name(from: &str) -> String {
     let file_name_index = parts.len() - 1;
     let file_name = parts[file_name_index];
     let new_file_name = if file_name.ends_with(FILE_EXT_PARQUET) {
-        file_name.replace(FILE_EXT_PARQUET, FILE_EXT_IDX)
+        file_name.replace(FILE_EXT_PARQUET, FILE_EXT_PUFFIN)
     } else {
-        file_name.replace(FILE_EXT_IDX, FILE_EXT_PARQUET)
+        file_name.replace(FILE_EXT_PUFFIN, FILE_EXT_PARQUET)
     };
     parts[file_name_index] = &new_file_name;
 

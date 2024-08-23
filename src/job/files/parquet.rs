@@ -36,7 +36,7 @@ use config::{
     cluster, get_config,
     meta::{
         bitvec::BitVec,
-        inverted_index::{ColumnIndexer, IndexFileMetas},
+        inverted_index::{ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
     },
     metrics,
@@ -74,7 +74,7 @@ use crate::{
         infra::wal,
         meta::{authz::Authz, stream::SchemaRecords},
     },
-    job::files::idx::{write_fst_index_to_disk, write_parquet_index_to_disk},
+    job::files::idx::write_parquet_index_to_disk,
     service::{
         compact::merge::{generate_inverted_idx_recordbatch, merge_parquet_files},
         db,
@@ -690,8 +690,12 @@ async fn merge_files(
                     &full_text_search_fields,
                     &index_fields,
                 )? {
-                    if cfg.common.inverted_index_parquet_format {
-                        // for testing purposes
+                    let index_format =
+                        InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
+                    if matches!(
+                        index_format,
+                        InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
+                    ) {
                         generate_index_on_ingester(
                             inverted_idx_batch.clone(),
                             new_file_key.clone(),
@@ -706,15 +710,20 @@ async fn merge_files(
                             anyhow::anyhow!("generate_parquet_index_on_ingester error: {}", e)
                         })?;
                     }
-                    // generate fst inverted index and write to storage
-                    generate_fst_inverted_index(
-                        inverted_idx_batch,
-                        &new_file_key,
-                        &full_text_search_fields,
-                        &index_fields,
-                        None,
-                    )
-                    .await?;
+                    if matches!(
+                        index_format,
+                        InvertedIndexFormat::FST | InvertedIndexFormat::Both
+                    ) {
+                        // generate fst inverted index and write to storage
+                        generate_fst_inverted_index(
+                            inverted_idx_batch,
+                            &new_file_key,
+                            &full_text_search_fields,
+                            &index_fields,
+                            None,
+                        )
+                        .await?;
+                    }
                 }
             }
             Ok((new_file_key, new_file_meta, retain_file_list))
@@ -1217,8 +1226,8 @@ fn prepare_index_record_batches(
 pub(crate) async fn generate_fst_inverted_index(
     inverted_idx_batch: RecordBatch,
     parquet_file_name: &str,
-    full_text_search_fields: &Vec<String>,
-    index_fields: &Vec<String>,
+    full_text_search_fields: &[String],
+    index_fields: &[String],
     file_list_to_invalidate: Option<&[FileKey]>, /* for compactor to delete corresponding small
                                                   * .idx files */
 ) -> Result<(), anyhow::Error> {
@@ -1255,17 +1264,19 @@ pub(crate) async fn generate_fst_inverted_index(
     //     .await?;
 
     // write fst bytes into disk
-    let idx_file_name = convert_parquet_idx_file_name(&parquet_file_name);
+    let idx_file_name = convert_parquet_idx_file_name(parquet_file_name);
+    let caller = if file_list_to_invalidate.is_some() {
+        "[COMPACTOR:JOB]"
+    } else {
+        "[INGESTER:JOB]"
+    };
     match storage::put(&idx_file_name, Bytes::from(compressed_bytes)).await {
         Ok(_) => {
-            log::info!("[INGESTER:JOB] Written fst index idx file successfully");
+            log::info!("{} Written fst index file successfully", caller);
             Ok(())
         }
         Err(e) => {
-            log::error!(
-                "[INGESTER:JOB] Written fst index idx file error: {}",
-                e.to_string()
-            );
+            log::error!("{} Written fst index file error: {}", caller, e.to_string());
             Err(e)
         }
     }
@@ -1274,8 +1285,8 @@ pub(crate) async fn generate_fst_inverted_index(
 /// Create and compressed inverted index bytes using FST solution for the given RecordBatch
 pub(crate) fn prepare_fst_index_bytes(
     inverted_idx_batch: RecordBatch,
-    full_text_search_fields: &Vec<String>,
-    index_fields: &Vec<String>,
+    full_text_search_fields: &[String],
+    index_fields: &[String],
 ) -> Result<Option<(Vec<u8>, FileMeta)>, anyhow::Error> {
     let schema = inverted_idx_batch.schema();
 

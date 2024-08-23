@@ -16,7 +16,7 @@
 use config::{
     ider,
     meta::stream::{FileMeta, StreamType},
-    utils::{inverted_index::convert_parquet_idx_file_name, parquet::new_parquet_writer},
+    utils::parquet::new_parquet_writer,
     FILE_EXT_PARQUET,
 };
 use infra::storage;
@@ -39,48 +39,6 @@ fn generate_index_file_name_from_compacted_file(
     );
     let file_name = ider::generate();
     format!("files/{stream_key}/{file_date}/{file_name}{FILE_EXT_PARQUET}")
-}
-
-pub(crate) async fn write_fst_index_to_disk(
-    compressed_bytes: Vec<u8>,
-    org_id: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-    file_name: &str,
-    caller: &str,
-) -> Result<String, anyhow::Error> {
-    let new_idx_file_name = convert_parquet_idx_file_name(file_name);
-    log::info!(
-        "[JOB] FST IDX: write_to_disk: {}/{}/{} idx_file:{}, parquet_file:{}, caller: {}",
-        org_id,
-        stream_name,
-        stream_type,
-        new_idx_file_name,
-        file_name,
-        caller,
-    );
-
-    let store_file_name = new_idx_file_name.clone();
-    match task::spawn_blocking(move || async move {
-        storage::put(&store_file_name, bytes::Bytes::from(compressed_bytes)).await
-    })
-    .await
-    {
-        Ok(output) => match output.await {
-            Ok(_) => {
-                log::info!("[JOB] disk file upload succeeded: {}", &new_idx_file_name);
-                Ok(new_idx_file_name)
-            }
-            Err(err) => {
-                log::error!("[JOB] disk file upload error: {:?}", err);
-                Err(anyhow::anyhow!(err))
-            }
-        },
-        Err(err) => {
-            log::error!("[JOB] disk file upload error: {:?}", err);
-            Err(anyhow::anyhow!(err))
-        }
-    }
 }
 
 pub(crate) async fn write_parquet_index_to_disk(

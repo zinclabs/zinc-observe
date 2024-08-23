@@ -691,6 +691,7 @@ pub async fn around_multi(
             clusters: clusters.clone(),
             timeout,
             search_type: Some(search::SearchEventType::UI),
+            index_type: "".to_string(),
         };
         let search_res =
             SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
@@ -763,6 +764,7 @@ pub async fn around_multi(
             clusters: clusters.clone(),
             timeout,
             search_type: Some(search::SearchEventType::UI),
+            index_type: "".to_string(),
         };
         let search_res =
             SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)

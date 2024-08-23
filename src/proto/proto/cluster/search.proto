@@ -43,8 +43,9 @@ message SearchRequest {
     repeated FileKey         file_list = 7;
     int64                      timeout = 8;
     string                  work_group = 9;
-    optional string           user_id = 10;
-    optional string search_event_type = 11;
+    string                 index_type = 10;
+    optional string           user_id = 11;
+    optional string search_event_type = 12;
 }
 
 message SearchResponse {

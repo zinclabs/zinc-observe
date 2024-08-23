@@ -79,6 +79,7 @@ pub struct Sql {
     pub index_terms: Vec<(String, Vec<String>)>,
     pub histogram_interval: Option<i64>,
     pub use_inverted_index: bool,
+    pub index_type: String,
 }
 
 impl Sql {
@@ -529,6 +530,7 @@ impl Sql {
         } else {
             checking_inverted_index(&meta, &fts_fields, &index_fields)
         };
+        let index_type = req.index_type.to_string();
 
         Ok(Sql {
             origin_sql,
@@ -549,6 +551,7 @@ impl Sql {
                 .collect(),
             histogram_interval,
             use_inverted_index,
+            index_type,
         })
     }
 
@@ -977,6 +980,7 @@ mod tests {
             clusters: vec![],
             timeout: 0,
             search_type: None,
+            index_type: "".to_string(),
         };
 
         let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
@@ -1085,6 +1089,7 @@ mod tests {
                 clusters: vec![],
                 timeout: 0,
                 search_type: None,
+                index_type: "".to_string(),
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
             rpc_req.org_id = org_id.to_string();
@@ -1206,6 +1211,7 @@ mod tests {
                 clusters: vec![],
                 timeout: 0,
                 search_type: None,
+                index_type: "".to_string(),
             };
             let mut rpc_req: cluster_rpc::SearchRequest = req.to_owned().into();
             rpc_req.org_id = org_id.to_string();

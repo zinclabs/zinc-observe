@@ -162,7 +162,7 @@ pub async fn search(
     // then filter the file list based on the inverted index.
     let mut idx_scan_size = 0;
     let mut idx_took = 0;
-    if is_inverted_index {
+    if is_inverted_index && req.index_type == "parquet" {
         (file_list, idx_scan_size, idx_took) =
             get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
         log::info!(

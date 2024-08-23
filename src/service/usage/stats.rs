@@ -93,6 +93,7 @@ pub async fn publish_stats() -> Result<(), anyhow::Error> {
             clusters: vec![],
             timeout: 0,
             search_type: None,
+            index_type: "".to_string(),
         };
         // do search
         match SearchService::search("", &cfg.common.usage_org, StreamType::Logs, None, &req).await {
@@ -150,6 +151,7 @@ async fn get_last_stats(
         clusters: vec![],
         timeout: 0,
         search_type: None,
+        index_type: "".to_string(),
     };
     match SearchService::search(
         "",

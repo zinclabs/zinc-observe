@@ -22,7 +22,10 @@ use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
-    meta::stream::{FileKey, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats, StreamType},
+    meta::{
+        inverted_index::InvertedIndexFormat,
+        stream::{FileKey, FileMeta, MergeStrategy, PartitionTimeLevel, StreamStats, StreamType},
+    },
     metrics,
     utils::{
         json,
@@ -803,8 +806,12 @@ pub async fn merge_files(
                     &full_text_search_fields,
                     &index_fields,
                 )? {
-                    if cfg.common.inverted_index_parquet_format {
-                        // for testing purposes
+                    let index_format =
+                        InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
+                    if matches!(
+                        index_format,
+                        InvertedIndexFormat::Parquet | InvertedIndexFormat::Both
+                    ) {
                         let (index_file_name, filemeta) = generate_index_on_compactor(
                             &retain_file_list,
                             inverted_idx_batch.clone(),
@@ -849,16 +856,20 @@ pub async fn merge_files(
                             }
                         }
                     }
-
-                    // generate fst inverted index and write to storage
-                    generate_fst_inverted_index(
-                        inverted_idx_batch,
-                        &new_file_key,
-                        &full_text_search_fields,
-                        &index_fields,
-                        Some(&retain_file_list),
-                    )
-                    .await?;
+                    if matches!(
+                        index_format,
+                        InvertedIndexFormat::FST | InvertedIndexFormat::Both
+                    ) {
+                        // generate fst inverted index and write to storage
+                        generate_fst_inverted_index(
+                            inverted_idx_batch,
+                            &new_file_key,
+                            &full_text_search_fields,
+                            &index_fields,
+                            Some(&retain_file_list),
+                        )
+                        .await?;
+                    }
                 }
             }
             Ok((new_file_key, new_file_meta, retain_file_list))

@@ -68,6 +68,7 @@ impl Context for Export {
             clusters: vec![],
             timeout: 0,
             search_type,
+            index_type: "".to_string(),
         };
 
         match SearchService::search("", &c.org, stream_type, None, &req).await {
