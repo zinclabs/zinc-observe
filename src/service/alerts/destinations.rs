@@ -173,7 +173,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
         for alert in alerts.iter() {
             if stream_key.starts_with(org_id) && alert.destinations.contains(&name.to_string()) {
                 return Err((
-                    http::StatusCode::CONFLICT,
+                    http::StatusCode::FORBIDDEN,
                     anyhow::anyhow!("Alert destination is in use for alert {}", alert.name),
                 ));
             }
