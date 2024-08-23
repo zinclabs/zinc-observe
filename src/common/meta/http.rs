@@ -102,13 +102,6 @@ impl HttpResponse {
             .json(Self::error(StatusCode::FORBIDDEN.into(), error.to_string()))
     }
 
-    /// Send a Forbidden response in json format and associate the
-    /// provided error as `error` field.
-    pub fn conflict(error: impl ToString) -> ActixHttpResponse {
-        ActixHttpResponse::Conflict()
-            .json(Self::error(StatusCode::CONFLICT.into(), error.to_string()))
-    }
-
     /// Send a NotFound response in json format and associate the
     /// provided error as `error` field.
     pub fn not_found(error: impl ToString) -> ActixHttpResponse {
