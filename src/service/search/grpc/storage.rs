@@ -13,21 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, io::Read, sync::Arc};
+use std::{borrow::Cow, sync::Arc};
 
 use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        inverted_index::{Contains, IndexReader},
+        inverted_index::Contains,
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
-    utils::{inverted_index::convert_parquet_idx_file_name, schema_ext::SchemaExt},
+    utils::{
+        inverted_index::{convert_parquet_idx_file_name, create_index_reader_from_puffin_bytes},
+        schema_ext::SchemaExt,
+    },
     INDEX_FIELD_NAME_FOR_ALL,
 };
 use fst::{automaton::Str, IntoStreamer, Streamer};
-use futures::{future::try_join_all, io::Cursor};
+use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
     cache::file_data,
@@ -555,8 +558,9 @@ async fn cache_files<'a>(
 /// Filter file list using inverted index
 /// This function will load the index file corresponding to each file in the file list.
 /// FSTs in those files are used to match the incoming query in `SearchRequest`.
-/// If the query does not match any FST in the index file, the file will *not* be filtered out.
+/// If the query does not match any FST in the index file, the file will be filtered out.
 /// If the query does match then the segment IDs for the file will be updated.
+/// If the query not find corresponding index file, the file will *not* be filtered out.
 async fn filter_file_list_by_inverted_index(
     trace_id: &str,
     file_list: &mut Vec<FileKey>,
@@ -651,11 +655,8 @@ async fn inverted_index_search_in_file(
         Ok(bytes) => bytes,
     };
 
-    let mut decoder = zstd::Decoder::new(&compressed_index_blob[..])?;
-    let mut index_bytes = Vec::new();
-    decoder.read_to_end(&mut index_bytes)?;
-
-    let mut index_reader = IndexReader::new(Cursor::new(index_bytes));
+    let mut index_reader =
+        create_index_reader_from_puffin_bytes(compressed_index_blob.to_vec()).await?;
     let file_meta = index_reader.metadata().await.unwrap();
 
     let mut res = BitVec::new();
@@ -693,8 +694,6 @@ async fn inverted_index_search_in_file(
                             let bitmap = index_reader.get_bitmap(column_index_meta, value).await?;
 
                             // Resize if the res map is smaller than the bitmap
-                            // Ideally, this should only execute once since a file will always
-                            // have a fixed length bitmap.
                             if res.len() < bitmap.len() {
                                 res.resize(bitmap.len(), false);
                             }
@@ -744,6 +743,11 @@ async fn inverted_index_search_in_file(
                                 while let Some((_, value)) = stream.next() {
                                     let bitmap =
                                         index_reader.get_bitmap(column_index_meta, value).await?;
+
+                                    // Resize if the res map is smaller than the bitmap
+                                    if res.len() < bitmap.len() {
+                                        res.resize(bitmap.len(), false);
+                                    }
                                     // here we are doing bitwise OR to combine the bitmaps of all
                                     // the terms
                                     res |= bitmap;

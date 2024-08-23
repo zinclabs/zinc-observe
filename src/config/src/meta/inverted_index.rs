@@ -24,7 +24,7 @@ use fst::MapBuilder;
 use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
 use serde::{Deserialize, Serialize};
 
-use super::puffin::writer::PuffinFileWriter;
+use super::puffin::writer::PuffinBytesWriter;
 use crate::{
     meta::bitvec::BitVec,
     utils::inverted_index::{pack_u32_pair, unpack_u32_pair},
@@ -55,7 +55,7 @@ impl IndexFileMetas {
         if self.metas.is_empty() {
             return Ok(None);
         }
-        let meta_bytes = serde_json::to_vec(&self.metas)?;
+        let meta_bytes = serde_json::to_vec(&self)?;
         writer.write_all(&meta_bytes)?;
         let metas_size = meta_bytes.len() as u32;
         writer.write_all(&metas_size.to_le_bytes())?;
@@ -63,7 +63,7 @@ impl IndexFileMetas {
         let original_size = writer.len() as u64;
 
         let mut puffin_buf: Vec<u8> = Vec::new();
-        let mut puffin_writer = PuffinFileWriter::new(&mut puffin_buf);
+        let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
         puffin_writer.add_blob(writer)?;
         puffin_writer.finish()?;
 
@@ -227,8 +227,7 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> IndexReader<R> {
         let index_file_metas_buf = &mut vec![0u8; index_file_metas_size as usize];
         self.source.read_exact(index_file_metas_buf).await?;
 
-        let mut index_file_metas: IndexFileMetas = IndexFileMetas::new();
-        index_file_metas.metas = serde_json::from_slice(index_file_metas_buf)?;
+        let index_file_metas: IndexFileMetas = serde_json::from_slice(index_file_metas_buf)?;
         Self::validate_meta(&index_file_metas, index_file_metas_size, end_offset)?;
 
         Ok(Arc::new(index_file_metas))

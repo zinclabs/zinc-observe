@@ -26,15 +26,15 @@ pub const MAGIC: [u8; 4] = [0x50, 0x46, 0x41, 0x31];
 pub const MAGIC_SIZE: u64 = MAGIC.len() as u64;
 pub const MIN_FILE_SIZE: u64 = MAGIC_SIZE + MIN_FOOTER_SIZE;
 pub const FLAGS_SIZE: u64 = 4;
-pub const PAYLOAD_SIZE_SIZE: u64 = 4;
-pub const MIN_FOOTER_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + PAYLOAD_SIZE_SIZE + MAGIC_SIZE; // without any blobs
+pub const FOOTER_PAYLOAD_SIZE_SIZE: u64 = 4;
+pub const MIN_FOOTER_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + FOOTER_PAYLOAD_SIZE_SIZE + MAGIC_SIZE; // without any blobs
 pub const BLOB_TYPE: &str = "o2_inverted_index";
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct PuffinFooterFlags: u32 {
         const DEFAULT = 0b00000000;
-        const COMPRESSED_LZ4 = 0b00000001;
+        const COMPRESSED_ZSTD = 0b00000001;
     }
 }
 
@@ -58,15 +58,15 @@ pub struct BlobMetadata {
     #[serde(rename = "type")]
     pub blob_type: String,
 
-    /// Required by specs. Not used within OpenObserve
+    /// Required by specs. Not used for InvertedIndex within OpenObserve
     #[serde(default)]
     pub fields: Vec<i32>,
 
-    /// Required by specs. Not used within OpenObserve
+    /// Required by specs. Not used for InvertedIndex within OpenObserve
     #[serde(default)]
     pub snapshot_id: i64,
 
-    /// Required by specs. Not used within OpenObserve
+    /// Required by specs. Not used for InvertedIndex within OpenObserve
     #[serde(default)]
     pub sequence_number: i64,
 
@@ -76,11 +76,11 @@ pub struct BlobMetadata {
     /// The length of the blob stored in the file (after compression, if compressed)
     pub length: i64,
 
-    /// See [`CompressionCodec`]. If omitted, the data is assumed to be uncompressed.
+    /// Default to ZSTD compression for OpenObserve inverted index
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compression_codec: Option<CompressionCodec>,
 
-    /// Storage for arbitrary meta-information about the blob
+    /// Additional meta information of the file. Not used for InvertedIndex within OpenObserve
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub properties: HashMap<String, String>,
 }

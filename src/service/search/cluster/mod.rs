@@ -129,10 +129,11 @@ pub async fn search(
     let is_inverted_index = cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
         && meta.use_inverted_index
+        && req.index_type == "parquet"
         && (!meta.fts_terms.is_empty() || !meta.index_terms.is_empty());
 
     log::info!(
-        "[trace_id {trace_id}] search: is_inverted_index {}",
+        "[trace_id {trace_id}] search: is_inverted_index via parquet format {}",
         is_inverted_index
     );
 
@@ -162,7 +163,7 @@ pub async fn search(
     // then filter the file list based on the inverted index.
     let mut idx_scan_size = 0;
     let mut idx_took = 0;
-    if is_inverted_index && req.index_type == "parquet" {
+    if is_inverted_index {
         (file_list, idx_scan_size, idx_took) =
             get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
         log::info!(

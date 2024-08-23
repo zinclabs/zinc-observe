@@ -26,7 +26,7 @@ use super::{
     MAGIC, MAGIC_SIZE, MIN_FOOTER_SIZE,
 };
 
-pub(crate) struct PuffinFileWriter<W> {
+pub struct PuffinBytesWriter<W> {
     /// buffer to write to
     writer: W,
 
@@ -40,8 +40,8 @@ pub(crate) struct PuffinFileWriter<W> {
     written_bytes: u64,
 }
 
-impl<W> PuffinFileWriter<W> {
-    pub(crate) fn new(writer: W) -> Self {
+impl<W> PuffinBytesWriter<W> {
+    pub fn new(writer: W) -> Self {
         Self {
             writer,
             properties: HashMap::new(),
@@ -66,8 +66,8 @@ impl<W> PuffinFileWriter<W> {
     }
 }
 
-impl<W: io::Write> PuffinFileWriter<W> {
-    pub(crate) fn add_blob(&mut self, raw_data: Vec<u8>) -> Result<()> {
+impl<W: io::Write> PuffinBytesWriter<W> {
+    pub fn add_blob(&mut self, raw_data: Vec<u8>) -> Result<()> {
         self.add_header_if_needed()
             .context("Error writing puffin header")?;
 
@@ -91,7 +91,7 @@ impl<W: io::Write> PuffinFileWriter<W> {
         Ok(())
     }
 
-    pub(crate) fn finish(&mut self) -> Result<(u64)> {
+    pub(crate) fn finish(&mut self) -> Result<u64> {
         self.add_header_if_needed()
             .context("Error writing puffin header")?;
         self.write_footer().context("Error writing puffin footer")?;
@@ -101,8 +101,8 @@ impl<W: io::Write> PuffinFileWriter<W> {
 
     fn add_header_if_needed(&mut self) -> Result<()> {
         if self.written_bytes == 0 {
-            self.writer.write(&MAGIC)?;
-            self.written_bytes += MAGIC_SIZE as u64;
+            self.writer.write_all(&MAGIC)?;
+            self.written_bytes += MAGIC_SIZE;
         }
         Ok(())
     }
@@ -150,7 +150,7 @@ impl PuffinFooterWriter {
         buf.extend_from_slice(&(payload_size as i32).to_le_bytes());
 
         // flags
-        buf.extend_from_slice(&PuffinFooterFlags::COMPRESSED_LZ4.bits().to_le_bytes());
+        buf.extend_from_slice(&PuffinFooterFlags::COMPRESSED_ZSTD.bits().to_le_bytes());
 
         // FootMagic
         buf.extend_from_slice(&MAGIC);

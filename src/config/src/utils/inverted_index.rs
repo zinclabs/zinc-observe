@@ -13,14 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Read, path::PathBuf};
-
-use anyhow::{Context, Result};
+use anyhow::{anyhow, ensure, Result};
 use futures::io::Cursor;
 use itertools::Itertools;
 
 use crate::{
-    meta::inverted_index::IndexReader, FILE_EXT_PARQUET, FILE_EXT_PUFFIN, INDEX_MIN_CHAR_LEN,
+    meta::{inverted_index::IndexReader, puffin::reader::PuffinBytesReader},
+    FILE_EXT_PARQUET, FILE_EXT_PUFFIN, INDEX_MIN_CHAR_LEN,
 };
 
 /// Split a string into tokens based on a delimiter. if delimiter is empty, split by whitespace and
@@ -60,17 +59,20 @@ pub fn unpack_u32_pair(packed: u64) -> (u32, u32) {
     (offset, size)
 }
 
-/// Compressed finished InvertedIndex bytes before writing to file system
-pub async fn create_index_reader(file_path: &PathBuf) -> Result<IndexReader<Cursor<Vec<u8>>>> {
-    let buf = tokio::fs::read(file_path)
-        .await
-        .context("Failed to read file")?;
-    let mut decoder = zstd::Decoder::new(&buf[..]).context("Failed to create zstd decoder")?;
-    let mut decompressed = Vec::new();
-    decoder
-        .read_to_end(&mut decompressed)
-        .context("Failed to decompress file")?;
-    Ok(IndexReader::new(Cursor::new(decompressed)))
+/// Decompresses and parses puffin bytes into IndexerReader for searching
+pub async fn create_index_reader_from_puffin_bytes(
+    buf: Vec<u8>,
+) -> Result<IndexReader<Cursor<Vec<u8>>>> {
+    let mut puffin_reader = PuffinBytesReader::new(Cursor::new(buf));
+    let puffin_meta = puffin_reader.get_metadata().await?;
+    ensure!(
+        puffin_meta.blob_metadata.len() == 1,
+        anyhow!("InvertedIndex should only have one blob each puffin file")
+    );
+    let blob_bytes = puffin_reader
+        .read_blob_bytes(puffin_meta.blob_metadata.first().unwrap())
+        .await?;
+    Ok(IndexReader::new(Cursor::new(blob_bytes)))
 }
 
 /// FST inverted index solution has a 1:1 mapping between parquet and idx files.
@@ -78,7 +80,7 @@ pub async fn create_index_reader(file_path: &PathBuf) -> Result<IndexReader<Curs
 /// both the stream_type and extension parts of the file_name
 /// e.g.
 /// from: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
-/// to:   files/default/index/quickstart1/2024/02/16/16/7164299619311026293.idx
+/// to:   files/default/index/quickstart1/2024/02/16/16/7164299619311026293.puffin
 /// and vice versa
 pub fn convert_parquet_idx_file_name(from: &str) -> String {
     let mut parts: Vec<&str> = from.split('/').collect();
