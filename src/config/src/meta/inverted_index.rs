@@ -24,6 +24,7 @@ use fst::MapBuilder;
 use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
 use serde::{Deserialize, Serialize};
 
+use super::puffin::writer::PuffinFileWriter;
 use crate::{
     meta::bitvec::BitVec,
     utils::inverted_index::{pack_u32_pair, unpack_u32_pair},
@@ -59,11 +60,14 @@ impl IndexFileMetas {
         let metas_size = meta_bytes.len() as u32;
         writer.write_all(&metas_size.to_le_bytes())?;
         writer.flush()?;
-        let total_size = writer.len() as u64;
+        let original_size = writer.len() as u64;
 
-        let mut encoder = zstd::Encoder::new(vec![], 3)?;
-        encoder.write_all(&writer)?;
-        Ok(Some((encoder.finish()?, total_size)))
+        let mut puffin_buf: Vec<u8> = Vec::new();
+        let mut puffin_writer = PuffinFileWriter::new(&mut puffin_buf);
+        puffin_writer.add_blob(writer)?;
+        puffin_writer.finish()?;
+
+        Ok(Some((puffin_buf, original_size)))
     }
 }
 
