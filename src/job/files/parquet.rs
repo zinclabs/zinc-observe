@@ -1230,14 +1230,14 @@ pub(crate) async fn generate_fst_inverted_index(
     file_list_to_invalidate: Option<&[FileKey]>, /* for compactor to delete corresponding small
                                                   * .idx files */
 ) -> Result<(), anyhow::Error> {
-    let Some((compressed_bytes, _)) =
+    let Some((compressed_bytes, file_meta)) =
         prepare_fst_index_bytes(inverted_idx_batch, full_text_search_fields, index_fields)?
     else {
         log::info!("generate_fst_index_on_compactor creates empty index. skip");
         return Ok(());
     };
 
-    // delete corresponding small .idx files
+    // delete corresponding small .puffin files
     if let Some(file_list) = file_list_to_invalidate {
         for old_parquet_file in file_list {
             let old_idx_file = convert_parquet_idx_file_name(&old_parquet_file.key);
@@ -1271,7 +1271,12 @@ pub(crate) async fn generate_fst_inverted_index(
     };
     match storage::put(&idx_file_name, Bytes::from(compressed_bytes)).await {
         Ok(_) => {
-            log::info!("{} Written fst index file successfully", caller);
+            log::info!(
+                "{} Written fst index file successfully compressed size {}, original size {}",
+                caller,
+                file_meta.compressed_size,
+                file_meta.original_size,
+            );
             Ok(())
         }
         Err(e) => {

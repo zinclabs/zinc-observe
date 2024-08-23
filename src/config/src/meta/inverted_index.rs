@@ -223,7 +223,8 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> IndexReader<R> {
         let index_file_metas_buf = &mut vec![0u8; index_file_metas_size as usize];
         self.source.read_exact(index_file_metas_buf).await?;
 
-        let index_file_metas: IndexFileMetas = serde_json::from_slice(index_file_metas_buf)?;
+        let mut index_file_metas: IndexFileMetas = IndexFileMetas::new();
+        index_file_metas.metas = serde_json::from_slice(index_file_metas_buf)?;
         Self::validate_meta(&index_file_metas, index_file_metas_size, end_offset)?;
 
         Ok(Arc::new(index_file_metas))
@@ -241,11 +242,11 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> IndexReader<R> {
 
     pub async fn get_bitmap(
         &mut self,
-        column_index_mea: &ColumnIndexMeta,
+        column_index_meta: &ColumnIndexMeta,
         fst_val: u64,
     ) -> Result<BitVec> {
         let (relative_offset, size) = unpack_u32_pair(fst_val);
-        self.bitmap(column_index_mea.base_offset + relative_offset as u64, size)
+        self.bitmap(column_index_meta.base_offset + relative_offset as u64, size)
             .await
     }
 

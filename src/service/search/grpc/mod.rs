@@ -29,6 +29,7 @@ use config::{
 use futures::future::try_join_all;
 use hashbrown::HashSet;
 use infra::errors::{Error, ErrorCodes};
+use log::info;
 use proto::cluster_rpc;
 use tracing::Instrument;
 
@@ -115,6 +116,7 @@ pub async fn search(
         if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
             Ok((vec![], ScanStats::default()))
         } else {
+            info!("searching through the object store");
             storage::search(
                 &trace_id3,
                 sql3,

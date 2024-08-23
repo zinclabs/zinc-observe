@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, io::Read, sync::Arc};
 
 use config::{
     get_config, is_local_disk_storage,
@@ -555,7 +555,7 @@ async fn cache_files<'a>(
 /// Filter file list using inverted index
 /// This function will load the index file corresponding to each file in the file list.
 /// FSTs in those files are used to match the incoming query in `SearchRequest`.
-/// If the query does not match any FST in the index file, the file will be filtered out.
+/// If the query does not match any FST in the index file, the file will *not* be filtered out.
 /// If the query does match then the segment IDs for the file will be updated.
 async fn filter_file_list_by_inverted_index(
     trace_id: &str,
@@ -567,7 +567,7 @@ async fn filter_file_list_by_inverted_index(
     let mut scan_stats = ScanStats::new();
     let index_file_names = file_list
         .iter()
-        .map(|f| Cow::Owned(f.key.replace(".parquet", ".puffin")))
+        .map(|f| Cow::Owned(convert_parquet_idx_file_name(&f.key)))
         .collect_vec();
     let (cache_type, _, (mem_cached_files, disk_cached_files)) =
         cache_files(trace_id, index_file_names.as_ref(), &scan_stats).await?;
@@ -590,20 +590,14 @@ async fn filter_file_list_by_inverted_index(
     let full_text_terms = Arc::new(sql.fts_terms.clone());
     let index_terms = Arc::new(sql.index_terms.clone());
     // we can be iterating over a lot of files
-    for (file_id, file) in file_list.iter().enumerate() {
+    for file in file_list.iter() {
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
         let file_name = file.key.clone();
         // Spawn a task for each file, wherein full text search and
         // index search queries are executed
         let task = tokio::task::spawn(async move {
-            inverted_index_search_in_file(
-                file_id,
-                &file_name,
-                full_text_term_clone,
-                index_terms_clone,
-            )
-            .await
+            inverted_index_search_in_file(&file_name, full_text_term_clone, index_terms_clone).await
         });
         tasks.push(task)
     }
@@ -614,12 +608,21 @@ async fn filter_file_list_by_inverted_index(
     {
         // Each result corresponds to a file in the file list
         match result {
-            Ok((file_id, bitvec)) => {
+            Ok((file_name, bitvec)) => {
                 if let Some(res) = bitvec {
                     // Replace the segment IDs in the existing `FileKey` with the new found segments
-                    file_list[file_id].segment_ids = Some(res.into_vec());
+                    file_list
+                        .iter_mut()
+                        .find(|f| f.key == file_name)
+                        // File should exist in the file list
+                        .unwrap()
+                        .segment_ids = Some(res.into_vec());
                 } else {
-                    file_list.remove(file_id);
+                    log::info!(
+                        "[trace_id {trace_id}] search->storage: no match found in index for file {}",
+                        file_name
+                    );
+                    file_list.retain(|f| f.key != file_name)
                 }
             }
             Err(_) => {
@@ -632,13 +635,12 @@ async fn filter_file_list_by_inverted_index(
 }
 
 async fn inverted_index_search_in_file(
-    file_id: usize,
     parquet_file_name: &str,
     fts_terms: Arc<Vec<String>>,
     index_terms: Arc<Vec<(String, Vec<String>)>>,
-) -> anyhow::Result<(usize, Option<BitVec>)> {
+) -> anyhow::Result<(String, Option<BitVec>)> {
     let index_file_name = convert_parquet_idx_file_name(parquet_file_name);
-    let index_bytes = match storage::get(&index_file_name).await {
+    let compressed_index_blob = match storage::get(&index_file_name).await {
         Err(e) => {
             log::info!(
                 "Unable to load corresponding FST index file for parquet file {}",
@@ -649,12 +651,16 @@ async fn inverted_index_search_in_file(
         Ok(bytes) => bytes,
     };
 
-    let mut res = BitVec::new();
+    let mut decoder = zstd::Decoder::new(&compressed_index_blob[..])?;
+    let mut index_bytes = Vec::new();
+    decoder.read_to_end(&mut index_bytes)?;
+
     let mut index_reader = IndexReader::new(Cursor::new(index_bytes));
     let file_meta = index_reader.metadata().await.unwrap();
 
+    let mut res = BitVec::new();
     // filter through full text terms
-    if let Some(column_index_meta) = file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
+    if let Some(column_index_meta) = &file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
         let valid_terms = fts_terms
             .iter()
             .filter(|term| term.len() <= column_index_meta.max_len)
@@ -685,7 +691,14 @@ async fn inverted_index_search_in_file(
                         // We do not care about the key at this point, only the offset
                         while let Some((_, value)) = stream.next() {
                             let bitmap = index_reader.get_bitmap(column_index_meta, value).await?;
-                            // here we are doing bitwise OR to combine the bitmaps of all the terms
+
+                            // Resize if the res map is smaller than the bitmap
+                            // Ideally, this should only execute once since a file will always
+                            // have a fixed length bitmap.
+                            if res.len() < bitmap.len() {
+                                res.resize(bitmap.len(), false);
+                            }
+                            // bitwise OR to combine the bitmaps of all the terms
                             res |= bitmap;
                         }
                     }
@@ -743,8 +756,8 @@ async fn inverted_index_search_in_file(
         }
     }
     Ok(if res.is_empty() {
-        (file_id, None) // no match -> skip the file in search
+        (parquet_file_name.into(), None) // no match -> skip the file in search
     } else {
-        (file_id, Some(res)) // match -> take the file in search
+        (parquet_file_name.into(), Some(res)) // match -> take the file in search
     })
 }
