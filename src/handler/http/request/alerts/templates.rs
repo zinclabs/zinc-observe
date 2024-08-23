@@ -174,7 +174,7 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
     ),
     responses(
         (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
-        (status = 409, description = "Conflict", content_type = "application/json", body = HttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = HttpResponse),
         (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
         (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
     )
