@@ -342,9 +342,15 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
             destination_name: confirmDelete.value.data.name,
           })
-          .then(() => getDestinations())
+          .then(() =>  { 
+            q.notify({
+            type: "positive",
+            message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
+            timeout: 2000,
+          });
+            getDestinations()})
           .catch((err) => {
-            if (err.response.data.code === 403) {
+            if (err.response.data.code === 409) {
               const message =
                 err.response.data?.message ||
                 err.response.data?.error ||
