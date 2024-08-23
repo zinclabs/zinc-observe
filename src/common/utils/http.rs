@@ -83,6 +83,8 @@ pub(crate) fn get_search_type_from_request(
 /// `ZO_INVERTED_INDEX_STORE_FORMAT` is set as `both`.
 /// Otherwise 'index_type' is set by env `ZO_INVERTED_INDEX_SEARCH_FORMAT`, which is also
 /// the same as store format if store format is not `both`.
+///
+/// For performance testing phrase only. Will be deprecated after 1 month.
 #[inline(always)]
 pub(crate) fn get_index_type_from_request(
     query: &Query<HashMap<String, String>>,

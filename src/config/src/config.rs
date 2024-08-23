@@ -1448,7 +1448,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check default inverted index search format
     if cfg.common.inverted_index_store_format != "both" {
-        cfg.common.inverted_index_search_format = cfg.common.inverted_index_search_format.clone();
+        cfg.common.inverted_index_search_format = cfg.common.inverted_index_store_format.clone();
     }
 
     Ok(())

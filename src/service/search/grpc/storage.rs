@@ -629,7 +629,7 @@ async fn inverted_index_search_in_file(
         let valid_terms = fts_terms
             .iter()
             .filter(|term| {
-                term.len() >= column_index_meta.min_len && term.len() <= column_index_meta.max_len
+                term.len() <= column_index_meta.max_len
             })
             .collect::<Vec<_>>();
         if !valid_terms.is_empty() {

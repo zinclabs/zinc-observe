@@ -957,7 +957,6 @@ pub(crate) async fn generate_index_on_compactor(
         deleted,
         empty_segment,
     ];
-    // QUESTION(taiming): what is RecordBatch used for? to indicate files are deleted?
     let batch = RecordBatch::try_new(schema, columns)
         .map_err(|e| anyhow::anyhow!("RecordBatch::try_new error: {}", e))?;
     record_batches.push(batch);
