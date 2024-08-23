@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use config::{
     get_config, is_local_disk_storage,
@@ -35,6 +35,7 @@ use infra::{
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
     storage,
 };
+use itertools::Itertools;
 use tokio::{sync::Semaphore, time::Duration};
 use tracing::{info_span, Instrument};
 
@@ -128,7 +129,7 @@ pub async fn search(
     // filter file_list if is an inverted index search
     if (!sql.fts_terms.is_empty() || !sql.index_terms.is_empty()) && sql.index_type == "fst" {
         let prev_file_list_len = files.len();
-        filter_file_list_by_inverted_index(&mut files, &sql).await?;
+        filter_file_list_by_inverted_index(trace_id, &mut files, &sql, stream_type).await?;
         log::info!(
             "[trace_id {trace_id}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num reduced by {}",
             &sql.org_id,
@@ -199,10 +200,16 @@ pub async fn search(
     }
 
     // load files to local cache
-    let (cache_type, deleted_files, (mem_cached_files, disk_cached_files)) =
-        cache_parquet_files(trace_id, &files, &scan_stats)
-            .instrument(enter_span.clone())
-            .await?;
+    let (cache_type, deleted_files, (mem_cached_files, disk_cached_files)) = cache_files(
+        trace_id,
+        &files
+            .iter()
+            .map(|f| Cow::Borrowed(f.key.as_ref()))
+            .collect_vec(),
+        &scan_stats,
+    )
+    .instrument(enter_span.clone())
+    .await?;
     if !deleted_files.is_empty() {
         // remove deleted files from files_group
         for (_, g_files) in files_group.iter_mut() {
@@ -318,7 +325,7 @@ pub async fn search(
                                     let schema_version = format!("{}/{}/{}/{}", &sql.org_id, &stream_type, &sql.stream_name, schema_dt);
                                     let schema_fiels = schema.as_ref().simple_fields();
                                     let files = files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>();
-                                    log::error!("[trace_id {}] search->storage: schema and parquet mismatch, version: {}, schema: {:?}, files: {:?}", 
+                                    log::error!("[trace_id {}] search->storage: schema and parquet mismatch, version: {}, schema: {:?}, files: {:?}",
                                         session.id, schema_version, schema_fiels, files);
                                 }
                                 Err(err)
@@ -418,10 +425,10 @@ async fn get_file_list(
     Ok(files)
 }
 
-#[tracing::instrument(name = "service:search:grpc:storage:cache_parquet_files", skip_all)]
-async fn cache_parquet_files(
+#[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
+async fn cache_files<'a>(
     trace_id: &str,
-    files: &[FileKey],
+    files: &[Cow<'a, str>],
     scan_stats: &ScanStats,
 ) -> Result<(file_data::CacheType, Vec<String>, CachedFiles), Error> {
     let cfg = get_config();
@@ -448,7 +455,7 @@ async fn cache_parquet_files(
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
     for file in files.iter() {
         let trace_id = trace_id.to_string();
-        let file_name = file.key.clone();
+        let file_name = file.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         let task: tokio::task::JoinHandle<(Option<String>, bool, bool)> = tokio::task::spawn(
             async move {
@@ -551,11 +558,33 @@ async fn cache_parquet_files(
 /// If the query does not match any FST in the index file, the file will be filtered out.
 /// If the query does match then the segment IDs for the file will be updated.
 async fn filter_file_list_by_inverted_index(
+    trace_id: &str,
     file_list: &mut Vec<FileKey>,
     sql: &Sql,
+    stream_type: StreamType,
 ) -> Result<(), Error> {
-    // iterate through file list
-    // Fetch the FSTs from the corresponding index files
+    // Cache the corresponding Index files
+    let mut scan_stats = ScanStats::new();
+    let index_file_names = file_list
+        .iter()
+        .map(|f| Cow::Owned(f.key.replace(".parquet", ".puffin")))
+        .collect_vec();
+    let (cache_type, _, (mem_cached_files, disk_cached_files)) =
+        cache_files(trace_id, index_file_names.as_ref(), &scan_stats).await?;
+
+    scan_stats.querier_memory_cached_files = mem_cached_files as i64;
+    scan_stats.querier_disk_cached_files = disk_cached_files as i64;
+    log::info!(
+        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
+        &sql.org_id,
+        &stream_type,
+        &sql.stream_name,
+        scan_stats.querier_files,
+        scan_stats.querier_memory_cached_files,
+        scan_stats.querier_disk_cached_files,
+        cache_type,
+    );
+
     let mut tasks = Vec::new();
 
     let full_text_terms = Arc::new(sql.fts_terms.clone());
@@ -628,9 +657,7 @@ async fn inverted_index_search_in_file(
     if let Some(column_index_meta) = file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
         let valid_terms = fts_terms
             .iter()
-            .filter(|term| {
-                term.len() <= column_index_meta.max_len
-            })
+            .filter(|term| term.len() <= column_index_meta.max_len)
             .collect::<Vec<_>>();
         if !valid_terms.is_empty() {
             let fst_offset =
