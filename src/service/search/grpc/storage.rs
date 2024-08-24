@@ -24,7 +24,9 @@ use config::{
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
     utils::{
-        inverted_index::{convert_parquet_idx_file_name, create_index_reader_from_puffin_bytes},
+        inverted_index::{
+            convert_parquet_idx_file_name, create_index_reader_from_puffin_bytes, split_token,
+        },
         schema_ext::SchemaExt,
     },
     INDEX_FIELD_NAME_FOR_ALL,
@@ -579,7 +581,7 @@ async fn filter_file_list_by_inverted_index(
     scan_stats.querier_memory_cached_files = mem_cached_files as i64;
     scan_stats.querier_disk_cached_files = disk_cached_files as i64;
     log::info!(
-        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
+        "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load puffin index files {}, memory cached {}, disk cached {}, download others into {:?} cache done",
         &sql.org_id,
         &stream_type,
         &sql.stream_name,
@@ -591,7 +593,21 @@ async fn filter_file_list_by_inverted_index(
 
     let mut tasks = Vec::new();
 
-    let full_text_terms = Arc::new(sql.fts_terms.clone());
+    let full_text_terms = Arc::new(
+        sql.fts_terms
+            .iter()
+            .map(|term| {
+                let tokens = split_token(
+                    term,
+                    &config::get_config().common.inverted_index_split_chars,
+                );
+                tokens
+                    .into_iter()
+                    .max_by_key(|t| t.len())
+                    .unwrap_or_default()
+            })
+            .collect_vec(),
+    );
     let index_terms = Arc::new(sql.index_terms.clone());
     // we can be iterating over a lot of files
     for file in file_list.iter() {
@@ -620,7 +636,13 @@ async fn filter_file_list_by_inverted_index(
                         .find(|f| f.key == file_name)
                         // File should exist in the file list
                         .unwrap()
-                        .segment_ids = Some(res.into_vec());
+                        .segment_ids = Some(res.clone().into_vec());
+                    log::info!(
+                        "Final bitmap for fts_terms {:?} and index_terms: {:?} is {:?}",
+                        full_text_terms,
+                        index_terms,
+                        res.iter_ones().collect_vec()
+                    );
                 } else {
                     log::info!(
                         "[trace_id {trace_id}] search->storage: no match found in index for file {}",
@@ -629,8 +651,11 @@ async fn filter_file_list_by_inverted_index(
                     file_list.retain(|f| f.key != file_name)
                 }
             }
-            Err(_) => {
-                // didn't find the index file. retain parquet file to search
+            Err(e) => {
+                log::warn!(
+                    "[trace_id {trace_id}] search->storage: error filtering file via FST index. Keep file to search. error: {}",
+                    e.to_string()
+                );
                 continue;
             }
         }
@@ -657,7 +682,7 @@ async fn inverted_index_search_in_file(
 
     let mut index_reader =
         create_index_reader_from_puffin_bytes(compressed_index_blob.to_vec()).await?;
-    let file_meta = index_reader.metadata().await.unwrap();
+    let file_meta = index_reader.metadata().await?;
 
     let mut res = BitVec::new();
     // filter through full text terms
@@ -759,6 +784,7 @@ async fn inverted_index_search_in_file(
             }
         }
     }
+
     Ok(if res.is_empty() {
         (parquet_file_name.into(), None) // no match -> skip the file in search
     } else {

@@ -1318,10 +1318,13 @@ pub(crate) fn prepare_fst_index_bytes(
         // split the column into terms
         let terms = (0..num_rows)
             .flat_map(|i| {
-                split_token(column_data.value(i), "")
-                    .into_iter()
-                    .map(|s| (s, i))
-                    .collect::<Vec<_>>()
+                split_token(
+                    column_data.value(i),
+                    &config::get_config().common.inverted_index_split_chars,
+                )
+                .into_iter()
+                .map(|s| (s, i))
+                .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
 
