@@ -18,7 +18,7 @@ pub mod cluster;
 pub mod inverted_index;
 pub mod logger;
 pub mod meta_store;
-pub(crate) mod puffin;
+pub mod puffin;
 pub mod search;
 pub mod sql;
 pub mod stream;

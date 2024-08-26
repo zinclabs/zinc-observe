@@ -18,7 +18,7 @@ use futures::io::Cursor;
 use itertools::Itertools;
 
 use crate::{
-    meta::{inverted_index::IndexReader, puffin::reader::PuffinBytesReader},
+    meta::{inverted_index::reader::IndexReader, puffin::reader::PuffinBytesReader},
     FILE_EXT_PARQUET, FILE_EXT_PUFFIN, INDEX_MIN_CHAR_LEN,
 };
 

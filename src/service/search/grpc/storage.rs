@@ -19,7 +19,7 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        inverted_index::Contains,
+        inverted_index::reader::Contains,
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },

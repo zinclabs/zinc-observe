@@ -91,7 +91,7 @@ impl<W: io::Write> PuffinBytesWriter<W> {
         Ok(())
     }
 
-    pub(crate) fn finish(&mut self) -> Result<u64> {
+    pub fn finish(&mut self) -> Result<u64> {
         self.add_header_if_needed()
             .context("Error writing puffin header")?;
         self.write_footer().context("Error writing puffin footer")?;

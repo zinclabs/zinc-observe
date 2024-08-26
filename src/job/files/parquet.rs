@@ -36,7 +36,8 @@ use config::{
     cluster, get_config,
     meta::{
         bitvec::BitVec,
-        inverted_index::{ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
+        inverted_index::{writer::ColumnIndexer, IndexFileMetas, InvertedIndexFormat},
+        puffin::writer::PuffinBytesWriter,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
     },
     metrics,
@@ -1401,13 +1402,18 @@ pub(crate) fn prepare_fst_index_bytes(
         flattened: false,
     };
 
-    Ok(index_file_metas
-        .finish(writer)?
-        .map(|(compressed_bytes, original_size)| {
-            file_meta.original_size = original_size as _;
-            file_meta.compressed_size = compressed_bytes.len() as _;
-            (compressed_bytes, file_meta)
-        }))
+    let _ = index_file_metas.finish(&mut writer)?;
+    let original_size = writer.len();
+
+    let mut puffin_buf: Vec<u8> = Vec::new();
+    let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
+    puffin_writer.add_blob(writer)?;
+    puffin_writer.finish()?;
+
+    file_meta.original_size = original_size as _;
+    file_meta.compressed_size = puffin_buf.len() as _;
+
+    Ok(Some((puffin_buf, file_meta)))
 }
 
 #[allow(clippy::too_many_arguments)]
