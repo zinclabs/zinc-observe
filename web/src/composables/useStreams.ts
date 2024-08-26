@@ -35,7 +35,7 @@ const useStreams = () => {
   const getStreams = async (
     _streamName: string = "",
     schema: boolean,
-    notify: boolean = true
+    notify: boolean = true,
   ) => {
     return new Promise(async (resolve, reject) => {
       const streamName = _streamName || "all";
@@ -71,7 +71,7 @@ const useStreams = () => {
             ];
 
             const streamsToFetch = streamList.filter(
-              (_stream) => !streams[_stream]
+              (_stream) => !streams[_stream],
             );
 
             getStreamsPromise.value = Promise.allSettled(
@@ -79,9 +79,9 @@ const useStreams = () => {
                 StreamService.nameList(
                   store.state.selectedOrganization.identifier,
                   streamType,
-                  schema
-                )
-              )
+                  schema,
+                ),
+              ),
             );
 
             getStreamsPromise.value
@@ -93,7 +93,7 @@ const useStreams = () => {
                 });
 
                 areAllStreamsFetched.value = streamList.every(
-                  (stream) => !!streams[stream]
+                  (stream) => !!streams[stream],
                 );
 
                 getStreamsPromise.value = null;
@@ -110,7 +110,7 @@ const useStreams = () => {
             getStreamsPromise.value = StreamService.nameList(
               store.state.selectedOrganization.identifier,
               _streamName,
-              schema
+              schema,
             );
             getStreamsPromise.value
               .then((res: any) => {
@@ -159,7 +159,7 @@ const useStreams = () => {
     streamName: string,
     streamType: string,
     schema: boolean,
-    force: boolean = false
+    force: boolean = false,
   ): Promise<any> => {
     return new Promise(async (resolve, reject) => {
       if (!streamName || !streamType) {
@@ -186,7 +186,7 @@ const useStreams = () => {
           streams[streamType].list.length &&
           Object.prototype.hasOwnProperty.call(
             streamsIndexMapping[streamType],
-            streamName
+            streamName,
           )
         ) {
           const streamIndex = streamsIndexMapping[streamType][streamName];
@@ -197,7 +197,7 @@ const useStreams = () => {
               const _stream: any = await StreamService.schema(
                 store.state.selectedOrganization.identifier,
                 streamName,
-                streamType
+                streamType,
               );
               streams[streamType].list[streamIndex] = _stream.data;
             } catch (err) {
@@ -226,7 +226,11 @@ const useStreams = () => {
   };
 
   const getMultiStreams = async (
-    _streams: Array<{ streamName: string; streamType: string; schema: boolean }>
+    _streams: Array<{
+      streamName: string;
+      streamType: string;
+      schema: boolean;
+    }>,
   ): Promise<any[]> => {
     return Promise.all(
       _streams.map(async ({ streamName, streamType, schema }) => {
@@ -242,7 +246,7 @@ const useStreams = () => {
             streams[streamType].list.length &&
             Object.prototype.hasOwnProperty.call(
               streamsIndexMapping[streamType],
-              streamName
+              streamName,
             )
           ) {
             const streamIndex = streamsIndexMapping[streamType][streamName];
@@ -253,7 +257,7 @@ const useStreams = () => {
               const fetchedStream = await StreamService.schema(
                 store.state.selectedOrganization.identifier,
                 streamName,
-                streamType
+                streamType,
               );
 
               streams[streamType].list[streamIndex] = fetchedStream.data;
@@ -268,7 +272,7 @@ const useStreams = () => {
           // Use reject in Promise.all to catch errors specifically.
           throw new Error(e.message);
         }
-      })
+      }),
     );
   };
 
@@ -350,7 +354,7 @@ const useStreams = () => {
     if (
       Object.prototype.hasOwnProperty.call(
         streamsIndexMapping[streamType],
-        streamName
+        streamName,
       )
     ) {
       const indexToRemove = streamsIndexMapping[streamType][streamName];
@@ -402,6 +406,43 @@ const useStreams = () => {
     store.dispatch("setIsDataIngested", false);
   };
 
+  const getUpdatedSettings = (previousSettings: any, currentSettings: any) => {
+    const attributesToCompare: Array<string> = [
+      "partition_keys",
+      "index_fields",
+      "full_text_search_keys",
+      "bloom_filter_fields",
+      "defined_schema_fields",
+    ];
+
+    const updatedSettings = { ...currentSettings };
+
+    attributesToCompare.forEach((attribute) => {
+      const previousArray = Array.isArray(previousSettings[attribute])
+        ? previousSettings[attribute]
+        : [];
+      const currentArray = Array.isArray(currentSettings[attribute])
+        ? currentSettings[attribute]
+        : [];
+
+      // Calculate items to add and remove
+      const add = currentArray.filter(
+        (item: any) => !previousArray.includes(item),
+      );
+      const remove = previousArray.filter(
+        (item: any) => !currentArray.includes(item),
+      );
+
+      // Add the _add and _remove arrays to the result
+      updatedSettings[`${attribute}`] = { add: add, remove: remove };
+
+      // Remove the original attribute
+      // delete updatedSettings[attribute];
+    });
+
+    return updatedSettings;
+  };
+
   return {
     getStreams,
     getStream,
@@ -410,6 +451,7 @@ const useStreams = () => {
     resetStreams,
     removeStream,
     addStream,
+    getUpdatedSettings,
   };
 };
 

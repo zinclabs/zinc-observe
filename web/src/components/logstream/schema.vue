@@ -475,7 +475,7 @@ export default defineComponent({
       { label: "Hash partition (64 Buckets)", value: "hashPartition_64" },
       { label: "Hash partition (128 Buckets)", value: "hashPartition_128" },
     ];
-    const { getStream } = useStreams();
+    const { getStream, getUpdatedSettings } = useStreams();
 
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
@@ -685,43 +685,6 @@ export default defineComponent({
           console.log(err);
         });
     };
-
-    function getUpdatedSettings(previousSettings, currentSettings) {
-      const attributesToCompare = [
-        "partition_keys",
-        "index_fields",
-        "full_text_search_keys",
-        "bloom_filter_fields",
-        "defined_schema_fields",
-      ];
-
-      const updatedSettings = { ...currentSettings };
-
-      attributesToCompare.forEach((attribute) => {
-        const previousArray = Array.isArray(previousSettings[attribute])
-          ? previousSettings[attribute]
-          : [];
-        const currentArray = Array.isArray(currentSettings[attribute])
-          ? currentSettings[attribute]
-          : [];
-
-        // Calculate items to add and remove
-        const add = currentArray.filter(
-          (item) => !previousArray.includes(item),
-        );
-        const remove = previousArray.filter(
-          (item) => !currentArray.includes(item),
-        );
-
-        // Add the _add and _remove arrays to the result
-        updatedSettings[`${attribute}`] = { add: add, remove: remove };
-
-        // Remove the original attribute
-        // delete updatedSettings[attribute];
-      });
-
-      return updatedSettings;
-    }
 
     const onSubmit = async () => {
       let settings = {

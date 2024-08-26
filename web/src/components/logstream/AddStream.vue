@@ -144,7 +144,7 @@ const streamTypes = [
 
 const emits = defineEmits(["streamAdded", "close"]);
 
-const { addStream, getStream } = useStreams();
+const { addStream, getStream, getUpdatedSettings } = useStreams();
 
 const fields: Ref<any[]> = ref([]);
 
@@ -174,7 +174,7 @@ const isSchemaEvolutionEnabled = computed(() => {
 const showDataRetention = computed(
   () =>
     !!(store.state.zoConfig.data_retention_days || false) &&
-    streamInputs.value.stream_type !== "enrichment_tables"
+    streamInputs.value.stream_type !== "enrichment_tables",
 );
 
 const saveStream = async () => {
@@ -183,7 +183,7 @@ const saveStream = async () => {
   await getStream(
     streamInputs.value.name,
     streamInputs.value.stream_type,
-    false
+    false,
   )
     .then(() => {
       q.notify({
@@ -198,12 +198,13 @@ const saveStream = async () => {
   if (isStreamPresent) return;
 
   const payload = getStreamPayload();
+  let modifiedSettings = getUpdatedSettings([], payload);
   streamService
     .updateSettings(
       store.state.selectedOrganization.identifier,
       streamInputs.value.name,
       streamInputs.value.stream_type,
-      payload
+      modifiedSettings,
     )
     .then(() => {
       q.notify({
@@ -216,7 +217,7 @@ const saveStream = async () => {
         .schema(
           store.state.selectedOrganization.identifier,
           streamInputs.value.name,
-          streamInputs.value.stream_type
+          streamInputs.value.stream_type,
         )
         .then((streamRes: any) => {
           addStream(streamRes.data);
