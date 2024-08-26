@@ -35,6 +35,9 @@ pub fn split_token(s: &str, delimiter: &str) -> Vec<String> {
         })
         .filter_map(|s| {
             let s = s.trim().trim_matches(|c: char| c.is_ascii_punctuation());
+            // Question (Uddhav) : This is problematic if user is looking for a single character.
+            // If the idea is to skip small tokens, then we shoula also check if the input string is
+            // a single character. Is that allowed?
             if s.len() >= INDEX_MIN_CHAR_LEN {
                 Some(s.to_string())
             } else {
