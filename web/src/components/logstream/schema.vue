@@ -24,7 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="close" />
+          <q-btn v-close-popup="true" round
+flat icon="close" />
         </div>
       </div>
     </q-card-section>
@@ -45,7 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           No data available.
         </div>
-        <div v-else class="indexDetailsContainer" style="height: 100vh">
+        <div v-else
+class="indexDetailsContainer" style="height: 100vh">
           <div class="title" data-test="schema-stream-title-text">
             {{ indexData.name }}
           </div>
@@ -437,6 +439,7 @@ export default defineComponent({
     const router = useRouter();
     const newSchemaFields = ref([]);
     const activeTab = ref("allFields");
+    let previousSchemaVersion: any = null;
 
     const selectedFields = ref([]);
 
@@ -669,6 +672,10 @@ export default defineComponent({
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
+          // console.log("streamResponse:", streamResponse);
+          previousSchemaVersion = JSON.parse(
+            JSON.stringify(streamResponse.settings),
+          );
           setSchema(streamResponse);
           loadingState.value = false;
           dismiss();
@@ -678,6 +685,43 @@ export default defineComponent({
           console.log(err);
         });
     };
+
+    function getUpdatedSettings(previousSettings, currentSettings) {
+      const attributesToCompare = [
+        "partition_keys",
+        "index_fields",
+        "full_text_search_keys",
+        "bloom_filter_fields",
+        "defined_schema_fields",
+      ];
+
+      const updatedSettings = { ...currentSettings };
+
+      attributesToCompare.forEach((attribute) => {
+        const previousArray = Array.isArray(previousSettings[attribute])
+          ? previousSettings[attribute]
+          : [];
+        const currentArray = Array.isArray(currentSettings[attribute])
+          ? currentSettings[attribute]
+          : [];
+
+        // Calculate items to add and remove
+        const add = currentArray.filter(
+          (item) => !previousArray.includes(item),
+        );
+        const remove = previousArray.filter(
+          (item) => !currentArray.includes(item),
+        );
+
+        // Add the _add and _remove arrays to the result
+        updatedSettings[`${attribute}`] = { add: add, remove: remove };
+
+        // Remove the original attribute
+        // delete updatedSettings[attribute];
+      });
+
+      return updatedSettings;
+    }
 
     const onSubmit = async () => {
       let settings = {
@@ -771,12 +815,16 @@ export default defineComponent({
 
       newSchemaFields.value = [];
 
+      let modifiedSettings = getUpdatedSettings(
+        previousSchemaVersion,
+        settings,
+      );
       await streamService
         .updateSettings(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
           indexData.value.stream_type,
-          settings,
+          modifiedSettings,
         )
         .then(async (res) => {
           await getStream(
