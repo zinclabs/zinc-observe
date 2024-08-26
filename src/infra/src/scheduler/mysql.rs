@@ -480,10 +480,9 @@ SELECT CAST(COUNT(*) AS SIGNED) AS num FROM scheduled_jobs;"#,
 async fn add_data_column() -> Result<()> {
     log::info!("[MYSQL] Adding data column to scheduled_jobs table");
     let pool = CLIENT.clone();
-    if let Err(e) =
-        sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data TEXT NOT NULL DEFAULT ('');"#)
-            .execute(&pool)
-            .await
+    if let Err(e) = sqlx::query(r#"ALTER TABLE scheduled_jobs ADD COLUMN data LONGTEXT NOT NULL;"#)
+        .execute(&pool)
+        .await
     {
         if !e.to_string().contains("Duplicate column name") {
             // Check for the specific MySQL error code for duplicate column

@@ -773,6 +773,12 @@ pub struct Common {
     )]
     pub use_multi_result_cache: bool,
     #[env_config(
+        name = "ZO_RESULT_CACHE_SELECTION_STRATEGY",
+        default = "both",
+        help = "Strategy to use for result cache, default is both , possible value - both,overlap , duration"
+    )]
+    pub result_cache_selection_strategy: String,
+    #[env_config(
         name = "ZO_RESULT_CACHE_DISCARD_DURATION",
         default = "60",
         help = "Discard data of last n seconds from cached results"

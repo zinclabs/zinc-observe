@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use config::meta::search::Response;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -56,4 +58,29 @@ pub struct MultiCachedQueryResponse {
     pub is_descending: bool,
     pub limit: i64,
     pub took: usize,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub enum ResultCacheSelectionStrategy {
+    #[serde(rename = "overlap")]
+    Overlap,
+    #[serde(rename = "duration")]
+    Duration,
+    #[serde(rename = "both")]
+    #[default]
+    Both,
+}
+
+// Implementing FromStr for ResultCacheSelectionStrategy
+impl FromStr for ResultCacheSelectionStrategy {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<ResultCacheSelectionStrategy, Self::Err> {
+        match input {
+            "overlap" => Ok(ResultCacheSelectionStrategy::Overlap),
+            "duration" => Ok(ResultCacheSelectionStrategy::Duration),
+            "both" => Ok(ResultCacheSelectionStrategy::Both),
+            _ => Ok(ResultCacheSelectionStrategy::Both),
+        }
+    }
 }

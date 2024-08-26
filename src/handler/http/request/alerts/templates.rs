@@ -174,7 +174,7 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
     ),
     responses(
         (status = 200, description = "Success",   content_type = "application/json", body = HttpResponse),
-        (status = 403, description = "Forbidden", content_type = "application/json", body = HttpResponse),
+        (status = 409, description = "Conflict", content_type = "application/json", body = HttpResponse),
         (status = 404, description = "NotFound",  content_type = "application/json", body = HttpResponse),
         (status = 500, description = "Failure",   content_type = "application/json", body = HttpResponse),
     )
@@ -185,7 +185,7 @@ async fn delete_template(path: web::Path<(String, String)>) -> Result<HttpRespon
     match templates::delete(&org_id, &name).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert template deleted")),
         Err(e) => match e {
-            (http::StatusCode::FORBIDDEN, e) => Ok(MetaHttpResponse::forbidden(e)),
+            (http::StatusCode::CONFLICT, e) => Ok(MetaHttpResponse::conflict(e)),
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
             (_, e) => Ok(MetaHttpResponse::internal_error(e)),
         },
