@@ -246,9 +246,17 @@ const deleteTemplate = () => {
         org_identifier: store.state.selectedOrganization.identifier,
         template_name: confirmDelete.value.data.name,
       })
-      .then(() => getTemplates())
+      .then(() => {
+        q.notify({
+            type: "positive",
+            message: `Template ${confirmDelete.value.data.name} deleted successfully`,
+            timeout: 2000,
+          });
+        
+        getTemplates()
+      })
       .catch((err) => {
-        if (err.response.data.code === 403) {
+        if (err.response.data.code === 409) {
           q.notify({
             type: "negative",
             message: err.response.data.message,
