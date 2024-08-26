@@ -48,6 +48,7 @@ use crate::{
     service::{
         alerts::{build_sql, destinations},
         db,
+        search::sql::RE_ONLY_SELECT,
     },
 };
 
@@ -186,6 +187,13 @@ pub async fn save(
                 || alert.query_condition.sql.as_ref().unwrap().is_empty()
             {
                 return Err(anyhow::anyhow!("Alert with SQL mode should have a query"));
+            }
+            if alert.query_condition.sql.is_some()
+                && RE_ONLY_SELECT.is_match(alert.query_condition.sql.as_ref().unwrap())
+            {
+                return Err(anyhow::anyhow!(
+                    "Alert with SQL can not contain SELECT * in the SQL query"
+                ));
             }
         }
         QueryType::PromQL => {
