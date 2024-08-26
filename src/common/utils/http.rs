@@ -91,6 +91,7 @@ pub(crate) fn get_index_type_from_request(
 ) -> Result<String, Error> {
     let cfg = get_config();
     match query.get("index_type") {
+        // If index_type is provided in the query, it should be either 'parquet' or 'fst'
         Some(typ) if cfg.common.inverted_index_store_format == "both" => {
             match typ.to_lowercase().as_str() {
                 "parquet" => Ok("parquet".to_string()),
@@ -101,6 +102,13 @@ pub(crate) fn get_index_type_from_request(
                 )),
             }
         }
+        // We need this check to avoid situations where the index store format does contain index
+        // search format.
+        Some(_) if cfg.common.inverted_index_store_format != "both" => Err(Error::new(
+            ErrorKind::Other,
+            "index_type is only effective when env ZO_INVERTED_INDEX_STORE_FORMAT is set as 'both'",
+        )),
+        // Fall back to environment variable
         _ => Ok(cfg.common.inverted_index_search_format.to_string()),
     }
 }
