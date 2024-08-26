@@ -73,10 +73,13 @@ async fn recursive_process_multiple_metas(
     file_path: &str,
 ) -> Result<(), anyhow::Error> {
     if cache_metas.is_empty() {
-        log::info!(
-            "[CACHE RESULT {trace_id}] No cache found for query key: {}",
-            query_key
-        );
+        if results.is_empty() {
+            log::info!(
+                "[CACHE RESULT {trace_id}] No cache found for query key: {}",
+                query_key
+            );
+        }
+
         return Ok(());
     }
     let selection_strategy: ResultCacheSelectionStrategy = ResultCacheSelectionStrategy::from_str(

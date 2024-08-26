@@ -17,7 +17,7 @@ use chrono::Utc;
 use config::{
     get_config,
     meta::{
-        search,
+        search::{self, ResponseTook},
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -118,7 +118,7 @@ pub async fn search(
             delta_start_time: req.query.start_time,
             delta_end_time: req.query.end_time,
             delta_removed_hits: false,
-        })
+        });
     } else if use_cache {
         log::info!(
             "[trace_id {trace_id}] Query deltas are: {:?}",
@@ -363,6 +363,8 @@ fn merge_response(
     let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
 
+    let mut res_took = ResponseTook::default();
+
     for res in search_response.clone() {
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
@@ -375,13 +377,26 @@ fn merge_response(
         if res.hits.is_empty() {
             continue;
         }
+        if let Some(mut took_details) = res.took_detail {
+            res_took.cluster_total += took_details.cluster_total;
+            res_took.cluster_wait_queue += took_details.cluster_wait_queue;
+            res_took.idx_took += took_details.idx_took;
+            res_took.wait_queue += took_details.wait_queue;
+            res_took.total += took_details.total;
+            res_took.nodes.append(&mut took_details.nodes);
+        }
+
         cache_response.hits.extend(res.hits.clone());
     }
     sort_response(is_descending, &mut cache_response, ts_column);
 
-    if cache_response.hits.len() > limit as usize {
+    if cache_response.hits.len() > (limit as usize) {
         cache_response.hits.truncate(limit as usize);
     }
+    if limit > 0 {
+        cache_response.total = cache_response.hits.len();
+    }
+
     if !search_response.is_empty() {
         cache_response.cached_ratio = files_cache_ratio / search_response.len();
     }
@@ -389,10 +404,12 @@ fn merge_response(
     log::info!(
         "[trace_id {trace_id}] cache_response.hits.len: {}, Result cache len: {}",
         cache_hits_len,
-        result_cache_len,
+        result_cache_len
     );
-    cache_response.result_cache_ratio =
-        (cache_hits_len as f64 * 100_f64 / (result_cache_len + cache_hits_len) as f64) as usize;
+    cache_response.took_detail = Some(res_took);
+    cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
+        / ((result_cache_len + cache_hits_len) as f64))
+        as usize;
     cache_response
 }
 
