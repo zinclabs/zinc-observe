@@ -4,7 +4,7 @@ use actix_web::{get, http::StatusCode, put, web, HttpRequest, HttpResponse as Ac
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    models,
+    models::{self, ReportType},
     report::{generate_report, send_email, SMTP_CLIENT},
 };
 
@@ -66,6 +66,11 @@ pub async fn send_report(
     };
 
     let cfg = config::get_config();
+    let report_type = if report.email_details.recepients.is_empty() {
+        ReportType::Cache
+    } else {
+        ReportType::PDF
+    };
     let (pdf_data, email_dashboard_url) = match generate_report(
         &report.dashboards[0],
         &org_id,
@@ -73,6 +78,7 @@ pub async fn send_report(
         &cfg.report_server.user_password,
         &report.email_details.dashb_url,
         timezone,
+        report_type.clone(),
     )
     .await
     {
@@ -83,6 +89,13 @@ pub async fn send_report(
                 .json(HttpResponse::internal_server_error(e.to_string())));
         }
     };
+
+    if report_type == ReportType::Cache {
+        log::info!("Dashboard data cached by report {report_name}");
+        return Ok(ActixHttpResponse::Ok().json(HttpResponse::success(format!(
+            "dashboard data cached by report {report_name}"
+        ))));
+    }
 
     match send_email(
         &pdf_data,

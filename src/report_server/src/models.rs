@@ -17,6 +17,12 @@ pub struct EmailDetails {
     pub dashb_url: String,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum ReportType {
+    PDF,
+    Cache,
+}
+
 #[derive(Serialize, Debug, Deserialize, Clone)]
 pub struct Report {
     pub dashboards: Vec<ReportDashboard>,

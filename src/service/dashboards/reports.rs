@@ -118,8 +118,8 @@ pub async fn save(
         }
     }
 
-    // Atleast one `ReportDashboard` and `ReportDestination` needs to be present
-    if report.dashboards.is_empty() || report.destinations.is_empty() {
+    // Atleast one `ReportDashboard` needs to be present
+    if report.dashboards.is_empty() {
         return Err(anyhow::anyhow!(
             "Atleast one dashboard/destination is required"
         ));
@@ -265,14 +265,14 @@ impl Report {
         }
 
         let cfg = get_config();
-        if !cfg.common.report_server_url.is_empty() {
-            let mut recepients = vec![];
-            for recepient in &self.destinations {
-                match recepient {
-                    ReportDestination::Email(email) => recepients.push(email.clone()),
-                }
+        let mut recepients = vec![];
+        for recepient in &self.destinations {
+            match recepient {
+                ReportDestination::Email(email) => recepients.push(email.clone()),
             }
-
+        }
+        let no_of_recepients = recepients.len();
+        if !cfg.common.report_server_url.is_empty() {
             let report_data = HttpReportPayload {
                 dashboards: self.dashboards.clone(),
                 email_details: ReportEmailDetails {
@@ -323,6 +323,7 @@ impl Report {
                 &cfg.common.report_user_name,
                 &cfg.common.report_user_password,
                 &self.timezone,
+                no_of_recepients,
             )
             .await?;
             self.send_email(&report.0, report.1).await
@@ -340,7 +341,12 @@ impl Report {
         for recepient in &self.destinations {
             match recepient {
                 ReportDestination::Email(email) => recepients.push(email),
+                _ => {}
             }
+        }
+
+        if recepients.is_empty() {
+            return Ok(());
         }
 
         let mut email = Message::builder()
@@ -389,6 +395,7 @@ async fn generate_report(
     user_id: &str,
     user_pass: &str,
     timezone: &str,
+    no_of_recepients: usize,
 ) -> Result<(Vec<u8>, String), anyhow::Error> {
     let cfg = get_config();
     // Check if Chrome is enabled, otherwise don't save the report
@@ -560,12 +567,16 @@ async fn generate_report(
 
     // Last two elements loaded means atleast the metric components have loaded.
     // Convert the page into pdf
-    let pdf_data = page
-        .pdf(PrintToPdfParams {
+    let pdf_data = if no_of_recepients != 0 {
+        page.pdf(PrintToPdfParams {
             landscape: Some(true),
             ..Default::default()
         })
-        .await?;
+        .await?
+    } else {
+        // No need to capture pdf
+        vec![]
+    };
 
     browser.close().await?;
     handle.await?;
