@@ -19,7 +19,7 @@ use std::{
 };
 
 use actix_web::{delete, get, http, put, web, HttpRequest, HttpResponse, Responder};
-use config::meta::stream::{StreamSettings, StreamType, UpdateStreamSettings};
+use config::meta::stream::{StreamType, UpdateStreamSettings};
 
 use crate::{
     common::{

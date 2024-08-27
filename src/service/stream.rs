@@ -287,7 +287,7 @@ pub async fn update_stream_settings(
     stream_type: StreamType,
     update_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
-    match infra::schema::get_settings(org_id, stream_name, stream_type.clone()).await {
+    match infra::schema::get_settings(org_id, stream_name, stream_type).await {
         Some(mut settings) => {
             if let Some(max_query_range) = update_settings.max_query_range {
                 settings.max_query_range = max_query_range;
@@ -375,7 +375,7 @@ pub async fn update_stream_settings(
         }
         None => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
             http::StatusCode::BAD_REQUEST.into(),
-            format!("stream settings could not be found"),
+            "stream settings could not be found".to_string(),
         ))),
     }
 }
