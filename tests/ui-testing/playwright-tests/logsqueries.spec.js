@@ -97,8 +97,8 @@ test.describe("Logs Queries testcases", () => {
   });
 
   test("should add timestamp to editor save this view and switch", async ({ page }) => {
-    await page.waitForTimeout(
-      1000); await page.locator('[data-test="log-table-column-0-source"] > .flex > .ellipsis').click();
+    await page.waitForTimeout(3000); 
+    await page.locator('[data-test="log-table-column-0-source"]').click();
 
     await page.locator(':nth-child(1) > [data-test="log-details-include-exclude-field-btn"] > .q-btn__content > .q-icon').click(); await page.locator(
       '[data-test="log-details-include-field-btn"]').click(); await page.locator(

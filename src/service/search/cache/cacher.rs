@@ -123,7 +123,7 @@ pub async fn check_cache(
         handle_historgram(origin_sql, q_time_range);
         req.query.sql = origin_sql.clone();
         discard_interval = interval * 1000 * 1000; //in microseconds
-    };
+    }
     if req.query.size >= 0 {
         *file_path = format!("{}_{}_{}", file_path, req.query.from, req.query.size);
     }
@@ -138,6 +138,9 @@ pub async fn check_cache(
                 break;
             }
         }
+    }
+    if is_aggregate && order_by.is_empty() {
+        return MultiCachedQueryResponse::default();
     }
     let mut multi_resp = MultiCachedQueryResponse::default();
     if get_config().common.use_multi_result_cache {
@@ -223,12 +226,12 @@ pub async fn check_cache(
             Some(mut cached_resp) => {
                 let mut deltas = vec![];
                 calculate_deltas_v1(
-                    &ResultCacheMeta {
+                    &(ResultCacheMeta {
                         start_time: cached_resp.response_start_time,
                         end_time: cached_resp.response_end_time,
                         is_aggregate,
                         is_descending,
-                    },
+                    }),
                     req.query.start_time,
                     req.query.end_time,
                     &mut deltas,
@@ -242,7 +245,7 @@ pub async fn check_cache(
                 if search_delta.is_empty() {
                     log::debug!("cached response found");
                     *should_exec_query = false;
-                };
+                }
 
                 if cached_resp.cached_response.total == (meta.meta.limit as usize)
                     && cached_resp.response_end_time == req.query.end_time
@@ -288,27 +291,36 @@ pub async fn get_cached_results(
     drop(r);
 
     if let Some(cache_metas) = is_cached {
-        match cache_metas
-            .iter()
-            .filter(|cache_meta| {
-                // to make sure there is overlap between cache time range and query time range
-                log::info!(
-                "[CACHE CANDIDATES {trace_id}] Got caches :get_cached_results: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
-                cache_meta.start_time ,
-                cache_meta.end_time);
-                cache_meta.start_time <= cache_req.q_end_time
-                    && cache_meta.end_time >= cache_req.q_start_time
-            })
-            .max_by_key(|result| {
-                result.end_time -result.start_time
-            }) {
+        match
+            cache_metas
+                .iter()
+                .filter(|cache_meta| {
+                    // to make sure there is overlap between cache time range and query time range
+                    log::info!(
+                        "[CACHE CANDIDATES {trace_id}] Got caches :get_cached_results: cache_meta.response_start_time: {}, cache_meta.response_end_time: {}",
+                        cache_meta.start_time,
+                        cache_meta.end_time
+                    );
+                    cache_meta.start_time <= cache_req.q_end_time &&
+                        cache_meta.end_time >= cache_req.q_start_time
+                })
+                .max_by_key(|result| { result.end_time - result.start_time })
+        {
             Some(matching_meta) => {
                 let file_name = format!(
                     "{}_{}_{}_{}.json",
                     matching_meta.start_time,
                     matching_meta.end_time,
-                    if cache_req.is_aggregate { 1 } else { 0 },
-                    if cache_req.is_descending { 1 } else { 0 }
+                    if cache_req.is_aggregate {
+                        1
+                    } else {
+                        0
+                    },
+                    if cache_req.is_descending {
+                        1
+                    } else {
+                        0
+                    }
                 );
                 let mut matching_cache_meta = matching_meta.clone();
                 // calculate delta time range to fetch the delta data using search query
@@ -317,13 +329,17 @@ pub async fn get_cached_results(
 
                 let cache_duration = matching_cache_meta.end_time - matching_cache_meta.start_time;
                 // return None if cache duration is less than 2 * discard_duration
-                if cache_duration <= discard_duration && matching_cache_meta.start_time > Utc::now().timestamp_micros() - discard_duration  {
+                if
+                    cache_duration <= discard_duration &&
+                    matching_cache_meta.start_time >
+                        Utc::now().timestamp_micros() - discard_duration
+                {
                     return None;
                 }
 
                 match get_results(file_path, &file_name).await {
                     Ok(v) => {
-                        let mut cached_response: Response = match json::from_str::<Response>(&v){
+                        let mut cached_response: Response = match json::from_str::<Response>(&v) {
                             Ok(v) => v,
                             Err(e) => {
                                 log::error!(
@@ -335,19 +351,26 @@ pub async fn get_cached_results(
                         };
                         let first_ts = get_ts_value(
                             &cache_req.ts_column,
-                            cached_response.hits.first().unwrap(),
+                            cached_response.hits.first().unwrap()
                         );
 
                         let last_ts = get_ts_value(
                             &cache_req.ts_column,
-                            cached_response.hits.last().unwrap(),
+                            cached_response.hits.last().unwrap()
                         );
 
-                        let (hits_allowed_start_time,hits_allowed_end_time) =if cache_req.discard_interval > 0{
+                        let (hits_allowed_start_time, hits_allowed_end_time) = if
+                            cache_req.discard_interval > 0
+                        {
                             // calculation in line with date bin of datafusion
-                            (cache_req.q_start_time - (cache_req.q_start_time%cache_req.discard_interval) , cache_req.q_end_time - (cache_req.q_end_time%cache_req.discard_interval))
-                        }else{
-                            (cache_req.q_start_time,cache_req.q_end_time)
+                            (
+                                cache_req.q_start_time -
+                                    (cache_req.q_start_time % cache_req.discard_interval),
+                                cache_req.q_end_time -
+                                    (cache_req.q_end_time % cache_req.discard_interval),
+                            )
+                        } else {
+                            (cache_req.q_start_time, cache_req.q_end_time)
                         };
                         let discard_ts = if cache_req.is_descending {
                             if cache_req.discard_interval > 0 {
@@ -375,15 +398,15 @@ pub async fn get_cached_results(
 
                         cached_response.hits.retain(|hit| {
                             let hit_ts = get_ts_value(&cache_req.ts_column, hit);
-                            hit_ts <=  hits_allowed_end_time
-                                && hit_ts >= hits_allowed_start_time
-                                && hit_ts < discard_ts
+                            hit_ts <= hits_allowed_end_time &&
+                                hit_ts >= hits_allowed_start_time &&
+                                hit_ts < discard_ts
                         });
 
                         cached_response.total = cached_response.hits.len();
                         if cache_req.discard_interval < 0 {
                             matching_cache_meta.end_time = discard_ts;
-                        };
+                        }
 
                         log::info!(
                             "[CACHE RESULT {trace_id}] Get results from disk success for query key: {} with start time {} - end time {} ",
@@ -404,10 +427,7 @@ pub async fn get_cached_results(
                         })
                     }
                     Err(e) => {
-                        log::error!(
-                            "[trace_id {trace_id}] Get results from disk failed : {:?}",
-                            e
-                        );
+                        log::error!("[trace_id {trace_id}] Get results from disk failed : {:?}", e);
                         None
                     }
                 }
@@ -470,7 +490,7 @@ pub fn calculate_deltas_v1(
             });
             has_pre_cache_delta = true;
         }
-    };
+    }
     has_pre_cache_delta
 }
 
@@ -568,7 +588,7 @@ fn handle_historgram(origin_sql: &mut String, q_time_range: Option<(i64, i64)>) 
         .unwrap()
         .as_str()
         .split(',')
-        .map(|v| v.trim().trim_matches(|v| v == '\'' || v == '"'))
+        .map(|v| v.trim().trim_matches(|v| (v == '\'' || v == '"')))
         .collect::<Vec<&str>>();
 
     let interval = match attrs.get(1) {

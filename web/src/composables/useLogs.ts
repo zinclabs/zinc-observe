@@ -18,7 +18,7 @@ import { useI18n } from "vue-i18n";
 import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep, remove } from "lodash-es";
+import { cloneDeep } from "lodash-es";
 
 import {
   useLocalLogFilterField,
@@ -123,7 +123,7 @@ const defaultObject = {
       showPagination: true,
     },
     scrollInfo: {},
-    flagWrapContent: false,
+    flagWrapContent: true,
     pageType: "logs", // 'logs' or 'stream
     regions: [],
     clusters: [],
@@ -164,6 +164,7 @@ const defaultObject = {
       currentDateTime: new Date(),
       currentPage: 1,
       columns: <any>[],
+      colOrder: <any>{},
     },
     transforms: <any>[],
     queryResults: <any>[],
@@ -2062,6 +2063,27 @@ const useLogs = () => {
     queryReq: any,
     appendResult: boolean = false,
   ) => {
+    if (
+      searchObj.data.resultGrid.colOrder &&
+      searchObj.data.resultGrid.colOrder.hasOwnProperty(
+        searchObj.data.stream.selectedStream,
+      ) &&
+      searchObj.data.resultGrid.colOrder[
+        searchObj.data.stream.selectedStream
+      ][0].length > 0 &&
+      searchObj.data.stream.selectedFields.length > 0
+    ) {
+      searchObj.data.stream.selectedFields = [];
+      const colOrderObject =
+        searchObj.data.resultGrid.colOrder[
+          searchObj.data.stream.selectedStream
+        ];
+
+      const colOrderArray: any = Object.values(colOrderObject);
+
+      searchObj.data.stream.selectedFields = colOrderArray[0];
+    }
+    // searchObj.data.stream.selectedFields =
     return new Promise((resolve, reject) => {
       // // set track_total_hits true for first request of partition to get total records in partition
       // // it will be used to send pagination request
@@ -3015,7 +3037,8 @@ const useLogs = () => {
         ) {
           searchObj.data.resultGrid.columns.push({
             name: "@timestamp",
-            field: (row: any) =>
+            id: "@timestamp",
+            accessorFn: (row: any) =>
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
                 store.state.timezone,
@@ -3028,19 +3051,33 @@ const useLogs = () => {
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
             label: t("search.timestamp") + ` (${store.state.timezone})`,
+            header: t("search.timestamp") + ` (${store.state.timezone})`,
             align: "left",
             sortable: true,
+            enableResizing: false,
+            meta: {
+              closable: false,
+              showWrap: false,
+              wrapContent: false,
+            },
+            size: 225,
           });
         }
 
         if (searchObj.data.stream.selectedFields.length == 0) {
           searchObj.data.resultGrid.columns.push({
             name: "source",
-            field: (row: any) => JSON.stringify(row),
-            prop: (row: any) => JSON.stringify(row),
-            label: "source",
-            align: "left",
+            id: "source",
+            accessorFn: (row: any) => JSON.stringify(row),
+            cell: (info: any) => info.getValue(),
+            header: "source",
             sortable: true,
+            enableResizing: false,
+            meta: {
+              closable: false,
+              showWrap: false,
+              wrapContent: false,
+            },
           });
         }
       } else {
@@ -3048,7 +3085,8 @@ const useLogs = () => {
         if (searchObj.data.hasSearchDataTimestampField == true) {
           searchObj.data.resultGrid.columns.unshift({
             name: "@timestamp",
-            field: (row: any) =>
+            id: "@timestamp",
+            accessorFn: (row: any) =>
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
                 store.state.timezone,
@@ -3061,26 +3099,55 @@ const useLogs = () => {
                 "yyyy-MM-dd HH:mm:ss.SSS",
               ),
             label: t("search.timestamp") + ` (${store.state.timezone})`,
+            header: t("search.timestamp") + ` (${store.state.timezone})`,
             align: "left",
             sortable: true,
+            enableResizing: false,
+            meta: {
+              closable: false,
+              showWrap: false,
+              wrapContent: false,
+            },
+            size: 225,
           });
         }
+
+        //TODO Nikhil: create a key colSizes in resultGrid instead of directly adding dynamic key
+        //@ts-ignore
+        const sizes = (searchObj.data.resultGrid as any)[
+          searchObj.data.stream.selectedStream
+        ];
+
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
+            let foundKey, foundValue;
+
+            Object.keys(sizes[0]).forEach((key) => {
+              const trimmedKey = key
+                .replace(/^--(header|col)-/, "")
+                .replace(/-size$/, "");
+              if (trimmedKey === field) {
+                foundKey = key;
+                foundValue = sizes[0][key];
+              }
+            });
+
             searchObj.data.resultGrid.columns.push({
               name: field,
-              field: (row: { [x: string]: any; source: any }) => {
+              id: field,
+              accessorFn: (row: { [x: string]: any; source: any }) => {
                 return byString(row, field);
               },
-              prop: (row: { [x: string]: any; source: any }) => {
-                return byString(row, field);
-              },
-              label: field,
-              align: "left",
+              header: field,
               sortable: true,
-              closable: true,
-              showWrap: true,
-              wrapContent: false,
+              enableResizing: true,
+              meta: {
+                closable: true,
+                showWrap: true,
+                wrapContent: false,
+              },
+
+              size: foundValue,
             });
           }
         }
@@ -3522,6 +3589,7 @@ const useLogs = () => {
       console.log("Error while loading logs data");
     }
   };
+  const saveColumnSizes = () => {};
 
   const handleRunQuery = async () => {
     try {

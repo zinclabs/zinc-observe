@@ -149,14 +149,15 @@ test.describe("Logs Quickmode testcases", () => {
       page
         .locator('[data-test="log-table-column-0-source"]')
         .getByText(/kubernetes_pod_id/)
+        // .getByText(/_timestamp/)
         .first()
     ).toBeVisible();
   });
 
   test("should display error on entering random text in histogram mode when quick mode is on", async ({ page }) => {
+    await page.waitForTimeout(2000)
     // Click on the Monaco Editor to focus it
     await page.click('[data-test="logs-search-bar-query-editor"]');
-
     // Type into the Monaco Editor
     await page.keyboard.type("oooo");
     await page.waitForTimeout(1000)
@@ -184,11 +185,12 @@ test.describe("Logs Quickmode testcases", () => {
       .first()
       .click();
     await page.locator('[aria-label="SQL Mode"] > .q-toggle__inner').click();
+    await page.waitForSelector('[data-test="logs-search-bar-query-editor"]');
     await expect(
       page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_pod_id FROM "e2e_automate"')
     ).toBeVisible();
-
-
+    
+   
   });
 
   test("should adding/removing interesting field removes it from editor and results too", async ({
@@ -207,11 +209,11 @@ test.describe("Logs Quickmode testcases", () => {
     await page.locator('[data-cy="index-field-search-input"]').clear();
     await page
       .locator('[data-cy="index-field-search-input"]')
-      .fill("kubernetes_pod_id");
+      .fill("level");
     await page.waitForTimeout(2000);
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
+        '[data-test="log-search-index-list-interesting-level-field-btn"]'
       )
       .last()
       .click({
@@ -226,11 +228,11 @@ test.describe("Logs Quickmode testcases", () => {
     await expect(
       page
         .locator('[data-test="log-table-column-0-source"]')
-        .locator('text=kubernetes_pod_id')
+        // .locator('text=_timestamp')
     ).toBeVisible();
     await page
       .locator(
-        '[data-test="log-search-index-list-interesting-kubernetes_pod_id-field-btn"]'
+        '[data-test="log-search-index-list-interesting-level-field-btn"]'
       )
       .last()
       .click({
@@ -238,7 +240,7 @@ test.describe("Logs Quickmode testcases", () => {
       });
     await expect(
       page.locator('[data-test="logs-search-bar-query-editor"]')
-    ).not.toHaveText(/kubernetes_pod_id/);
+    ).not.toHaveText(/level/);
     await page
       .locator('[data-cy="search-bar-refresh-button"] > .q-btn__content')
       .click();

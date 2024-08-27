@@ -305,6 +305,9 @@ export default defineComponent({
     SearchResult: defineAsyncComponent(
       () => import("@/plugins/logs/SearchResult.vue"),
     ),
+    ConfirmDialog: defineAsyncComponent(
+      () => import("@/components/ConfirmDialog.vue"),
+    ),
     SanitizedHtmlRenderer,
     VisualizeLogsQuery,
   },
@@ -452,7 +455,8 @@ export default defineComponent({
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     let parser: any;
-    const expandedLogs = ref({});
+
+    const expandedLogs = ref([]);
     const splitterModel = ref(10);
 
     // flag to know if it is the first time visualize
@@ -618,7 +622,6 @@ export default defineComponent({
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
       // searchObj.runQuery = false;
-      // expandedLogs.value = {};
       try {
         await getQueryData();
         refreshHistogramChart();
@@ -765,10 +768,10 @@ export default defineComponent({
       return !!searchObj.data.stream.streamLists.length;
     });
 
-    const toggleExpandLog = async (index: number) => {
-      if (expandedLogs.value[index.toString()])
-        delete expandedLogs.value[index.toString()];
-      else expandedLogs.value[index.toString()] = true;
+    const toggleExpandLog = (index: number) => {
+      if (expandedLogs.value.includes(index))
+        expandedLogs.value = expandedLogs.value.filter((item) => item != index);
+      else expandedLogs.value.push(index);
     };
 
     const onSplitterUpdate = () => {
@@ -1202,7 +1205,6 @@ export default defineComponent({
         : 0;
     },
     showHistogram() {
-
       if (
         this.searchObj.meta.showHistogram &&
         !this.searchObj.shouldIgnoreWatcher
@@ -1216,18 +1218,17 @@ export default defineComponent({
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
 
-          this.getHistogramQueryData(this.searchObj.data.histogramQuery).then(
-            (res: any) => {
-                 this.refreshTimezone();
-                 this.searchResultRef.reDrawChart();
-
-            }          
-            ).catch((err: any) => {
-            console.log(err,"err in updating chart");
-          }).finally(() => {
-            this.searchObj.loadingHistogram = false;
-
-          })
+          this.getHistogramQueryData(this.searchObj.data.histogramQuery)
+            .then((res: any) => {
+              this.refreshTimezone();
+              this.searchResultRef.reDrawChart();
+            })
+            .catch((err: any) => {
+              console.log(err, "err in updating chart");
+            })
+            .finally(() => {
+              this.searchObj.loadingHistogram = false;
+            });
         }
       }
 

@@ -118,7 +118,6 @@ jobs:
           echo "ORGNAME=${ORGNAME}" >> .env
           mv .env tests/ui-testing
           cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
-
       - name: Check OpenObserve logs
         if: always()
         run: cat o2.log

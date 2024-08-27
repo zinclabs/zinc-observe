@@ -126,17 +126,19 @@ test.describe("Schema testcases", () => {
     await page.waitForTimeout(1000);
      await page.getByText(/^arrow_drop_down_all:.*$/).click();
     await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
-  await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_timestamp');
-  await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click();
-  await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
-  await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_all');
-  await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_all')
-  await page.locator('[data-test="logs-all-fields-btn"]').click();
-  await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
-  await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_all')
-  await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
-  await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_timestamp');
-  await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_timestamp');
+    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_all');
+    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_all')
+    await page.locator('[data-test="logs-all-fields-btn"]').click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
+    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_all')
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('_timestamp');
+    await page.locator('[data-test="log-search-index-list-fields-table"]').getByTitle('_timestamp').click();
+
+    await page.waitForSelector('[data-test="log-expand-detail-key-_all"]', { state: 'visible' });
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');
