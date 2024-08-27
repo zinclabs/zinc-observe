@@ -35,7 +35,8 @@ use crate::{
                 datetime_now,
                 reports::{
                     HttpReportPayload, Report, ReportDashboard, ReportDestination,
-                    ReportEmailDetails, ReportFrequencyType, ReportTimerangeType,
+                    ReportEmailDetails, ReportFrequencyType, ReportListFilters,
+                    ReportTimerangeType,
                 },
             },
         },
@@ -179,11 +180,14 @@ pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
 
 pub async fn list(
     org_id: &str,
+    filters: ReportListFilters,
     permitted: Option<Vec<String>>,
 ) -> Result<Vec<Report>, anyhow::Error> {
     match db::dashboards::reports::list(org_id).await {
         Ok(reports) => {
             let mut result = Vec::new();
+            let dashboard = filters.dashboard;
+            let destination_less = filters.destination_less;
             for report in reports {
                 if permitted.is_none()
                     || permitted
@@ -195,7 +199,30 @@ pub async fn list(
                         .unwrap()
                         .contains(&format!("report:_all_{}", org_id))
                 {
-                    result.push(report);
+                    let mut should_include = true;
+                    if let Some(dashboard_id) = dashboard.as_ref() {
+                        // Check if report contains this dashboard
+                        if report
+                            .dashboards
+                            .iter()
+                            .find(|&x| x.dashboard.eq(dashboard_id))
+                            .is_none()
+                        {
+                            should_include = false;
+                        }
+                    }
+                    if let Some(destination_less) = destination_less.as_ref() {
+                        // destination_less = true -> push only if the report is destination-less
+                        // destination_less = false -> push only if the report has destinations
+                        if *destination_less && !report.destinations.is_empty() {
+                            should_include = false;
+                        } else if !*destination_less && report.destinations.is_empty() {
+                            should_include = false;
+                        }
+                    }
+                    if should_include {
+                        result.push(report);
+                    }
                 }
             }
             Ok(result)

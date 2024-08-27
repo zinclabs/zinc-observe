@@ -211,3 +211,10 @@ pub struct HttpReportPayload {
     pub dashboards: Vec<ReportDashboard>,
     pub email_details: ReportEmailDetails,
 }
+
+#[derive(Debug, Clone)]
+pub struct ReportListFilters {
+    pub dashboard: Option<String>,
+    pub folder: Option<String>,
+    pub destination_less: Option<bool>,
+}
