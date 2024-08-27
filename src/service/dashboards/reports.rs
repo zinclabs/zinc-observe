@@ -341,7 +341,6 @@ impl Report {
         for recepient in &self.destinations {
             match recepient {
                 ReportDestination::Email(email) => recepients.push(email),
-                _ => {}
             }
         }
 

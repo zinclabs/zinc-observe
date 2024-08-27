@@ -222,7 +222,7 @@ pub async fn generate_report(
 
     // dashboard link in the email should contain data of the same period as the report
     let (dashb_url, email_dashb_url) = match timerange.range_type {
-        ReportTimerangeType::Relative => {
+        models::ReportTimerangeType::Relative => {
             let period = &timerange.period;
             let (time_duration, time_unit) = period.split_at(period.len() - 1);
             let dashb_url = format!(
@@ -275,7 +275,7 @@ pub async fn generate_report(
             );
             (dashb_url, email_dashb_url)
         }
-        ReportTimerangeType::Absolute => {
+        models::ReportTimerangeType::Absolute => {
             let url = format!(
                 "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype=reports&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
                 &timerange.from, &timerange.to
@@ -368,10 +368,10 @@ pub async fn generate_report(
 }
 
 /// Sends emails to the [`Report`] recepients. Currently only one pdf data is supported.
-async fn send_email(
+pub async fn send_email(
     pdf_data: &[u8],
-    email_details: EmailDetails,
-    config: SmtpConfig,
+    email_details: models::EmailDetails,
+    config: models::SmtpConfig,
 ) -> Result<(), anyhow::Error> {
     let mut recepients = vec![];
     for recepient in &email_details.recepients {
@@ -422,7 +422,7 @@ async fn send_email(
 
 pub async fn wait_for_panel_data_load(page: &Page) -> Result<Duration, anyhow::Error> {
     let start = std::time::Instant::now();
-    let timeout = std::time::Duration::from_secs(CONFIG.chrome.chrome_sleep_secs.into());
+    let timeout = std::time::Duration::from_secs(get_config().chrome.chrome_sleep_secs.into());
     loop {
         if page
             .find_element("span#dashboardVariablesAndPanelsDataLoaded")

@@ -17,7 +17,7 @@ pub struct EmailDetails {
     pub dashb_url: String,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ReportType {
     PDF,
     Cache,
