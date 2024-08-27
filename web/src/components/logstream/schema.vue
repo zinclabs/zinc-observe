@@ -586,6 +586,12 @@ export default defineComponent({
 
     const setSchema = (streamResponse) => {
       const schemaMapping = new Set([]);
+      if (streamResponse?.settings) {
+        // console.log("streamResponse:", streamResponse);
+        previousSchemaVersion = JSON.parse(
+          JSON.stringify(streamResponse.settings),
+        );
+      }
       if (!streamResponse.schema?.length) {
         streamResponse.schema = [];
         if (streamResponse.settings.defined_schema_fields?.length)
@@ -672,10 +678,6 @@ export default defineComponent({
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
-          // console.log("streamResponse:", streamResponse);
-          previousSchemaVersion = JSON.parse(
-            JSON.stringify(streamResponse.settings),
-          );
           setSchema(streamResponse);
           loadingState.value = false;
           dismiss();

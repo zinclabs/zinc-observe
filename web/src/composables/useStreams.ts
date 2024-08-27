@@ -415,7 +415,8 @@ const useStreams = () => {
       "defined_schema_fields",
     ];
 
-    const updatedSettings = { ...currentSettings };
+    let updatedSettings: any = {};
+    updatedSettings = { ...currentSettings };
 
     attributesToCompare.forEach((attribute) => {
       const previousArray = Array.isArray(previousSettings[attribute])
