@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
 use config::{
     get_config, is_local_disk_storage,
@@ -132,19 +132,24 @@ pub async fn search(
     );
 
     // filter file_list if is an inverted index search
-    if (!sql.fts_terms.is_empty() || !sql.index_terms.is_empty()) && sql.index_type == "fst" {
-        let prev_file_list_len = files.len();
+    let cfg = get_config();
+    let use_inverted_index = cfg.common.inverted_index_enabled
+        && !cfg.common.feature_query_without_index
+        && sql.use_inverted_index
+        && (sql.inverted_index_type == "fst" || sql.inverted_index_type == "both")
+        && (!sql.fts_terms.is_empty() || !sql.index_terms.is_empty());
+    if use_inverted_index {
+        // TODO: need to log search on FST took time
         filter_file_list_by_inverted_index(trace_id, &mut files, &sql, stream_type).await?;
         log::info!(
-            "[trace_id {trace_id}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num reduced by {}",
+            "[trace_id {trace_id}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num to {}",
             &sql.org_id,
             &stream_type,
             &sql.stream_name,
-            prev_file_list_len - files.len(),
+            files.len(),
         );
     }
 
-    let cfg = get_config();
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
     let mut scan_stats = ScanStats::new();
@@ -207,10 +212,7 @@ pub async fn search(
     // load files to local cache
     let (cache_type, deleted_files, (mem_cached_files, disk_cached_files)) = cache_files(
         trace_id,
-        &files
-            .iter()
-            .map(|f| Cow::Borrowed(f.key.as_ref()))
-            .collect_vec(),
+        &files.iter().map(|f| f.key.as_ref()).collect_vec(),
         &scan_stats,
     )
     .instrument(enter_span.clone())
@@ -433,7 +435,7 @@ async fn get_file_list(
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
 async fn cache_files<'a>(
     trace_id: &str,
-    files: &[Cow<'a, str>],
+    files: &[&str],
     scan_stats: &ScanStats,
 ) -> Result<(file_data::CacheType, Vec<String>, CachedFiles), Error> {
     let cfg = get_config();
@@ -498,6 +500,7 @@ async fn cache_files<'a>(
                     }
                     _ => (None, false, false),
                 };
+                // TODO: we can't delete index file
                 let file_name = if let Some(e) = ret.0 {
                     if e.to_string().to_lowercase().contains("not found")
                         || e.to_string().to_lowercase().contains("data size is zero")
@@ -573,8 +576,9 @@ async fn filter_file_list_by_inverted_index(
     let mut scan_stats = ScanStats::new();
     let index_file_names = file_list
         .iter()
-        .map(|f| Cow::Owned(convert_parquet_idx_file_name(&f.key)))
+        .filter_map(|f| convert_parquet_idx_file_name(&f.key))
         .collect_vec();
+    let index_file_names = index_file_names.iter().map(|f| f.as_str()).collect_vec();
     let (cache_type, _, (mem_cached_files, disk_cached_files)) =
         cache_files(trace_id, index_file_names.as_ref(), &scan_stats).await?;
 
@@ -590,8 +594,6 @@ async fn filter_file_list_by_inverted_index(
         scan_stats.querier_disk_cached_files,
         cache_type,
     );
-
-    let mut tasks = Vec::new();
 
     let full_text_terms = Arc::new(
         sql.fts_terms
@@ -610,6 +612,8 @@ async fn filter_file_list_by_inverted_index(
     );
     let index_terms = Arc::new(sql.index_terms.clone());
     // we can be iterating over a lot of files
+    // TODO: add a limit to the number of files we can process in parallel
+    let mut tasks = Vec::new();
     for file in file_list.iter() {
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
@@ -631,6 +635,7 @@ async fn filter_file_list_by_inverted_index(
             Ok((file_name, bitvec)) => {
                 if let Some(res) = bitvec {
                     // Replace the segment IDs in the existing `FileKey` with the new found segments
+                    // TODO: need a hashmap to avoid this O(n) operation
                     file_list
                         .iter_mut()
                         .find(|f| f.key == file_name)
@@ -644,6 +649,7 @@ async fn filter_file_list_by_inverted_index(
                         res.iter_ones().collect_vec()
                     );
                 } else {
+                    // TODO: some parquet file maybe have no index file, need to filter out
                     log::info!(
                         "[trace_id {trace_id}] search->storage: no match found in index for file {}",
                         file_name
@@ -668,12 +674,22 @@ async fn inverted_index_search_in_file(
     fts_terms: Arc<Vec<String>>,
     index_terms: Arc<Vec<(String, Vec<String>)>>,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
-    let index_file_name = convert_parquet_idx_file_name(parquet_file_name);
+    let Some(index_file_name) = convert_parquet_idx_file_name(parquet_file_name) else {
+        return Err(anyhow::anyhow!(
+            "Unable to convert parquet file name {} to index file name",
+            parquet_file_name
+        ));
+    };
+    // TODO: already cached in cache_files, should not download again
+    // first get from meory cache
+    // second get from disk cache
+    // at the end, still not data, get from storage
     let compressed_index_blob = match storage::get(&index_file_name).await {
         Err(e) => {
-            log::info!(
-                "Unable to load corresponding FST index file for parquet file {}",
-                parquet_file_name
+            log::warn!(
+                "Unable to load corresponding FST index file for parquet file {}, err: {}",
+                parquet_file_name,
+                e
             );
             return Err(e);
         }
@@ -687,6 +703,8 @@ async fn inverted_index_search_in_file(
     let mut res = BitVec::new();
     // filter through full text terms
     if let Some(column_index_meta) = &file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
+        // TODO: still have no min_value, max_value
+        // max_len: 5, i want search: taiming
         let valid_terms = fts_terms
             .iter()
             .filter(|term| term.len() <= column_index_meta.max_len)
@@ -734,6 +752,7 @@ async fn inverted_index_search_in_file(
     if !index_terms.is_empty() {
         for (col, index_terms) in index_terms.iter() {
             if let Some(column_index_meta) = file_meta.metas.get(col) {
+                // TODO: still have no min_value, max_value
                 let valid_terms = index_terms
                     .iter()
                     .filter(|term| {

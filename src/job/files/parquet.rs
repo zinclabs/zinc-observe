@@ -1241,7 +1241,9 @@ pub(crate) async fn generate_fst_inverted_index(
     // delete corresponding small .puffin files
     if let Some(file_list) = file_list_to_invalidate {
         for old_parquet_file in file_list {
-            let old_idx_file = convert_parquet_idx_file_name(&old_parquet_file.key);
+            let Some(old_idx_file) = convert_parquet_idx_file_name(&old_parquet_file.key) else {
+                continue;
+            };
             if let Err(e) = storage::del(&[&old_idx_file]).await {
                 log::info!(
                     "[COMPACTOR:JOB] Failed to remove merged fst idx file from disk: {}, {}",
@@ -1264,7 +1266,9 @@ pub(crate) async fn generate_fst_inverted_index(
     //     .await?;
 
     // write fst bytes into disk
-    let idx_file_name = convert_parquet_idx_file_name(parquet_file_name);
+    let Some(idx_file_name) = convert_parquet_idx_file_name(parquet_file_name) else {
+        return Ok(());
+    };
     let caller = if file_list_to_invalidate.is_some() {
         "[COMPACTOR:JOB]"
     } else {

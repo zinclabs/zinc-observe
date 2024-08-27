@@ -79,7 +79,7 @@ pub struct Sql {
     pub index_terms: Vec<(String, Vec<String>)>,
     pub histogram_interval: Option<i64>,
     pub use_inverted_index: bool,
-    pub index_type: String,
+    pub inverted_index_type: String,
 }
 
 impl Sql {
@@ -530,7 +530,13 @@ impl Sql {
         } else {
             checking_inverted_index(&meta, &fts_fields, &index_fields)
         };
-        let index_type = req.index_type.to_string();
+
+        // check index search type
+        let inverted_index_type = if req.index_type.is_empty() {
+            cfg.common.inverted_index_search_format.clone()
+        } else {
+            req.index_type.clone()
+        };
 
         Ok(Sql {
             origin_sql,
@@ -551,7 +557,7 @@ impl Sql {
                 .collect(),
             histogram_interval,
             use_inverted_index,
-            index_type,
+            inverted_index_type,
         })
     }
 

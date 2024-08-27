@@ -1453,6 +1453,15 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check default inverted index search format
+    cfg.common.inverted_index_store_format = cfg.common.inverted_index_store_format.to_lowercase();
+    if cfg.common.inverted_index_store_format.is_empty() {
+        cfg.common.inverted_index_search_format = "parquet".to_string();
+    }
+    if !["both", "parquet", "fst"].contains(&cfg.common.inverted_index_store_format.as_str()) {
+        return Err(anyhow::anyhow!(
+            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of both, parquet, fst."
+        ));
+    }
     if cfg.common.inverted_index_store_format != "both" {
         cfg.common.inverted_index_search_format = cfg.common.inverted_index_store_format.clone();
     }

@@ -79,37 +79,32 @@ pub async fn create_index_reader_from_puffin_bytes(
 }
 
 /// FST inverted index solution has a 1:1 mapping between parquet and idx files.
-/// This is a helper function to convert the file names between the two by changing
-/// both the stream_type and extension parts of the file_name
+/// This is a helper function to convert the paruqet file name to idx file name.
 /// e.g.
 /// from: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
 /// to:   files/default/index/quickstart1/2024/02/16/16/7164299619311026293.puffin
-/// and vice versa
-pub fn convert_parquet_idx_file_name(from: &str) -> String {
+pub fn convert_parquet_idx_file_name(from: &str) -> Option<String> {
     let mut parts: Vec<&str> = from.split('/').collect();
-    let stream_type_index = parts
-        .iter()
-        .position(|part| *part == "logs" || *part == "index")
-        .unwrap();
 
     // Replace the stream_type part
-    parts[stream_type_index] = if parts[stream_type_index] == "logs" {
-        "index"
+    let stream_type_pos = if parts.len() < 4 || !["logs", "metrics", "traces"].contains(&parts[2]) {
+        return None;
     } else {
-        "logs"
+        2
     };
+    parts[stream_type_pos] = "index";
 
     // Replace the file extension
-    let file_name_index = parts.len() - 1;
-    let file_name = parts[file_name_index];
+    let file_name_pos = parts.len() - 1;
+    let file_name = parts[file_name_pos];
     let new_file_name = if file_name.ends_with(FILE_EXT_PARQUET) {
         file_name.replace(FILE_EXT_PARQUET, FILE_EXT_PUFFIN)
     } else {
-        file_name.replace(FILE_EXT_PUFFIN, FILE_EXT_PARQUET)
+        return None;
     };
-    parts[file_name_index] = &new_file_name;
+    parts[file_name_pos] = &new_file_name;
 
-    parts.join("/")
+    Some(parts.join("/"))
 }
 
 #[cfg(test)]
@@ -276,11 +271,32 @@ mod tests {
         let test_cases = vec![
             (
                 "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
-                "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.idx",
+                Some(
+                    "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.puffin"
+                        .to_string(),
+                ),
             ),
             (
-                "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.idx",
-                "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                "files/default/metrics/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                Some(
+                    "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.puffin"
+                        .to_string(),
+                ),
+            ),
+            (
+                "files/default/traces/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                Some(
+                    "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.puffin"
+                        .to_string(),
+                ),
+            ),
+            (
+                "files/default/metadata/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                None,
+            ),
+            (
+                "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.parquet",
+                None,
             ),
         ];
         for (input, expected) in test_cases {
