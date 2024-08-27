@@ -406,6 +406,28 @@ const useStreams = () => {
     store.dispatch("setIsDataIngested", false);
   };
 
+  const deepEqual = (objA: any, objB: any) => {
+    if (
+      typeof objA !== "object" ||
+      typeof objB !== "object" ||
+      objA === null ||
+      objB === null
+    ) {
+      return objA === objB;
+    }
+
+    const keysA = Object.keys(objA);
+    const keysB = Object.keys(objB);
+
+    if (keysA.length !== keysB.length) return false;
+
+    for (const key of keysA) {
+      if (!deepEqual(objA[key], objB[key])) return false;
+    }
+
+    return true;
+  };
+
   const getUpdatedSettings = (previousSettings: any, currentSettings: any) => {
     const attributesToCompare: Array<string> = [
       "partition_keys",
@@ -419,26 +441,48 @@ const useStreams = () => {
     updatedSettings = { ...currentSettings };
 
     attributesToCompare.forEach((attribute) => {
-      const previousArray = Array.isArray(previousSettings[attribute])
-        ? previousSettings[attribute]
-        : [];
-      const currentArray = Array.isArray(currentSettings[attribute])
-        ? currentSettings[attribute]
-        : [];
+      const previousArray =
+        Array.isArray(previousSettings[attribute]) ||
+        typeof previousSettings[attribute] === "object"
+          ? previousSettings[attribute]
+          : [];
+      const currentArray =
+        Array.isArray(currentSettings[attribute]) ||
+        typeof currentSettings[attribute] === "object"
+          ? currentSettings[attribute]
+          : [];
 
-      // Calculate items to add and remove
-      const add = currentArray.filter(
-        (item: any) => !previousArray.includes(item),
-      );
-      const remove = previousArray.filter(
-        (item: any) => !currentArray.includes(item),
-      );
+      let add: any[] = [];
+      let remove: any[] = [];
+
+      if (
+        attribute === "partition_keys" &&
+        typeof previousArray === "object" &&
+        typeof currentArray === "object"
+      ) {
+        add = Object.values(currentArray).filter(
+          (currentItem: any) =>
+            !Object.values(previousArray).some((previousItem: any) =>
+              deepEqual(currentItem, previousItem),
+            ),
+        );
+
+        remove = Object.values(previousArray).filter(
+          (previousItem: any) =>
+            !Object.values(currentArray).some((currentItem: any) =>
+              deepEqual(previousItem, currentItem),
+            ),
+        );
+      } else {
+        // For other attributes, do a simple array comparison
+        add = currentArray.filter((item: any) => !previousArray.includes(item));
+        remove = previousArray.filter(
+          (item: any) => !currentArray.includes(item),
+        );
+      }
 
       // Add the _add and _remove arrays to the result
       updatedSettings[`${attribute}`] = { add: add, remove: remove };
-
-      // Remove the original attribute
-      // delete updatedSettings[attribute];
     });
 
     return updatedSettings;
