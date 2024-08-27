@@ -17,6 +17,7 @@ use std::io::{BufRead, BufReader};
 
 use bytes::Buf;
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use config::utils::inverted_index::convert_parquet_idx_file_name;
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{file_list as infra_file_list, storage};
@@ -47,6 +48,30 @@ pub async fn delete(
         if !e.to_string().to_lowercase().contains("not found") {
             log::error!("[COMPACT] delete files from storage failed: {}", e);
             return Err(e);
+        }
+    }
+
+    // delete related inverted index puffin files
+    let inverted_index_files = files
+        .values()
+        .flatten()
+        .filter_map(|file| convert_parquet_idx_file_name(&file.0))
+        .collect::<Vec<_>>();
+    if !inverted_index_files.is_empty() {
+        if let Err(e) = storage::del(
+            &inverted_index_files
+                .iter()
+                .map(|file| file.as_str())
+                .collect::<Vec<_>>(),
+        )
+        .await
+        {
+            // maybe the file already deleted or there's not related index files,
+            // so we just skip the `not found` error
+            if !e.to_string().to_lowercase().contains("not found") {
+                log::error!("[COMPACT] delete files from storage failed: {}", e);
+                return Err(e);
+            }
         }
     }
 

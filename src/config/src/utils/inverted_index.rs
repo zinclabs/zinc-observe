@@ -13,12 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::borrow::Cow;
+
 use anyhow::{anyhow, ensure, Result};
 use futures::io::Cursor;
 use itertools::Itertools;
 
 use crate::{
-    meta::{inverted_index::reader::IndexReader, puffin::reader::PuffinBytesReader},
+    get_config,
+    meta::{
+        inverted_index::reader::IndexReader, puffin::reader::PuffinBytesReader, stream::StreamType,
+    },
     FILE_EXT_PARQUET, FILE_EXT_PUFFIN, INDEX_MIN_CHAR_LEN,
 };
 
@@ -84,25 +89,35 @@ pub async fn create_index_reader_from_puffin_bytes(
 /// from: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
 /// to:   files/default/index/quickstart1/2024/02/16/16/7164299619311026293.puffin
 pub fn convert_parquet_idx_file_name(from: &str) -> Option<String> {
-    let mut parts: Vec<&str> = from.split('/').collect();
+    let mut parts: Vec<Cow<str>> = from.split('/').map(Cow::Borrowed).collect();
+
+    if parts.len() < 4 {
+        return None;
+    }
 
     // Replace the stream_type part
-    let stream_type_pos = if parts.len() < 4 || !["logs", "metrics", "traces"].contains(&parts[2]) {
-        return None;
-    } else {
-        2
+    let stream_type_pos = 2;
+    let stream_type = match parts[stream_type_pos].as_ref() {
+        "logs" => StreamType::Logs,
+        "metrics" => StreamType::Metrics,
+        "traces" => StreamType::Traces,
+        _ => return None,
     };
-    parts[stream_type_pos] = "index";
+    parts[stream_type_pos] = Cow::Borrowed("index");
+
+    // Replace the stream_name part
+    if !get_config().common.inverted_index_old_format || stream_type != StreamType::Logs {
+        let stream_name_pos = stream_type_pos + 1;
+        parts[stream_name_pos] = Cow::Owned(format!("{}_{}", parts[stream_name_pos], stream_type));
+    }
 
     // Replace the file extension
     let file_name_pos = parts.len() - 1;
-    let file_name = parts[file_name_pos];
-    let new_file_name = if file_name.ends_with(FILE_EXT_PARQUET) {
-        file_name.replace(FILE_EXT_PARQUET, FILE_EXT_PUFFIN)
-    } else {
+    if !parts[file_name_pos].ends_with(FILE_EXT_PARQUET) {
         return None;
-    };
-    parts[file_name_pos] = &new_file_name;
+    }
+    parts[file_name_pos] =
+        Cow::Owned(parts[file_name_pos].replace(FILE_EXT_PARQUET, FILE_EXT_PUFFIN));
 
     Some(parts.join("/"))
 }
@@ -272,21 +287,21 @@ mod tests {
             (
                 "files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet",
                 Some(
-                    "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.puffin"
+                    "files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.puffin"
                         .to_string(),
                 ),
             ),
             (
                 "files/default/metrics/quickstart1/2024/02/16/16/7164299619311026293.parquet",
                 Some(
-                    "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.puffin"
+                    "files/default/index/quickstart1_metrics/2024/02/16/16/7164299619311026293.puffin"
                         .to_string(),
                 ),
             ),
             (
                 "files/default/traces/quickstart1/2024/02/16/16/7164299619311026293.parquet",
                 Some(
-                    "files/default/index/quickstart1/2024/02/16/16/7164299619311026293.puffin"
+                    "files/default/index/quickstart1_traces/2024/02/16/16/7164299619311026293.puffin"
                         .to_string(),
                 ),
             ),
