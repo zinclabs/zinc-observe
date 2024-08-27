@@ -125,12 +125,8 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
     let org_id = org_id.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
 
-    let folder = query
-        .get("folder_id")
-        .and_then(|field| Some(field.to_owned()));
-    let dashboard = query
-        .get("dashboard_id")
-        .and_then(|field| Some(field.to_owned()));
+    let folder = query.get("folder_id").map(|field| field.to_owned());
+    let dashboard = query.get("dashboard_id").map(|field| field.to_owned());
     let destination_less =
         query
             .get("destination_less")

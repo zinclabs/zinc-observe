@@ -205,8 +205,7 @@ pub async fn list(
                         if report
                             .dashboards
                             .iter()
-                            .find(|&x| x.dashboard.eq(dashboard_id))
-                            .is_none()
+                            .any(|x| x.dashboard.eq(dashboard_id))
                         {
                             should_include = false;
                         }
@@ -214,9 +213,9 @@ pub async fn list(
                     if let Some(destination_less) = destination_less.as_ref() {
                         // destination_less = true -> push only if the report is destination-less
                         // destination_less = false -> push only if the report has destinations
-                        if *destination_less && !report.destinations.is_empty() {
-                            should_include = false;
-                        } else if !*destination_less && report.destinations.is_empty() {
+                        if (*destination_less && !report.destinations.is_empty())
+                            || (!*destination_less && report.destinations.is_empty())
+                        {
                             should_include = false;
                         }
                     }
