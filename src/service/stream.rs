@@ -18,7 +18,7 @@ use std::io::Error;
 use actix_web::{http, http::StatusCode, HttpResponse};
 use config::{
     is_local_disk_storage,
-    meta::stream::{StreamSettings, StreamStats, StreamType},
+    meta::stream::{StreamSettings, StreamStats, StreamType, UpdateStreamSettings},
     utils::json,
     SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
@@ -278,6 +278,106 @@ pub async fn save_stream_settings(
         http::StatusCode::OK.into(),
         "".to_string(),
     )))
+}
+
+#[tracing::instrument(skip(update_settings))]
+pub async fn update_stream_settings(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    update_settings: UpdateStreamSettings,
+) -> Result<HttpResponse, Error> {
+    match infra::schema::get_settings(org_id, stream_name, stream_type.clone()).await {
+        Some(mut settings) => {
+            if let Some(max_query_range) = update_settings.max_query_range {
+                settings.max_query_range = max_query_range;
+            }
+
+            if let Some(flatten_level) = update_settings.flatten_level {
+                settings.flatten_level = Some(flatten_level);
+            }
+
+            if let Some(data_retention) = update_settings.data_retention {
+                settings.data_retention = data_retention;
+            }
+
+            if !update_settings.defined_schema_fields.add.is_empty() {
+                settings.defined_schema_fields =
+                    if let Some(mut schema_fields) = settings.defined_schema_fields {
+                        schema_fields.extend(update_settings.defined_schema_fields.add);
+                        Some(schema_fields)
+                    } else {
+                        Some(update_settings.defined_schema_fields.add)
+                    }
+            }
+
+            if !update_settings.defined_schema_fields.remove.is_empty() {
+                if let Some(schema_fields) = settings.defined_schema_fields.as_mut() {
+                    schema_fields.retain(|field| {
+                        !update_settings.defined_schema_fields.remove.contains(field)
+                    });
+                }
+            }
+
+            if !update_settings.bloom_filter_fields.add.is_empty() {
+                settings
+                    .bloom_filter_fields
+                    .extend(update_settings.bloom_filter_fields.add);
+            }
+
+            if !update_settings.bloom_filter_fields.remove.is_empty() {
+                settings
+                    .bloom_filter_fields
+                    .retain(|field| !update_settings.bloom_filter_fields.remove.contains(field));
+            }
+
+            if !update_settings.index_fields.add.is_empty() {
+                settings
+                    .index_fields
+                    .extend(update_settings.index_fields.add);
+            }
+
+            if !update_settings.index_fields.remove.is_empty() {
+                settings
+                    .index_fields
+                    .retain(|field| !update_settings.index_fields.remove.contains(field));
+            }
+
+            if !update_settings.full_text_search_keys.add.is_empty() {
+                settings
+                    .full_text_search_keys
+                    .extend(update_settings.full_text_search_keys.add);
+            }
+
+            if !update_settings.full_text_search_keys.remove.is_empty() {
+                settings
+                    .full_text_search_keys
+                    .retain(|field| !update_settings.full_text_search_keys.remove.contains(field));
+            }
+
+            if !update_settings.partition_keys.add.is_empty() {
+                settings
+                    .partition_keys
+                    .extend(update_settings.partition_keys.add);
+            }
+
+            if !update_settings.partition_keys.remove.is_empty() {
+                settings
+                    .partition_keys
+                    .retain(|field| !update_settings.partition_keys.remove.contains(field));
+            }
+
+            // TODO: What to do if partition time level is intentionally None?
+            if let Some(partition_time_level) = update_settings.partition_time_level {
+                settings.partition_time_level = Some(partition_time_level);
+            }
+            save_stream_settings(org_id, stream_name, stream_type, settings).await
+        }
+        None => Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            format!("stream settings could not be found"),
+        ))),
+    }
 }
 
 #[tracing::instrument]

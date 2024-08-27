@@ -19,7 +19,7 @@ use std::{
 };
 
 use actix_web::{delete, get, http, put, web, HttpRequest, HttpResponse, Responder};
-use config::meta::stream::{StreamSettings, StreamType};
+use config::meta::stream::{StreamSettings, StreamType, UpdateStreamSettings};
 
 use crate::{
     common::{
@@ -93,7 +93,7 @@ async fn schema(
 #[put("/{org_id}/streams/{stream_name}/settings")]
 async fn settings(
     path: web::Path<(String, String)>,
-    settings: web::Json<StreamSettings>,
+    settings: web::Json<UpdateStreamSettings>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, mut stream_name) = path.into_inner();
@@ -128,7 +128,7 @@ async fn settings(
     };
 
     let stream_type = stream_type.unwrap_or(StreamType::Logs);
-    stream::save_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
+    stream::update_stream_settings(&org_id, &stream_name, stream_type, settings.into_inner()).await
 }
 
 /// DeleteStreamFields

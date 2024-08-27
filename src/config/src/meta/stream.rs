@@ -464,6 +464,43 @@ impl std::fmt::Display for PartitionTimeLevel {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct UpdateStreamPartition {
+    pub add: Vec<StreamPartition>,
+    pub remove: Vec<StreamPartition>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct UpdateStringSettingsArray {
+    pub add: Vec<String>,
+    pub remove: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct UpdateStreamSettings {
+    #[serde(skip_serializing_if = "Option::None")]
+    pub partition_time_level: Option<PartitionTimeLevel>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub partition_keys: UpdateStreamPartition,
+    #[serde(default)]
+    pub full_text_search_keys: UpdateStringSettingsArray,
+    #[serde(default)]
+    pub index_fields: UpdateStringSettingsArray,
+    #[serde(default)]
+    pub bloom_filter_fields: UpdateStringSettingsArray,
+    #[serde(skip_serializing_if = "Option::None")]
+    #[serde(default)]
+    pub data_retention: Option<i64>,
+    #[serde(skip_serializing_if = "Option::None")]
+    #[serde(default)]
+    pub flatten_level: Option<i64>,
+    #[serde(default)]
+    pub defined_schema_fields: UpdateStringSettingsArray,
+    #[serde(default)]
+    pub max_query_range: Option<i64>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct StreamSettings {
     #[serde(skip_serializing_if = "Option::None")]
     pub partition_time_level: Option<PartitionTimeLevel>,
