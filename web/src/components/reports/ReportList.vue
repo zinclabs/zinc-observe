@@ -175,7 +175,7 @@ import {
   outlinedPause,
   outlinedPlayArrow,
 } from "@quasar/extras/material-icons-outlined";
-import { useQuasar, type QTableProps } from "quasar";
+import { useQuasar, date, type QTableProps } from "quasar";
 import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
 import { cloneDeep } from "lodash-es";
@@ -239,12 +239,26 @@ const columns: any = ref<QTableProps["columns"]>([
     sortable: true,
   },
   {
+    name: "owner",
+    field: "owner",
+    label: t("alerts.owner"),
+    align: "center",
+    sortable: true,
+    },
+  {
     name: "description",
     field: "description",
     label: t("alerts.description"),
     align: "center",
     sortable: false,
   },
+  {
+    name: "last_triggered_at",
+    field: "lastTriggeredAt",
+    label: t("alerts.lastTriggered"),
+    align: "left",
+    sortable: true,
+    },
   {
     name: "actions",
     field: "actions",
@@ -270,6 +284,7 @@ onBeforeMount(() => {
       reportsTableRows.value = res.data.map((report: any, index: number) => ({
         "#": index + 1,
         ...report,
+        lastTriggeredAt: convertUnixToQuasarFormat(report.lastTriggeredAt),
       }));
       resultTotal.value = reportsTableRows.value.length;
     })
@@ -291,6 +306,13 @@ const changePagination = (val: { label: string; value: any }) => {
   pagination.value.rowsPerPage = val.value;
   reportListTableRef.value?.setPagination(pagination.value);
 };
+function convertUnixToQuasarFormat(unixMicroseconds : any) {
+  if(!unixMicroseconds) return "";
+    const unixSeconds = unixMicroseconds / 1e6;
+    const dateToFormat = new Date(unixSeconds * 1000);
+    const formattedDate = dateToFormat.toISOString();
+    return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+}
 
 const filterData = (rows: any, terms: any) => {
   var filtered = [];

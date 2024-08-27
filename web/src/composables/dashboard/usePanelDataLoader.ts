@@ -25,14 +25,17 @@ import {
 import queryService from "../../services/search";
 import { useStore } from "vuex";
 import { addLabelToPromQlQuery } from "@/utils/query/promQLUtils";
-import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
+import {
+  addLabelsToSQlQuery,
+  changeHistogramInterval,
+} from "@/utils/query/sqlUtils";
 import { getStreamFromQuery } from "@/utils/query/sqlUtils";
 import {
   formatInterval,
   formateRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -57,7 +60,9 @@ export const usePanelDataLoader = (
     data: [] as any,
     loading: false,
     errorDetail: "",
-    metadata: {},
+    metadata: {
+      queries: [] as any,
+    },
     resultMetaData: [] as any,
   });
 
@@ -129,7 +134,7 @@ export const usePanelDataLoader = (
         clearTimeout(timeoutId);
         reject(new Error("Aborted waiting for loading"));
       });
-    })
+    });
   };
 
   // an async function that waits for the panel to become visible
@@ -212,13 +217,16 @@ export const usePanelDataLoader = (
         log("loadData: there are no queries to execute");
         state.loading = false;
         state.data = [];
-        state.metadata = {};
+        state.metadata = {
+          queries: [],
+        };
+        state.resultMetaData = [];
         return;
       }
 
       log("loadData: now waiting for the timeout to avoid frequent updates");
 
-      await waitForTimeout(abortController.signal)
+      await waitForTimeout(abortController.signal);
 
       log("loadData: now waiting for the panel to become visible");
 
@@ -298,11 +306,11 @@ export const usePanelDataLoader = (
         );
 
         // Wait for all query promises to resolve
-        const queryResults = await Promise.all(queryPromises);
+        const queryResults: any = await Promise.all(queryPromises);
         state.loading = false;
         state.data = queryResults.map((it: any) => it?.result);
         state.metadata = {
-          queries: queryResults.map((it) => it?.metadata),
+          queries: queryResults.map((it: any) => it?.metadata),
         };
       } else {
         // Call search API
@@ -310,85 +318,165 @@ export const usePanelDataLoader = (
         // Get the page type from the first query in the panel schema
         const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
 
-        const sqlqueryPromise = panelSchema.value.queries?.map(
-          async (it: any) => {
-            const { query: query1, metadata: metadata1 } = replaceQueryValue(
-              it.query,
-              startISOTimestamp,
-              endISOTimestamp,
-              panelSchema.value.queryType,
-            );
+        // Handle each query sequentially
+        for (const it of panelSchema.value.queries) {
+          const { query: query1, metadata: metadata1 } = replaceQueryValue(
+            it.query,
+            startISOTimestamp,
+            endISOTimestamp,
+            panelSchema.value.queryType,
+          );
 
-            const { query: query2, metadata: metadata2 } =
-              await applyDynamicVariables(query1, panelSchema.value.queryType);
+          const { query: query2, metadata: metadata2 } =
+            await applyDynamicVariables(query1, panelSchema.value.queryType);
 
-            const query = query2;
+          const query = query2;
 
-            const metadata = {
-              originalQuery: it.query,
-              query: query,
-              startTime: startISOTimestamp,
-              endTime: endISOTimestamp,
-              queryType: panelSchema.value.queryType,
-              variables: [...(metadata1 || []), ...(metadata2 || [])],
+          const metadata: any = {
+            originalQuery: it.query,
+            query: query,
+            startTime: startISOTimestamp,
+            endTime: endISOTimestamp,
+            queryType: panelSchema.value.queryType,
+            variables: [...(metadata1 || []), ...(metadata2 || [])],
+          };
+
+          try {
+            // trace context
+            const { traceparent } = generateTraceContext();
+
+            // partition api call
+            const res = await queryService.partition({
+              org_identifier: store.state.selectedOrganization.identifier,
+              query: {
+                sql: query,
+                query_fn: it.vrlFunctionQuery
+                  ? b64EncodeUnicode(it.vrlFunctionQuery)
+                  : null,
+                sql_mode: "full",
+                start_time: startISOTimestamp,
+                end_time: endISOTimestamp,
+                size: -1,
+              },
+              page_type: pageType,
+              traceparent,
+            });
+
+            // partition array from api response
+            const partitionArr = res?.data?.partitions ?? [];
+
+            // histogram_interval from partition api response
+            const histogramInterval = res?.data?.histogram_interval
+              ? `${res?.data?.histogram_interval} seconds`
+              : null;
+
+            // reset old state data
+            state.data = [];
+            state.metadata = {
+              queries: [],
             };
+            state.resultMetaData = [];
 
-            // console.log("Calling search API", query, metadata);
-            return await queryService
-              .search(
-                {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                  query: {
+            // loop on all partitions and call search api for each partition
+            for (const it of panelSchema.value.queries) {
+              const partitionResult: any = [];
+
+              // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
+              state.data.push([]);
+              state.metadata.queries.push({});
+              state.resultMetaData.push({});
+
+              const currentQueryIndex = state.data.length - 1;
+
+              // copy of current abortController
+              // which is used to check whether the current query has been aborted
+              const abortControllerRef = abortController;
+
+              // Update the metadata for the current query
+              Object.assign(
+                state.metadata.queries[currentQueryIndex],
+                metadata,
+              );
+
+              for (const partition of partitionArr) {
+                if (abortControllerRef?.signal?.aborted) {
+                  break;
+                }
+                const searchRes = await queryService.search(
+                  {
+                    org_identifier: store.state.selectedOrganization.identifier,
                     query: {
-                      sql: query,
-                      query_fn: it.vrlFunctionQuery
-                        ? b64EncodeUnicode(it.vrlFunctionQuery)
-                        : null,
-                      sql_mode: "full",
-                      start_time: startISOTimestamp,
-                      end_time: endISOTimestamp,
-                      size: -1,
+                      query: {
+                        sql: await changeHistogramInterval(
+                          query,
+                          histogramInterval,
+                        ),
+                        query_fn: it.vrlFunctionQuery
+                          ? b64EncodeUnicode(it.vrlFunctionQuery)
+                          : null,
+                        sql_mode: "full",
+                        start_time: partition[0],
+                        end_time: partition[1],
+                        size: -1,
+                      },
                     },
+                    page_type: pageType,
                   },
-                  page_type: pageType,
-                },
-                searchType.value ?? "Dashboards",
-              )
-              .then((res) => {
-                // Set searchQueryData.data to the API response hits
-                // state.data = res.data.hits;
-                state.errorDetail = "";
-                // console.log("API response received");
+                  searchType.value ?? "Dashboards",
+                );
 
-                // if there is an error in vrl function, throw error
-                if (res.data.function_error) {
-                  throw new Error(`Function error: ${res.data.function_error}`);
+                // remove past error detail
+                state.errorDetail = "";
+
+                // if there is an function error and which not related to stream range, throw error
+                if (
+                  searchRes.data.function_error &&
+                  searchRes.data.is_partial != true
+                ) {
+                  // abort on unmount
+                  if (abortController) {
+                    // this will stop partition api call
+                    abortController.abort();
+                  }
+
+                  // throw error
+                  throw new Error(
+                    `Function error: ${searchRes.data.function_error}`,
+                  );
                 }
 
-                return {
-                  result: res.data.hits,
-                  metadata: metadata,
-                  resultMetaData: { ...res.data },
-                };
-              })
-              .catch((error) => {
-                // console.log("API error received", error);
+                // if the query is aborted, break the loop
+                if (abortControllerRef?.signal?.aborted) {
+                  break;
+                }
 
-                // Process API error for "sql"
-                processApiError(error, "sql");
-                return { result: null, metadata: metadata };
-              });
-          },
-        );
-        // Wait for all query promises to resolve
-        const sqlqueryResults = await Promise.all(sqlqueryPromise);
+                partitionResult.push(...searchRes.data.hits);
+
+                // Update the state with the new data after each partition API call
+                state.data[currentQueryIndex] = JSON.parse(
+                  JSON.stringify(partitionResult),
+                );
+
+                // update result metadata
+                state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
+              }
+            }
+          } catch (error) {
+            // Process API error for "sql"
+            processApiError(error, "sql");
+            return { result: null, metadata: metadata };
+          } finally {
+            // set loading to false
+            state.loading = false;
+
+            // abort on done
+            if (abortController) {
+              abortController.abort();
+            }
+          }
+        }
+
         state.loading = false;
-        state.data = sqlqueryResults.map((it) => it?.result);
-        state.metadata = {
-          queries: sqlqueryResults.map((it) => it?.metadata),
-        };
-
-        state.resultMetaData = sqlqueryResults.map((it) => it?.resultMetaData);
 
         log("logaData: state.data", state.data);
         log("logaData: state.metadata", state.metadata);
@@ -1035,6 +1123,11 @@ export const usePanelDataLoader = (
 
   // remove intersection observer
   onUnmounted(() => {
+    // abort on unmount
+    if (abortController) {
+      // this will stop partition api call
+      abortController.abort();
+    }
     if (observer) {
       observer.disconnect();
     }

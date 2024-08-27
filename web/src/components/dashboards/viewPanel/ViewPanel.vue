@@ -234,7 +234,7 @@ export default defineComponent({
             // check if the column is histogram
             if (
               column.expr.type === "function" &&
-              column.expr.name === "histogram"
+              column?.expr?.name?.name[0]?.value === "histogram"
             ) {
               const histogramExpr = column.expr;
               if (

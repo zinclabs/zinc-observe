@@ -32,7 +32,7 @@ export const convertPanelData = async (
   chartPanelRef: any,
   hoveredSeriesState: any,
   resultMetaData: any,
-  metadata: any
+  metadata: any,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -63,7 +63,7 @@ export const convertPanelData = async (
             data,
             store,
             chartPanelRef,
-            hoveredSeriesState
+            hoveredSeriesState,
           )),
         };
       } else {
@@ -77,7 +77,7 @@ export const convertPanelData = async (
             chartPanelRef,
             hoveredSeriesState,
             resultMetaData,
-            metadata
+            metadata,
           )),
         };
       }
@@ -101,7 +101,6 @@ export const convertPanelData = async (
       };
     }
     default: {
-      console.log("No Chart Type found, skipping");
       return {};
     }
   }

@@ -347,13 +347,21 @@ export default defineComponent({
     );
 
     // when we get the new metadata from the apis, emit the metadata update
-    watch(metadata, () => {
-      emit("metadata-update", metadata.value);
-    });
+    watch(
+      metadata,
+      () => {
+        emit("metadata-update", metadata.value);
+      },
+      { deep: true },
+    );
 
-    watch(resultMetaData, () => {
-      emit("result-metadata-update", resultMetaData.value);
-    });
+    watch(
+      resultMetaData,
+      () => {
+        emit("result-metadata-update", resultMetaData.value);
+      },
+      { deep: true },
+    );
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(

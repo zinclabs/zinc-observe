@@ -1,0 +1,31 @@
+name: Delete Spam Comments
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+jobs:
+  delete_mediafire_comments:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for Mediafire in comments
+        uses: actions/github-script@v6
+        with:
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          # Set the owner, so the token can be used in all repositories
+          owner: ${{ github.repository_owner }}
+          script: |
+            const commentBody = context.payload.comment.body.toLowerCase();
+            const commentId = context.payload.comment.id;
+            const issueNumber = context.payload.issue.number;
+
+            if (commentBody.includes('mediafire')) {
+              console.log(`Deleting comment #${commentId} on issue #${issueNumber}`);
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: commentId
+              });
+            } else {
+              console.log('No Mediafire link found, no action needed.');
+            }

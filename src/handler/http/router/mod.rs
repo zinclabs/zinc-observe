@@ -357,6 +357,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(organization::es::org_data_stream_create)
             .service(stream::schema)
             .service(stream::settings)
+            .service(stream::update_settings)
             .service(stream::delete_fields)
             .service(stream::delete)
             .service(stream::list)

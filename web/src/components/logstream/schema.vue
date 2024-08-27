@@ -24,7 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="close" />
+          <q-btn v-close-popup="true" round
+flat icon="close" />
         </div>
       </div>
     </q-card-section>
@@ -45,7 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           No data available.
         </div>
-        <div v-else class="indexDetailsContainer" style="height: 100vh">
+        <div v-else
+class="indexDetailsContainer" style="height: 100vh">
           <div class="title" data-test="schema-stream-title-text">
             {{ indexData.name }}
           </div>
@@ -437,6 +439,7 @@ export default defineComponent({
     const router = useRouter();
     const newSchemaFields = ref([]);
     const activeTab = ref("allFields");
+    let previousSchemaVersion: any = null;
 
     const selectedFields = ref([]);
 
@@ -472,7 +475,7 @@ export default defineComponent({
       { label: "Hash partition (64 Buckets)", value: "hashPartition_64" },
       { label: "Hash partition (128 Buckets)", value: "hashPartition_128" },
     ];
-    const { getStream } = useStreams();
+    const { getStream, getUpdatedSettings } = useStreams();
 
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
@@ -583,6 +586,12 @@ export default defineComponent({
 
     const setSchema = (streamResponse) => {
       const schemaMapping = new Set([]);
+      if (streamResponse?.settings) {
+        // console.log("streamResponse:", streamResponse);
+        previousSchemaVersion = JSON.parse(
+          JSON.stringify(streamResponse.settings),
+        );
+      }
       if (!streamResponse.schema?.length) {
         streamResponse.schema = [];
         if (streamResponse.settings.defined_schema_fields?.length)
@@ -771,12 +780,16 @@ export default defineComponent({
 
       newSchemaFields.value = [];
 
+      let modifiedSettings = getUpdatedSettings(
+        previousSchemaVersion,
+        settings,
+      );
       await streamService
         .updateSettings(
           store.state.selectedOrganization.identifier,
           indexData.value.name,
           indexData.value.stream_type,
-          settings,
+          modifiedSettings,
         )
         .then(async (res) => {
           await getStream(

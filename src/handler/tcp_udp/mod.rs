@@ -59,7 +59,6 @@ pub async fn udp_server(socket: UdpSocket) {
 pub async fn tcp_server(listener: TcpListener) {
     let sender = BROADCASTER.read().await;
     let mut tcp_receiver_rx = sender.subscribe();
-    let mut buf_tcp = vec![0u8; 1460];
     loop {
         let (mut stream, _) = match listener.accept().await {
             Ok(val) => val,
@@ -68,17 +67,29 @@ pub async fn tcp_server(listener: TcpListener) {
                 continue;
             }
         };
-
-        match stream.peer_addr() {
-            Ok(addr) => {
-                let len = match stream.read(&mut buf_tcp).await {
-                    Ok(val) => val,
+        tokio::task::spawn(async move {
+            let mut buf_tcp = vec![0u8; 1460];
+            let peer_addr = match stream.peer_addr() {
+                Ok(addr) => addr,
+                Err(e) => {
+                    log::error!("Error while reading peer_addr from TCP stream: {}", e);
+                    return;
+                }
+            };
+            log::info!("spawned new syslog tcp receiver for peer {}", peer_addr);
+            loop {
+                let n = match stream.read(&mut buf_tcp).await {
+                    Ok(0) => {
+                        log::info!("received 0 bytes, closing for peer {}", peer_addr);
+                        break;
+                    }
+                    Ok(n) => n,
                     Err(e) => {
                         log::error!("Error while reading from TCP stream: {}", e);
-                        continue;
+                        break;
                     }
                 };
-                let message = BytesMut::from(&buf_tcp[..len]);
+                let message = BytesMut::from(&buf_tcp[..n]);
                 let input_str = match String::from_utf8(message.to_vec()) {
                     Ok(val) => val,
                     Err(e) => {
@@ -87,19 +98,15 @@ pub async fn tcp_server(listener: TcpListener) {
                     }
                 };
                 if input_str != STOP_SRV {
-                    let _ = syslog::ingest(&input_str, addr).await;
+                    let _ = syslog::ingest(&input_str, peer_addr).await;
                 }
-                if let Ok(val) = tcp_receiver_rx.try_recv() {
-                    if !val {
-                        log::warn!("TCP server - received the stop signal, exiting.");
-                        drop(listener);
-                        break;
-                    }
-                };
             }
-            Err(e) => {
-                log::error!("Error while writing to TCP stream: {}", e);
-                continue;
+        });
+        if let Ok(val) = tcp_receiver_rx.try_recv() {
+            if !val {
+                log::warn!("TCP server - received the stop signal, exiting.");
+                drop(listener);
+                break;
             }
         };
     }

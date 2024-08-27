@@ -750,6 +750,7 @@
     "header": "Alerts",
     "add": "Add alert",
     "edit": "Edit",
+    "clone": "Clone alert",
     "search": "Search alert",
     "name": "Name",
     "save": "Save",
@@ -791,7 +792,9 @@
     "groupBy": "Group by",
     "row": "Row Template",
     "preview": "Preview",
-    "crontitle": "Enable Cron"
+    "crontitle": "Enable Cron",
+    "lastTriggered":"Last Triggered At",
+    "owner": "Owner"
   },
   "alert_templates": {
     "header": "Templates",

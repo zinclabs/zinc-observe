@@ -39,6 +39,7 @@ use crate::{common::meta, handler::http::request};
         request::stream::list,
         request::stream::schema,
         request::stream::settings,
+        request::stream::update_settings,
         request::stream::delete_fields,
         request::stream::delete,
         request::logs::ingest::bulk,

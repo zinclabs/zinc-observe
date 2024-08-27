@@ -959,7 +959,7 @@ export default defineComponent({
     },
     changeFunctionName(value) {
       // alert(value)
-      console.log(value);
+      // console.log(value);
     },
     createNewValue(inputValue, doneFn) {
       // Call the doneFn with the new value
@@ -997,7 +997,6 @@ export default defineComponent({
         return;
       }
       // const queryReq = this.buildSearch();
-      // console.log(this.searchObj.data.customDownloadQueryObj)
       this.searchObj.data.customDownloadQueryObj.query.from = initNumber;
       this.searchObj.data.customDownloadQueryObj.query.size =
         this.downloadCustomRange;
@@ -1626,7 +1625,6 @@ export default defineComponent({
     const resetEditorLayout = () => {
       setTimeout(() => {
         queryEditorRef?.value?.resetEditorLayout();
-        console.log("resetEditorLayout", fnEditorRef.value);
         fnEditorRef?.value?.resetEditorLayout();
       }, 100);
     };

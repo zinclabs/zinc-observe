@@ -54,6 +54,19 @@ const stream = {
     }
     return http().put(url, data);
   },
+  createSettings: (
+    org_identifier: string,
+    stream_name: string,
+    type: string,
+    data: any
+  ) => {
+    let url = `/api/${org_identifier}/streams/${stream_name}/settings`;
+
+    if (type != "") {
+      url += "?type=" + type;
+    }
+    return http().post(url, data);
+  },
 
   fieldValues: ({
     org_identifier,

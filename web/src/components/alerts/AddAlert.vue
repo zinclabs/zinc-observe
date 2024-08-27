@@ -750,6 +750,7 @@ export default defineComponent({
       isFetchingStreams.value = true;
       return getStreams(formData.value.stream_type, false)
         .then((res: any) => {
+
           streams.value[formData.value.stream_type] = res.list;
           schemaList.value = res.list;
           indexOptions.value = res.list.map((data: any) => {

@@ -35,7 +35,7 @@ const useStreams = () => {
   const getStreams = async (
     _streamName: string = "",
     schema: boolean,
-    notify: boolean = true
+    notify: boolean = true,
   ) => {
     return new Promise(async (resolve, reject) => {
       const streamName = _streamName || "all";
@@ -47,7 +47,6 @@ const useStreams = () => {
       if (getStreamsPromise.value) {
         await getStreamsPromise.value;
       }
-      console.log("_streamName", _streamName);
       try {
         if (!isStreamFetched(streamName || "all")) {
           // Added adddtional check to fetch all streamstype separately if streamName is all
@@ -72,7 +71,7 @@ const useStreams = () => {
             ];
 
             const streamsToFetch = streamList.filter(
-              (_stream) => !streams[_stream]
+              (_stream) => !streams[_stream],
             );
 
             getStreamsPromise.value = Promise.allSettled(
@@ -80,9 +79,9 @@ const useStreams = () => {
                 StreamService.nameList(
                   store.state.selectedOrganization.identifier,
                   streamType,
-                  schema
-                )
-              )
+                  schema,
+                ),
+              ),
             );
 
             getStreamsPromise.value
@@ -94,7 +93,7 @@ const useStreams = () => {
                 });
 
                 areAllStreamsFetched.value = streamList.every(
-                  (stream) => !!streams[stream]
+                  (stream) => !!streams[stream],
                 );
 
                 getStreamsPromise.value = null;
@@ -111,7 +110,7 @@ const useStreams = () => {
             getStreamsPromise.value = StreamService.nameList(
               store.state.selectedOrganization.identifier,
               _streamName,
-              schema
+              schema,
             );
             getStreamsPromise.value
               .then((res: any) => {
@@ -160,14 +159,13 @@ const useStreams = () => {
     streamName: string,
     streamType: string,
     schema: boolean,
-    force: boolean = false
+    force: boolean = false,
   ): Promise<any> => {
     return new Promise(async (resolve, reject) => {
       if (!streamName || !streamType) {
         resolve(null);
       }
 
-      console.log("getStream", streamName);
       // Wait for the streams to be fetched if they are being fetched
       if (getStreamsPromise.value) {
         await getStreamsPromise.value;
@@ -188,7 +186,7 @@ const useStreams = () => {
           streams[streamType].list.length &&
           Object.prototype.hasOwnProperty.call(
             streamsIndexMapping[streamType],
-            streamName
+            streamName,
           )
         ) {
           const streamIndex = streamsIndexMapping[streamType][streamName];
@@ -199,7 +197,7 @@ const useStreams = () => {
               const _stream: any = await StreamService.schema(
                 store.state.selectedOrganization.identifier,
                 streamName,
-                streamType
+                streamType,
               );
               streams[streamType].list[streamIndex] = _stream.data;
             } catch (err) {
@@ -228,7 +226,11 @@ const useStreams = () => {
   };
 
   const getMultiStreams = async (
-    _streams: Array<{ streamName: string; streamType: string; schema: boolean }>
+    _streams: Array<{
+      streamName: string;
+      streamType: string;
+      schema: boolean;
+    }>,
   ): Promise<any[]> => {
     return Promise.all(
       _streams.map(async ({ streamName, streamType, schema }) => {
@@ -244,7 +246,7 @@ const useStreams = () => {
             streams[streamType].list.length &&
             Object.prototype.hasOwnProperty.call(
               streamsIndexMapping[streamType],
-              streamName
+              streamName,
             )
           ) {
             const streamIndex = streamsIndexMapping[streamType][streamName];
@@ -255,7 +257,7 @@ const useStreams = () => {
               const fetchedStream = await StreamService.schema(
                 store.state.selectedOrganization.identifier,
                 streamName,
-                streamType
+                streamType,
               );
 
               streams[streamType].list[streamIndex] = fetchedStream.data;
@@ -270,7 +272,7 @@ const useStreams = () => {
           // Use reject in Promise.all to catch errors specifically.
           throw new Error(e.message);
         }
-      })
+      }),
     );
   };
 
@@ -352,7 +354,7 @@ const useStreams = () => {
     if (
       Object.prototype.hasOwnProperty.call(
         streamsIndexMapping[streamType],
-        streamName
+        streamName,
       )
     ) {
       const indexToRemove = streamsIndexMapping[streamType][streamName];
@@ -404,6 +406,88 @@ const useStreams = () => {
     store.dispatch("setIsDataIngested", false);
   };
 
+  const deepEqual = (objA: any, objB: any) => {
+    if (
+      typeof objA !== "object" ||
+      typeof objB !== "object" ||
+      objA === null ||
+      objB === null
+    ) {
+      return objA === objB;
+    }
+
+    const keysA = Object.keys(objA);
+    const keysB = Object.keys(objB);
+
+    if (keysA.length !== keysB.length) return false;
+
+    for (const key of keysA) {
+      if (!deepEqual(objA[key], objB[key])) return false;
+    }
+
+    return true;
+  };
+
+  const getUpdatedSettings = (previousSettings: any, currentSettings: any) => {
+    const attributesToCompare: Array<string> = [
+      "partition_keys",
+      "index_fields",
+      "full_text_search_keys",
+      "bloom_filter_fields",
+      "defined_schema_fields",
+    ];
+
+    let updatedSettings: any = {};
+    updatedSettings = { ...currentSettings };
+
+    attributesToCompare.forEach((attribute) => {
+      const previousArray =
+        Array.isArray(previousSettings[attribute]) ||
+        typeof previousSettings[attribute] === "object"
+          ? previousSettings[attribute]
+          : [];
+      const currentArray =
+        Array.isArray(currentSettings[attribute]) ||
+        typeof currentSettings[attribute] === "object"
+          ? currentSettings[attribute]
+          : [];
+
+      let add: any[] = [];
+      let remove: any[] = [];
+
+      if (
+        attribute === "partition_keys" &&
+        typeof previousArray === "object" &&
+        typeof currentArray === "object"
+      ) {
+        add = Object.values(currentArray).filter(
+          (currentItem: any) =>
+            !Object.values(previousArray).some((previousItem: any) =>
+              deepEqual(currentItem, previousItem),
+            ),
+        );
+
+        remove = Object.values(previousArray).filter(
+          (previousItem: any) =>
+            !Object.values(currentArray).some((currentItem: any) =>
+              deepEqual(previousItem, currentItem),
+            ),
+        );
+      } else {
+        // For other attributes, do a simple array comparison
+        add = currentArray.filter((item: any) => !previousArray.includes(item));
+        remove = previousArray.filter(
+          (item: any) => !currentArray.includes(item),
+        );
+      }
+
+      // Add the _add and _remove arrays to the result
+      updatedSettings[`${attribute}`] = { add: add, remove: remove };
+    });
+
+    return updatedSettings;
+  };
+
   return {
     getStreams,
     getStream,
@@ -412,6 +496,7 @@ const useStreams = () => {
     resetStreams,
     removeStream,
     addStream,
+    getUpdatedSettings,
   };
 };
 
