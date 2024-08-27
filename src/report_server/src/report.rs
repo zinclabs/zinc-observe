@@ -349,13 +349,11 @@ pub async fn generate_report(
     // Convert the page into pdf
     let pdf_data = match report_type {
         ReportType::PDF => {
-            let pdf = page
-                .pdf(PrintToPdfParams {
-                    landscape: Some(true),
-                    ..Default::default()
-                })
-                .await?;
-            pdf
+            page.pdf(PrintToPdfParams {
+                landscape: Some(true),
+                ..Default::default()
+            })
+            .await?
         }
         // No need to capture pdf when report type is cache
         ReportType::Cache => vec![],
