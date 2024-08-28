@@ -173,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="loading"
           @row-click="onRowClick"
           data-test="dashboard-table"
+          dense
         >
           <!-- if data not available show nodata component -->
           <template #no-data>
