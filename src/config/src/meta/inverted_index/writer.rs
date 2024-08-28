@@ -72,8 +72,8 @@ impl ColumnIndexer {
     /// writes constructed fst_map bytes into buffer. Return finalized column_index_meta data
     pub fn write(mut self, writer: &mut Vec<u8>) -> Result<ColumnIndexMeta> {
         // Get the min and max value from the sorter, and update the meta
-        let min_val = self.sorter.keys().next().map(Bytes::clone);
-        let max_val = self.sorter.keys().next_back().map(Bytes::clone);
+        let min_val = self.sorter.keys().next().cloned();
+        let max_val = self.sorter.keys().next_back().cloned();
         // 1. write bitmaps to writer
         for (value, bitmap) in std::mem::take(&mut self.sorter) {
             self.append_value(value, bitmap, writer)?;

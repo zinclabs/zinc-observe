@@ -578,7 +578,7 @@ async fn cache_files<'a>(
 /// If the query not find corresponding index file, the file will *not* be filtered out.
 async fn filter_file_list_by_inverted_index(
     trace_id: &str,
-    file_list: &mut Vec<FileKey>,
+    file_list: &mut [FileKey],
     sql: &Sql,
     stream_type: StreamType,
 ) -> Result<usize, Error> {
@@ -586,10 +586,10 @@ async fn filter_file_list_by_inverted_index(
     // Cache the corresponding Index files
     let cfg = get_config();
     let mut scan_stats = ScanStats::new();
-    let mut file_list_map = file_list.into_iter().into_group_map_by(|f| f.key.clone());
+    let mut file_list_map = file_list.iter_mut().into_group_map_by(|f| f.key.clone());
     let index_file_names = file_list_map
         .keys()
-        .filter_map(|f| convert_parquet_idx_file_name(&f))
+        .filter_map(|f| convert_parquet_idx_file_name(f))
         .collect_vec();
     let (cache_type, _, (mem_cached_files, disk_cached_files)) = cache_files(
         trace_id,
