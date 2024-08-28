@@ -29,7 +29,7 @@ use config::{
         },
         schema_ext::SchemaExt,
     },
-    INDEX_FIELD_NAME_FOR_ALL,
+    FILE_EXT_PARQUET, INDEX_FIELD_NAME_FOR_ALL,
 };
 use fst::{automaton::Str, IntoStreamer, Streamer};
 use futures::future::try_join_all;
@@ -139,14 +139,15 @@ pub async fn search(
         && (sql.inverted_index_type == "fst" || sql.inverted_index_type == "both")
         && (!sql.fts_terms.is_empty() || !sql.index_terms.is_empty());
     if use_inverted_index {
-        // TODO: need to log search on FST took time
-        filter_file_list_by_inverted_index(trace_id, &mut files, &sql, stream_type).await?;
+        let idx_took =
+            filter_file_list_by_inverted_index(trace_id, &mut files, &sql, stream_type).await?;
         log::info!(
-            "[trace_id {trace_id}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num to {}",
+            "[trace_id {trace_id}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num to {} in {}ms",
             &sql.org_id,
             &stream_type,
             &sql.stream_name,
             files.len(),
+            idx_took
         );
     }
 
@@ -500,10 +501,19 @@ async fn cache_files<'a>(
                     }
                     _ => (None, false, false),
                 };
-                // TODO: we can't delete index file
+                // In case where the parquet file is not found or has no data, we assume that it
+                // must have been deleted by some external entity, and hence we
+                // should remove the entry from file_list table.
+                //
+                // Caching Index files is a little different from caching parquet filesd as index
+                // files are not present in the file_list table as of now
+                // (TODO: part of phase 2).
                 let file_name = if let Some(e) = ret.0 {
-                    if e.to_string().to_lowercase().contains("not found")
-                        || e.to_string().to_lowercase().contains("data size is zero")
+                    if (e.to_string().to_lowercase().contains("not found")
+                        || e.to_string().to_lowercase().contains("data size is zero"))
+                    // only proceed if the file_name has parquet extension
+                    // FIXME: Revisit, after phase 2 of FST Index
+                        && file_name.ends_with(FILE_EXT_PARQUET)
                     {
                         // delete file from file list
                         log::warn!("found invalid file: {}", file_name);
@@ -571,16 +581,26 @@ async fn filter_file_list_by_inverted_index(
     file_list: &mut Vec<FileKey>,
     sql: &Sql,
     stream_type: StreamType,
-) -> Result<(), Error> {
+) -> Result<usize, Error> {
+    let start = std::time::Instant::now();
     // Cache the corresponding Index files
+    let cfg = get_config();
     let mut scan_stats = ScanStats::new();
-    let index_file_names = file_list
-        .iter()
-        .filter_map(|f| convert_parquet_idx_file_name(&f.key))
+    let mut file_list_map = file_list.into_iter().into_group_map_by(|f| f.key.clone());
+    let index_file_names = file_list_map
+        .keys()
+        .filter_map(|f| convert_parquet_idx_file_name(&f))
         .collect_vec();
-    let index_file_names = index_file_names.iter().map(|f| f.as_str()).collect_vec();
-    let (cache_type, _, (mem_cached_files, disk_cached_files)) =
-        cache_files(trace_id, index_file_names.as_ref(), &scan_stats).await?;
+    let (cache_type, _, (mem_cached_files, disk_cached_files)) = cache_files(
+        trace_id,
+        index_file_names
+            .iter()
+            .map(|f| f.as_str())
+            .collect_vec()
+            .as_ref(),
+        &scan_stats,
+    )
+    .await?;
 
     scan_stats.querier_memory_cached_files = mem_cached_files as i64;
     scan_stats.querier_disk_cached_files = disk_cached_files as i64;
@@ -611,18 +631,28 @@ async fn filter_file_list_by_inverted_index(
             .collect_vec(),
     );
     let index_terms = Arc::new(sql.index_terms.clone());
-    // we can be iterating over a lot of files
-    // TODO: add a limit to the number of files we can process in parallel
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
     let mut tasks = Vec::new();
-    for file in file_list.iter() {
+    for file in file_list_map.keys() {
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
-        let file_name = file.key.clone();
+        let file_name = file.clone();
+        let trace_id_clone = trace_id.to_string();
+        let permit = semaphore.clone().acquire_owned().await.unwrap();
         // Spawn a task for each file, wherein full text search and
-        // index search queries are executed
+        // secondary index search queries are executed
         let task = tokio::task::spawn(async move {
-            inverted_index_search_in_file(&file_name, full_text_term_clone, index_terms_clone).await
+            let res = inverted_index_search_in_file(
+                trace_id_clone.as_str(),
+                &file_name,
+                full_text_term_clone,
+                index_terms_clone,
+            )
+            .await;
+            drop(permit);
+            res
         });
+
         tasks.push(task)
     }
 
@@ -635,26 +665,26 @@ async fn filter_file_list_by_inverted_index(
             Ok((file_name, bitvec)) => {
                 if let Some(res) = bitvec {
                     // Replace the segment IDs in the existing `FileKey` with the new found segments
-                    // TODO: need a hashmap to avoid this O(n) operation
-                    file_list
-                        .iter_mut()
-                        .find(|f| f.key == file_name)
-                        // File should exist in the file list
+                    let file = file_list_map
+                        .get_mut(&file_name)
                         .unwrap()
-                        .segment_ids = Some(res.clone().into_vec());
+                        .first_mut()
+                        // we expect each file name has atleast 1 file
+                        .unwrap();
+                    file.segment_ids = Some(res.clone().into_vec());
                     log::info!(
-                        "Final bitmap for fts_terms {:?} and index_terms: {:?} is {:?}",
-                        full_text_terms,
+                        "[trace_id {trace_id}] search->storage: Final bitmap for fts_terms {:?} and index_terms: {:?} is {:?}",
+                        *full_text_terms,
                         index_terms,
                         res.iter_ones().collect_vec()
                     );
                 } else {
-                    // TODO: some parquet file maybe have no index file, need to filter out
+                    // if the bitmap is empty then we remove the file from the list
                     log::info!(
                         "[trace_id {trace_id}] search->storage: no match found in index for file {}",
                         file_name
                     );
-                    file_list.retain(|f| f.key != file_name)
+                    file_list_map.remove(&file_name);
                 }
             }
             Err(e) => {
@@ -666,28 +696,46 @@ async fn filter_file_list_by_inverted_index(
             }
         }
     }
-    Ok(())
+    Ok(start.elapsed().as_millis() as usize)
+}
+
+/// Fetches the file from cache if it exists, otherwise fetch from storage
+async fn fetch_file(file_name: &str) -> anyhow::Result<Vec<u8>> {
+    // first get from meory cache
+    if file_data::memory::exist(file_name).await {
+        return file_data::memory::get(file_name, None)
+            .await
+            .map(|bytes| bytes.to_vec())
+            .ok_or(anyhow::anyhow!("memory cache get failed"));
+    } else if file_data::disk::exist(file_name).await {
+        // check disk next
+        return file_data::disk::get(file_name, None)
+            .await
+            .map(|bytes| bytes.to_vec())
+            .ok_or(anyhow::anyhow!("disk cache get failed"));
+    } else {
+        // finally get from storage
+        storage::get(file_name).await.map(|bytes| bytes.to_vec())
+    }
 }
 
 async fn inverted_index_search_in_file(
+    trace_id: &str,
     parquet_file_name: &str,
     fts_terms: Arc<Vec<String>>,
     index_terms: Arc<Vec<(String, Vec<String>)>>,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
     let Some(index_file_name) = convert_parquet_idx_file_name(parquet_file_name) else {
         return Err(anyhow::anyhow!(
-            "Unable to convert parquet file name {} to index file name",
+            "[trace_id {trace_id}] search->storage: Unable to convert parquet file name {} to index file name",
             parquet_file_name
         ));
     };
-    // TODO: already cached in cache_files, should not download again
-    // first get from meory cache
-    // second get from disk cache
-    // at the end, still not data, get from storage
-    let compressed_index_blob = match storage::get(&index_file_name).await {
+    let compressed_index_blob = match fetch_file(&index_file_name).await {
         Err(e) => {
             log::warn!(
-                "Unable to load corresponding FST index file for parquet file {}, err: {}",
+                "[trace_id {trace_id}] search->storage: Unable to load corresponding FST index
+    file for parquet file {}, err: {}",
                 parquet_file_name,
                 e
             );
@@ -707,7 +755,10 @@ async fn inverted_index_search_in_file(
         // max_len: 5, i want search: taiming
         let valid_terms = fts_terms
             .iter()
+            // We do not check the min length here since smaller term can exist in the index for Full Text Search
             .filter(|term| term.len() <= column_index_meta.max_len)
+            // Filter out the terms which are outside the min and max value of the column
+            .filter(|term| column_index_meta.min_val.as_slice() <= term.as_bytes() && term.as_bytes() <= column_index_meta.max_val.as_slice())
             .collect::<Vec<_>>();
         if !valid_terms.is_empty() {
             let fst_offset =
@@ -716,7 +767,7 @@ async fn inverted_index_search_in_file(
             match index_reader.fst(fst_offset, fst_size).await {
                 Err(e) => {
                     log::warn!(
-                        "Error loading FST map from index file {} for column {} with error {}. Keep the file",
+                        "[trace_id {trace_id}] search->storage: Error loading FST map from index file {} for column {} with error {}. Keep the file",
                         index_file_name,
                         INDEX_FIELD_NAME_FOR_ALL,
                         e.to_string()
@@ -752,13 +803,14 @@ async fn inverted_index_search_in_file(
     if !index_terms.is_empty() {
         for (col, index_terms) in index_terms.iter() {
             if let Some(column_index_meta) = file_meta.metas.get(col) {
-                // TODO: still have no min_value, max_value
                 let valid_terms = index_terms
                     .iter()
                     .filter(|term| {
                         term.len() >= column_index_meta.min_len
                             && term.len() <= column_index_meta.max_len
                     })
+                    // Filter out the terms which are outside the min and max value of the column
+                    .filter(|term| column_index_meta.min_val.as_slice() <= term.as_bytes() && term.as_bytes() <= column_index_meta.max_val.as_slice())
                     .collect::<Vec<_>>();
                 if !valid_terms.is_empty() {
                     let fst_offset = column_index_meta.base_offset
@@ -767,7 +819,7 @@ async fn inverted_index_search_in_file(
                     match index_reader.fst(fst_offset, fst_size).await {
                         Err(e) => {
                             log::warn!(
-                                "Error loading FST map from index file {} for column {} with error {}. Keep the file",
+                                "[trace_id {trace_id}] search->storage: Error loading FST map from index file {} for column {} with error {}. Keep the file",
                                 index_file_name,
                                 col,
                                 e.to_string()

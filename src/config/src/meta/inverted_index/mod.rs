@@ -78,6 +78,12 @@ pub struct ColumnIndexMeta {
     // the maximum term length indexed in this column
     #[serde(default)]
     pub max_len: usize,
+    // the minimum value (alphabetically) indexed in this column.
+    #[serde(default)]
+    pub min_val: Bytes,
+    // the maximum value (alphabetically) indexed in this column.
+    #[serde(default)]
+    pub max_val: Bytes,
 }
 
 const fn default_min_len() -> usize {

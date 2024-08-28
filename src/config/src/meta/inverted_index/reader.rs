@@ -192,3 +192,56 @@ impl<'a> fst::automaton::Automaton for Contains<'a> {
         None
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use super::*;
+    #[test]
+    fn test_index_reader_validate_empty_meta() {
+        let index_file_metas = IndexFileMetas {
+            metas: HashMap::new(),
+        };
+        let index_file_metas_size = 0;
+        let end_offset = 0;
+        let result = IndexReader::<Vec<u8>>::validate_meta(
+            &index_file_metas,
+            index_file_metas_size,
+            end_offset,
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_index_reader_validate_meta() {
+        let mut metas = HashMap::new();
+        metas.insert(
+            "col1".to_string(),
+            ColumnIndexMeta {
+                base_offset: 0,
+                index_size: 10,
+                relative_fst_offset: 10,
+                ..Default::default()
+            },
+        );
+        metas.insert(
+            "col2".to_string(),
+            ColumnIndexMeta {
+                base_offset: 10,
+                index_size: 10,
+                relative_fst_offset: 10,
+                ..Default::default()
+            },
+        );
+        let index_file_metas = IndexFileMetas { metas };
+        let index_file_metas_size = 0;
+        let end_offset = 30;
+        let result = IndexReader::<Vec<u8>>::validate_meta(
+            &index_file_metas,
+            index_file_metas_size,
+            end_offset,
+        );
+        assert!(result.is_ok());
+    }
+}

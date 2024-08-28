@@ -71,6 +71,9 @@ impl ColumnIndexer {
     /// Appends all inserted value-bitmap pairs into buffer and constructs fst_map and
     /// writes constructed fst_map bytes into buffer. Return finalized column_index_meta data
     pub fn write(mut self, writer: &mut Vec<u8>) -> Result<ColumnIndexMeta> {
+        // Get the min and max value from the sorter, and update the meta
+        let min_val = self.sorter.keys().next().map(Bytes::clone);
+        let max_val = self.sorter.keys().next_back().map(Bytes::clone);
         // 1. write bitmaps to writer
         for (value, bitmap) in std::mem::take(&mut self.sorter) {
             self.append_value(value, bitmap, writer)?;
@@ -84,6 +87,8 @@ impl ColumnIndexer {
         self.meta.relative_fst_offset = self.meta.index_size as _;
         self.meta.fst_size = fst_bytes.len() as _;
         self.meta.index_size += self.meta.fst_size as u64;
+        self.meta.min_val = min_val.unwrap_or_default();
+        self.meta.max_val = max_val.unwrap_or_default();
 
         Ok(self.meta)
     }
@@ -117,5 +122,36 @@ impl ColumnIndexer {
 impl Default for ColumnIndexer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn check_col_indexer_min_max() {
+        let mut indexer = super::ColumnIndexer::new();
+        indexer.meta.min_len = std::usize::MAX;
+        indexer.push("a".as_bytes(), 0, 1);
+        indexer.push("b".as_bytes(), 0, 1);
+        indexer.push("c".as_bytes(), 0, 1);
+        indexer.push("a".as_bytes(), 1, 1);
+        indexer.push("b".as_bytes(), 1, 1);
+        indexer.push("c".as_bytes(), 1, 1);
+        indexer.push("a".as_bytes(), 2, 1);
+        indexer.push("b".as_bytes(), 2, 1);
+        indexer.push("c".as_bytes(), 2, 1);
+
+        let mut writer = Vec::new();
+        let meta = indexer.write(&mut writer).unwrap();
+        assert_eq!(meta.min_len, 1);
+        assert_eq!(meta.max_len, 1);
+        assert_eq!(meta.min_val, "a".as_bytes());
+        assert_eq!(meta.max_val, "c".as_bytes());
+    }
+
+    #[test]
+    fn check_col_indexer_empty() {
+        let indexer = super::ColumnIndexer::new();
+        assert!(indexer.is_empty());
     }
 }
