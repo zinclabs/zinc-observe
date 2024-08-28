@@ -20,7 +20,6 @@ use futures::io::Cursor;
 use itertools::Itertools;
 
 use crate::{
-    get_config,
     meta::{
         inverted_index::reader::IndexReader, puffin::reader::PuffinBytesReader, stream::StreamType,
     },
@@ -87,7 +86,7 @@ pub async fn create_index_reader_from_puffin_bytes(
 /// This is a helper function to convert the paruqet file name to idx file name.
 /// e.g.
 /// from: files/default/logs/quickstart1/2024/02/16/16/7164299619311026293.parquet
-/// to:   files/default/index/quickstart1/2024/02/16/16/7164299619311026293.puffin
+/// to:   files/default/index/quickstart1_logs/2024/02/16/16/7164299619311026293.puffin
 pub fn convert_parquet_idx_file_name(from: &str) -> Option<String> {
     let mut parts: Vec<Cow<str>> = from.split('/').map(Cow::Borrowed).collect();
 
@@ -106,10 +105,8 @@ pub fn convert_parquet_idx_file_name(from: &str) -> Option<String> {
     parts[stream_type_pos] = Cow::Borrowed("index");
 
     // Replace the stream_name part
-    if !get_config().common.inverted_index_old_format || stream_type != StreamType::Logs {
-        let stream_name_pos = stream_type_pos + 1;
-        parts[stream_name_pos] = Cow::Owned(format!("{}_{}", parts[stream_name_pos], stream_type));
-    }
+    let stream_name_pos = stream_type_pos + 1;
+    parts[stream_name_pos] = Cow::Owned(format!("{}_{}", parts[stream_name_pos], stream_type));
 
     // Replace the file extension
     let file_name_pos = parts.len() - 1;
