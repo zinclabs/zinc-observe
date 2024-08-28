@@ -486,6 +486,11 @@ async fn generate_report(
     tokio::time::sleep(Duration::from_secs(5)).await;
 
     let timerange = &dashboard.timerange;
+    let search_type = if no_of_recepients == 0 {
+        "ui"
+    } else {
+        "reports"
+    };
 
     // dashboard link in the email should contain data of the same period as the report
     let (dashb_url, email_dashb_url) = match timerange.range_type {
@@ -493,7 +498,7 @@ async fn generate_report(
             let period = &timerange.period;
             let (time_duration, time_unit) = period.split_at(period.len() - 1);
             let dashb_url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype=reports&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype={search_type}&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
             );
 
             let time_duration: i64 = time_duration.parse()?;
@@ -543,7 +548,7 @@ async fn generate_report(
         }
         ReportTimerangeType::Absolute => {
             let url = format!(
-                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype=reports&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
+                "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&searchtype={search_type}&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
                 &timerange.from, &timerange.to
             );
             (url.clone(), url)
