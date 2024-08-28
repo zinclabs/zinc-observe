@@ -525,7 +525,7 @@ async fn cache_files<'a>(
                         }
                         Some(file_name)
                     } else {
-                        log::error!(
+                        log::warn!(
                             "[trace_id {trace_id}] search->storage: download file to cache err: {}",
                             e
                         );
@@ -707,16 +707,16 @@ async fn fetch_file(file_name: &str) -> anyhow::Result<Vec<u8>> {
             .await
             .map(|bytes| bytes.to_vec())
             .ok_or(anyhow::anyhow!("memory cache get failed"));
-    } else if file_data::disk::exist(file_name).await {
+    }
+    if file_data::disk::exist(file_name).await {
         // check disk next
         return file_data::disk::get(file_name, None)
             .await
             .map(|bytes| bytes.to_vec())
             .ok_or(anyhow::anyhow!("disk cache get failed"));
-    } else {
-        // finally get from storage
-        storage::get(file_name).await.map(|bytes| bytes.to_vec())
     }
+    // finally get from storage
+    storage::get(file_name).await.map(|bytes| bytes.to_vec())
 }
 
 async fn inverted_index_search_in_file(
@@ -758,7 +758,26 @@ async fn inverted_index_search_in_file(
             // We do not check the min length here since smaller term can exist in the index for Full Text Search
             .filter(|term| term.len() <= column_index_meta.max_len)
             // Filter out the terms which are outside the min and max value of the column
-            .filter(|term| column_index_meta.min_val.as_slice() <= term.as_bytes() && term.as_bytes() <= column_index_meta.max_val.as_slice())
+            .filter(|term|
+                if let Some(val) = column_index_meta.min_val.as_ref() {
+                    val.as_slice() <= term.as_bytes()
+                } else {
+                    // we do not have the min value, which can be due to backwards compatibility logic
+                    // FIXME(Uddhav): Once testing is complete and we are sure that no column meta is without
+                    // min and max value, remove this logic and use `is_some_and` instead.
+                    true
+                }
+            )
+            .filter(|term| {
+                if let Some(val) = column_index_meta.max_val.as_ref() {
+                    val.as_slice() >= term.as_bytes()
+                } else {
+                    // we do not have the max value, which can be due to backwards compatibility logic
+                    // FIXME(Uddhav): Once testing is complete and we are sure that no column meta is without
+                    // min and max value, remove this logic and use `is_some_and` instead.
+                    true
+                }
+            })
             .collect::<Vec<_>>();
         if !valid_terms.is_empty() {
             let fst_offset =
@@ -810,7 +829,26 @@ async fn inverted_index_search_in_file(
                             && term.len() <= column_index_meta.max_len
                     })
                     // Filter out the terms which are outside the min and max value of the column
-                    .filter(|term| column_index_meta.min_val.as_slice() <= term.as_bytes() && term.as_bytes() <= column_index_meta.max_val.as_slice())
+                    .filter(|term|
+                        if let Some(val) = column_index_meta.min_val.as_ref() {
+                            val.as_slice() <= term.as_bytes()
+                        } else {
+                            // we do not have the min value, which can be due to backwards compatibility logic
+                            // FIXME(Uddhav): Once testing is complete and we are sure that no column meta is without
+                            // min and max value, remove this logic and use `is_some_and` instead.
+                            true
+                        }
+                    )
+                    .filter(|term| {
+                        if let Some(val) = column_index_meta.max_val.as_ref() {
+                            val.as_slice() >= term.as_bytes()
+                        } else {
+                            // we do not have the max value, which can be due to backwards compatibility logic
+                            // FIXME(Uddhav): Once testing is complete and we are sure that no column meta is without
+                            // min and max value, remove this logic and use `is_some_and` instead.
+                            true
+                        }
+                    })
                     .collect::<Vec<_>>();
                 if !valid_terms.is_empty() {
                     let fst_offset = column_index_meta.base_offset
