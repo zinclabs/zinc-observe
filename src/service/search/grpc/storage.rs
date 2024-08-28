@@ -757,27 +757,6 @@ async fn inverted_index_search_in_file(
             .iter()
             // We do not check the min length here since smaller term can exist in the index for Full Text Search
             .filter(|term| term.len() <= column_index_meta.max_len)
-            // Filter out the terms which are outside the min and max value of the column
-            .filter(|term|
-                if let Some(val) = column_index_meta.min_val.as_ref() {
-                    val.as_slice() <= term.as_bytes()
-                } else {
-                    // we do not have the min value, which can be due to backwards compatibility logic
-                    // FIXME(Uddhav): Once testing is complete and we are sure that no column meta is without
-                    // min and max value, remove this logic and use `is_some_and` instead.
-                    true
-                }
-            )
-            .filter(|term| {
-                if let Some(val) = column_index_meta.max_val.as_ref() {
-                    val.as_slice() >= term.as_bytes()
-                } else {
-                    // we do not have the max value, which can be due to backwards compatibility logic
-                    // FIXME(Uddhav): Once testing is complete and we are sure that no column meta is without
-                    // min and max value, remove this logic and use `is_some_and` instead.
-                    true
-                }
-            })
             .collect::<Vec<_>>();
         if !valid_terms.is_empty() {
             let fst_offset =
