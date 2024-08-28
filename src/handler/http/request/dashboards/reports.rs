@@ -127,13 +127,12 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
 
     let folder = query.get("folder_id").map(|field| field.to_owned());
     let dashboard = query.get("dashboard_id").map(|field| field.to_owned());
-    let destination_less =
-        query
-            .get("destination_less")
-            .and_then(|field| match field.parse::<bool>() {
-                Ok(value) => Some(value),
-                Err(_) => None,
-            });
+    let destination_less = query
+        .get("cache")
+        .and_then(|field| match field.parse::<bool>() {
+            Ok(value) => Some(value),
+            Err(_) => None,
+        });
     let filters = ReportListFilters {
         folder,
         dashboard,
