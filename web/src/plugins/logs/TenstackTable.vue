@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   '-' +
                   cell.column.columnDef.id
                 "
-                class="tw-py-1 tw-px-2 tw-items-center tw-justify-start tw-relative table-cell"
+                class="tw-py-none tw-px-2 tw-items-center tw-justify-start tw-relative table-cell"
                 :style="{
                   width:
                     cell.column.columnDef.id !== 'source'
@@ -284,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : wrap
                         ? width - 260 - 12 + 'px'
                         : 'auto',
-                  height: wrap ? '100%' : '26px',
+                  height: wrap ? '100%' : '20px',
                 }"
                 :class="[
                   columnOrder.includes('source') && !wrap
@@ -566,7 +566,6 @@ const setExpandedRows = () => {
 };
 
 const copyLogToClipboard = (value: any) => {
-  emits("copy", value);
 };
 const addSearchTerm = (value: string) => {
   emits("addSearchTerm", value);
