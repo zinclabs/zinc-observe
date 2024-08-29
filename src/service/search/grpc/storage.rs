@@ -23,11 +23,8 @@ use config::{
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
-    utils::{
-        inverted_index::{
-            convert_parquet_idx_file_name, create_index_reader_from_puffin_bytes, split_token,
-        },
-        schema_ext::SchemaExt,
+    utils::inverted_index::{
+        convert_parquet_idx_file_name, create_index_reader_from_puffin_bytes, split_token,
     },
     FILE_EXT_PARQUET, INDEX_FIELD_NAME_FOR_ALL,
 };
@@ -41,8 +38,6 @@ use infra::{
     storage,
 };
 use itertools::Itertools;
-use tokio::{sync::Semaphore, time::Duration};
-use tracing::{info_span, Instrument};
 use tokio::sync::Semaphore;
 use tracing::Instrument;
 
