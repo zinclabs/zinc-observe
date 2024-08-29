@@ -233,7 +233,7 @@ export default defineComponent({
       }
 
       // set current hovered series name in state
-      hoveredSeriesState?.value?.setHoveredSeriesName(params?.seriesName);
+      hoveredSeriesState?.value?.setHoveredSeriesName(params?.seriesName ?? "");
 
       // Below logic is to scroll legend upto current series index
       // which creates wrong legend highlight issue in tooltip
@@ -316,9 +316,9 @@ export default defineComponent({
       });
 
       chart?.on("legendselectchanged", legendSelectChangedFn);
-      chart?.on("downplay", (params: any) => {
+      chart?.on("highlight", (params: any) => {
         // reset hovered series name on downplay
-        hoveredSeriesState?.value?.setHoveredSeriesName("");
+        // hoveredSeriesState?.value?.setHoveredSeriesName("");
 
         // downplay event will only called by currently hovered panel else it will go into infinite loop
         // and chart must be timeseries chart

@@ -124,9 +124,10 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             ));
         }
     };
+    let now = Utc::now().timestamp_micros();
 
     let mut new_trigger = db::scheduler::Trigger {
-        next_run_at: Utc::now().timestamp_micros(),
+        next_run_at: now,
         is_realtime: alert.is_real_time,
         is_silenced: false,
         status: db::scheduler::TriggerStatus::Waiting,
@@ -142,8 +143,45 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         return Ok(());
     }
 
+    let mut trigger_data_stream = TriggerData {
+        _timestamp: triggered_at,
+        org: trigger.org,
+        module: TriggerDataType::Alert,
+        key: trigger.module_key.clone(),
+        next_run_at: new_trigger.next_run_at,
+        is_realtime: trigger.is_realtime,
+        is_silenced: trigger.is_silenced,
+        status: TriggerDataStatus::Completed,
+        start_time: now
+            - Duration::try_minutes(alert.trigger_condition.period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap(),
+        end_time: now,
+        retries: trigger.retries,
+        error: None,
+    };
+
     // evaluate alert
-    let (ret, end_time) = alert.evaluate(None).await?;
+    let result = alert.evaluate(None).await;
+    if result.is_err() {
+        let err = result.err().unwrap();
+        trigger_data_stream.status = TriggerDataStatus::Failed;
+        trigger_data_stream.error = Some(err.to_string());
+        // update its status and retries
+        db::scheduler::update_status(
+            &new_trigger.org,
+            new_trigger.module,
+            &new_trigger.module_key,
+            db::scheduler::TriggerStatus::Waiting,
+            trigger.retries + 1,
+        )
+        .await?;
+        publish_triggers_usage(trigger_data_stream).await;
+        return Err(err);
+    }
+
+    let (ret, end_time) = result.unwrap();
     if ret.is_some() {
         log::info!(
             "Alert conditions satisfied, org: {}, module_key: {}",
@@ -185,25 +223,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             .num_microseconds()
             .unwrap();
     }
-
-    let mut trigger_data_stream = TriggerData {
-        _timestamp: triggered_at,
-        org: trigger.org,
-        module: TriggerDataType::Alert,
-        key: trigger.module_key.clone(),
-        next_run_at: new_trigger.next_run_at,
-        is_realtime: trigger.is_realtime,
-        is_silenced: trigger.is_silenced,
-        status: TriggerDataStatus::Completed,
-        start_time: end_time
-            - Duration::try_minutes(alert.trigger_condition.period)
-                .unwrap()
-                .num_microseconds()
-                .unwrap(),
-        end_time,
-        retries: trigger.retries,
-        error: None,
-    };
+    trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
     let last_satisfied_at = if ret.is_some() {
         Some(triggered_at)
@@ -262,6 +282,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                         trigger.retries + 1,
                     )
                     .await?;
+                    trigger_data_stream.next_run_at = now;
                 }
                 trigger_data_stream.status = TriggerDataStatus::Failed;
                 trigger_data_stream.error =
@@ -275,6 +296,12 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             &new_trigger.module_key
         );
         db::scheduler::update_trigger(new_trigger).await?;
+        trigger_data_stream.start_time = end_time
+            - Duration::try_minutes(alert.trigger_condition.period)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        trigger_data_stream.end_time = end_time;
         trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
     }
 

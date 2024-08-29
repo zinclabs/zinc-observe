@@ -59,6 +59,8 @@ pub async fn save_alert(
     alert.owner = Some(user_email.user_id.clone());
     alert.last_edited_by = Some(user_email.user_id);
     alert.updated_at = Some(datetime_now());
+    alert.last_triggered_at = None;
+    alert.last_satisfied_at = None;
 
     match alert::save(&org_id, &stream_name, "", alert, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert saved")),

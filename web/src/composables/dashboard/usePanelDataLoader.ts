@@ -365,6 +365,9 @@ export const usePanelDataLoader = (
             // partition array from api response
             const partitionArr = res?.data?.partitions ?? [];
 
+            // max_query_range for current query stream
+            const max_query_range = res?.data?.max_query_range ?? 0;
+
             // histogram_interval from partition api response
             const histogramInterval = res?.data?.histogram_interval
               ? `${res?.data?.histogram_interval} seconds`
@@ -377,88 +380,134 @@ export const usePanelDataLoader = (
             };
             state.resultMetaData = [];
 
+            const partitionResult: any = [];
+
+            // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
+            state.data.push([]);
+            state.metadata.queries.push({});
+            state.resultMetaData.push({});
+
+            const currentQueryIndex = state.data.length - 1;
+
+            // copy of current abortController
+            // which is used to check whether the current query has been aborted
+            const abortControllerRef = abortController;
+
+            // Update the metadata for the current query
+            Object.assign(state.metadata.queries[currentQueryIndex], metadata);
+
+            // remaining query range
+            let remainingQueryRange = max_query_range;
+
             // loop on all partitions and call search api for each partition
-            for (const it of panelSchema.value.queries) {
-              const partitionResult: any = [];
+            for (let i = partitionArr.length - 1; i >= 0; i--) {
+              const partition = partitionArr[i];
 
-              // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
-              state.data.push([]);
-              state.metadata.queries.push({});
-              state.resultMetaData.push({});
-
-              const currentQueryIndex = state.data.length - 1;
-
-              // copy of current abortController
-              // which is used to check whether the current query has been aborted
-              const abortControllerRef = abortController;
-
-              // Update the metadata for the current query
-              Object.assign(
-                state.metadata.queries[currentQueryIndex],
-                metadata,
+              if (abortControllerRef?.signal?.aborted) {
+                break;
+              }
+              const searchRes = await queryService.search(
+                {
+                  org_identifier: store.state.selectedOrganization.identifier,
+                  query: {
+                    query: {
+                      sql: await changeHistogramInterval(
+                        query,
+                        histogramInterval,
+                      ),
+                      query_fn: it.vrlFunctionQuery
+                        ? b64EncodeUnicode(it.vrlFunctionQuery)
+                        : null,
+                      sql_mode: "full",
+                      start_time: partition[0],
+                      end_time: partition[1],
+                      size: -1,
+                    },
+                  },
+                  page_type: pageType,
+                },
+                searchType.value ?? "Dashboards",
               );
 
-              for (const partition of partitionArr) {
-                if (abortControllerRef?.signal?.aborted) {
-                  break;
+              // remove past error detail
+              state.errorDetail = "";
+
+              // if there is an function error and which not related to stream range, throw error
+              if (
+                searchRes.data.function_error &&
+                searchRes.data.is_partial != true
+              ) {
+                // abort on unmount
+                if (abortController) {
+                  // this will stop partition api call
+                  abortController.abort();
                 }
-                const searchRes = await queryService.search(
-                  {
-                    org_identifier: store.state.selectedOrganization.identifier,
-                    query: {
-                      query: {
-                        sql: await changeHistogramInterval(
-                          query,
-                          histogramInterval,
-                        ),
-                        query_fn: it.vrlFunctionQuery
-                          ? b64EncodeUnicode(it.vrlFunctionQuery)
-                          : null,
-                        sql_mode: "full",
-                        start_time: partition[0],
-                        end_time: partition[1],
-                        size: -1,
-                      },
-                    },
-                    page_type: pageType,
-                  },
-                  searchType.value ?? "Dashboards",
+
+                // throw error
+                throw new Error(
+                  `Function error: ${searchRes.data.function_error}`,
                 );
+              }
 
-                // remove past error detail
-                state.errorDetail = "";
+              partitionResult.push(...searchRes.data.hits);
 
-                // if there is an function error and which not related to stream range, throw error
-                if (
-                  searchRes.data.function_error &&
-                  searchRes.data.is_partial != true
-                ) {
-                  // abort on unmount
-                  if (abortController) {
-                    // this will stop partition api call
-                    abortController.abort();
+              // Update the state with the new data after each partition API call
+              state.data[currentQueryIndex] = JSON.parse(
+                JSON.stringify(partitionResult),
+              );
+
+              // update result metadata
+              state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
+
+              // if the query is aborted or the response is partial, break the loop
+              if (abortControllerRef?.signal?.aborted) {
+                break;
+              }
+
+              if (searchRes.data.is_partial == true) {
+                // set the new start time as the start time of query
+                state.resultMetaData[currentQueryIndex].new_end_time =
+                  endISOTimestamp;
+                break;
+              }
+
+              if (max_query_range != 0) {
+                // calculate the current partition time range
+                // convert timerange from milliseconds to hours
+                const timeRange = (partition[1] - partition[0]) / 3600000000;
+
+                // get result cache ratio(it will be from 0 to 100)
+                const resultCacheRatio = searchRes.data.result_cache_ratio ?? 0;
+
+                // calculate the remaining query range
+                // remaining query range = remaining query range - queried time range for the current partition
+                // queried time range = time range * ((100 - result cache ratio) / 100)
+
+                const queriedTimeRange =
+                  timeRange * ((100 - resultCacheRatio) / 100);
+
+                remainingQueryRange = remainingQueryRange - queriedTimeRange;
+
+                // if the remaining query range is less than 0, break the loop
+                // we exceeded the max query range
+                if (remainingQueryRange < 0) {
+                  // set that is_partial to true if it is not last partition which we need to call
+                  if (i != 0) {
+                    // set that is_partial to true
+                    state.resultMetaData[currentQueryIndex].is_partial = true;
+                    // set function error
+                    state.resultMetaData[currentQueryIndex].function_error =
+                      `Query duration is modified due to query range restriction of ${max_query_range} hours`;
+                    // set the new start time and end time
+                    state.resultMetaData[currentQueryIndex].new_end_time =
+                      endISOTimestamp;
+
+                    // set the new start time as the start time of query
+                    state.resultMetaData[currentQueryIndex].new_start_time =
+                      partition[0];
+                    break;
                   }
-
-                  // throw error
-                  throw new Error(
-                    `Function error: ${searchRes.data.function_error}`,
-                  );
                 }
-
-                // if the query is aborted, break the loop
-                if (abortControllerRef?.signal?.aborted) {
-                  break;
-                }
-
-                partitionResult.push(...searchRes.data.hits);
-
-                // Update the state with the new data after each partition API call
-                state.data[currentQueryIndex] = JSON.parse(
-                  JSON.stringify(partitionResult),
-                );
-
-                // update result metadata
-                state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
               }
             }
           } catch (error) {

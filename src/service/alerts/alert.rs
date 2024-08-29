@@ -81,6 +81,7 @@ pub async fn save(
                 return Err(anyhow::anyhow!("Alert already exists"));
             }
             alert.last_triggered_at = old_alert.last_triggered_at;
+            alert.last_satisfied_at = old_alert.last_satisfied_at;
             alert.owner = old_alert.owner;
         }
         Ok(None) => {
