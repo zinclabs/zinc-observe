@@ -140,6 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="searchObj.loading"
         :functionErrorMsg="searchObj.data.functionError"
         :expandedRows="expandedLogs"
+        :highlight-timestamp="searchObj.data.searchAround.indexTimestamp"
         class="col-12"
         :style="{
           height: !searchObj.meta.showHistogram

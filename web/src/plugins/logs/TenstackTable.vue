@@ -209,6 +209,13 @@
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw-table-row'
                 : 'tw-flex',
+              tableRows[virtualRow.index][
+                store.state.zoConfig.timestamp_column
+              ] === highlightTimestamp
+                ? store.state.theme === 'dark'
+                  ? 'tw-bg-zinc-700'
+                  : 'tw-bg-zinc-300'
+                : '',
             ]"
             @click="
               !(formattedRows[virtualRow.index]?.original as any)
@@ -357,6 +364,10 @@ const props = defineProps({
   expandedRows: {
     type: Array,
     default: () => [],
+  },
+  highlightTimestamp: {
+    type: Number,
+    default: -1,
   },
 });
 
