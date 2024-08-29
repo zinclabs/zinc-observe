@@ -28,7 +28,8 @@ pub const MIN_FILE_SIZE: u64 = MAGIC_SIZE + MIN_FOOTER_SIZE;
 pub const FLAGS_SIZE: u64 = 4;
 pub const FOOTER_PAYLOAD_SIZE_SIZE: u64 = 4;
 pub const MIN_FOOTER_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + FOOTER_PAYLOAD_SIZE_SIZE + MAGIC_SIZE; // without any blobs
-pub const BLOB_TYPE: &str = "o2_inverted_index";
+// Version 1 of the inverted index blob
+pub const BLOB_TYPE: &str = "o2_inverted_index_v1";
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

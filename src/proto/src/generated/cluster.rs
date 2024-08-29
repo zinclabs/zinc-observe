@@ -72,6 +72,9 @@ pub struct ScanStats {
     /// unit: MB
     #[prost(int64, tag = "8")]
     pub idx_scan_size: i64,
+    /// unit: ms
+    #[prost(int64, tag = "9")]
+    pub idx_took: i64,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]

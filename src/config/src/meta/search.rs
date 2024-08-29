@@ -409,6 +409,7 @@ pub struct ScanStats {
     pub querier_memory_cached_files: i64,
     pub querier_disk_cached_files: i64,
     pub idx_scan_size: i64,
+    pub idx_took: i64,
 }
 
 impl ScanStats {
@@ -425,6 +426,7 @@ impl ScanStats {
         self.querier_memory_cached_files += other.querier_memory_cached_files;
         self.querier_disk_cached_files += other.querier_disk_cached_files;
         self.idx_scan_size += other.idx_scan_size;
+        self.idx_took += other.idx_took;
     }
 
     pub fn format_to_mb(&mut self) {
@@ -486,6 +488,7 @@ impl From<&ScanStats> for cluster_rpc::ScanStats {
             querier_memory_cached_files: req.querier_memory_cached_files,
             querier_disk_cached_files: req.querier_disk_cached_files,
             idx_scan_size: req.idx_scan_size,
+            idx_took: req.idx_took,
         }
     }
 }
@@ -501,6 +504,7 @@ impl From<&cluster_rpc::ScanStats> for ScanStats {
             querier_memory_cached_files: req.querier_memory_cached_files,
             querier_disk_cached_files: req.querier_disk_cached_files,
             idx_scan_size: req.idx_scan_size,
+            idx_took: req.idx_took,
         }
     }
 }

@@ -138,9 +138,11 @@ pub async fn search(
         && sql.use_inverted_index
         && (sql.inverted_index_type == "fst" || sql.inverted_index_type == "both")
         && (!sql.fts_terms.is_empty() || !sql.index_terms.is_empty());
+    let mut scan_stats = ScanStats::new();
     if use_inverted_index {
         let idx_took =
             filter_file_list_by_inverted_index(trace_id, &mut files, &sql, stream_type).await?;
+        scan_stats.idx_took = idx_took as i64;
         log::info!(
             "[trace_id {trace_id}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num to {} in {}ms",
             &sql.org_id,
@@ -153,7 +155,6 @@ pub async fn search(
 
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
-    let mut scan_stats = ScanStats::new();
     if !cfg.common.widening_schema_evolution || schema_versions.len() == 1 {
         let files = files.to_vec();
         scan_stats = match file_list::calculate_files_size(&files).await {
@@ -808,26 +809,7 @@ async fn inverted_index_search_in_file(
                             && term.len() <= column_index_meta.max_len
                     })
                     // Filter out the terms which are outside the min and max value of the column
-                    .filter(|term|
-                        if let Some(val) = column_index_meta.min_val.as_ref() {
-                            val.as_slice() <= term.as_bytes()
-                        } else {
-                            // we do not have the min value, which can be due to backwards compatibility logic
-                            // FIXME(Uddhav): Once testing is complete and we are sure that no column meta is without
-                            // min and max value, remove this logic and use `is_some_and` instead.
-                            true
-                        }
-                    )
-                    .filter(|term| {
-                        if let Some(val) = column_index_meta.max_val.as_ref() {
-                            val.as_slice() >= term.as_bytes()
-                        } else {
-                            // we do not have the max value, which can be due to backwards compatibility logic
-                            // FIXME(Uddhav): Once testing is complete and we are sure that no column meta is without
-                            // min and max value, remove this logic and use `is_some_and` instead.
-                            true
-                        }
-                    })
+                    .filter(|term| column_index_meta.min_val.as_slice() <= term.as_bytes() && term.as_bytes() <= column_index_meta.max_val.as_slice())
                     .collect::<Vec<_>>();
                 if !valid_terms.is_empty() {
                     let fst_offset = column_index_meta.base_offset

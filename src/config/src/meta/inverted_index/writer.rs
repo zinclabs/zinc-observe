@@ -87,8 +87,8 @@ impl ColumnIndexer {
         self.meta.relative_fst_offset = self.meta.index_size as _;
         self.meta.fst_size = fst_bytes.len() as _;
         self.meta.index_size += self.meta.fst_size as u64;
-        self.meta.min_val = min_val;
-        self.meta.max_val = max_val;
+        self.meta.min_val = min_val.unwrap_or_default();
+        self.meta.max_val = max_val.unwrap_or_default();
 
         Ok(self.meta)
     }
@@ -145,8 +145,8 @@ mod test {
         let meta = indexer.write(&mut writer).unwrap();
         assert_eq!(meta.min_len, 1);
         assert_eq!(meta.max_len, 1);
-        assert_eq!(meta.min_val, Some("a".as_bytes().to_vec()));
-        assert_eq!(meta.max_val, Some("c".as_bytes().to_vec()));
+        assert_eq!(meta.min_val, "a".as_bytes());
+        assert_eq!(meta.max_val, "c".as_bytes());
     }
 
     #[test]

@@ -58,6 +58,7 @@ message ScanStats {
     int64 querier_memory_cached_files = 6;
     int64 querier_disk_cached_files   = 7;
     int64 idx_scan_size               = 8; // unit: MB
+    int64 idx_took                    = 9; // unit: ms
 }
 
 message FileList {
