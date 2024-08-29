@@ -94,31 +94,6 @@
                   (header.column.columnDef.meta as any).showWrap
                 "
               >
-                <!-- <span
-                        v-if="(header.column.columnDef.meta as any).showWrap"
-                        style="font-weight: normal"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'text-white'
-                            : 'text-grey-9'
-                        "
-                        >{{ t("common.wrap") }}</span
-                      >
-                      <q-toggle
-                        v-if="(header.column.columnDef.meta as any).showWrap"
-                        class="text-normal q-ml-xs q-mr-sm"
-                        :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
-                        v-model="(header.column.columnDef.meta as any).wrapContent"
-                        color="primary"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'text-white'
-                            : 'text-grey-7'
-                        "
-                        size="xs"
-                        dense
-                      /> -->
-
                 <q-icon
                   v-if="(header.column.columnDef.meta as any).closable"
                   :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
@@ -441,9 +416,7 @@ watch(
     await nextTick();
 
     expandedRowIndices.value = [];
-    props.expandedRows.forEach((index) => {
-      expandRow(index as number);
-    });
+    setExpandedRows();
   },
   {
     deep: true,
@@ -507,9 +480,7 @@ watch(columnSizeVars, (newColSizes) => {
 });
 
 onMounted(() => {
-  props.expandedRows.forEach((index) => {
-    expandRow(index as number);
-  });
+  setExpandedRows();
 });
 
 const formattedRows = computed(() => {
@@ -555,6 +526,14 @@ const rowVirtualizer = useVirtualizer(rowVirtualizerOptions);
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
 const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+
+const setExpandedRows = () => {
+  props.expandedRows.forEach((index: number) => {
+    if (index < props.rows.length) {
+      expandRow(index as number);
+    }
+  });
+};
 
 const copyLogToClipboard = (value: any) => {
   emits("copy", value);
