@@ -121,7 +121,8 @@
     "cancel": "Cancel query",
     "viewTrace": "View Trace",
     "flattened": "Flattened",
-    "unflattened": "Unflattened"
+    "unflattened": "Unflattened",
+    "resetFilters": "Reset Filters"
   },
   "menu": {
     "home": "Home",

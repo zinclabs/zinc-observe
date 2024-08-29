@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-btn
           data-test="logs-search-bar-reset-filters-btn"
-          label="Reset Filters"
+          :title="t('search.resetFilters')"
           no-caps
           size="sm"
           icon="restart_alt"
-          class="q-pr-sm q-pl-xs reset-filters q-ml-xs"
+          class="tw-flex tw-justify-center tw-items-center reset-filters q-ml-xs"
           @click="resetFilters"
         />
         <syntax-guide
@@ -1739,13 +1739,11 @@ export default defineComponent({
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
 
+            // Resetting columns as its not required in searchObj
+            // As we reassign columns from selectedFields and search results
+            extractedObj.data.resultGrid.columns = [];
+
             // Add colOrder to searchObj if saved view don't have colOrder property in resultGrid
-            if (!extractedObj.data.resultGrid.hasOwnProperty("colOrder")) {
-              extractedObj.data.resultGrid.colOrder = {};
-              extractedObj.data.resultGrid.colOrder[
-                extractedObj.data.stream.selectedStream
-              ] = [];
-            }
 
             if (extractedObj.data?.timezone) {
               store.dispatch("setTimezone", extractedObj.data.timezone);
@@ -2746,6 +2744,15 @@ export default defineComponent({
   padding-bottom: 1px;
   height: 100%;
   overflow: visible;
+
+  .reset-filters {
+    width: 32px;
+    height: 32px;
+
+    .q-icon {
+      margin-right: 0;
+    }
+  }
 
   #logsQueryEditor,
   #fnEditor {

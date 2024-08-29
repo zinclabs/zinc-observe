@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     flat
     class="q-ml-xs q-pa-xs syntax-guide-button"
     :class="sqlmode ? 'sql-mode' : 'normal-mode'"
-    :label="t('search.syntaxGuideLabel')"
+    :title="t('search.syntaxGuideLabel')"
     icon="help"
   >
     <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
@@ -36,18 +36,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="syntax-guide-text">
               <ul class="guide-list">
                 <li>
-                  For inverted index search of value 'error' use 
-                  <span class="bg-highlight">match_all('error')</span> 
+                  For inverted index search of value 'error' use
+                  <span class="bg-highlight">match_all('error')</span>
                   in query editor. Search terms are case-insensitive.
                 </li>
                 <li>
-                  For full text search of value 'error' use 
-                  <span class="bg-highlight"
-                    >match_all_raw('error')</span
-                  >
+                  For full text search of value 'error' use
+                  <span class="bg-highlight">match_all_raw('error')</span>
                 </li>
                 <li>
-                  For case-insensitive full text search of value 'error' use 
+                  For case-insensitive full text search of value 'error' use
                   <span class="bg-highlight"
                     >match_all_raw_ignore_case('error')</span
                   >
@@ -100,21 +98,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="syntax-guide-text">
               <ul class="guide-list">
                 <li>
-                  For inverted index search of value 'error' use 
+                  For inverted index search of value 'error' use
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                   in query editor. Search terms are case-insensitive.
                 </li>
                 <li>
-                  For full text search of value 'error' use 
+                  For full text search of value 'error' use
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
                     match_all_raw('error')</span
                   >
                 </li>
                 <li>
-                  For case-insensitive full text search of value 'error' use 
+                  For case-insensitive full text search of value 'error' use
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
                     match_all_raw_ignore_case('error')</span
@@ -206,13 +204,10 @@ export default defineComponent({
 .syntax-guide-button {
   cursor: pointer;
   text-transform: capitalize;
-  padding: 5px 5px;
+  width: 32px;
+  height: 32px;
   font-weight: bold;
   border: 1px solid rgba(89, 96, 178, 0.3);
-}
-
-.normal-mode {
-  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .sql-mode {
