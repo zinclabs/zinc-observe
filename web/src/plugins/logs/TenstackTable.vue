@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw-table-row'
                 : 'tw-flex',
-              tableRows[virtualRow.index][
+              (tableRows[virtualRow.index] as any)[
                 store.state.zoConfig.timestamp_column
               ] === highlightTimestamp
                 ? store.state.theme === 'dark'
@@ -558,7 +558,7 @@ const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
 
 const setExpandedRows = () => {
-  props.expandedRows.forEach((index: number) => {
+  props.expandedRows.forEach((index: any) => {
     if (index < props.rows.length) {
       expandRow(index as number);
     }
