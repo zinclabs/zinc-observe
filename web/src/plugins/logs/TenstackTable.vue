@@ -58,6 +58,9 @@
               "
               :class="[
                 'resizer',
+                store.state.theme === 'dark'
+                  ? 'tw-bg-zinc-800'
+                  : 'tw-bg-zinc-300',
                 header.column.getIsResizing() ? 'isResizing' : '',
               ]"
               :style="{}"
@@ -263,7 +266,7 @@
                     cell.column.columnDef.id !== 'source'
                       ? cell.column.getSize() + 'px'
                       : wrap
-                        ? width - 225 - 12 + 'px'
+                        ? width - 260 - 12 + 'px'
                         : 'auto',
                   height: wrap ? '100%' : '26px',
                 }"
@@ -464,9 +467,9 @@ const table = useVueTable({
     minSize: 60,
     maxSize: 800,
   },
-  debugTable: true,
-  debugHeaders: true,
-  debugColumns: true,
+  // debugTable: true,
+  // debugHeaders: true,
+  // debugColumns: true,
   columnResizeMode,
   enableColumnResizing: true,
   onStateChange: async (state) => {
@@ -660,7 +663,6 @@ defineExpose({
   top: 0;
   height: 100%;
   width: 5px;
-  background: rgba(0, 0, 0, 0.5);
   cursor: col-resize;
   user-select: none;
   touch-action: none;

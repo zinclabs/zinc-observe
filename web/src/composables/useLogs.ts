@@ -2980,7 +2980,7 @@ const useLogs = () => {
               showWrap: false,
               wrapContent: false,
             },
-            size: 225,
+            size: 260,
           });
         }
 
@@ -3032,7 +3032,7 @@ const useLogs = () => {
               showWrap: false,
               wrapContent: false,
             },
-            size: 225,
+            size: 260,
           });
         }
 
@@ -3085,6 +3085,7 @@ const useLogs = () => {
           }
         }
       }
+
       extractFTSFields();
     } catch (e: any) {
       searchObj.loadingStream = false;

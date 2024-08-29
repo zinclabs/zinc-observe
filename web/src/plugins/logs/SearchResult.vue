@@ -132,15 +132,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <tenstack-table
         ref="searchTableRef"
-        :columns="searchObj.data.resultGrid.columns"
-        :rows="searchObj.data.queryResults.hits"
+        :columns="getColumns || []"
+        :rows="searchObj.data.queryResults?.hits || []"
         :wrap="searchObj.meta.toggleSourceWrap"
         :width="getTableWidth"
         :err-msg="searchObj.data.missingStreamMessage"
         :loading="searchObj.loading"
-        :functionErrorMsg="searchObj.data.functionError"
+        :functionErrorMsg="searchObj?.data?.functionError"
         :expandedRows="expandedLogs"
-        :highlight-timestamp="searchObj.data.searchAround.indexTimestamp"
+        :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
         class="col-12"
         :style="{
           height: !searchObj.meta.showHistogram
@@ -511,8 +511,14 @@ export default defineComponent({
     });
 
     const scrollTableToTop = (value: number) => {
-      searchTableRef.value?.parentRef.scrollTo({ top: value });
+      searchTableRef.value?.parentRef?.scrollTo({ top: value });
     };
+
+    const getColumns = computed(() => {
+      return searchObj.data?.resultGrid?.columns?.filter(
+        (col: any) => !!col.id,
+      );
+    });
 
     return {
       t,
@@ -547,6 +553,7 @@ export default defineComponent({
       redirectToTraces,
       getTableWidth,
       scrollTableToTop,
+      getColumns,
     };
   },
   computed: {
