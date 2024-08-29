@@ -566,6 +566,7 @@ const setExpandedRows = () => {
 };
 
 const copyLogToClipboard = (value: any) => {
+  emits("copy", value, false);
 };
 const addSearchTerm = (value: string) => {
   emits("addSearchTerm", value);
