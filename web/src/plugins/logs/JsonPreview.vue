@@ -102,8 +102,9 @@
       <query-editor
         v-model:query="nestedJson"
         ref="queryEditorRef"
-        editor-id="logs-json-preview-unflattened-json-editor"
+        :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
         class="monaco-editor"
+        :class="mode"
         language="json"
       />
     </div>
@@ -230,8 +231,9 @@ import {
   onMounted,
   watch,
   nextTick,
+  defineAsyncComponent,
 } from "vue";
-import { getImageURL } from "@/utils/zincutils";
+import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -241,7 +243,6 @@ import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
 
 export default {
   name: "JsonPreview",
@@ -255,8 +256,19 @@ export default {
       type: Boolean,
       default: true,
     },
+    mode: {
+      type: String,
+      default: "sidebar",
+    },
   },
-  components: { NotEqualIcon, EqualIcon, AppTabs, QueryEditor },
+  components: {
+    NotEqualIcon,
+    EqualIcon,
+    AppTabs,
+    QueryEditor: defineAsyncComponent(
+      () => import("@/components/QueryEditor.vue"),
+    ),
+  },
   emits: ["copy", "addSearchTerm", "addFieldToTable", "view-trace"],
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
@@ -273,6 +285,8 @@ export default {
     const activeTab = ref("flattened");
 
     const queryEditorRef = ref<any>();
+
+    const previewId = ref("");
 
     const nestedJson = ref("");
 
@@ -313,6 +327,7 @@ export default {
         }
       });
       getTracesStreams();
+      previewId.value = getUUID();
     });
 
     onMounted(() => {
@@ -369,41 +384,45 @@ export default {
     const getNestedJson = () => {
       const result = {};
 
-      Object.keys(props.value).forEach((key) => {
-        let keys = key.split("_");
+      try {
+        Object.keys(props.value).forEach((key) => {
+          let keys = key.split("_");
 
-        // If any field starts with _
-        let keyWithPrefix = "";
-        for (let i = 0; i < keys.length; i++) {
-          if (keys[i] === "") {
-            keyWithPrefix += "_";
-          } else {
-            if (keyWithPrefix.length) {
-              keyWithPrefix += keys[i];
-              keys[i] = keyWithPrefix;
-              keyWithPrefix = "";
+          // If any field starts with _
+          let keyWithPrefix = "";
+          for (let i = 0; i < keys.length; i++) {
+            if (keys[i] === "") {
+              keyWithPrefix += "_";
+            } else {
+              if (keyWithPrefix.length) {
+                keyWithPrefix += keys[i];
+                keys[i] = keyWithPrefix;
+                keyWithPrefix = "";
+              }
             }
           }
-        }
 
-        keys = keys.filter((k) => k !== "");
+          keys = keys.filter((k) => k !== "");
 
-        type NestedObject = {
-          [key: string]: NestedObject | any;
-        };
+          type NestedObject = {
+            [key: string]: NestedObject | any;
+          };
 
-        // { [key: string]: string }
-        keys.reduce((acc: NestedObject, k: string, index: number) => {
-          if (index === keys.length - 1) {
-            acc[k] = props.value[key];
-          } else {
-            if (!(k in acc)) {
-              acc[k] = {};
+          // { [key: string]: string }
+          keys.reduce((acc: NestedObject, k: string, index: number) => {
+            if (index === keys.length - 1) {
+              acc[k] = props.value[key];
+            } else {
+              if (!(k in acc)) {
+                acc[k] = {};
+              }
             }
-          }
-          return acc[k];
-        }, result);
-      });
+            return acc[k];
+          }, result);
+        });
+      } catch (e) {
+        console.log("Error in getNestedJson", e);
+      }
 
       return JSON.stringify(result);
     };
@@ -435,6 +454,7 @@ export default {
       nestedJson,
       handleTabChange,
       queryEditorRef,
+      previewId,
     };
   },
 };
@@ -449,6 +469,11 @@ export default {
 .monaco-editor {
   width: calc(100% - 16px) !important;
   height: calc(100vh - 250px) !important;
+
+  &.expanded {
+    height: 300px !important;
+    max-width: 1024px !important;
+  }
 }
 </style>
 

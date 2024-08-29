@@ -36,17 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="!loadingState" class="text-center full-width full-height">
           <NoData />
         </div>
-        <div v-else class="text-center full-width full-height q-mt-lg">
+        <div
+          v-else
+          class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
+        >
           <q-spinner-hourglass color="primary" size="lg" />
         </div>
       </template>
       <template #header-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-selection="scope">
-        <q-checkbox v-model="scope.selected"
-size="sm" color="secondary" />
+        <q-checkbox v-model="scope.selected" size="sm" color="secondary" />
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props">
@@ -167,27 +168,25 @@ size="sm" color="secondary" />
         />
       </template>
 
-
       <template #bottom="scope">
         <div class="bottom-bar">
-
-              <q-btn
-                v-if="selected.length > 0"
-                class="delete-btn"
-                color="red"
-                icon="delete"
-                :label="isDeleting ? 'Deleting...' : 'Delete'"
-                :disable="isDeleting"
-                @click="confirmBatchDeleteAction"
-              />
-        <QTablePagination
-          data-test="log-stream-table-pagination"
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
+          <q-btn
+            v-if="selected.length > 0"
+            class="delete-btn"
+            color="red"
+            icon="delete"
+            :label="isDeleting ? 'Deleting...' : 'Delete'"
+            :disable="isDeleting"
+            @click="confirmBatchDeleteAction"
+          />
+          <QTablePagination
+            data-test="log-stream-table-pagination"
+            :scope="scope"
+            :resultTotal="resultTotal"
+            :perPageOptions="perPageOptions"
+            position="bottom"
+            @update:changeRecordPerPage="changePagination"
+          />
         </div>
       </template>
     </q-table>
@@ -220,8 +219,7 @@ size="sm" color="secondary" />
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
@@ -245,8 +243,7 @@ no-caps class="q-mr-sm">
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated
-no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
             {{ t("logStream.cancel") }}
           </q-btn>
           <q-btn
@@ -403,7 +400,7 @@ export default defineComponent({
     onBeforeMount(() => {
       if (columns.value && !store.state.zoConfig.show_stream_stats_doc_num) {
         columns.value = columns.value.filter(
-          (column) => column.name !== "doc_num"
+          (column) => column.name !== "doc_num",
         );
       }
 
@@ -426,7 +423,7 @@ export default defineComponent({
         if (!value) {
           onChangeStreamFilter(selectedStreamType.value);
         }
-      }
+      },
     );
 
     const getLogStream = (refresh: boolean = false) => {
@@ -470,7 +467,7 @@ export default defineComponent({
                   schema: data.schema ? data.schema : [],
                   stream_type: data.stream_type,
                 };
-              })
+              }),
             );
             duplicateStreamList.value = [...logStream.value];
 
@@ -548,7 +545,7 @@ export default defineComponent({
     };
     const confirmBatchDeleteAction = () => {
       confirmBatchDelete.value = true;
-      console.log(selected,"selected items")
+      console.log(selected, "selected items");
     };
 
     const deleteStream = () => {
@@ -556,7 +553,7 @@ export default defineComponent({
         .delete(
           store.state.selectedOrganization.identifier,
           deleteStreamName,
-          deleteStreamType
+          deleteStreamType,
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -565,7 +562,7 @@ export default defineComponent({
               message: "Stream deleted successfully.",
             });
             removeStream(deleteStreamName, deleteStreamType);
-            selected.value = []
+            selected.value = [];
             getLogStream();
           }
         })
@@ -574,61 +571,70 @@ export default defineComponent({
             color: "negative",
             message: "Error while deleting stream.",
           });
-        })
+        });
     };
     const deleteBatchStream = () => {
       isDeleting.value = true;
-      const selectedItems = selected.value
-  const promises : Promise<any>[] = [];
+      const selectedItems = selected.value;
+      const promises: Promise<any>[] = [];
 
-  selectedItems.forEach((stream : any) => {
-    promises.push(
-      streamService.delete(
-        store.state.selectedOrganization.identifier,
-        stream.name,
-        stream.stream_type
-      )
-    );
-  });
-
-  Promise.all(promises)
-    .then((responses) => {
-      const successfulDeletions = responses.filter((res) => res.data.code === 200);
-      const failedDeletions = responses.filter((res) => res.data.code !== 200);
-
-      if (successfulDeletions.length > 0) {
-        $q.notify({
-          color: "positive",
-          message: `Deleted ${successfulDeletions.length} streams successfully.`,
-        });
-      }
-
-      if (failedDeletions.length > 0) {
-        $q.notify({
-          color: "negative",
-          message: `Failed to delete ${failedDeletions.length} streams.`,
-        });
-      }
-
-      // Remove deleted streams from the list
-      console.log(selectedItems,"after deleting streams")
-      selectedItems.forEach((stream : any) => {
-        removeStream(stream.name, stream.stream_type);
-        selected.value = selected.value.filter((item : any) => item.name !== stream.name && item.stream_type !== stream.stream_type);
+      selectedItems.forEach((stream: any) => {
+        promises.push(
+          streamService.delete(
+            store.state.selectedOrganization.identifier,
+            stream.name,
+            stream.stream_type,
+          ),
+        );
       });
 
-      getLogStream();
-    })
-    .catch((error) => {
-      console.error(error);
-      $q.notify({
-        color: "negative",
-        message: "Error while deleting streams.",
-      });
-    }).finally(() => {
-      isDeleting.value = false;
-    });
-};
+      Promise.all(promises)
+        .then((responses) => {
+          const successfulDeletions = responses.filter(
+            (res) => res.data.code === 200,
+          );
+          const failedDeletions = responses.filter(
+            (res) => res.data.code !== 200,
+          );
+
+          if (successfulDeletions.length > 0) {
+            $q.notify({
+              color: "positive",
+              message: `Deleted ${successfulDeletions.length} streams successfully.`,
+            });
+          }
+
+          if (failedDeletions.length > 0) {
+            $q.notify({
+              color: "negative",
+              message: `Failed to delete ${failedDeletions.length} streams.`,
+            });
+          }
+
+          // Remove deleted streams from the list
+          console.log(selectedItems, "after deleting streams");
+          selectedItems.forEach((stream: any) => {
+            removeStream(stream.name, stream.stream_type);
+            selected.value = selected.value.filter(
+              (item: any) =>
+                item.name !== stream.name &&
+                item.stream_type !== stream.stream_type,
+            );
+          });
+
+          getLogStream();
+        })
+        .catch((error) => {
+          console.error(error);
+          $q.notify({
+            color: "negative",
+            message: "Error while deleting streams.",
+          });
+        })
+        .finally(() => {
+          isDeleting.value = false;
+        });
+    };
 
     onActivated(() => {
       if (logStream.value.length > 0) {
@@ -646,10 +652,11 @@ export default defineComponent({
         getLogStream();
       }
     });
-    const  getSelectedString =  () => {
-        return selected.value.length === 0 ? '' : `${selected.value.length} record${selected.value.length > 1 ? 's' : ''} selected`
-      }
-
+    const getSelectedString = () => {
+      return selected.value.length === 0
+        ? ""
+        : `${selected.value.length} record${selected.value.length > 1 ? "s" : ""} selected`;
+    };
 
     const exploreStream = (props: any) => {
       router.push({
@@ -690,14 +697,14 @@ export default defineComponent({
       selectedStreamType.value = value;
       logStream.value = filterData(
         duplicateStreamList.value,
-        filterQuery.value.toLowerCase()
+        filterQuery.value.toLowerCase(),
       );
       resultTotal.value = logStream.value.length;
     };
 
-    const getSelectedItems = () =>{
-      console.log(selected.value[0],"selected")
-    }
+    const getSelectedItems = () => {
+      console.log(selected.value[0], "selected");
+    };
     const addStream = () => {
       addStreamDialog.value.show = true;
       // router.push({
@@ -750,7 +757,6 @@ export default defineComponent({
       getSelectedItems,
       isDeleting,
     };
-
   },
 });
 </script>
@@ -762,13 +768,13 @@ export default defineComponent({
     justify-content: flex-end;
   }
 }
-.bottom-bar{
+.bottom-bar {
   display: flex;
-  width:100%;
+  width: 100%;
   justify-content: space-between;
   align-items: center;
 }
-.delete-btn{
+.delete-btn {
   width: 10vw;
 }
 

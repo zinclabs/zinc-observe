@@ -54,8 +54,19 @@ pub async fn search(
     req.query.as_mut().unwrap().query_fn = "".to_string();
 
     // handle query function
-    let (_took, grpc_results) =
-        o2_enterprise::enterprise::super_cluster::search(req, req_regions, req_clusters).await?;
+    let (_took, grpc_results) = match o2_enterprise::enterprise::super_cluster::search(
+        req,
+        req_regions,
+        req_clusters,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("[trace_id {trace_id}] super_cluster->search: err: {:?}", e);
+            return Err(e);
+        }
+    };
 
     // handle query function
     let grpc_results = grpc_results
@@ -63,7 +74,16 @@ pub async fn search(
         .map(|v| (Node::default(), v))
         .collect();
     let (merge_batches, scan_stats, is_partial) =
-        super::merge_grpc_result(&trace_id, sql.clone(), grpc_results, true).await?;
+        match super::merge_grpc_result(&trace_id, sql.clone(), grpc_results, true).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "[trace_id {trace_id}] super_cluster->merge_grpc_result: err: {:?}",
+                    e
+                );
+                return Err(e);
+            }
+        };
 
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);

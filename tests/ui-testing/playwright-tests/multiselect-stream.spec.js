@@ -132,7 +132,7 @@ async function multistreamselect(page) {
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-h-btn"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="log-table-column-0-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
+    await page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
   }
   
 

@@ -787,6 +787,7 @@
     "prom_am": "Alert manager",
     "addTitle": "Add Alert",
     "updateTitle": "Update Alert",
+    "cloneTitle": "Clone Alert",
     "start": "start",
     "pause": "Pause",
     "groupBy": "Group by",
@@ -794,6 +795,7 @@
     "preview": "Preview",
     "crontitle": "Enable Cron",
     "lastTriggered":"Last Triggered At",
+    "lastSatisfied":"Last Satisfied At",
     "owner": "Owner"
   },
   "alert_templates": {

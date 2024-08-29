@@ -24,8 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round
-flat icon="close" />
+          <q-btn v-close-popup="true" round flat icon="close" />
         </div>
       </div>
     </q-card-section>
@@ -34,7 +33,7 @@ flat icon="close" />
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
         <div
           v-if="loadingState"
-          class="q-pt-md text-center q-w-md q-mx-lg"
+          class="q-pt-md text-center q-w-md q-mx-lg tw-flex tw-justify-center"
           style="max-width: 450px"
         >
           <q-spinner-hourglass color="primary" size="lg" />
@@ -46,8 +45,7 @@ flat icon="close" />
         >
           No data available.
         </div>
-        <div v-else
-class="indexDetailsContainer" style="height: 100vh">
+        <div v-else class="indexDetailsContainer" style="height: 100vh">
           <div class="title" data-test="schema-stream-title-text">
             {{ indexData.name }}
           </div>
@@ -708,6 +706,8 @@ export default defineComponent({
       }
       if (Number(maxQueryRange.value) > 0) {
         settings["max_query_range"] = Number(maxQueryRange.value);
+      } else {
+        settings["max_query_range"] = 0;
       }
 
       if (showDataRetention.value) {

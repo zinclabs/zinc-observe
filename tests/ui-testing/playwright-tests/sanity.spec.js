@@ -616,7 +616,7 @@ test.describe("Sanity testcases", () => {
       .click();
     await page.getByLabel("SQL Mode").locator("div").first().click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="log-table-column-1-\\@timestamp"]').click();
+    await page.locator('[data-test="log-table-column-1-_timestamp"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
       .getByText("fast_rewind12345fast_forward100arrow_drop_down")
@@ -663,7 +663,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page
       .locator(
-        '[data-test="log-table-column-0-\\@timestamp"] [data-test="table-row-expand-menu"]'
+        '[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]'
       )
       .click();
   });

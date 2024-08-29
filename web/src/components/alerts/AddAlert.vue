@@ -750,7 +750,6 @@ export default defineComponent({
       isFetchingStreams.value = true;
       return getStreams(formData.value.stream_type, false)
         .then((res: any) => {
-
           streams.value[formData.value.stream_type] = res.list;
           schemaList.value = res.list;
           indexOptions.value = res.list.map((data: any) => {
@@ -1119,6 +1118,9 @@ export default defineComponent({
       });
 
       delete query.aggs;
+
+      // We get 15 minutes time range for the query, so reducing it by 13 minutes to get 2 minute data
+      query.query.start_time = query.query.start_time + 780000000;
 
       query.query.sql = formData.value.query_condition.sql;
 

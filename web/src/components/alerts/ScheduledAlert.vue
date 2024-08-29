@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
     <template v-else>
-      <div class="flex tw-justify-between items-center">
+      <div class="tw-flex tw-justify-start tw-items-center">
         <div class="text-bold q-mr-sm q-my-sm">
           {{ tab === "promql" ? "Promql" : "SQL" }}
         </div>

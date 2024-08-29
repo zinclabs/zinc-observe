@@ -65,6 +65,7 @@ use object_store::ObjectStore;
 pub mod empty_table;
 mod helpers;
 pub mod memtable;
+pub mod uniontable;
 
 pub(crate) struct NewListingTable {
     table_paths: Vec<ListingTableUrl>,

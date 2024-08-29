@@ -1483,9 +1483,7 @@ $streamSelectorHeight: 44px;
 
       .field_list {
         &.selected {
-          .q-expansion-item {
-            background-color: rgba(89, 96, 178, 0.3);
-          }
+          background-color: rgba(89, 96, 178, 0.3);
 
           .field_overlay {
             // background-color: #ffffff;

@@ -61,7 +61,7 @@ pub async fn set(
         Ok(_) => {
             let trigger = db::scheduler::Trigger {
                 org: org_id.to_string(),
-                module_key: schedule_key,
+                module_key: schedule_key.clone(),
                 next_run_at: chrono::Utc::now().timestamp_micros(),
                 is_realtime: alert.is_real_time,
                 is_silenced: false,
@@ -71,21 +71,35 @@ pub async fn set(
                 match db::scheduler::push(trigger).await {
                     Ok(_) => Ok(()),
                     Err(e) => {
-                        log::error!("Failed to save trigger: {}", e);
+                        log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+                        Ok(())
+                    }
+                }
+            } else if db::scheduler::exists(
+                org_id,
+                db::scheduler::TriggerModule::Alert,
+                &schedule_key,
+            )
+            .await
+            {
+                match db::scheduler::update_trigger(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to update trigger for alert {schedule_key}: {}", e);
                         Ok(())
                     }
                 }
             } else {
-                match db::scheduler::update_trigger(trigger).await {
+                match db::scheduler::push(trigger).await {
                     Ok(_) => Ok(()),
                     Err(e) => {
-                        log::error!("Failed to update trigger: {}", e);
+                        log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
                         Ok(())
                     }
                 }
             }
         }
-        Err(e) => Err(anyhow::anyhow!("Error save alert: {}", e)),
+        Err(e) => Err(anyhow::anyhow!("Error save alert {schedule_key}: {}", e)),
     }
 }
 

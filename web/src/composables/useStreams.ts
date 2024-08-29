@@ -406,7 +406,44 @@ const useStreams = () => {
     store.dispatch("setIsDataIngested", false);
   };
 
-  const deepEqual = (objA: any, objB: any) => {
+  function compareArrays(previousArray: any, currentArray: any) {
+    const add = [];
+    const remove = [];
+
+    // Convert previousArray into a map for easy lookup
+    const previousMap = new Map();
+    for (const key in previousArray) {
+      const prevItem = previousArray[key];
+      previousMap.set(prevItem.field, prevItem);
+    }
+
+    // Convert currentArray into a map for easy lookup
+    const currentMap = new Map();
+    for (const currentItem of currentArray) {
+      currentMap.set(currentItem.field, currentItem);
+    }
+
+    // Check for items in currentArray that are not in previousArray
+    for (const currentItem of currentArray) {
+      const prevItem = previousMap.get(currentItem.field);
+      if (!prevItem || !deepEqual(currentItem, prevItem)) {
+        add.push(currentItem);
+      }
+    }
+
+    // Check for items in previousArray that are not in currentArray
+    for (const [field, prevItem] of previousMap) {
+      const currentItem = currentMap.get(field);
+      if (!currentItem || !deepEqual(prevItem, currentItem)) {
+        remove.push(prevItem);
+      }
+    }
+
+    return { add, remove };
+  }
+
+  // Helper function to deeply compare two objects, considering the "types" object and ignoring the "disabled" attribute
+  function deepEqual(objA: any, objB: any) {
     if (
       typeof objA !== "object" ||
       typeof objB !== "object" ||
@@ -416,17 +453,21 @@ const useStreams = () => {
       return objA === objB;
     }
 
-    const keysA = Object.keys(objA);
-    const keysB = Object.keys(objB);
+    const keysA = Object.keys(objA).filter((key: string) => key !== "disabled");
+    const keysB = Object.keys(objB).filter((key: string) => key !== "disabled");
 
     if (keysA.length !== keysB.length) return false;
 
     for (const key of keysA) {
-      if (!deepEqual(objA[key], objB[key])) return false;
+      if (typeof objA[key] === "object" && typeof objB[key] === "object") {
+        if (!deepEqual(objA[key], objB[key])) return false;
+      } else if (objA[key] !== objB[key]) {
+        return false;
+      }
     }
 
     return true;
-  };
+  }
 
   const getUpdatedSettings = (previousSettings: any, currentSettings: any) => {
     const attributesToCompare: Array<string> = [
@@ -460,19 +501,24 @@ const useStreams = () => {
         typeof previousArray === "object" &&
         typeof currentArray === "object"
       ) {
-        add = Object.values(currentArray).filter(
-          (currentItem: any) =>
-            !Object.values(previousArray).some((previousItem: any) =>
-              deepEqual(currentItem, previousItem),
-            ),
-        );
+        // add = currentArray.filter(
+        //   (currentItem: any) =>
+        //     !Object.values(previousArray).some((previousItem: any) =>
+        //       deepEqual(currentItem, previousItem),
+        //     ),
+        // );
 
-        remove = Object.values(previousArray).filter(
-          (previousItem: any) =>
-            !Object.values(currentArray).some((currentItem: any) =>
-              deepEqual(previousItem, currentItem),
-            ),
-        );
+        // remove = Object.values(previousArray).filter(
+        //   (previousItem: any) =>
+        //     !Object.values(currentArray).some((currentItem: any) =>
+        //       deepEqual(previousItem, currentItem),
+        //     ),
+        // );
+        const result: any = compareArrays(previousArray, currentArray);
+        add = result.add;
+        remove = result.remove;
+
+        remove = remove.filter((item: any) => item.disabled !== true);
       } else {
         // For other attributes, do a simple array comparison
         add = currentArray.filter((item: any) => !previousArray.includes(item));

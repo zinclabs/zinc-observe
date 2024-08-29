@@ -447,7 +447,7 @@ async fn move_files(
         // check if allowed to delete the file
         for file in new_file_list.iter() {
             loop {
-                if wal::lock_files_exists(&file.key).await {
+                if wal::lock_files_exists(&file.key) {
                     log::warn!(
                         "[INGESTER:JOB:{thread_id}] the file is still in use, waiting for a few ms: {}",
                         file.key

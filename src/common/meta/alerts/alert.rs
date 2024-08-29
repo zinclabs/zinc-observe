@@ -53,6 +53,8 @@ pub struct Alert {
     #[serde(default)]
     pub last_triggered_at: Option<i64>,
     #[serde(default)]
+    pub last_satisfied_at: Option<i64>,
+    #[serde(default)]
     pub owner: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = String, format = DateTime)]
@@ -89,6 +91,7 @@ impl Default for Alert {
             owner: None,
             updated_at: None,
             last_edited_by: None,
+            last_satisfied_at: None,
         }
     }
 }

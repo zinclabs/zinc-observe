@@ -122,7 +122,7 @@ test.describe("Schema testcases", () => {
     // await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
     await page.waitForTimeout(2000);
     // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page.locator('[data-test="log-table-column-1-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
+    await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
     await page.waitForTimeout(1000);
      await page.getByText(/^arrow_drop_down_all:.*$/).click();
     await page.locator('[data-test="log-search-index-list-field-search-input"]').click();
@@ -159,7 +159,7 @@ test.describe("Schema testcases", () => {
     // await page.locator('[data-test="date-time-relative-15-m-btn"]').click();
     // await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.waitForTimeout(2000);
-    await page.locator('[data-test="log-table-column-1-\\@timestamp"] [data-test="table-row-expand-menu"]').click();
+    await page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]').click();
     await page.getByText('arrow_drop_down_timestamp:').click();
   });
 

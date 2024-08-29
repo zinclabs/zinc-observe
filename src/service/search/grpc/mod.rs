@@ -13,31 +13,38 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
-use ::datafusion::arrow::{ipc, record_batch::RecordBatch};
+use ::datafusion::{arrow::ipc, catalog::TableProvider, error::DataFusionError};
 use arrow_schema::Schema;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        search::ScanStats,
+        search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, StreamType},
     },
     utils::record_batch_ext::format_recordbatch_by_schema,
 };
-use futures::future::try_join_all;
-use hashbrown::HashSet;
-use infra::errors::{Error, ErrorCodes};
+use hashbrown::{HashMap, HashSet};
+use infra::{
+    errors::{Error, ErrorCodes},
+    schema::unwrap_stream_settings,
+};
 use proto::cluster_rpc;
-use tracing::Instrument;
 
-use super::datafusion;
-use crate::service::db;
+use crate::service::{
+    db,
+    search::{
+        datafusion::exec,
+        generate_search_schema, generate_select_start_search_schema,
+        sql::{Sql, RE_SELECT_WILDCARD},
+    },
+};
 mod storage;
 mod wal;
 
-pub type SearchResult = Result<(Vec<Vec<RecordBatch>>, ScanStats), Error>;
+pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats), Error>;
 
 #[tracing::instrument(name = "service:search:grpc:search", skip_all, fields(org_id = req.org_id))]
 pub async fn search(
@@ -48,6 +55,7 @@ pub async fn search(
     let stream_type = StreamType::from(req.stream_type.as_str());
     let work_group = req.work_group.clone();
 
+    let cfg = get_config();
     let trace_id = Arc::new(req.job.as_ref().unwrap().trace_id.to_string());
     let timeout = if req.timeout > 0 {
         req.timeout as u64
@@ -73,76 +81,167 @@ pub async fn search(
         sql.meta.time_range
     );
 
-    // search in WAL parquet
-    let skip_wal = req.query.as_ref().unwrap().skip_wal;
-    let work_group1 = work_group.clone();
-    let trace_id1 = trace_id.clone();
-    let sql1 = sql.clone();
-    let wal_parquet_span = tracing::span::Span::current();
-    let task1 = tokio::task::spawn(async move {
-        if LOCAL_NODE.is_ingester() && !skip_wal {
-            wal::search_parquet(&trace_id1, sql1, stream_type, &work_group1, timeout)
-                .instrument(wal_parquet_span)
-                .await
-        } else {
-            Ok((vec![], ScanStats::default()))
-        }
+    // set target partitions based on cache type
+    // construct latest schema map
+    let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
+        .await
+        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
+    for field in schema_latest.fields() {
+        schema_latest_map.insert(field.name(), field);
+    }
+    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
+    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
+
+    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
+
+    let (schema, _) = if select_wildcard {
+        generate_select_start_search_schema(
+            &sql,
+            &schema_latest,
+            &schema_latest_map,
+            &defined_schema_fields,
+        )?
+    } else {
+        generate_search_schema(&sql, &schema_latest, &schema_latest_map)?
+    };
+
+    let sql = Arc::new(Sql {
+        schema: schema.as_ref().clone(),
+        ..sql.as_ref().clone()
     });
 
+    // get all tables
+    let mut tables = Vec::new();
+    let mut scan_stats = ScanStats::new();
+
+    // binding release lock files
+    let _release_file_guard = ReleaseFileGuard::new(&trace_id);
+
+    // search in WAL parquet
+    let skip_wal = req.query.as_ref().unwrap().skip_wal;
+    if LOCAL_NODE.is_ingester() && !skip_wal {
+        let (tbls, stats) =
+            wal::search_parquet(&trace_id, sql.clone(), stream_type, &work_group).await?;
+        tables.extend(tbls);
+        scan_stats.add(&stats);
+    }
+
     // search in WAL memory
-    let work_group2 = work_group.clone();
-    let trace_id2 = trace_id.clone();
-    let sql2 = sql.clone();
-    let wal_mem_span = tracing::span::Span::current();
-    let task2 = tokio::task::spawn(async move {
-        if LOCAL_NODE.is_ingester() && !skip_wal {
-            wal::search_memtable(&trace_id2, sql2, stream_type, &work_group2, timeout)
-                .instrument(wal_mem_span)
-                .await
-        } else {
-            Ok((vec![], ScanStats::default()))
-        }
-    });
+    if LOCAL_NODE.is_ingester() && !skip_wal {
+        let (tbls, stats) = wal::search_memtable(&trace_id, sql.clone(), stream_type).await?;
+        tables.extend(tbls);
+        scan_stats.add(&stats);
+    }
 
     // search in object storage
     let req_stype = req.stype;
-    let work_group3 = work_group.clone();
-    let trace_id3 = trace_id.clone();
-    let sql3 = sql.clone();
-    let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
-    let storage_span = tracing::span::Span::current();
-    let task3 = tokio::task::spawn(async move {
-        if req_stype == cluster_rpc::SearchType::WalOnly as i32 {
-            Ok((vec![], ScanStats::default()))
-        } else {
-            storage::search(
-                &trace_id3,
-                sql3,
-                &file_list,
-                stream_type,
-                &work_group3,
-                timeout,
-            )
-            .instrument(storage_span)
-            .await
-        }
-    });
-
-    // merge result
-    let mut results = Vec::new();
-    let mut scan_stats = ScanStats::new();
-    let tasks = try_join_all(vec![task1, task2, task3])
-        .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-    for task in tasks {
-        let (batches, stats) = task?;
+    if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
+        let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
+        let (tbls, stats) =
+            storage::search(&trace_id, sql.clone(), &file_list, stream_type, &work_group).await?;
+        tables.extend(tbls);
         scan_stats.add(&stats);
-        results.extend(batches.into_iter().flatten().filter(|v| v.num_rows() > 0));
     }
 
+    let session = config::meta::search::Session {
+        id: trace_id.to_string(),
+        storage_type: StorageType::Memory,
+        search_type: if !sql.meta.group_by.is_empty() {
+            SearchType::Aggregation
+        } else {
+            SearchType::Normal
+        },
+        work_group: Some(work_group.to_string()),
+        target_partitions: cfg.limit.cpu_num,
+    };
+
+    // run and get the RecordBatch
+    #[cfg(feature = "enterprise")]
+    let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
+    #[cfg(feature = "enterprise")]
+    if crate::service::search::SEARCH_SERVER
+        .insert_sender(&trace_id, abort_sender)
+        .await
+        .is_err()
+    {
+        log::info!(
+            "[trace_id {}] search->storage: search canceled before call search->storage",
+            session.id
+        );
+        return Err(Error::Message(format!(
+            "[trace_id {}] search->storage: search canceled before call search->storage",
+            session.id
+        )));
+    }
+
+    if tables.is_empty() {
+        return Ok(cluster_rpc::SearchResponse {
+            job: req.job.clone(),
+            took: start.elapsed().as_millis() as i32,
+            idx_took: 0,
+            from: sql.meta.offset as i32,
+            size: sql.meta.limit as i32,
+            total: 0,
+            hits: vec![],
+            scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
+            is_partial: false,
+        });
+    }
+
+    let ret = tokio::select! {
+        ret = exec::sql(&session, &sql, tables) => {
+            match ret {
+                Ok(ret) => Ok(ret),
+                Err(err) => {
+                    log::error!("[trace_id {}] search->storage: datafusion execute error: {}", session.id, err);
+                    Err(err)
+                }
+            }
+        },
+        _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+            log::error!("[trace_id {}] search->storage: search timeout", session.id);
+            Err(DataFusionError::ResourcesExhausted(format!(
+                "[trace_id {}] search->storage: task timeout", session.id
+            )))
+        },
+        _ = async {
+            #[cfg(feature = "enterprise")]
+            let _ = abort_receiver.await;
+            #[cfg(not(feature = "enterprise"))]
+            futures::future::pending::<()>().await;
+        } => {
+            log::info!("[trace_id {}] search->storage: search canceled", session.id);
+            Err( DataFusionError::Execution(format!(
+                "[trace_id {}] search->storage: task is cancel", session.id
+            )))
+        }
+    };
+
+    let mut results = match ret {
+        Ok(v) => v,
+        Err(err) => match err {
+            DataFusionError::ResourcesExhausted(e) => {
+                return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(e)));
+            }
+            _ => return Err(err.into()),
+        },
+    };
+
     // format recordbatch with same schema
-    if !results.is_empty() {
-        let mut schema = results[0].schema();
+    let merge_schema = results
+        .iter()
+        .filter_map(|v| {
+            if v.num_rows() > 0 {
+                Some(v.schema())
+            } else {
+                None
+            }
+        })
+        .next()
+        .unwrap_or_else(|| Arc::new(Schema::empty()));
+    if !merge_schema.fields().is_empty() {
+        let mut schema = merge_schema.clone();
         let schema_fields = schema
             .fields()
             .iter()
@@ -182,9 +281,6 @@ pub async fn search(
         }
     }
     log::info!("[trace_id {trace_id}] in node merge task finish");
-
-    // clear session data
-    datafusion::storage::file_list::clear(&trace_id);
 
     // final result
     let mut hits_total = 0;
@@ -263,4 +359,29 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
         }
     }
     Ok(())
+}
+
+struct ReleaseFileGuard {
+    trace_id: String,
+}
+
+impl ReleaseFileGuard {
+    fn new(trace_id: &str) -> Self {
+        Self {
+            trace_id: trace_id.to_string(),
+        }
+    }
+}
+
+impl Drop for ReleaseFileGuard {
+    fn drop(&mut self) {
+        log::info!(
+            "[trace_id {}] grpc->search: drop ReleaseFileGuard",
+            self.trace_id
+        );
+        // clear session data
+        crate::service::search::datafusion::storage::file_list::clear(&self.trace_id);
+        // release wal lock files
+        crate::common::infra::wal::release_request(&self.trace_id);
+    }
 }

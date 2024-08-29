@@ -37,8 +37,12 @@ use crate::common::meta::stream::StreamParams;
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);
 
 // SEARCHING_FILES for searching files, in use, should not move to s3
-static SEARCHING_FILES: Lazy<tokio::sync::RwLock<SearchingFileLocker>> =
-    Lazy::new(|| tokio::sync::RwLock::new(SearchingFileLocker::new()));
+static SEARCHING_FILES: Lazy<parking_lot::RwLock<SearchingFileLocker>> =
+    Lazy::new(|| parking_lot::RwLock::new(SearchingFileLocker::new()));
+
+// SEARCHING_REQUESTS for searching requests, in use, should not move to s3
+static SEARCHING_REQUESTS: Lazy<parking_lot::RwLock<HashMap<String, Vec<String>>>> =
+    Lazy::new(Default::default);
 
 type RwData = RwLock<HashMap<String, Arc<RwFile>>>;
 
@@ -94,9 +98,9 @@ pub struct RwFile {
     expired: i64,
 }
 
-pub async fn init() -> Result<(), anyhow::Error> {
+pub fn init() -> Result<(), anyhow::Error> {
     _ = MANAGER.data.len();
-    _ = SEARCHING_FILES.read().await.len();
+    _ = SEARCHING_FILES.read().len();
     Ok(())
 }
 
@@ -373,23 +377,39 @@ impl RwFile {
     }
 }
 
-pub async fn lock_files(files: &[String]) {
-    let mut locker = SEARCHING_FILES.write().await;
+pub fn lock_files(files: &[String]) {
+    let mut locker = SEARCHING_FILES.write();
     for file in files.iter() {
         locker.lock(file.clone());
     }
 }
 
-pub async fn release_files(files: &[String]) {
-    let mut locker = SEARCHING_FILES.write().await;
+pub fn release_files(files: &[String]) {
+    let mut locker = SEARCHING_FILES.write();
     for file in files.iter() {
         locker.release(file);
     }
     locker.shrink_to_fit();
 }
 
-pub async fn lock_files_exists(file: &str) -> bool {
-    SEARCHING_FILES.read().await.exist(file)
+pub fn lock_files_exists(file: &str) -> bool {
+    SEARCHING_FILES.read().exist(file)
+}
+
+pub fn lock_request(trace_id: &str, files: &[String]) {
+    let mut locker = SEARCHING_REQUESTS.write();
+    locker.insert(trace_id.to_string(), files.to_vec());
+}
+
+pub fn release_request(trace_id: &str) {
+    log::info!("[trace_id {}] release_request for wal files", trace_id);
+    let mut locker = SEARCHING_REQUESTS.write();
+    let files = locker.remove(trace_id);
+    locker.shrink_to_fit();
+    drop(locker);
+    if let Some(files) = files {
+        release_files(&files);
+    }
 }
 
 #[cfg(test)]

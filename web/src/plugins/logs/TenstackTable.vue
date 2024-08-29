@@ -141,7 +141,10 @@
           <td
             :colspan="columnOrder.length"
             class="text-bold"
-            style="opacity: 0.7"
+            :style="{
+              background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
+              opacity: 0.7,
+            }"
           >
             <div
               class="text-subtitle2 text-weight-bold tw-flex tw-items-center"
@@ -226,7 +229,9 @@
               store.state.theme === 'dark'
                 ? 'w-border-gray-800  hover:tw-bg-zinc-800'
                 : 'w-border-gray-100 hover:tw-bg-zinc-100',
-              columnOrder.includes('source') && !wrap
+              columnOrder.includes('source') &&
+              !wrap &&
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'tw-table-row'
                 : 'tw-flex',
             ]"
@@ -246,11 +251,13 @@
               "
               :colspan="columnOrder.length"
               :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
+              class="tw-w-full"
             >
               <json-preview
                 :value="tableRows[virtualRow.index - 1] as any"
                 show-copy-button
                 class="tw-py-1"
+                mode="expanded"
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
@@ -443,6 +450,13 @@ watch(
   },
 );
 
+watch(
+  () => columnOrder.value,
+  () => {
+    emits("update:columnOrder", columnOrder.value, props.columns);
+  },
+);
+
 const table = useVueTable({
   get data() {
     return tableRows.value || [];
@@ -455,11 +469,11 @@ const table = useVueTable({
       return sorting.value;
     },
     get columnOrder() {
-      emits("update:columnOrder", columnOrder.value);
       return columnOrder.value;
     },
   },
   onSortingChange: setSorting,
+  enableSorting: false,
   getCoreRowModel: getCoreRowModel(),
   getSortedRowModel: getSortedRowModel(),
   defaultColumn: {
@@ -473,7 +487,7 @@ const table = useVueTable({
   enableColumnResizing: true,
   onStateChange: async (state) => {
     await nextTick();
-    tableRowSize.value = tableBodyRef.value.children[0]?.scrollWidth;
+    tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
   },
 });
 
@@ -557,7 +571,9 @@ const closeColumn = (data: any) => {
 };
 
 const handleDragStart = (event: any) => {
-  if (columnOrder.value[event.oldIndex] === "@timestamp") {
+  if (
+    columnOrder.value[event.oldIndex] === store.state.zoConfig.timestamp_column
+  ) {
     isResizingHeader.value = true;
   } else {
     isResizingHeader.value = false;
@@ -566,8 +582,8 @@ const handleDragStart = (event: any) => {
 
 const handleDragEnd = async (event: any) => {
   if (
-    columnOrder.value.includes("@timestamp") &&
-    columnOrder.value[0] !== "@timestamp"
+    columnOrder.value.includes(store.state.zoConfig.timestamp_column) &&
+    columnOrder.value[0] !== store.state.zoConfig.timestamp_column
   ) {
     await nextTick();
     const newItem = columnOrder.value[event.newIndex];
@@ -669,18 +685,8 @@ defineExpose({
 }
 
 .resizer.isResizing {
-  background: blue;
+  background: $primary;
   opacity: 1;
-}
-
-@media (hover: hover) {
-  .resizer {
-    opacity: 0;
-  }
-
-  *:hover > .resizer {
-    opacity: 1;
-  }
 }
 
 .container {

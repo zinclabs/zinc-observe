@@ -37,7 +37,7 @@ pub fn get_partial_plan(
     if children.is_empty() {
         return Ok(None);
     }
-    if children.len() > 1 {
+    if plan.name() != "UnionExec" && children.len() > 1 {
         return Err(datafusion::error::DataFusionError::NotImplemented(
             "ExecutionPlan with multiple children".to_string(),
         ));
@@ -161,18 +161,18 @@ pub fn get_empty_final_plan(
 }
 
 /// Rewriter to update the offset and limit of a GlobalLimitExec node
-pub(crate) struct UpdateOffsetExec {
+pub(crate) struct UpdateOffsetRewrite {
     offset: usize,
     limit: usize,
 }
 
-impl UpdateOffsetExec {
+impl UpdateOffsetRewrite {
     pub fn new(offset: usize, limit: usize) -> Self {
         Self { offset, limit }
     }
 }
 
-impl TreeNodeRewriter for UpdateOffsetExec {
+impl TreeNodeRewriter for UpdateOffsetRewrite {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_down(

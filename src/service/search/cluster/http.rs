@@ -56,7 +56,13 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
 
     // handle query function
     let (merge_batches, scan_stats, took_wait, is_partial, idx_took) =
-        super::search(&trace_id, sql.clone(), req).await?;
+        match super::search(&trace_id, sql.clone(), req).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[trace_id {trace_id}] http->search: err: {:?}", e);
+                return Err(e);
+            }
+        };
 
     // final result
     let mut result = search::Response::new(sql.meta.offset, sql.meta.limit);

@@ -16,7 +16,7 @@
 #[cfg(test)]
 mod tests {
     use core::time;
-    use std::{env, fs, str, sync::Once, thread};
+    use std::{env, fs, net::SocketAddr, str, sync::Once, thread};
 
     use actix_web::{http::header::ContentType, test, web, App};
     use bytes::{Bytes, BytesMut};
@@ -24,10 +24,12 @@ mod tests {
     use config::{get_config, utils::json};
     use openobserve::{
         common::meta::dashboards::{v1, Dashboard, Dashboards},
-        handler::http::router::*,
+        handler::{grpc::auth::check_auth, http::router::*},
+        service::search::SEARCH_SERVER,
     };
     use prost::Message;
-    use proto::prometheus_rpc;
+    use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
+    use tonic::codec::CompressionEncoding;
 
     static START: Once = Once::new();
 
@@ -40,7 +42,7 @@ mod tests {
             env::set_var("ZO_FILE_PUSH_INTERVAL", "1");
             env::set_var("ZO_PAYLOAD_LIMIT", "209715200");
             env::set_var("ZO_JSON_LIMIT", "209715200");
-            env::set_var("ZO_TIME_STAMP_COL", "_timestamp");
+            env::set_var("ZO_RESULT_CACHE_ENABLED", "false");
 
             env_logger::init_from_env(
                 env_logger::Env::new().default_filter_or(&get_config().log.level),
@@ -52,6 +54,30 @@ mod tests {
             "Authorization",
             "Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM=",
         )
+    }
+
+    async fn init_grpc_server() -> Result<(), anyhow::Error> {
+        let cfg = get_config();
+        let ip = if !cfg.grpc.addr.is_empty() {
+            cfg.grpc.addr.clone()
+        } else {
+            "0.0.0.0".to_string()
+        };
+        let gaddr: SocketAddr = format!("{}:{}", ip, cfg.grpc.port).parse()?;
+        let search_svc = SearchServer::new(SEARCH_SERVER.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+            .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+            .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+
+        log::info!("starting gRPC server at {}", gaddr);
+        tonic::transport::Server::builder()
+            .layer(tonic::service::interceptor(check_auth))
+            .add_service(search_svc)
+            .serve(gaddr)
+            .await
+            .expect("gRPC server init failed");
+        Ok(())
     }
 
     async fn e2e_100_tear_down() {
@@ -66,6 +92,13 @@ mod tests {
             .unwrap_or_else(|e| log::info!("Error deleting local dir: {}", e));
 
         setup();
+
+        // start gRPC server
+        tokio::task::spawn(async move {
+            init_grpc_server()
+                .await
+                .expect("router gRPC server init failed");
+        });
 
         // register node
         openobserve::common::infra::cluster::register_and_keepalive()
@@ -107,12 +140,9 @@ mod tests {
         e2e_remove_stream_function().await;
         e2e_delete_function().await;
 
-        // FIXME: Revise and restore the e2e tests for search API calls.
-        // They have been broken by https://github.com/openobserve/openobserve/pull/570
-        //
-        // // search
-        // e2e_search().await;
-        // e2e_search_around().await;
+        // search
+        e2e_search().await;
+        e2e_search_around().await;
 
         // users
         e2e_post_user().await;
@@ -1308,6 +1338,8 @@ mod tests {
             .set_payload(body_str)
             .to_request();
         let resp = test::call_service(&app, req).await;
+        println!("{:?}", resp.status());
+        println!("{:?}", resp.response().body());
         assert!(resp.status().is_success());
     }
 

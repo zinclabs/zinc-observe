@@ -34,17 +34,17 @@ pub struct NewEmptyTable {
     name: String,
     schema: SchemaRef,
     partitions: usize,
-    is_memtable: bool,
+    sorted_by_time: bool,
 }
 
 impl NewEmptyTable {
     /// Initialize a new `EmptyTable` from a schema.
-    pub fn new(name: &str, schema: SchemaRef, is_memtable: bool) -> Self {
+    pub fn new(name: &str, schema: SchemaRef, sorted_by_time: bool) -> Self {
         Self {
             name: name.to_string(),
             schema,
             partitions: 1,
-            is_memtable,
+            sorted_by_time,
         }
     }
 
@@ -85,7 +85,7 @@ impl TableProvider for NewEmptyTable {
                 projection,
                 filters,
                 limit,
-                self.is_memtable,
+                self.sorted_by_time,
             )
             .with_partitions(self.partitions),
         ))

@@ -43,14 +43,12 @@ use infra::{
 use itertools::Itertools;
 use tokio::{sync::Semaphore, time::Duration};
 use tracing::{info_span, Instrument};
+use tokio::sync::Semaphore;
+use tracing::Instrument;
 
 use crate::service::{
     db, file_list,
-    search::{
-        datafusion::{exec, file_type::FileType},
-        generate_search_schema, generate_select_start_search_schema,
-        sql::{Sql, RE_SELECT_WILDCARD},
-    },
+    search::{datafusion::exec, generate_search_schema_diff, sql::Sql},
 };
 
 type CachedFiles = (usize, usize);
@@ -63,13 +61,10 @@ pub async fn search(
     file_list: &[FileKey],
     stream_type: StreamType,
     work_group: &str,
-    timeout: u64,
-) -> super::SearchResult {
+) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {trace_id}] search->storage: enter");
-    let schema_latest = infra::schema::get(&sql.org_id, &sql.stream_name, stream_type)
-        .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
+    let schema = sql.schema.clone();
     // fetch all schema versions, group files by version
     let schema_versions = match infra::schema::get_versions(
         &sql.org_id,
@@ -100,10 +95,9 @@ pub async fn search(
     }
     let schema_latest_id = schema_versions.len() - 1;
 
-    let stream_settings = unwrap_stream_settings(&schema_latest).unwrap_or_default();
+    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
-    let defined_schema_fields = stream_settings.defined_schema_fields.unwrap_or_default();
 
     // get file list
     let mut files = match file_list.is_empty() {
@@ -247,21 +241,22 @@ pub async fn search(
     };
 
     // construct latest schema map
+    let schema_latest = Arc::new(
+        schema
+            .clone()
+            .with_metadata(std::collections::HashMap::new()),
+    );
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
-    let select_wildcard = RE_SELECT_WILDCARD.is_match(sql.origin_sql.as_str());
 
-    let mut tasks = Vec::new();
+    let mut tables = Vec::new();
     for (ver, files) in files_group {
+        if files.is_empty() {
+            continue;
+        }
         let schema = schema_versions[ver].clone();
-        let schema_dt = schema
-            .metadata()
-            .get("start_dt")
-            .cloned()
-            .unwrap_or_default();
-        let schema = schema.with_metadata(std::collections::HashMap::new());
         let schema = Arc::new(schema);
         let sql = sql.clone();
         let session = config::meta::search::Session {
@@ -276,113 +271,19 @@ pub async fn search(
             target_partitions,
         };
 
-        // cacluate the diff between latest schema and group schema
-        let (schema, diff_fields) = if select_wildcard {
-            generate_select_start_search_schema(
-                &sql,
-                schema.clone(),
-                &schema_latest_map,
-                &defined_schema_fields,
-            )?
-        } else {
-            generate_search_schema(&sql, schema.clone(), &schema_latest_map)?
-        };
-
-        let datafusion_span = info_span!(
-            "service:search:grpc:storage:datafusion",
-            org_id = sql.org_id,
-            stream_name = sql.stream_name,
-            stream_type = stream_type.to_string(),
-        );
-
-        #[cfg(feature = "enterprise")]
-        let (abort_sender, abort_receiver) = tokio::sync::oneshot::channel();
-        #[cfg(feature = "enterprise")]
-        if crate::service::search::SEARCH_SERVER
-            .insert_sender(trace_id, abort_sender)
-            .await
-            .is_err()
-        {
-            log::info!(
-                "[trace_id {}] search->storage: search canceled before call search->storage",
-                session.id
-            );
-            return Err(Error::Message(format!(
-                "[trace_id {}] search->storage: search canceled before call search->storage",
-                session.id
-            )));
-        }
-
-        let task = tokio::task::spawn(
-            async move {
-                tokio::select! {
-                    ret = exec::sql(
-                        &session,
-                        schema.clone(),
-                        diff_fields,
-                        &sql,
-                        &files,
-                        None,
-                        FileType::PARQUET,
-                    ) => {
-                        match ret {
-                            Ok(ret) => Ok(ret),
-                            Err(err) => {
-                                log::error!("[trace_id {}] search->storage: datafusion execute error: {}", session.id, err);
-                                if err.to_string().contains("Invalid comparison operation") {
-                                    // print the session_id, schema, sql, files
-                                    let schema_version = format!("{}/{}/{}/{}", &sql.org_id, &stream_type, &sql.stream_name, schema_dt);
-                                    let schema_fiels = schema.as_ref().simple_fields();
-                                    let files = files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>();
-                                    log::error!("[trace_id {}] search->storage: schema and parquet mismatch, version: {}, schema: {:?}, files: {:?}",
-                                        session.id, schema_version, schema_fiels, files);
-                                }
-                                Err(err)
-                            }
-                        }
-                    },
-                    _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-                        log::error!("[trace_id {}] search->storage: search timeout", session.id);
-                        Err(datafusion::error::DataFusionError::ResourcesExhausted(format!(
-                            "[trace_id {}] search->storage: task timeout", session.id
-                        )))
-                    },
-                    _ = async {
-                        #[cfg(feature = "enterprise")]
-                        let _ = abort_receiver.await;
-                        #[cfg(not(feature = "enterprise"))]
-                        futures::future::pending::<()>().await;
-                    } => {
-                        log::info!("[trace_id {}] search->storage: search canceled", session.id);
-                        Err(datafusion::error::DataFusionError::Execution(format!(
-                            "[trace_id {}] search->storage: task is cancel", session.id
-                        )))
-                    }
-                }
-            }
-            .instrument(datafusion_span),
-        );
-
-        tasks.push(task);
+        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
+        let table = exec::create_parquet_table(
+            &session,
+            schema_latest.clone(),
+            &files,
+            diff_fields,
+            &sql.meta.order_by,
+        )
+        .await?;
+        tables.push(Arc::new(table) as Arc<dyn datafusion::datasource::TableProvider>);
     }
 
-    let mut results = vec![];
-    let task_results = try_join_all(tasks)
-        .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?;
-    for ret in task_results {
-        match ret {
-            Ok(v) => results.extend(v),
-            Err(err) => match err {
-                datafusion::error::DataFusionError::ResourcesExhausted(e) => {
-                    return Err(Error::ErrorCode(ErrorCodes::SearchTimeout(e)));
-                }
-                _ => return Err(err.into()),
-            },
-        };
-    }
-
-    Ok((results, scan_stats))
+    Ok((tables, scan_stats))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]

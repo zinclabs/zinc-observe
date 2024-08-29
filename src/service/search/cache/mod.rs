@@ -79,12 +79,19 @@ pub async fn search(
         .as_ref()
         .and_then(|v| base64::decode_url(v).ok());
 
+    // calculate hash for the query
+    let mut hash_body = vec![origin_sql.to_string()];
+    if let Some(vrl_function) = &query_fn {
+        hash_body.push(vrl_function.to_string());
+    }
+    if !req.regions.is_empty() {
+        hash_body.extend(req.regions.clone());
+    }
+    if !req.clusters.is_empty() {
+        hash_body.extend(req.clusters.clone());
+    }
     let mut h = config::utils::hash::gxhash::new();
-    let hashed_query = if let Some(vrl_function) = &query_fn {
-        h.sum64(&format!("{}{}", origin_sql, vrl_function))
-    } else {
-        h.sum64(&origin_sql)
-    };
+    let hashed_query = h.sum64(&hash_body.join(","));
 
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;

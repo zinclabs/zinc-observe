@@ -45,6 +45,7 @@ const useLocalStorage = (
     const value = ref(defaultValue);
     const read = () => {
       const v = window.localStorage.getItem(key);
+
       if (v != null && isJSONValue === true) value.value = JSON.parse(v);
       else if (v != null) value.value = v;
       else value.value = null;
@@ -79,10 +80,10 @@ const useLocalStorage = (
     if (
       window.localStorage.getItem(key) == null &&
       !isDelete &&
-      defaultValue != ""
+      defaultValue !== ""
     )
       write();
-    else if (value.value != defaultValue && defaultValue != "") write();
+    else if (value.value !== defaultValue && defaultValue !== "") write();
 
     const remove = () => {
       window.localStorage.removeItem(key);

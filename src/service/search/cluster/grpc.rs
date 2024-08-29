@@ -16,7 +16,9 @@
 use std::sync::Arc;
 
 use arrow::ipc;
-use config::meta::stream::StreamType;
+use arrow_schema::Schema;
+use config::{meta::stream::StreamType, utils::record_batch_ext::format_recordbatch_by_schema};
+use hashbrown::HashSet;
 use infra::errors::Result;
 use proto::cluster_rpc;
 
@@ -49,8 +51,68 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<cluster_rpc::
     );
 
     // handle query function
-    let (merge_results, scan_stats, _, is_partial, idx_took) =
-        super::search(&trace_id, sql.clone(), req).await?;
+    let (mut merge_results, scan_stats, _, is_partial, idx_took) =
+        match super::search(&trace_id, sql.clone(), req).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[trace_id {trace_id}] grpc->cluster_search: err: {:?}", e);
+                return Err(e);
+            }
+        };
+
+    // format recordbatch with same schema
+    let merge_schema = merge_results
+        .iter()
+        .filter_map(|v| {
+            if v.num_rows() > 0 {
+                Some(v.schema())
+            } else {
+                None
+            }
+        })
+        .next()
+        .unwrap_or_else(|| Arc::new(Schema::empty()));
+    if !merge_schema.fields().is_empty() {
+        let mut schema = merge_schema.clone();
+        let schema_fields = schema
+            .fields()
+            .iter()
+            .map(|f| f.name())
+            .collect::<HashSet<_>>();
+        let mut new_fields = HashSet::new();
+        let mut need_format = false;
+        for batch in merge_results.iter() {
+            if batch.num_rows() == 0 {
+                continue;
+            }
+            if batch.schema().fields() != schema.fields() {
+                need_format = true;
+            }
+            for field in batch.schema().fields() {
+                if !schema_fields.contains(field.name()) {
+                    new_fields.insert(field.clone());
+                }
+            }
+        }
+        drop(schema_fields);
+        if !new_fields.is_empty() {
+            need_format = true;
+            let new_schema = Schema::new(new_fields.into_iter().collect::<Vec<_>>());
+            schema =
+                Arc::new(Schema::try_merge(vec![schema.as_ref().clone(), new_schema]).unwrap());
+        }
+        if need_format {
+            let mut new_batches = Vec::new();
+            for batch in merge_results {
+                if batch.num_rows() == 0 {
+                    continue;
+                }
+                new_batches.push(format_recordbatch_by_schema(schema.clone(), batch));
+            }
+            merge_results = new_batches;
+        }
+    }
+    log::info!("[trace_id {trace_id}] in cluster leader merge task finish");
 
     // final result
     let mut hits_buf = Vec::new();

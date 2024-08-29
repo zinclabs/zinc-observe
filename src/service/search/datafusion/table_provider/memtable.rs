@@ -16,16 +16,18 @@
 use std::{any::Any, sync::Arc};
 
 use arrow::array::RecordBatch;
-use arrow_schema::{DataType, SchemaRef};
+use arrow_schema::{DataType, SchemaRef, SortOptions};
 use async_trait::async_trait;
 use datafusion::{
     catalog::Session,
     common::{project_schema, Constraints, Result},
     datasource::{MemTable, TableProvider},
     logical_expr::{Expr, TableType},
+    physical_expr::PhysicalSortExpr,
     physical_plan::{
         expressions::{CastExpr, Column},
         projection::ProjectionExec,
+        sorts::sort::SortExec,
         ExecutionPlan, PhysicalExpr,
     },
 };
@@ -35,6 +37,7 @@ use hashbrown::HashMap;
 pub(crate) struct NewMemTable {
     mem_table: MemTable,
     diff_rules: HashMap<String, DataType>,
+    sorted_by_time: bool,
 }
 
 impl NewMemTable {
@@ -43,11 +46,13 @@ impl NewMemTable {
         schema: SchemaRef,
         partitions: Vec<Vec<RecordBatch>>,
         rules: HashMap<String, DataType>,
+        sorted_by_time: bool,
     ) -> Result<Self> {
         let mem = MemTable::try_new(schema, partitions)?;
         Ok(Self {
             mem_table: mem,
             diff_rules: rules,
+            sorted_by_time,
         })
     }
 }
@@ -84,7 +89,11 @@ impl TableProvider for NewMemTable {
 
         // add the diff rules to the execution plan
         if self.diff_rules.is_empty() {
-            return Ok(memory_exec);
+            return Ok(if self.sorted_by_time {
+                wrap_sort(memory_exec)
+            } else {
+                memory_exec
+            });
         }
         let projected_schema = project_schema(&self.schema(), projection)?;
         let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> =
@@ -98,8 +107,12 @@ impl TableProvider for NewMemTable {
                 exprs.push((col, name));
             }
         }
-        let projection_exec = ProjectionExec::try_new(exprs, memory_exec)?;
-        Ok(Arc::new(projection_exec))
+        let projection_exec = Arc::new(ProjectionExec::try_new(exprs, memory_exec)?);
+        Ok(if self.sorted_by_time {
+            wrap_sort(projection_exec)
+        } else {
+            projection_exec
+        })
     }
 
     async fn insert_into(
@@ -114,4 +127,23 @@ impl TableProvider for NewMemTable {
     fn get_column_default(&self, column: &str) -> Option<&Expr> {
         self.mem_table.get_column_default(column)
     }
+}
+
+// create sort exec by _timestamp
+fn wrap_sort(exec: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
+    let column_timestamp = config::get_config().common.column_timestamp.to_string();
+    let index = exec.schema().index_of(&column_timestamp);
+    (match index {
+        Ok(index) => {
+            let ordering = vec![PhysicalSortExpr {
+                expr: Arc::new(Column::new(&column_timestamp, index)),
+                options: SortOptions {
+                    descending: true,
+                    nulls_first: false,
+                },
+            }];
+            Arc::new(SortExec::new(ordering, exec))
+        }
+        Err(_) => exec,
+    }) as _
 }

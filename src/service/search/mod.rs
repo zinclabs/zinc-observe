@@ -285,6 +285,7 @@ pub async fn search_partition(
         original_size: original_size as usize,
         compressed_size: compressed_size as usize,
         histogram_interval: meta.histogram_interval,
+        max_query_range: stream_settings.max_query_range,
         partitions: vec![],
     };
 
@@ -773,7 +774,7 @@ impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
 // generate parquet file search schema
 fn generate_search_schema(
     sql: &Arc<sql::Sql>,
-    schema: Arc<Schema>,
+    schema: &Schema,
     schema_latest_map: &HashMap<&String, &Arc<Field>>,
 ) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
     // cacluate the diff between latest schema and group schema
@@ -821,7 +822,7 @@ fn generate_search_schema(
 // generate parquet file search schema
 fn generate_select_start_search_schema(
     sql: &Arc<sql::Sql>,
-    schema: Arc<Schema>,
+    schema: &Schema,
     schema_latest_map: &HashMap<&String, &Arc<Field>>,
     defined_schema_fields: &[String],
 ) -> Result<(Arc<Schema>, HashMap<String, DataType>), Error> {
@@ -872,12 +873,9 @@ fn generate_select_start_search_schema(
         Arc::new(Schema::new(new_fields))
     } else if !new_fields.is_empty() {
         let new_schema = Schema::new(new_fields);
-        Arc::new(Schema::try_merge(vec![
-            schema.as_ref().to_owned(),
-            new_schema,
-        ])?)
+        Arc::new(Schema::try_merge(vec![schema.to_owned(), new_schema])?)
     } else {
-        schema.clone()
+        Arc::new(schema.clone())
     };
     Ok((schema, diff_fields))
 }
@@ -897,6 +895,25 @@ fn generate_used_fields_in_query(sql: &Arc<sql::Sql>) -> Vec<String> {
         .collect();
 
     used_fields.into_iter().collect()
+}
+
+// generate parquet file search schema
+fn generate_search_schema_diff(
+    schema: &Schema,
+    schema_latest_map: &HashMap<&String, &Arc<Field>>,
+) -> Result<HashMap<String, DataType>, Error> {
+    // cacluate the diff between latest schema and group schema
+    let mut diff_fields = HashMap::new();
+
+    for field in schema.fields().iter() {
+        if let Some(latest_field) = schema_latest_map.get(field.name()) {
+            if field.data_type() != latest_field.data_type() {
+                diff_fields.insert(field.name().clone(), latest_field.data_type().clone());
+            }
+        }
+    }
+
+    Ok(diff_fields)
 }
 
 #[cfg(test)]

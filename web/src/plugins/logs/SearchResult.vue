@@ -247,21 +247,24 @@ export default defineComponent({
   },
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
-      //@ts-ignore
-      this.searchObj.data.resultGrid[
+      this.searchObj.data.resultGrid.colSizes[
         this.searchObj.data.stream.selectedStream
       ] = [newColSizes];
     },
-    handleColumnOrderUpdate(newColOrder: any) {
-      if (this.searchObj.data.stream?.selectedStream.length === 1) {
-        const colOrderToStore = newColOrder.slice(1);
+    handleColumnOrderUpdate(newColOrder: string[], columns: any[]) {
+      // Here we are checking if the columns are default columns ( _timestamp and source)
+      // If selected fields are empty, then we are setting colOrder to empty array as we
+      // don't change the order of default columns
+      // If you store the colOrder it will create issue when you save the view and load it again
+
+      if (!this.searchObj.data.stream.selectedFields.length) {
         this.searchObj.data.resultGrid.colOrder[
           this.searchObj.data.stream.selectedStream
-        ] = [colOrderToStore];
+        ] = [];
       } else {
         this.searchObj.data.resultGrid.colOrder[
           this.searchObj.data.stream.selectedStream
-        ] = [newColOrder];
+        ] = [...newColOrder];
       }
     },
 
@@ -361,7 +364,6 @@ export default defineComponent({
       updatedLocalLogFilterField,
       searchAroundData,
       extractFTSFields,
-      evaluateWrapContentFlag,
       refreshPartitionPagination,
       filterHitsColumns,
     } = useLogs();
@@ -454,7 +456,6 @@ export default defineComponent({
       searchObj.organizationIdetifier =
         store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
-      evaluateWrapContentFlag();
       filterHitsColumns();
     }
 
@@ -535,7 +536,6 @@ export default defineComponent({
       getWidth,
       copyLogToClipboard,
       extractFTSFields,
-      evaluateWrapContentFlag,
       useLocalWrapContent,
       noOfRecordsTitle,
       scrollPosition,
@@ -568,7 +568,6 @@ export default defineComponent({
     },
     findFTSFields() {
       this.extractFTSFields();
-      this.evaluateWrapContentFlag();
     },
     updateTitle() {
       this.noOfRecordsTitle = this.searchObj.data.histogram.chartParams.title;

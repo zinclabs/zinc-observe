@@ -165,8 +165,8 @@ const refreshData = () => {
   const relativeTime = props.formData.trigger_condition.period;
 
   const endTime = new Date().getTime() * 1000;
-  let new_relative_time = 5;
-  if (relativeTime < 5) {
+  let new_relative_time = 2;
+  if (relativeTime < 2) {
     new_relative_time = relativeTime;
   }
 
@@ -241,7 +241,7 @@ defineExpose({ refreshData });
 </script>
 
 <style scoped>
-.sql-preview{
+.sql-preview {
   display: flex;
   justify-content: center;
   align-items: center;

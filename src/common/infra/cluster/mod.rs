@@ -607,6 +607,10 @@ mod tests {
             ["test2", "node-q-0", "node-c-2"],
             ["test3", "node-q-7", "node-c-3"],
         ];
+
+        remove_node_from_consistent_hash(&node, &Role::Querier, None).await;
+        remove_node_from_consistent_hash(&node, &Role::Compactor, None).await;
+        remove_node_from_consistent_hash(&node, &Role::FlattenCompactor, None).await;
         for key in data {
             assert_eq!(
                 get_node_from_consistent_hash(key.first().unwrap(), &Role::Querier, None).await,

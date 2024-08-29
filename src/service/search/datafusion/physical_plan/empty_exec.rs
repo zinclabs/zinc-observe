@@ -38,6 +38,7 @@ pub struct NewEmptyExec {
     projection: Option<Vec<usize>>,
     filters: Vec<Expr>,
     limit: Option<usize>,
+    sorted_by_time: bool,
 }
 
 impl NewEmptyExec {
@@ -48,9 +49,9 @@ impl NewEmptyExec {
         projection: Option<&Vec<usize>>,
         filters: &[Expr],
         limit: Option<usize>,
-        is_memtable: bool,
+        sorted_by_time: bool,
     ) -> Self {
-        let cache = Self::compute_properties(Arc::clone(&schema), 1, is_memtable);
+        let cache = Self::compute_properties(Arc::clone(&schema), 1, sorted_by_time);
         NewEmptyExec {
             name: name.to_string(),
             schema,
@@ -59,6 +60,7 @@ impl NewEmptyExec {
             projection: projection.cloned(),
             filters: filters.to_owned(),
             limit,
+            sorted_by_time,
         }
     }
 
@@ -84,11 +86,11 @@ impl NewEmptyExec {
     fn compute_properties(
         schema: SchemaRef,
         n_partitions: usize,
-        is_memtable: bool,
+        sorted_by_time: bool,
     ) -> PlanProperties {
         let timestamp_column = config::get_config().common.column_timestamp.clone();
         let index = schema.index_of(&timestamp_column);
-        let eq_properties = if is_memtable {
+        let eq_properties = if !sorted_by_time {
             EquivalenceProperties::new(schema)
         } else {
             match index {
@@ -155,12 +157,21 @@ impl DisplayAs for NewEmptyExec {
                 let limit_string = self
                     .limit
                     .map_or_else(|| "".to_string(), |l| format!(", limit={}", l));
+                let sorted_by_time_string = if self.sorted_by_time {
+                    ", sorted_by_time=true"
+                } else {
+                    ""
+                };
 
                 write!(f, "NewEmptyExec: ")?;
                 write!(
                     f,
-                    "{}{}{}{}",
-                    name_string, projection_string, filters_string, limit_string
+                    "{}{}{}{}{}",
+                    name_string,
+                    projection_string,
+                    filters_string,
+                    limit_string,
+                    sorted_by_time_string
                 )
             }
         }
@@ -221,5 +232,23 @@ impl ExecutionPlan for NewEmptyExec {
             &self.schema,
             None,
         ))
+    }
+}
+
+// add some unit tests here
+#[cfg(test)]
+mod tests {
+    use arrow::datatypes::{DataType, Field, Schema};
+
+    use super::*;
+
+    #[test]
+    fn test_new_empty_exec() {
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec = NewEmptyExec::new("test", schema, None, &[], None, false);
+        assert_eq!(exec.name(), "test");
+        assert_eq!(exec.projection(), None);
+        assert_eq!(exec.filters().len(), 0);
+        assert_eq!(exec.limit(), None);
     }
 }

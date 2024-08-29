@@ -127,7 +127,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 
     let mut new_trigger = db::scheduler::Trigger {
         next_run_at: Utc::now().timestamp_micros(),
-        is_realtime: false,
+        is_realtime: alert.is_real_time,
         is_silenced: false,
         status: db::scheduler::TriggerStatus::Waiting,
         retries: 0,
@@ -205,6 +205,11 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         error: None,
     };
 
+    let last_satisfied_at = if ret.is_some() {
+        Some(triggered_at)
+    } else {
+        None
+    };
     // send notification
     if let Some(data) = ret {
         let vars = get_row_column_map(&data);
@@ -288,6 +293,9 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             }
         };
     old_alert.last_triggered_at = Some(triggered_at);
+    if let Some(last_satisfied_at) = last_satisfied_at {
+        old_alert.last_satisfied_at = Some(last_satisfied_at);
+    }
     if let Err(e) = db::alerts::alert::set_without_updating_trigger(
         &org_id,
         stream_type,

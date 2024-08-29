@@ -123,7 +123,6 @@ const defaultObject = {
       showPagination: true,
     },
     scrollInfo: {},
-    flagWrapContent: true,
     pageType: "logs", // 'logs' or 'stream
     regions: [],
     clusters: [],
@@ -165,6 +164,7 @@ const defaultObject = {
       currentPage: 1,
       columns: <any>[],
       colOrder: <any>{},
+      colSizes: <any>{},
     },
     transforms: <any>[],
     queryResults: <any>[],
@@ -1702,7 +1702,9 @@ const useLogs = () => {
               if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
                 partitions.reverse();
               }
+
               await generateHistogramSkeleton();
+
               for (const partition of partitions) {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
@@ -2029,27 +2031,6 @@ const useLogs = () => {
     queryReq: any,
     appendResult: boolean = false,
   ) => {
-    if (
-      searchObj.data.resultGrid.colOrder &&
-      searchObj.data.resultGrid.colOrder.hasOwnProperty(
-        searchObj.data.stream.selectedStream,
-      ) &&
-      searchObj.data.resultGrid.colOrder[
-        searchObj.data.stream.selectedStream
-      ][0].length > 0 &&
-      searchObj.data.stream.selectedFields.length > 0
-    ) {
-      searchObj.data.stream.selectedFields = [];
-      const colOrderObject =
-        searchObj.data.resultGrid.colOrder[
-          searchObj.data.stream.selectedStream
-        ];
-
-      const colOrderArray: any = Object.values(colOrderObject);
-
-      searchObj.data.stream.selectedFields = colOrderArray[0];
-    }
-    // searchObj.data.stream.selectedFields =
     return new Promise((resolve, reject) => {
       // // set track_total_hits true for first request of partition to get total records in partition
       // // it will be used to send pagination request
@@ -2354,9 +2335,11 @@ const useLogs = () => {
         searchObj.loadingHistogram = false;
         searchObj.data.isOperationCancelled = false;
 
-        notificationMsg.value = "Search query was cancelled";
-        searchObj.data.histogram.errorMsg = "Search query was cancelled";
-        searchObj.data.histogram.errorDetail = "Search query was cancelled";
+        if (!searchObj.data.histogram?.xData?.length) {
+          notificationMsg.value = "Search query was cancelled";
+          searchObj.data.histogram.errorMsg = "Search query was cancelled";
+          searchObj.data.histogram.errorDetail = "Search query was cancelled";
+        }
         return;
       }
 
@@ -2448,13 +2431,6 @@ const useLogs = () => {
                 notificationMsg.value += " TraceID:" + trace_id;
                 trace_id = "";
               }
-            }
-
-            if (err?.request?.status >= 429) {
-              notificationMsg.value = err?.response?.data?.message;
-              searchObj.data.histogram.errorMsg = err?.response?.data?.message;
-              searchObj.data.histogram.errorDetail =
-                err?.response?.data?.error_detail;
             }
 
             reject(false);
@@ -2961,6 +2937,11 @@ const useLogs = () => {
 
       const parsedSQL: any = fnParsedSQL();
 
+      // By default when no fields are selected. Timestamp and Source will be visible. If user selects field, then only selected fields will be visible in table
+      // In SQL and Quick mode.
+      // If user adds timestamp manually then only we get it in response.
+      // If we don’t add timestamp and add timestamp to table it should show invalid date.
+
       if (searchObj.data.stream.selectedFields.length == 0) {
         searchObj.meta.resultGrid.manualRemoveFields = false;
         if (
@@ -2975,8 +2956,8 @@ const useLogs = () => {
           )
         ) {
           searchObj.data.resultGrid.columns.push({
-            name: "@timestamp",
-            id: "@timestamp",
+            name: store.state.zoConfig.timestamp_column,
+            id: store.state.zoConfig.timestamp_column,
             accessorFn: (row: any) =>
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
@@ -3020,11 +3001,15 @@ const useLogs = () => {
           });
         }
       } else {
-        // searchObj.data.stream.selectedFields.forEach((field: any) => {
-        if (searchObj.data.hasSearchDataTimestampField == true) {
+        if (
+          searchObj.data.hasSearchDataTimestampField ||
+          searchObj.data.stream.selectedFields.includes(
+            store.state.zoConfig.timestamp_column,
+          )
+        ) {
           searchObj.data.resultGrid.columns.unshift({
-            name: "@timestamp",
-            id: "@timestamp",
+            name: store.state.zoConfig.timestamp_column,
+            id: store.state.zoConfig.timestamp_column,
             accessorFn: (row: any) =>
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
@@ -3051,25 +3036,34 @@ const useLogs = () => {
           });
         }
 
-        //TODO Nikhil: create a key colSizes in resultGrid instead of directly adding dynamic key
-        //@ts-ignore
-        const sizes = (searchObj.data.resultGrid as any)[
-          searchObj.data.stream.selectedStream
-        ];
+        let sizes: any;
+        if (
+          searchObj.data.resultGrid.colSizes &&
+          searchObj.data.resultGrid.colSizes.hasOwnProperty(
+            searchObj.data.stream.selectedStream,
+          )
+        ) {
+          sizes =
+            searchObj.data.resultGrid.colSizes[
+              searchObj.data.stream.selectedStream
+            ];
+        }
 
         for (const field of searchObj.data.stream.selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
             let foundKey, foundValue;
 
-            Object.keys(sizes[0]).forEach((key) => {
-              const trimmedKey = key
-                .replace(/^--(header|col)-/, "")
-                .replace(/-size$/, "");
-              if (trimmedKey === field) {
-                foundKey = key;
-                foundValue = sizes[0][key];
-              }
-            });
+            if (sizes?.length > 0) {
+              Object.keys(sizes[0]).forEach((key) => {
+                const trimmedKey = key
+                  .replace(/^--(header|col)-/, "")
+                  .replace(/-size$/, "");
+                if (trimmedKey === field) {
+                  foundKey = key;
+                  foundValue = sizes[0][key];
+                }
+              });
+            }
 
             searchObj.data.resultGrid.columns.push({
               name: field,
@@ -3085,14 +3079,13 @@ const useLogs = () => {
                 showWrap: true,
                 wrapContent: false,
               },
-
-              size: foundValue,
+              size: foundValue || 250,
+              maxSize: window.innerWidth,
             });
           }
         }
       }
       extractFTSFields();
-      evaluateWrapContentFlag();
     } catch (e: any) {
       searchObj.loadingStream = false;
       console.log("Error while updating grid columns");
@@ -3717,31 +3710,6 @@ const useLogs = () => {
     }
   };
 
-  const evaluateWrapContentFlag = () => {
-    // Initialize a flag to false
-    let flag = false;
-
-    // Iterate through the array of objects
-    for (const item of searchObj.data.resultGrid.columns) {
-      // Check if the item's name is 'source' (the static field)
-      // if (item.name.toLowerCase() === "source") {
-      //   flag = true; // Set the flag to true if 'source' exists
-      // }
-      // Check if the item's name is in the ftsFields array
-      if (ftsFields.value.includes(item.name.toLowerCase())) {
-        flag = true; // Set the flag to true if an ftsField exists
-      }
-
-      // If the flag is already true, no need to continue checking
-      if (flag) {
-        searchObj.meta.flagWrapContent = flag;
-        break;
-      }
-    }
-
-    searchObj.meta.flagWrapContent = flag;
-  };
-
   const getSavedViews = async () => {
     try {
       searchObj.loadingSavedView = true;
@@ -4025,7 +3993,6 @@ const useLogs = () => {
     handleRunQuery,
     generateHistogramData,
     extractFTSFields,
-    evaluateWrapContentFlag,
     getSavedViews,
     onStreamChange,
     generateURLQuery,

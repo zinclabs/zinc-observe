@@ -288,7 +288,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="float-right col-auto q-mb-xs">
         <q-toggle
           data-test="logs-search-bar-wrap-table-content-toggle-btn"
-          v-if="searchObj.meta.flagWrapContent"
           v-model="searchObj.meta.toggleSourceWrap"
           icon="wrap_text"
           :title="t('search.messageWrapContent')"
@@ -1174,6 +1173,16 @@ export default defineComponent({
           } else if (item.expr.args.expr.value) {
             columnNames.push(item.expr.args.expr.value);
           }
+        } else if (
+          item.expr &&
+          item.expr.name &&
+          item.expr.type === "function"
+        ) {
+          item.expr.args.value.map((val) => {
+            if (val.type === "column_ref") {
+              columnNames.push(val.column);
+            }
+          });
         }
       });
       return columnNames;
@@ -1730,6 +1739,14 @@ export default defineComponent({
             store.dispatch("setSavedViewFlag", true);
             const extractedObj = res.data.data;
 
+            // Add colOrder to searchObj if saved view don't have colOrder property in resultGrid
+            if (!extractedObj.data.resultGrid.hasOwnProperty("colOrder")) {
+              extractedObj.data.resultGrid.colOrder = {};
+              extractedObj.data.resultGrid.colOrder[
+                extractedObj.data.stream.selectedStream
+              ] = [];
+            }
+
             if (extractedObj.data?.timezone) {
               store.dispatch("setTimezone", extractedObj.data.timezone);
             }
@@ -1967,29 +1984,35 @@ export default defineComponent({
                 console.log(e);
               }
             }, 1000);
+
             if (
               extractedObj.data.resultGrid.colOrder &&
               extractedObj.data.resultGrid.colOrder.hasOwnProperty(
                 searchObj.data.stream.selectedStream,
               )
             ) {
-              const colOrderObject =
+              searchObj.data.stream.selectedFields =
                 extractedObj.data.resultGrid.colOrder[
                   searchObj.data.stream.selectedStream
                 ];
-
-              const colOrderArray = Object.values(colOrderObject);
-
-              searchObj.data.stream.selectedFields = colOrderArray[0];
             } else {
               searchObj.data.stream.selectedFields =
                 extractedObj.data.stream.selectedFields;
             }
 
-            searchObj.data.resultGrid[searchObj.data.stream.selectedStream] =
-              extractedObj.data.resultGrid[
+            if (
+              extractedObj.data.resultGrid.colSizes &&
+              extractedObj.data.resultGrid.colSizes.hasOwnProperty(
+                searchObj.data.stream.selectedStream,
+              )
+            ) {
+              searchObj.data.resultGrid.colSizes[
                 searchObj.data.stream.selectedStream
-              ];
+              ] =
+                extractedObj.data.resultGrid.colSizes[
+                  searchObj.data.stream.selectedStream
+                ];
+            }
 
             // } else {
             //   searchObj.value = mergeDeep(searchObj, extractedObj);
@@ -2120,6 +2143,7 @@ export default defineComponent({
 
         savedSearchObj.data.timezone = store.state.timezone;
         delete savedSearchObj.value;
+
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
       } catch (e) {
@@ -2303,9 +2327,7 @@ export default defineComponent({
 
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
-        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.join(
-          ",",
-        )}" ORDER BY ${store.state.zoConfig.timestamp_column} DESC`;
+        searchObj.data.query = `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream}"`;
         if (
           searchObj.data.stream.interestingFieldList.length > 0 &&
           searchObj.meta.quickMode
