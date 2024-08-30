@@ -19,7 +19,7 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        inverted_index::reader::Contains,
+        inverted_index::search::{ExactSearch, SubstringSearch},
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
@@ -28,7 +28,6 @@ use config::{
     },
     FILE_EXT_PARQUET, INDEX_FIELD_NAME_FOR_ALL,
 };
-use fst::{automaton::Str, IntoStreamer, Streamer};
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
@@ -475,7 +474,7 @@ async fn cache_files<'a>(
 /// If the query not find corresponding index file, the file will *not* be filtered out.
 async fn filter_file_list_by_inverted_index(
     trace_id: &str,
-    file_list: &mut [FileKey],
+    file_list: &mut Vec<FileKey>,
     sql: &Sql,
     stream_type: StreamType,
 ) -> Result<usize, Error> {
@@ -483,7 +482,7 @@ async fn filter_file_list_by_inverted_index(
     // Cache the corresponding Index files
     let cfg = get_config();
     let mut scan_stats = ScanStats::new();
-    let mut file_list_map = file_list.iter_mut().into_group_map_by(|f| f.key.clone());
+    let mut file_list_map = file_list.drain(..).into_group_map_by(|f| f.key.clone());
     let index_file_names = file_list_map
         .keys()
         .filter_map(|f| convert_parquet_idx_file_name(f))
@@ -593,6 +592,7 @@ async fn filter_file_list_by_inverted_index(
             }
         }
     }
+    file_list.extend(file_list_map.into_values().flatten());
     Ok(start.elapsed().as_millis() as usize)
 }
 
@@ -646,105 +646,45 @@ async fn inverted_index_search_in_file(
     let file_meta = index_reader.metadata().await?;
 
     let mut res = BitVec::new();
-    // filter through full text terms
+
     if let Some(column_index_meta) = &file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
-        // TODO: still have no min_value, max_value
-        // max_len: 5, i want search: taiming
-        let valid_terms = fts_terms
-            .iter()
-            // We do not check the min length here since smaller term can exist in the index for Full Text Search
-            .filter(|term| term.len() <= column_index_meta.max_len)
-            .collect::<Vec<_>>();
-        if !valid_terms.is_empty() {
-            let fst_offset =
-                column_index_meta.base_offset + column_index_meta.relative_fst_offset as u64;
-            let fst_size = column_index_meta.fst_size;
-            match index_reader.fst(fst_offset, fst_size).await {
-                Err(e) => {
-                    log::warn!(
-                        "[trace_id {trace_id}] search->storage: Error loading FST map from index file {} for column {} with error {}. Keep the file",
-                        index_file_name,
-                        INDEX_FIELD_NAME_FOR_ALL,
-                        e.to_string()
-                    );
+        let mut full_text_search =
+            SubstringSearch::new(fts_terms.as_ref(), column_index_meta).await;
+        match full_text_search.search(&mut index_reader).await {
+            Ok(bitmap) => {
+                if res.len() < bitmap.len() {
+                    res.resize(bitmap.len(), false);
                 }
-                Ok(fst_map) => {
-                    // construct automatons for multiple full text search terms
-                    let matchers = valid_terms
-                        .iter()
-                        .map(|term| Contains::new(term))
-                        .collect::<Vec<Contains>>();
-
-                    for matcher in matchers {
-                        // Stream for matched keys and their bitmap offsets
-                        let mut stream = fst_map.search(matcher).into_stream();
-                        // We do not care about the key at this point, only the offset
-                        while let Some((_, value)) = stream.next() {
-                            let bitmap = index_reader.get_bitmap(column_index_meta, value).await?;
-
-                            // Resize if the res map is smaller than the bitmap
-                            if res.len() < bitmap.len() {
-                                res.resize(bitmap.len(), false);
-                            }
-                            // bitwise OR to combine the bitmaps of all the terms
-                            res |= bitmap;
-                        }
-                    }
-                }
-            };
+                res |= bitmap;
+            }
+            Err(e) => {
+                log::warn!(
+                    "[trace_id {trace_id}] search->storage: Error loading FST map from index file {} for full text search with error {}. Keep the file",
+                    index_file_name,
+                    e.to_string()
+                );
+            }
         }
     }
 
     if !index_terms.is_empty() {
         for (col, index_terms) in index_terms.iter() {
             if let Some(column_index_meta) = file_meta.metas.get(col) {
-                let valid_terms = index_terms
-                    .iter()
-                    .filter(|term| {
-                        term.len() >= column_index_meta.min_len
-                            && term.len() <= column_index_meta.max_len
-                    })
-                    // Filter out the terms which are outside the min and max value of the column
-                    .filter(|term| column_index_meta.min_val.as_slice() <= term.as_bytes() && term.as_bytes() <= column_index_meta.max_val.as_slice())
-                    .collect::<Vec<_>>();
-                if !valid_terms.is_empty() {
-                    let fst_offset = column_index_meta.base_offset
-                        + column_index_meta.relative_fst_offset as u64;
-                    let fst_size = column_index_meta.fst_size;
-                    match index_reader.fst(fst_offset, fst_size).await {
-                        Err(e) => {
-                            log::warn!(
-                                "[trace_id {trace_id}] search->storage: Error loading FST map from index file {} for column {} with error {}. Keep the file",
-                                index_file_name,
-                                col,
-                                e.to_string()
-                            );
+                let mut secondary_index_match = ExactSearch::new(index_terms, column_index_meta);
+                match secondary_index_match.search(&mut index_reader).await {
+                    Ok(bitmap) => {
+                        if res.len() < bitmap.len() {
+                            res.resize(bitmap.len(), false);
                         }
-                        Ok(fst_map) => {
-                            // construct automatons for multiple full text search terms
-                            let matchers = valid_terms
-                                .iter()
-                                .map(|term| Str::new(term))
-                                .collect::<Vec<Str>>();
-
-                            for matcher in matchers {
-                                // Stream for matched keys and their bitmap offsets
-                                let mut stream = fst_map.search(matcher).into_stream();
-                                // We do not care about the key at this point, only the offset
-                                while let Some((_, value)) = stream.next() {
-                                    let bitmap =
-                                        index_reader.get_bitmap(column_index_meta, value).await?;
-
-                                    // Resize if the res map is smaller than the bitmap
-                                    if res.len() < bitmap.len() {
-                                        res.resize(bitmap.len(), false);
-                                    }
-                                    // here we are doing bitwise OR to combine the bitmaps of all
-                                    // the terms
-                                    res |= bitmap;
-                                }
-                            }
-                        }
+                        res &= bitmap;
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "[trace_id {trace_id}] search->storage: Error loading FST map from index file {} for column {} with error {}. Keep the file",
+                            index_file_name,
+                            col,
+                            e.to_string()
+                        );
                     }
                 }
             }

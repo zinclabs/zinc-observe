@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod reader;
+pub mod search;
 pub mod writer;
 
 use std::{collections::HashMap, io::Write};
