@@ -179,7 +179,7 @@ pub async fn search(
         return Ok(cluster_rpc::SearchResponse {
             job: req.job.clone(),
             took: start.elapsed().as_millis() as i32,
-            idx_took: 0,
+            idx_took: scan_stats.idx_took as i32,
             from: sql.meta.offset as i32,
             size: sql.meta.limit as i32,
             total: 0,
