@@ -82,7 +82,7 @@ fn validate_input_percentile_expr(expr: &Expr) -> Result<f64> {
         ScalarValue::Float64(Some(q)) => *q,
         got => {
             return not_impl_err!(
-                "Percentile value for 'APPROX_PERCENTILE_CONT' must be Float32 or Float64 literal (got data type {})",
+                "Percentile value for 'PERCENTILE_CONT' must be Float32 or Float64 literal (got data type {})",
                 got.data_type()
             );
         }
@@ -134,7 +134,7 @@ fn merge_sorted_arrays(existing: &mut Vec<f64>, new: &[f64]) {
 }
 
 /// This accumulator will return the exact percentile value
-/// from the given data, unlike `ApproxPercentileAccumulator`
+/// from the given data
 #[derive(Default, Debug)]
 struct PercentileCont {
     data: Vec<f64>,
@@ -150,6 +150,8 @@ impl PercentileCont {
         }
     }
 }
+
+// TODO(Uddhav): Add function to convert DataTypes to f64Array for this accumulator
 
 impl Accumulator for PercentileCont {
     fn state(&mut self) -> Result<Vec<ScalarValue>> {
@@ -211,6 +213,8 @@ impl Accumulator for PercentileCont {
     }
 
     fn merge_batch(&mut self, states: &[ArrayRef]) -> Result<()> {
+        // TODO(Uddhav): Most of the code is duplicated from update_batch.
+        // Reduce duplication and improve performance.
         let mut values = Arc::clone(&states[0]);
         // Filter out null values
         if values.nulls().is_some() {
@@ -289,17 +293,6 @@ mod test {
         let ctx = create_context();
         let percentile = 0.75;
         let sql = &format!("select percentile_cont(value, {}) from t", percentile);
-
-        // Creates a udaf with default percentile
-        // let acc_udaf = create_udaf(
-        //     PERCENTILE_EXACT,
-        //     vec![DataType::Float64, DataType::Float64],
-        //     Arc::new(DataType::Float64),
-        //     Volatility::Immutable,
-        //     Arc::new(|_| Ok(Box::<PercentileCont>::default())),
-        //     Arc::new(vec![DataType::Float64]),
-        // );
-
         let acc_udaf = AggregateUDF::from(PercentileContUdaf::new());
         ctx.register_udaf(acc_udaf);
 
@@ -309,14 +302,6 @@ mod test {
         let result = as_float64_array(results[0].column(0)).unwrap();
 
         // verify that the calculation is correct
-        // assert!((result.value(0) - 8.0).abs() < f64::EPSILON);
-        println!(
-            "The {} percentile of data is {}",
-            percentile,
-            result.value(0)
-        );
-        // let count = result.iter().map(|batch| batch.num_rows()).sum::<usize>();
-        // assert_eq!(count, 1);
-        // assert_eq!(result.first().unwrap(), ScalarValue::Float64(Some(2456.5)));
+        assert_eq!(result.value(0), 2456.5);
     }
 }

@@ -14,9 +14,9 @@ pub struct SubstringSearch<'b> {
 }
 
 impl<'b> SubstringSearch<'b> {
-    pub async fn new(terms: &Vec<String>, meta: &'b ColumnIndexMeta) -> Self {
+    pub async fn new(terms: &[String], meta: &'b ColumnIndexMeta) -> Self {
         SubstringSearch {
-            terms: terms.clone(),
+            terms: terms.to_vec(),
             meta,
         }
     }
@@ -45,9 +45,9 @@ pub struct ExactSearch<'b> {
 }
 
 impl<'b> ExactSearch<'b> {
-    pub fn new(terms: &Vec<String>, meta: &'b ColumnIndexMeta) -> Self {
+    pub fn new(terms: &[String], meta: &'b ColumnIndexMeta) -> Self {
         ExactSearch {
-            terms: terms.clone(),
+            terms: terms.to_vec(),
             meta,
         }
     }
