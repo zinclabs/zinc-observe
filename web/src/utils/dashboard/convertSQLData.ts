@@ -236,7 +236,7 @@ export const convertSQLData = async (
     }
 
     // Extract and process metaDataStartTime
-    const metaDataStartTime = metadata.queries[0].startTime.toString();
+    const metaDataStartTime = metadata?.queries[0]?.startTime?.toString() ?? 0;
     const startTime = new Date(parseInt(metaDataStartTime) / 1000);
 
     // Calculate the binnedDate
@@ -264,7 +264,7 @@ export const convertSQLData = async (
     }
 
     // Extract and process metaDataEndTime
-    const metaDataEndTime = metadata.queries[0].endTime.toString();
+    const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
     const endTime = new Date(parseInt(metaDataEndTime) / 1000);
 
     const xAxisKeysWithoutTimeStamp = getXAxisKeys().filter(
