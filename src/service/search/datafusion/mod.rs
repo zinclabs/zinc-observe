@@ -21,6 +21,7 @@ pub mod physical_plan;
 pub mod plan;
 pub mod storage;
 pub mod table_provider;
+pub mod udaf;
 pub mod udf;
 
 /// Extension setting for query limit
