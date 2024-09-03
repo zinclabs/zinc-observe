@@ -21,7 +21,7 @@ use std::{
 use actix_web::http;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
-    get_config,
+    get_config, ider,
     meta::stream::StreamType,
     utils::{
         base64,
@@ -48,7 +48,7 @@ use crate::{
     service::{
         alerts::{build_sql, destinations},
         db,
-        search::sql::RE_ONLY_SELECT,
+        search::{self as SearchService, sql::RE_ONLY_SELECT},
     },
 };
 
@@ -335,6 +335,57 @@ pub async fn trigger(
         .send_notification(&[])
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+}
+
+pub async fn history(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    name: &str,
+) -> Result<config::meta::search::Response, (http::StatusCode, anyhow::Error)> {
+    let config = get_config();
+    if !config.common.usage_enabled {
+        return Err((
+            http::StatusCode::SERVICE_UNAVAILABLE,
+            anyhow::anyhow!("Usage tracking is disabled"),
+        ));
+    }
+    let usage_org = &config.common.usage_org;
+
+    let now = Utc::now().timestamp_micros();
+    let key = format!("{}/{}/{}", stream_type, stream_name, name);
+    let req = config::meta::search::Request {
+        // TODO: Add more filters/flexibility to this query
+        query: config::meta::search::Query {
+            sql: format!(
+                "SELECT * FROM \"{}\" WHERE org = '{}' AND module = 'alert' AND key = '{}'",
+                config::meta::usage::TRIGGERS_USAGE_STREAM,
+                org_id,
+                key
+            ),
+            size: 20,
+            // end_time: now,
+            // start_time: now - Duration::days(7).num_microseconds().unwrap(),
+            ..Default::default()
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 0,
+        search_type: Some(config::meta::search::SearchEventType::UI),
+    };
+
+    let trace_id = ider::uuid();
+    let resp = match SearchService::search(&trace_id, usage_org, stream_type, None, &req).await {
+        Ok(v) => v,
+        Err(e) => {
+            return Err((
+                http::StatusCode::INTERNAL_SERVER_ERROR,
+                anyhow::anyhow!("Error fetching alert trigger data: {e}"),
+            ));
+        }
+    };
+    Ok(resp)
 }
 
 impl Alert {
