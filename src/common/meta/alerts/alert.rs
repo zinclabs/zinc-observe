@@ -98,3 +98,11 @@ impl Default for Alert {
         }
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct AlertHistoryFilter {
+    pub from: i64,
+    pub to: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
