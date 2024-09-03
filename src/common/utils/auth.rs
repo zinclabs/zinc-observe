@@ -383,6 +383,17 @@ impl FromRequest for AuthExtractor {
                     path_columns[2]
                 )
             }
+        } else if url_len == 5
+            && path_columns[2].eq("alerts")
+            && path_columns[url_len - 1].eq("history")
+        {
+            format!(
+                "{}:{}",
+                OFGA_MODELS
+                    .get(path_columns[2])
+                    .map_or(path_columns[2], |model| model.key),
+                path_columns[3]
+            )
         } else {
             format!(
                 "{}:{}",
