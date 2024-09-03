@@ -202,6 +202,39 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             trigger_data_stream.is_partial = Some(true);
         }
         trigger_data_stream.error = Some(err_string);
+        // Store the error in the alert
+        // Check if the alert has been disabled in the mean time
+        let mut old_alert =
+            match super::alert::get(&org_id, stream_type, stream_name, alert_name).await? {
+                Some(alert) => alert,
+                None => {
+                    return Err(anyhow::anyhow!(
+                        "alert not found: {}/{}/{}/{}",
+                        org_id,
+                        stream_name,
+                        stream_type,
+                        alert_name
+                    ));
+                }
+            };
+        old_alert.last_triggered_at = Some(triggered_at);
+        old_alert.error = Some(err.to_string());
+        if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
+            // It has been tried the maximum time, just disable the alert
+            // and show the error.
+            old_alert.enabled = false;
+        }
+        if let Err(e) = db::alerts::alert::set_without_updating_trigger(
+            &org_id,
+            stream_type,
+            stream_name,
+            &old_alert,
+        )
+        .await
+        {
+            log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
+        }
+
         // update its status and retries
         db::scheduler::update_status(
             &new_trigger.org,
@@ -211,25 +244,6 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             trigger.retries + 1,
         )
         .await?;
-        if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
-            // It has been tried the maximum time, just disable the alert
-            // and show the error.
-            if let Some(mut alert) =
-                super::alert::get(&org_id, stream_type, stream_name, alert_name).await?
-            {
-                alert.enabled = false;
-                if let Err(e) = db::alerts::alert::set_without_updating_trigger(
-                    &org_id,
-                    stream_type,
-                    stream_name,
-                    &alert,
-                )
-                .await
-                {
-                    log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
-                }
-            }
-        }
         publish_triggers_usage(trigger_data_stream).await;
         return Err(err);
     }
@@ -295,6 +309,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     } else {
         None
     };
+    let mut error = "".to_string();
     // send notification
     if let Some(data) = ret {
         let vars = get_row_column_map(&data);
@@ -349,11 +364,11 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 db::scheduler::update_trigger(new_trigger).await?;
             }
             Err(e) => {
-                log::error!(
-                    "Error sending alert notification: org: {}, module_key: {}",
-                    &new_trigger.org,
-                    &new_trigger.module_key
+                error = format!(
+                    "Error sending notification for org {}, alert {}: {e}",
+                    &new_trigger.org, &new_trigger.module_key
                 );
+                log::error!("{error}");
                 if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
                     // It has been tried the maximum time, just update the
                     // next_run_at to the next expected trigger time
@@ -438,6 +453,9 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     old_alert.last_triggered_at = Some(triggered_at);
     if let Some(last_satisfied_at) = last_satisfied_at {
         old_alert.last_satisfied_at = Some(last_satisfied_at);
+    }
+    if !error.is_empty() {
+        old_alert.error = Some(error);
     }
     if let Err(e) = db::alerts::alert::set_without_updating_trigger(
         &org_id,
