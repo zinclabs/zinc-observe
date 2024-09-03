@@ -168,6 +168,34 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         let err = result.err().unwrap();
         trigger_data_stream.status = TriggerDataStatus::Failed;
         trigger_data_stream.error = Some(err.to_string());
+        // Store the error in the alert
+        // Check if the alert has been disabled in the mean time
+        let mut old_alert =
+            match super::alert::get(&org_id, stream_type, stream_name, alert_name).await? {
+                Some(alert) => alert,
+                None => {
+                    return Err(anyhow::anyhow!(
+                        "alert not found: {}/{}/{}/{}",
+                        org_id,
+                        stream_name,
+                        stream_type,
+                        alert_name
+                    ));
+                }
+            };
+        old_alert.last_triggered_at = Some(triggered_at);
+        old_alert.error = Some(err.to_string());
+        if let Err(e) = db::alerts::alert::set_without_updating_trigger(
+            &org_id,
+            stream_type,
+            stream_name,
+            &old_alert,
+        )
+        .await
+        {
+            log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
+        }
+
         // update its status and retries
         db::scheduler::update_status(
             &new_trigger.org,
@@ -230,6 +258,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     } else {
         None
     };
+    let mut error = "".to_string();
     // send notification
     if let Some(data) = ret {
         let vars = get_row_column_map(&data);
@@ -247,22 +276,22 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 db::scheduler::update_trigger(new_trigger).await?;
             }
             Ok((false, msg)) => {
-                log::error!(
+                error = format!(
                     "Some notifications for alert {}/{} could not be sent: {msg}",
-                    &new_trigger.org,
-                    &new_trigger.module_key
+                    &new_trigger.org, &new_trigger.module_key
                 );
+                log::error!("{error}");
                 // Notification is already sent to some destinations,
                 // hence no need to retry
                 trigger_data_stream.error = Some(msg);
                 db::scheduler::update_trigger(new_trigger).await?;
             }
             Err(e) => {
-                log::error!(
-                    "Error sending alert notification: org: {}, module_key: {}",
-                    &new_trigger.org,
-                    &new_trigger.module_key
+                error = format!(
+                    "Error sending notification for org {}, alert {}: {e}",
+                    &new_trigger.org, &new_trigger.module_key
                 );
+                log::error!("{error}");
                 if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
                     // It has been tried the maximum time, just update the
                     // next_run_at to the next expected trigger time
@@ -322,6 +351,9 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     old_alert.last_triggered_at = Some(triggered_at);
     if let Some(last_satisfied_at) = last_satisfied_at {
         old_alert.last_satisfied_at = Some(last_satisfied_at);
+    }
+    if !error.is_empty() {
+        old_alert.error = Some(error);
     }
     if let Err(e) = db::alerts::alert::set_without_updating_trigger(
         &org_id,

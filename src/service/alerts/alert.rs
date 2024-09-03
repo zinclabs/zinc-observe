@@ -74,6 +74,9 @@ pub async fn save(
     let stream_type = alert.stream_type;
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
+    // Even if we don't know if there is any error, we can set it to None.
+    // The alert manager will eventually set it to the actual error if there is any
+    alert.error = None;
 
     match db::alerts::alert::get(org_id, stream_type, stream_name, &alert.name).await {
         Ok(Some(old_alert)) => {
