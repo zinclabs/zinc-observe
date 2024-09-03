@@ -359,7 +359,7 @@ export default defineComponent({
 
 <style lang="scss">
 .logs-query-editor {
-  --vscode-focusBorder: gray !important;
+  --vscode-focusBorder: #515151 !important;
   .monaco-editor,
   .monaco-editor .monaco-editor {
     padding: 0px 0px 0px 0px !important;
