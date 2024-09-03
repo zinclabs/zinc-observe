@@ -125,6 +125,15 @@ impl HttpResponse {
         ))
     }
 
+    /// Send a InternalServerError response in json format and associate the
+    /// provided error as `error` field.
+    pub fn service_unavailable(error: impl ToString) -> ActixHttpResponse {
+        ActixHttpResponse::ServiceUnavailable().json(Self::error(
+            StatusCode::SERVICE_UNAVAILABLE.into(),
+            error.to_string(),
+        ))
+    }
+
     /// Send a response in json format, status code is 200.
     /// The payload should be serde-serializable.
     pub fn json(payload: impl Serialize) -> ActixHttpResponse {

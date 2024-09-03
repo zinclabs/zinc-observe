@@ -426,3 +426,46 @@ async fn trigger_alert(
         },
     }
 }
+
+/// ShowAlertHistory
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ShowAlertHistory",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("alert_name" = String, Path, description = "Alert name"),
+    ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 503, description = "Service Unavailable",  content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/{stream_name}/alerts/{alert_name}/history")]
+async fn show_alert_history(
+    path: web::Path<(String, String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name, name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or_default(),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    };
+    match alert::history(&org_id, stream_type, &stream_name, &name).await {
+        Ok(res) => Ok(MetaHttpResponse::json(res)),
+        Err(e) => match e {
+            (http::StatusCode::SERVICE_UNAVAILABLE, e) => {
+                Ok(MetaHttpResponse::service_unavailable(e))
+            }
+            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+        },
+    }
+}
