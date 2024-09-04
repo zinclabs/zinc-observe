@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :filter="filterQuery"
         :filter-method="filterData"
         style="width: 100%"
+        :visible-columns="visibleColumns"
       >
         <template #no-data>
           <div
@@ -87,7 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <NoData />
           </template>
         </template>
+       
+
         <template v-slot:body-cell-actions="props">
+          
           <q-td :props="props">
             <div
               data-test="alert-list-loading-alert"
@@ -165,11 +169,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
           </q-td>
         </template>
-
+        
         <template #top="scope">
+          
           <div class="q-table__title" data-test="alerts-list-title">
             {{ t("alerts.header") }}
           </div>
+        <div class="q-ml-auto flex ">
+          <q-select
+          v-model="visibleColumns"
+          multiple
+          outlined
+          dense
+          options-dense
+          :display-value="$q.lang.table.columns"
+          emit-value
+          map-options
+          :options="columnsCanBeSelected"
+          option-value="name"
+          class="q-pr-md"
+          style="min-width: 150px; "
+        />
+          
           <q-input
             data-test="alert-list-search-input"
             v-model="filterQuery"
@@ -179,10 +200,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="q-ml-auto q-mb-xs no-border"
             :placeholder="t('alerts.search')"
           >
+          
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
             </template>
+            
           </q-input>
+        </div>
           <q-btn
             data-test="alert-list-add-alert-btn"
             class="q-ml-md q-mb-xs text-bold no-border"
@@ -194,6 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t(`alerts.add`)"
             @click="showAddUpdateFn({})"
           />
+        
 
           <QTablePagination
             :scope="scope"
@@ -203,9 +228,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :perPageOptions="perPageOptions"
             @update:changeRecordPerPage="changePagination"
           />
+        
         </template>
 
+        
+
         <template #bottom="scope">
+
           <QTablePagination
             :scope="scope"
             :position="'bottom'"
@@ -213,6 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :perPageOptions="perPageOptions"
             @update:changeRecordPerPage="changePagination"
           />
+          
         </template>
       </q-table>
     </div>
@@ -374,6 +404,9 @@ export default defineComponent({
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
+    const visibleColumns =  ref(['name','alert_type','stream_type',"stream_name",'owner','last_triggered_at', 'last_satisfied_at','actions' ]);
+    const columnsCanBeSelected  = ref(['alert_type','stream_type',"stream_name",'owner','conditions','description','actions'])
+
     const splitterModel = ref(220);
     const showForm = ref(false);
     const indexOptions = ref([]);
@@ -918,6 +951,8 @@ export default defineComponent({
       formData,
       hideForm,
       confirmDelete,
+      visibleColumns,
+      columnsCanBeSelected,
       selectedDelete,
       updateStreams,
       updateStreamName,
@@ -998,6 +1033,7 @@ export default defineComponent({
   },
 });
 </script>
+
 
 <style lang="scss">
 .q-table {
