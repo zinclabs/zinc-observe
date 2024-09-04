@@ -22,7 +22,11 @@ use actix_web::http;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     get_config, ider,
-    meta::stream::StreamType,
+    meta::{
+        search::SearchEventType,
+        stream::StreamType,
+        usage::{RequestStats, UsageType, TRIGGERS_USAGE_STREAM},
+    },
     utils::{
         base64,
         json::{Map, Value},
@@ -50,6 +54,7 @@ use crate::{
         db,
         search::{self as SearchService, sql::RE_ONLY_SELECT},
         short_url,
+        usage::report_request_usage_stats,
     },
 };
 
@@ -352,8 +357,10 @@ pub async fn history(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
+    user_id: &str,
     filters: AlertHistoryFilter,
 ) -> Result<config::meta::search::Response, (http::StatusCode, anyhow::Error)> {
+    let now = Utc::now().timestamp_micros();
     let config = get_config();
     if !config.common.usage_enabled {
         return Err((
@@ -363,11 +370,7 @@ pub async fn history(
     }
     let usage_org = &config.common.usage_org;
 
-    let end_time = if filters.to == 0 {
-        Utc::now().timestamp_micros()
-    } else {
-        filters.to
-    };
+    let end_time = if filters.to == 0 { now } else { filters.to };
     let start_time = if filters.from == 0 {
         // 15 minutes ago by default
         end_time - Duration::minutes(15).num_microseconds().unwrap()
@@ -379,9 +382,7 @@ pub async fn history(
         query: config::meta::search::Query {
             sql: format!(
                 "SELECT * FROM \"{}\" WHERE org = '{}' AND module = 'alert' AND key = '{}'",
-                config::meta::usage::TRIGGERS_USAGE_STREAM,
-                org_id,
-                key
+                TRIGGERS_USAGE_STREAM, org_id, key
             ),
             size: filters.limit,
             from: filters.offset,
@@ -393,12 +394,15 @@ pub async fn history(
         regions: vec![],
         clusters: vec![],
         timeout: 0,
-        search_type: Some(config::meta::search::SearchEventType::UI),
+        search_type: Some(SearchEventType::UI),
         index_type: "".to_string(),
     };
 
     let trace_id = ider::uuid();
-    let res = match SearchService::search(&trace_id, usage_org, stream_type, None, &req).await {
+    let start = std::time::Instant::now();
+    // Fetch the alert trigger data from usage org
+    let res = match SearchService::search(&trace_id, usage_org, StreamType::Logs, None, &req).await
+    {
         Ok(v) => v,
         Err(e) => {
             return Err((
@@ -407,7 +411,40 @@ pub async fn history(
             ));
         }
     };
-    // TODO: Publish usage event
+
+    // Publish usage event
+    let req_stats = RequestStats {
+        records: res.hits.len() as i64,
+        response_time: start.elapsed().as_secs_f64(),
+        size: res.scan_size as f64,
+        request_body: Some(req.query.sql),
+        user_email: Some(user_id.to_string()),
+        min_ts: Some(start_time),
+        max_ts: Some(end_time),
+        cached_ratio: Some(res.cached_ratio),
+        search_type: Some(SearchEventType::UI),
+        trace_id: Some(trace_id),
+        took_wait_in_queue: if res.took_detail.is_some() {
+            let resp_took = res.took_detail.as_ref().unwrap();
+            // Consider only the cluster wait queue duration
+            Some(resp_took.cluster_wait_queue)
+        } else {
+            None
+        },
+        ..Default::default()
+    };
+    let num_fn = req.query.query_fn.is_some() as u16;
+    report_request_usage_stats(
+        req_stats,
+        usage_org,
+        TRIGGERS_USAGE_STREAM,
+        StreamType::Logs,
+        UsageType::Search,
+        num_fn,
+        now,
+    )
+    .await;
+
     Ok(res)
 }
 

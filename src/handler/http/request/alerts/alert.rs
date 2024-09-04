@@ -452,6 +452,7 @@ async fn show_alert_history(
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name, name) = path.into_inner();
+    let user_id = req.headers().get("user_id").unwrap().to_str().unwrap();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or_default(),
@@ -481,7 +482,7 @@ async fn show_alert_history(
         limit,
         offset,
     };
-    match alert::history(&org_id, stream_type, &stream_name, &name, filters).await {
+    match alert::history(&org_id, stream_type, &stream_name, &name, user_id, filters).await {
         Ok(res) => Ok(MetaHttpResponse::json(res)),
         Err(e) => match e {
             (http::StatusCode::SERVICE_UNAVAILABLE, e) => {
