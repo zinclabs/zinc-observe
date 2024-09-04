@@ -476,11 +476,16 @@ async fn show_alert_history(
         Some(v) => v.parse::<i64>().unwrap_or_default(),
         None => 0,
     };
+    let period = match query.get("period") {
+        Some(v) => v.parse::<i64>().unwrap_or_default(),
+        None => 0,
+    };
     let filters = AlertHistoryFilter {
         from,
         to,
         limit,
         offset,
+        period,
     };
     match alert::history(&org_id, stream_type, &stream_name, &name, user_id, filters).await {
         Ok(res) => Ok(MetaHttpResponse::json(res)),

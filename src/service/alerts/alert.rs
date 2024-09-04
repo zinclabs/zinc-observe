@@ -372,8 +372,13 @@ pub async fn history(
 
     let end_time = if filters.to == 0 { now } else { filters.to };
     let start_time = if filters.from == 0 {
-        // 15 minutes ago by default
-        end_time - Duration::minutes(15).num_microseconds().unwrap()
+        let period = if filters.period == 0 {
+            // 15 minutes ago by default
+            15
+        } else {
+            filters.period
+        };
+        end_time - Duration::minutes(period).num_microseconds().unwrap()
     } else {
         filters.from
     };
