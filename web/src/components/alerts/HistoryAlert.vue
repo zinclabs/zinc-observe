@@ -108,26 +108,51 @@ export default defineComponent({
 
     const columnsToBeRendered = ref([]);
 
-const generateColumns = (data) => {
+    const generateColumns = (data) => {
   if (data.length === 0) return [];
   
-  const keys = Object.keys(data[0]);
+  const desiredOrder = [
+    '_timestamp', 'key', 'start_time', 'end_time', 'next_run_at',
+    'is_realtime', 'is_silenced', 'retries', 'status'
+  ];
+
+  const keys = Object.keys(data[0])
+    .filter(key => key !== 'module' && key !== 'org'); // Remove 'module' and 'org'
+
+  // Order the keys according to the desired order, putting others at the end
+  const orderedKeys = desiredOrder.concat(keys.filter(key => !desiredOrder.includes(key)));
   
-  return keys.map(key => ({
-    id: key,
-    header: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '), 
-    accessorKey: key,
-    label: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '), 
-    sortable: true,
-    align:"center",
-    enableResizing: true,
-    meta: {
-      closable: false,
-      showWrap: false,
-      wrapContent: false,
-    },
-  }));
+  return orderedKeys.map(key => {
+    let columnWidth = 200; // Default width
+    
+    // Customize widths for specific columns
+    if (key === '_timestamp' || key === 'key') {
+      columnWidth = 200;
+    } else if (key === 'is_realtime' || key === 'is_silenced' || key === 'retries') {
+      columnWidth = 100;
+    } else if (key === 'status') {
+      columnWidth = 200;
+    }
+    
+    return {
+      id: key,
+      header: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '), 
+      accessorKey: key,
+      label: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '), 
+      sortable: true,
+      align: "center",
+      enableResizing: true,
+      size: columnWidth, // Add column size
+      meta: {
+        closable: false,
+        showWrap: false,
+        wrapContent: false,
+      },
+    };
+  });
 };
+
+
 
 const convertUnixToQuasarFormat = (unixMicroseconds) => {
       if (!unixMicroseconds) return "";
