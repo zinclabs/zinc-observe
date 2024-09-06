@@ -19,6 +19,7 @@ import AddTemplate from "./AddTemplate.vue";
 import DestinationList from "./DestinationList.vue";
 import TemplateList from "./TemplateList.vue";
 import AlertList from "./AlertList.vue";
+import HistoryAlert from "./HistoryAlert.vue";
 
 export {
   AddAlert,
@@ -27,4 +28,5 @@ export {
   DestinationList,
   TemplateList,
   AlertList,
+  HistoryAlert,
 };

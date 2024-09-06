@@ -50,6 +50,15 @@ const alerts = {
       data,
     );
   },
+  history : (
+    org_identifier: string,
+    stream_name: string,
+    alert_name: string,
+  ) => {
+    return http().get(
+      `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(alert_name)}/history`,
+    );
+  },
   get_with_name: (
     org_identifier: string,
     stream_name: string,
