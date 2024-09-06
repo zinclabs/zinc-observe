@@ -2,7 +2,7 @@
     <div 
     class="store.state.theme === 'dark' ? 'dark-theme-history-page' : 'light-theme-history-page'"
      style="width: 100vw; padding: 16px; ">
-     <div class="flex items-center">
+    <div class="flex items-center">
         <div
           data-test="add-alert-back-btn"
           class="flex justify-center items-center q-mr-md cursor-pointer"
@@ -21,7 +21,6 @@
           {{ t("alerts.historyTitle") }}
         </div>
       </div>
-
 
  <div>
   <div class="info-box">
@@ -48,24 +47,15 @@
   </div>
  </div>
 
-<div v-if="!dataToBeLoaded.length == 0" style="{
-          height: !searchObj.meta.showHistogram
-            ? 'calc(100% - 40px)'
-            : 'calc(100% - 140px)',
-        }"    >
 
-  <tenstack-table
+  
+    </div>
+    <tenstack-table
         :columns="columnsToBeRendered || []"
         :rows="dataToBeLoaded || []"
-        :wrap="true"
-        class="col-12"
+        class="col-8"
         :default-columns="false"
         />
-</div>
-<div v-else>
-  no data
-</div>
-    </div>
 </template>
 
 <script>
@@ -78,8 +68,9 @@ import TenstackTable from '../../plugins/logs/TenstackTable.vue';
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 
-
+import DateTime from "@/components/DateTime.vue";
 import { useI18n } from 'vue-i18n';
+import { date } from 'quasar';
 
 
 
@@ -87,6 +78,7 @@ export default defineComponent({
   name: "AlertHistory",
   components: {
     TenstackTable: defineAsyncComponent(() => import("../../plugins/logs/TenstackTable.vue")),
+    DateTime,
   },
   props: {
     alertName: String,
@@ -127,16 +119,23 @@ const generateColumns = (data) => {
     accessorKey: key,
     label: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '), 
     sortable: true,
+    align:"center",
     enableResizing: true,
     meta: {
       closable: false,
       showWrap: false,
       wrapContent: false,
     },
-            size: 150,
   }));
 };
 
+const convertUnixToQuasarFormat = (unixMicroseconds) => {
+      if (!unixMicroseconds) return "";
+      const unixSeconds = unixMicroseconds / 1e6;
+      const dateToFormat = new Date(unixSeconds * 1000);
+      const formattedDate = dateToFormat.toISOString();
+      return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+    }
     const fetchAlertHistory = async () => {
       const { org_identifier, name, stream_name } = route.query;
       if (!org_identifier || !name || !stream_name) {
@@ -145,21 +144,27 @@ const generateColumns = (data) => {
         }
       try {
         const response = await alertsService.history(org_identifier, stream_name, name);
-        dataToBeLoaded.value =  response.data.hits;
-        if(dataToBeLoaded.value.length === 0){
+        if(response.data.hits.length === 0){
          console.log("No data found");
          return;
         }
+        response.data.hits.forEach((hit) => {
+          hit.next_run_at = convertUnixToQuasarFormat(hit.next_run_at);
+          hit.start_time = convertUnixToQuasarFormat(hit.start_time);
+          hit.end_time = convertUnixToQuasarFormat(hit.end_time);
+        });
+
+        dataToBeLoaded.value =  response.data.hits;
+
+        
         columnsToBeRendered.value = generateColumns(dataToBeLoaded.value);
         console.log(dataToBeLoaded.value, "dataToBeLoaded");
         console.log(columnsToBeRendered.value, "columnsToBeRendered");
       } catch (error) {
-        this.$q.notify({
-          type: "negative",
-          message: error.response?.data?.message || "Error fetching history",
-        });
+        console.error("Error fetching alert history", error);
       }
     };
+   
     onMounted(() => {
       fetchAlertHistory(); 
     }),
