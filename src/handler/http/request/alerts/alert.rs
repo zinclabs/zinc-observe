@@ -460,6 +460,11 @@ async fn show_alert_history(
             return Ok(MetaHttpResponse::bad_request(e));
         }
     };
+
+    let track_total_hits = match query.get("track_total_hits") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
     let limit = match query.get("limit") {
         Some(v) => v.parse::<i64>().unwrap_or_default(),
         None => 20,
@@ -486,6 +491,7 @@ async fn show_alert_history(
         limit,
         offset,
         period,
+        track_total_hits,
     };
     match alert::history(&org_id, stream_type, &stream_name, &name, user_id, filters).await {
         Ok(res) => Ok(MetaHttpResponse::json(res)),

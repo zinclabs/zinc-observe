@@ -393,6 +393,7 @@ pub async fn history(
             from: filters.offset,
             end_time,
             start_time,
+            track_total_hits: filters.track_total_hits,
             ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
