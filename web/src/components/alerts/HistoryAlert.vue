@@ -51,6 +51,7 @@
   
     </div>
     <tenstack-table
+        :loading = isLoading
         :columns="columnsToBeRendered || []"
         :rows="dataToBeLoaded || []"
         class="col-8"
@@ -107,6 +108,7 @@ export default defineComponent({
     const dataToBeLoaded = ref([]);
 
     const columnsToBeRendered = ref([]);
+    const isLoading = ref(false);
 
     const generateColumns = (data) => {
   if (data.length === 0) return [];
@@ -163,6 +165,7 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
     }
     const fetchAlertHistory = async () => {
       const { org_identifier, name, stream_name } = route.query;
+      isLoading.value = true;
       if (!org_identifier || !name || !stream_name) {
           console.log("Skipping fetch due to missing params");
           return;
@@ -183,10 +186,14 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
 
         
         columnsToBeRendered.value = generateColumns(dataToBeLoaded.value);
+        isLoading.value = false;
         console.log(dataToBeLoaded.value, "dataToBeLoaded");
         console.log(columnsToBeRendered.value, "columnsToBeRendered");
       } catch (error) {
         console.error("Error fetching alert history", error);
+      }
+      finally {
+        isLoading.value = false;
       }
     };
    
@@ -213,6 +220,7 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
       columnsToBeRendered,
       t,
       route,
+      isLoading,
     };
 
     // Watch the searchObj for changes
