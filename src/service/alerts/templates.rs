@@ -14,11 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http;
+use config::meta::alerts::templates::Template;
 
 use crate::{
     common::{
         infra::config::ALERTS_DESTINATIONS,
-        meta::{alerts::templates::Template, authz::Authz},
+        meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::db,

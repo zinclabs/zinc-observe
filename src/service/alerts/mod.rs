@@ -15,10 +15,15 @@
 
 use alert::to_float;
 use arrow_schema::DataType;
+use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use config::{
     get_config, ider,
-    meta::{search::SearchEventType, stream::StreamParams},
+    meta::{
+        alerts::{AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition},
+        search::SearchEventType,
+        stream::StreamParams,
+    },
     utils::{
         base64,
         json::{Map, Value},
@@ -26,12 +31,7 @@ use config::{
 };
 
 use super::promql;
-use crate::{
-    common::meta::alerts::{
-        AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition,
-    },
-    service::search as SearchService,
-};
+use crate::service::search as SearchService;
 
 pub mod alert;
 pub mod derived_streams;
@@ -39,8 +39,25 @@ pub mod destinations;
 pub mod scheduler;
 pub mod templates;
 
-impl QueryCondition {
-    pub async fn evaluate_realtime(
+#[async_trait]
+pub trait QueryConditionExt: Sync + Send + 'static {
+    async fn evaluate_realtime(
+        &self,
+        row: Option<&Map<String, Value>>,
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+
+    async fn evaluate_scheduled(
+        &self,
+        stream_param: &StreamParams,
+        trigger_condition: &TriggerCondition,
+        query_condition: &QueryCondition,
+        start_time: Option<i64>,
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+}
+
+#[async_trait]
+impl QueryConditionExt for QueryCondition {
+    async fn evaluate_realtime(
         &self,
         row: Option<&Map<String, Value>>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
@@ -66,7 +83,7 @@ impl QueryCondition {
         Ok((Some(vec![row.to_owned()]), now))
     }
 
-    pub async fn evaluate_scheduled(
+    async fn evaluate_scheduled(
         &self,
         stream_param: &StreamParams,
         trigger_condition: &TriggerCondition,
@@ -257,8 +274,14 @@ impl QueryCondition {
     }
 }
 
-impl Condition {
-    pub async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+#[async_trait]
+pub trait ConditionExt: Sync + Send + 'static {
+    async fn evaluate(&self, row: &Map<String, Value>) -> bool;
+}
+
+#[async_trait]
+impl ConditionExt for Condition {
+    async fn evaluate(&self, row: &Map<String, Value>) -> bool {
         let val = match row.get(&self.column) {
             Some(val) => val,
             None => {

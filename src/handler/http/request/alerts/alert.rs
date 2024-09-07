@@ -16,14 +16,11 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use config::meta::alerts::alert::{Alert, AlertListFilter};
 
 use crate::{
     common::{
-        meta::{
-            alerts::alert::{Alert, AlertListFilter},
-            dashboards::datetime_now,
-            http::HttpResponse as MetaHttpResponse,
-        },
+        meta::{dashboards::datetime_now, http::HttpResponse as MetaHttpResponse},
         utils::{auth::UserEmail, http::get_stream_type_from_request},
     },
     service::alerts::alert,

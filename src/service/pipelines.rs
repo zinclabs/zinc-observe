@@ -25,12 +25,15 @@ use config::meta::{
 };
 
 use super::db;
-use crate::common::{
-    infra::config::STREAM_FUNCTIONS,
-    meta::{
-        http::HttpResponse as MetaHttpResponse,
-        pipelines::{PipeLine, PipeLineList},
+use crate::{
+    common::{
+        infra::config::STREAM_FUNCTIONS,
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            pipelines::{PipeLine, PipeLineList},
+        },
     },
+    service::alerts::derived_streams::DerivedStreamMetaExt,
 };
 
 #[tracing::instrument(skip(pipeline))]

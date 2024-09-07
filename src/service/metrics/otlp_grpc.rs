@@ -22,6 +22,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        alerts::alert,
         stream::{PartitioningDetails, StreamParams, StreamType},
         usage::UsageType,
     },
@@ -38,10 +39,9 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 
 use crate::{
-    common::meta::{
-        alerts::alert, http::HttpResponse as MetaHttpResponse, prom::*, stream::SchemaRecords,
-    },
+    common::meta::{http::HttpResponse as MetaHttpResponse, prom::*, stream::SchemaRecords},
     service::{
+        alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{
             evaluate_trigger,

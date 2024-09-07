@@ -19,6 +19,7 @@ use chrono::{Duration, FixedOffset, Utc};
 use config::{
     get_config,
     meta::{
+        alerts::FrequencyType,
         stream::StreamType,
         usage::{TriggerData, TriggerDataStatus, TriggerDataType},
     },
@@ -29,9 +30,12 @@ use futures::future::try_join_all;
 use proto::cluster_rpc;
 
 use crate::{
-    common::meta::{alerts::FrequencyType, dashboards::reports::ReportFrequencyType},
+    common::meta::dashboards::reports::ReportFrequencyType,
     service::{
-        alerts::alert::{get_alert_start_end_time, get_row_column_map},
+        alerts::{
+            alert::{get_alert_start_end_time, get_row_column_map, AlertExt},
+            derived_streams::DerivedStreamMetaExt,
+        },
         db::{self, scheduler::DerivedTriggerData},
         ingestion::ingestion_service,
         usage::publish_triggers_usage,

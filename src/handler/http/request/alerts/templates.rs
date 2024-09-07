@@ -16,11 +16,9 @@
 use std::io::Error;
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use config::meta::alerts::templates::Template;
 
-use crate::{
-    common::meta::{alerts::templates::Template, http::HttpResponse as MetaHttpResponse},
-    service::alerts::templates,
-};
+use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::templates};
 
 /// CreateTemplate
 #[utoipa::path(

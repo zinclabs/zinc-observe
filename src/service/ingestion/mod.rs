@@ -24,6 +24,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        alerts::alert::Alert,
         stream::{
             PartitionTimeLevel, PartitioningDetails, Routing, StreamParams, StreamPartition,
             StreamType,
@@ -47,14 +48,13 @@ use crate::{
             REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
         },
         meta::{
-            alerts::alert::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
             ingestion::IngestionRequest,
             stream::SchemaRecords,
         },
         utils::functions::get_vrl_compiler_config,
     },
-    service::{db, format_partition_key},
+    service::{alerts::alert::AlertExt, db, format_partition_key},
 };
 
 pub mod grpc;

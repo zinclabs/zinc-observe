@@ -15,7 +15,10 @@
 
 use std::sync::Arc;
 
-use config::{RwAHashMap, RwHashMap};
+use config::{
+    meta::alerts::{alert::Alert, destinations::Destination, templates::Template},
+    RwAHashMap, RwHashMap,
+};
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -24,7 +27,6 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
-        alerts::{alert::Alert, destinations::Destination, templates::Template},
         dashboards::reports,
         functions::{StreamFunctionsList, Transform},
         maxmind::MaxmindClient,
