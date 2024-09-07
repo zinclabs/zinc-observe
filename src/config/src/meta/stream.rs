@@ -108,6 +108,45 @@ impl std::fmt::Display for StreamType {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StreamParams {
+    pub org_id: faststr::FastStr,
+    pub stream_name: faststr::FastStr,
+    pub stream_type: StreamType,
+}
+
+impl PartialEq for StreamParams {
+    fn eq(&self, other: &Self) -> bool {
+        self.org_id == other.org_id
+            && self.stream_name == other.stream_name
+            && self.stream_type == other.stream_type
+    }
+}
+
+impl Default for StreamParams {
+    fn default() -> Self {
+        Self {
+            org_id: String::default().into(),
+            stream_name: String::default().into(),
+            stream_type: StreamType::default(),
+        }
+    }
+}
+
+impl StreamParams {
+    pub fn new(org_id: &str, stream_name: &str, stream_type: StreamType) -> Self {
+        Self {
+            org_id: org_id.to_string().into(),
+            stream_name: stream_name.to_string().into(),
+            stream_type,
+        }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !(self.org_id.is_empty() || self.stream_name.is_empty())
+    }
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FileKey {
     pub key: String,
@@ -927,5 +966,13 @@ mod tests {
         assert_eq!(part.get_partition_key("test1"), "field=25");
         assert_eq!(part.get_partition_key("test2"), "field=4");
         assert_eq!(part.get_partition_key("test3"), "field=2");
+    }
+
+    #[test]
+    fn test_stream_params() {
+        let params = StreamParams::new("org_id", "stream_name", StreamType::Logs);
+        assert_eq!(params.org_id, "org_id");
+        assert_eq!(params.stream_name, "stream_name");
+        assert_eq!(params.stream_type, StreamType::Logs);
     }
 }

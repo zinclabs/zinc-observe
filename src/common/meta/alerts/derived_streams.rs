@@ -13,14 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::stream::StreamParams;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::meta::{
-    alerts::{QueryCondition, TriggerCondition},
-    stream::StreamParams,
-};
+use crate::common::meta::alerts::{QueryCondition, TriggerCondition};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct DerivedStreamMeta {

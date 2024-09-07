@@ -22,7 +22,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        stream::{PartitioningDetails, StreamType},
+        stream::{PartitioningDetails, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -39,10 +39,7 @@ use prost::Message;
 
 use crate::{
     common::meta::{
-        alerts::alert,
-        http::HttpResponse as MetaHttpResponse,
-        prom::*,
-        stream::{SchemaRecords, StreamParams},
+        alerts::alert, http::HttpResponse as MetaHttpResponse, prom::*, stream::SchemaRecords,
     },
     service::{
         db, format_stream_name,

@@ -161,7 +161,8 @@ async fn delete_pipeline(
             return Ok(crate::common::meta::http::HttpResponse::bad_request(e));
         }
     };
-    let pipeline_source = meta::stream::StreamParams::new(&org_id, &stream_name, stream_type);
+    let pipeline_source =
+        config::meta::stream::StreamParams::new(&org_id, &stream_name, stream_type);
     crate::service::pipelines::delete_pipeline(&name, pipeline_source).await
 }
 

@@ -20,7 +20,7 @@ use config::{
     get_config,
     meta::{
         sql::{Sql as MetaSql, SqlOperator},
-        stream::{FileKey, StreamPartition, StreamPartitionType, StreamType},
+        stream::{FileKey, StreamParams, StreamPartition, StreamPartitionType, StreamType},
     },
     utils::sql::is_aggregate_query,
     QUERY_WITH_NO_LIMIT, QUICK_MODEL_FIELDS,
@@ -40,7 +40,7 @@ use regex::Regex;
 use serde::Serialize;
 use sqlparser::ast::{BinaryOperator, Expr, Ident};
 
-use crate::{common::meta::stream::StreamParams, service::search::match_source};
+use crate::service::search::match_source;
 
 const SQL_DELIMITERS: [u8; 12] = [
     b' ', b'*', b'(', b')', b'<', b'>', b',', b';', b'=', b'!', b'\r', b'\n',

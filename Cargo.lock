@@ -2054,6 +2054,7 @@ dependencies = [
  "datafusion",
  "dotenv_config",
  "dotenvy",
+ "faststr",
  "fst",
  "futures",
  "get_if_addrs",

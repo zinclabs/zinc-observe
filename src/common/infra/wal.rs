@@ -18,7 +18,7 @@ use std::{path::Path, sync::Arc};
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use config::{
     get_config, ider,
-    meta::stream::{PartitionTimeLevel, StreamType},
+    meta::stream::{PartitionTimeLevel, StreamParams, StreamType},
     metrics,
     utils::asynchronism::file::get_file_contents,
     FILE_EXT_JSON,
@@ -30,8 +30,6 @@ use tokio::{
     io::AsyncWriteExt,
     sync::RwLock,
 };
-
-use crate::common::meta::stream::StreamParams;
 
 // MANAGER for manage using WAL files, in use, should not move to s3
 static MANAGER: Lazy<Manager> = Lazy::new(Manager::new);

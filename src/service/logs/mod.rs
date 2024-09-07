@@ -25,7 +25,7 @@ use arrow_schema::{DataType, Field};
 use config::{
     get_config,
     meta::{
-        stream::{PartitionTimeLevel, StreamPartition, StreamType},
+        stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     utils::{
@@ -42,11 +42,7 @@ use super::{
     schema::stream_schema_exists,
 };
 use crate::{
-    common::meta::{
-        alerts::alert::Alert,
-        ingestion::IngestionStatus,
-        stream::{SchemaRecords, StreamParams},
-    },
+    common::meta::{alerts::alert::Alert, ingestion::IngestionStatus, stream::SchemaRecords},
     service::{
         db, ingestion::get_wal_time_key, schema::check_for_schema,
         usage::report_request_usage_stats,

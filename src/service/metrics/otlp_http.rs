@@ -22,7 +22,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        stream::{PartitioningDetails, StreamType},
+        stream::{PartitioningDetails, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -43,7 +43,7 @@ use crate::{
         alerts::alert::Alert,
         http::HttpResponse as MetaHttpResponse,
         prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-        stream::{SchemaRecords, StreamParams},
+        stream::SchemaRecords,
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{

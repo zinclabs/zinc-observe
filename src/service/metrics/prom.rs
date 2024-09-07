@@ -21,7 +21,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        stream::{PartitioningDetails, StreamType},
+        stream::{PartitioningDetails, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -42,12 +42,7 @@ use proto::prometheus_rpc;
 use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        meta::{
-            alerts::alert,
-            functions::StreamTransform,
-            prom::*,
-            stream::{SchemaRecords, StreamParams},
-        },
+        meta::{alerts::alert, functions::StreamTransform, prom::*, stream::SchemaRecords},
     },
     service::{
         db, format_stream_name,
