@@ -22,7 +22,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        stream::{PartitionTimeLevel, StreamPartition, StreamType},
+        stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,
@@ -44,7 +44,7 @@ use crate::{
     common::meta::{
         alerts::alert::Alert,
         http::HttpResponse as MetaHttpResponse,
-        stream::{SchemaRecords, StreamParams},
+        stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
     service::{

@@ -64,45 +64,6 @@ pub struct ListStream {
     pub list: Vec<Stream>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StreamParams {
-    pub org_id: faststr::FastStr,
-    pub stream_name: faststr::FastStr,
-    pub stream_type: StreamType,
-}
-
-impl PartialEq for StreamParams {
-    fn eq(&self, other: &Self) -> bool {
-        self.org_id == other.org_id
-            && self.stream_name == other.stream_name
-            && self.stream_type == other.stream_type
-    }
-}
-
-impl Default for StreamParams {
-    fn default() -> Self {
-        Self {
-            org_id: String::default().into(),
-            stream_name: String::default().into(),
-            stream_type: StreamType::default(),
-        }
-    }
-}
-
-impl StreamParams {
-    pub fn new(org_id: &str, stream_name: &str, stream_type: StreamType) -> Self {
-        Self {
-            org_id: org_id.to_string().into(),
-            stream_name: stream_name.to_string().into(),
-            stream_type,
-        }
-    }
-
-    pub fn is_valid(&self) -> bool {
-        !(self.org_id.is_empty() || self.stream_name.is_empty())
-    }
-}
-
 pub struct SchemaEvolution {
     pub is_schema_changed: bool,
     pub types_delta: Option<Vec<Field>>,
@@ -130,13 +91,5 @@ mod tests {
         let stats_str: String = stats.into();
         let stats_frm_str = StreamStats::from(stats_str.as_str());
         assert_eq!(stats, stats_frm_str);
-    }
-
-    #[test]
-    fn test_stream_params() {
-        let params = StreamParams::new("org_id", "stream_name", StreamType::Logs);
-        assert_eq!(params.org_id, "org_id");
-        assert_eq!(params.stream_name, "stream_name");
-        assert_eq!(params.stream_type, StreamType::Logs);
     }
 }

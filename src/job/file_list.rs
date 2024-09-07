@@ -15,14 +15,16 @@
 
 use std::{fs, path::Path};
 
-use config::{cluster::LOCAL_NODE, get_config, meta::stream::StreamType, utils::file::scan_files};
+use config::{
+    cluster::LOCAL_NODE,
+    get_config,
+    meta::stream::{StreamParams, StreamType},
+    utils::file::scan_files,
+};
 use infra::storage;
 use tokio::time;
 
-use crate::{
-    common::{infra::wal, meta::stream::StreamParams},
-    service::db,
-};
+use crate::{common::infra::wal, service::db};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = get_config();

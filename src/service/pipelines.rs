@@ -19,7 +19,10 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use config::meta::{search::SearchEventType, stream::StreamType};
+use config::meta::{
+    search::SearchEventType,
+    stream::{StreamParams, StreamType},
+};
 
 use super::db;
 use crate::common::{
@@ -27,7 +30,6 @@ use crate::common::{
     meta::{
         http::HttpResponse as MetaHttpResponse,
         pipelines::{PipeLine, PipeLineList},
-        stream::StreamParams,
     },
 };
 

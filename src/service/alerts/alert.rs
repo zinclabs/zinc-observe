@@ -22,7 +22,7 @@ use actix_web::http;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     get_config,
-    meta::stream::StreamType,
+    meta::stream::{StreamParams, StreamType},
     utils::{
         base64,
         json::{Map, Value},
@@ -41,7 +41,6 @@ use crate::{
                 FrequencyType, Operator, QueryType,
             },
             authz::Authz,
-            stream::StreamParams,
         },
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },

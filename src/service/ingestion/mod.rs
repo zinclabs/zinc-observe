@@ -24,7 +24,10 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
+        stream::{
+            PartitionTimeLevel, PartitioningDetails, Routing, StreamParams, StreamPartition,
+            StreamType,
+        },
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
     utils::{flatten, json::*},
@@ -47,7 +50,7 @@ use crate::{
             alerts::alert::Alert,
             functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
             ingestion::IngestionRequest,
-            stream::{SchemaRecords, StreamParams},
+            stream::SchemaRecords,
         },
         utils::functions::get_vrl_compiler_config,
     },

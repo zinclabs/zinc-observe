@@ -30,6 +30,7 @@ datafusion.workspace = true
 dashmap.workspace = true
 dotenv_config.workspace = true
 dotenvy.workspace = true
+faststr.workspace = true
 futures.workspace = true
 fst.workspace = true
 get_if_addrs.workspace = true

@@ -24,7 +24,7 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        stream::{Routing, StreamType},
+        stream::{Routing, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -41,7 +41,6 @@ use crate::{
             IngestionRequest, IngestionResponse, IngestionStatus, KinesisFHIngestionResponse,
             StreamStatus,
         },
-        stream::StreamParams,
     },
     service::{
         format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,
