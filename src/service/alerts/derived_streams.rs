@@ -15,24 +15,17 @@
 
 use std::str::FromStr;
 
+use async_trait::async_trait;
 use chrono::Utc;
 use config::{
     get_config,
+    meta::alerts::{derived_streams::DerivedStreamMeta, FrequencyType, QueryType},
     utils::json::{Map, Value},
 };
 use cron::Schedule;
 use hashbrown::HashMap;
 
-use crate::{
-    common::{
-        meta::{
-            // authz::Authz,
-            alerts::{derived_streams::DerivedStreamMeta, FrequencyType, QueryType},
-        },
-        // utils::auth::{remove_ownership, set_ownership},
-    },
-    service::db,
-};
+use crate::service::{alerts::QueryConditionExt, db};
 
 pub async fn save(
     mut derived_stream: DerivedStreamMeta,
@@ -162,23 +155,37 @@ pub async fn delete(
     .map_err(|e| anyhow::anyhow!("Error deleting derived stream trigger: {e}"))
 }
 
-impl DerivedStreamMeta {
-    pub fn is_valid(&self) -> bool {
+#[async_trait]
+pub trait DerivedStreamMetaExt: Sync + Send + 'static {
+    fn is_valid(&self) -> bool;
+
+    fn get_scheduler_module_key(&self, pipeline_name: &str) -> String;
+
+    async fn evaluate(
+        &self,
+        row: Option<&Map<String, Value>>,
+        start_time: Option<i64>,
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+}
+
+#[async_trait]
+impl DerivedStreamMetaExt for DerivedStreamMeta {
+    fn is_valid(&self) -> bool {
         !self.name.is_empty()
-            && !self.is_real_time // TODO(taiming): support realtime DerivedStream
+            && !self.is_real_time
             && self.source.is_valid()
             && self.destination.is_valid()
             && self.trigger_condition.period != 0
     }
 
-    pub fn get_scheduler_module_key(&self, pipeline_name: &str) -> String {
+    fn get_scheduler_module_key(&self, pipeline_name: &str) -> String {
         format!(
             "{}/{}/{}/{}",
             self.source.stream_type, self.source.stream_name, pipeline_name, self.name
         )
     }
 
-    pub async fn evaluate(
+    async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
         start_time: Option<i64>,

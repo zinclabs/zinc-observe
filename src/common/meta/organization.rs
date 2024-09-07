@@ -13,10 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::alerts::alert::Alert;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::{alerts::alert::Alert, functions::Transform};
+use super::functions::Transform;
 
 pub const DEFAULT_ORG: &str = "default";
 pub const CUSTOM: &str = "custom";

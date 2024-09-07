@@ -22,6 +22,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        alerts::alert::Alert,
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
@@ -42,12 +43,12 @@ use prost::Message;
 
 use crate::{
     common::meta::{
-        alerts::alert::Alert,
         http::HttpResponse as MetaHttpResponse,
         stream::SchemaRecords,
         traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
     },
     service::{
+        alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{evaluate_trigger, grpc::get_val, write_file, TriggerAlertData},
         metadata::{

@@ -16,11 +16,9 @@
 use std::io::Error;
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use config::meta::alerts::destinations::Destination;
 
-use crate::{
-    common::meta::{alerts::destinations::Destination, http::HttpResponse as MetaHttpResponse},
-    service::alerts::destinations,
-};
+use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::destinations};
 
 /// CreateDestination
 #[utoipa::path(

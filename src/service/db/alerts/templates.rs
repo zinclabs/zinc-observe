@@ -15,14 +15,11 @@
 
 use std::sync::Arc;
 
-use config::utils::json;
+use config::{meta::alerts::templates::Template, utils::json};
 use itertools::Itertools;
 
 use crate::{
-    common::{
-        infra::config::ALERTS_TEMPLATES,
-        meta::{alerts::templates::Template, organization::DEFAULT_ORG},
-    },
+    common::{infra::config::ALERTS_TEMPLATES, meta::organization::DEFAULT_ORG},
     service::db,
 };
 

@@ -14,12 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, FixedOffset};
-use config::meta::stream::StreamType;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::{QueryCondition, TriggerCondition};
+use crate::meta::{
+    alerts::{QueryCondition, TriggerCondition},
+    stream::StreamType,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {

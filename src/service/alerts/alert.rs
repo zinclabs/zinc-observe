@@ -19,10 +19,18 @@ use std::{
 };
 
 use actix_web::http;
+use async_trait::async_trait;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
 use config::{
     get_config,
-    meta::stream::{StreamParams, StreamType},
+    meta::{
+        alerts::{
+            alert::{Alert, AlertListFilter},
+            destinations::{DestinationType, DestinationWithTemplate, HTTPType},
+            FrequencyType, Operator, QueryType,
+        },
+        stream::{StreamParams, StreamType},
+    },
     utils::{
         base64,
         json::{Map, Value},
@@ -34,18 +42,11 @@ use lettre::{message::SinglePart, AsyncTransport, Message};
 
 use crate::{
     common::{
-        meta::{
-            alerts::{
-                alert::{Alert, AlertListFilter},
-                destinations::{DestinationType, DestinationWithTemplate, HTTPType},
-                FrequencyType, Operator, QueryType,
-            },
-            authz::Authz,
-        },
+        meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::{
-        alerts::{build_sql, destinations},
+        alerts::{build_sql, destinations, QueryConditionExt},
         db,
         search::sql::RE_ONLY_SELECT,
     },
@@ -342,10 +343,28 @@ pub async fn trigger(
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
-impl Alert {
+#[async_trait]
+pub trait AlertExt: Sync + Send + 'static {
     /// Returns the evaluated row data and the end time of the search timerange,
     /// for realtime this is 0
-    pub async fn evaluate(
+    async fn evaluate(
+        &self,
+        row: Option<&Map<String, Value>>,
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+
+    /// Returns a tuple containing a boolean - if all the send notification jobs succeeded
+    /// and the error message if any
+    async fn send_notification(
+        &self,
+        rows: &[Map<String, Value>],
+    ) -> Result<(bool, String), anyhow::Error>;
+
+    fn get_stream_params(&self) -> StreamParams;
+}
+
+#[async_trait]
+impl AlertExt for Alert {
+    async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
@@ -363,9 +382,7 @@ impl Alert {
         }
     }
 
-    /// Returns a tuple containing a boolean - if all the send notification jobs succeeded
-    /// and the error message if any
-    pub async fn send_notification(
+    async fn send_notification(
         &self,
         rows: &[Map<String, Value>],
     ) -> Result<(bool, String), anyhow::Error> {
@@ -400,7 +417,7 @@ impl Alert {
         }
     }
 
-    pub fn get_stream_params(&self) -> StreamParams {
+    fn get_stream_params(&self) -> StreamParams {
         StreamParams {
             org_id: self.org_id.clone().into(),
             stream_name: self.stream_name.clone().into(),
