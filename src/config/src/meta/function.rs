@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::stream::StreamType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use vrl::{
     compiler::{CompileConfig, Program, TimeZone, VrlRuntime},
     prelude::Function,
 };
+
+use crate::meta::stream::StreamType;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -148,9 +149,8 @@ pub struct VRLResultResolver {
 
 #[cfg(test)]
 mod tests {
-    use config::utils::json;
-
     use super::*;
+    use crate::utils::json;
 
     #[test]
     fn test_functions() {

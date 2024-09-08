@@ -15,7 +15,6 @@
 
 pub mod authz;
 pub mod dashboards;
-pub mod functions;
 pub mod http;
 pub mod ingestion;
 pub mod maxmind;

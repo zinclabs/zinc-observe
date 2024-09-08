@@ -25,6 +25,7 @@ use config::{
     get_config,
     meta::{
         alerts::alert::Alert,
+        function::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
         stream::{
             PartitionTimeLevel, PartitioningDetails, Routing, StreamParams, StreamPartition,
             StreamType,
@@ -47,11 +48,7 @@ use crate::{
         infra::config::{
             REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
         },
-        meta::{
-            functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            ingestion::IngestionRequest,
-            stream::SchemaRecords,
-        },
+        meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::functions::get_vrl_compiler_config,
     },
     service::{alerts::alert::AlertExt, db, format_partition_key},

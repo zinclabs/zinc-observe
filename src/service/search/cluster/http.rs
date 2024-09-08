@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
-    meta::search,
+    meta::{function::VRLResultResolver, search},
     utils::{
         arrow::record_batches_to_json_rows,
         flatten,
@@ -27,8 +27,6 @@ use config::{
 use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc;
 use vector_enrichment::TableRegistry;
-
-use crate::common::meta::functions::VRLResultResolver;
 
 #[tracing::instrument(
     name = "service:search:cluster",

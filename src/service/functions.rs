@@ -19,18 +19,15 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use config::meta::stream::StreamType;
+use config::meta::{
+    function::{FunctionList, StreamFunctionsList, StreamOrder, StreamTransform, Transform},
+    stream::StreamType,
+};
 
 use crate::{
     common::{
         infra::config::STREAM_FUNCTIONS,
-        meta::{
-            authz::Authz,
-            functions::{
-                FunctionList, StreamFunctionsList, StreamOrder, StreamTransform, Transform,
-            },
-            http::HttpResponse as MetaHttpResponse,
-        },
+        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
     },
     service::{db, ingestion::compile_vrl_function},
