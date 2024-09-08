@@ -15,12 +15,14 @@
 
 use std::collections::HashMap;
 
-use config::{GEO_IP_ASN_ENRICHMENT_TABLE, GEO_IP_CITY_ENRICHMENT_TABLE};
+use config::{
+    meta::function::VRLCompilerConfig, GEO_IP_ASN_ENRICHMENT_TABLE, GEO_IP_CITY_ENRICHMENT_TABLE,
+};
 use vector_enrichment::{Table, TableRegistry};
 
 use crate::common::{
     infra::config::{ENRICHMENT_TABLES, GEOIP_ASN_TABLE, GEOIP_CITY_TABLE},
-    meta::{functions::VRLCompilerConfig, organization::DEFAULT_ORG},
+    meta::organization::DEFAULT_ORG,
 };
 
 pub async fn get_all_transform_keys(org_id: &str) -> Vec<String> {

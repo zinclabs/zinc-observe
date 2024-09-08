@@ -26,7 +26,7 @@ use arrow_schema::Schema;
 use config::{
     cluster::LOCAL_NODE,
     get_config, get_instance_id,
-    meta::cluster::NodeStatus,
+    meta::{cluster::NodeStatus, function::ZoFunction},
     utils::{json, schema_ext::SchemaExt},
     Config, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
@@ -64,7 +64,6 @@ use crate::{
     common::{
         infra::{cluster, config::*},
         meta::{
-            functions::ZoFunction,
             http::HttpResponse as MetaHttpResponse,
             user::{AuthTokens, AuthTokensExt},
         },

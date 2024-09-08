@@ -22,6 +22,7 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
+        function::{StreamTransform, VRLResultResolver},
         stream::{Routing, StreamParams, StreamType},
         usage::UsageType,
     },
@@ -35,10 +36,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use prost::Message;
 
 use crate::{
-    common::meta::{
-        functions::{StreamTransform, VRLResultResolver},
-        ingestion::{IngestionStatus, StreamStatus},
-    },
+    common::meta::ingestion::{IngestionStatus, StreamStatus},
     handler::http::request::CONTENT_TYPE_PROTO,
     service::{
         format_stream_name,
