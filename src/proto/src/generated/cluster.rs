@@ -1377,6 +1377,8 @@ pub struct SearchRequest {
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "12")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(int64, repeated, tag = "13")]
+    pub file_id_list: ::prost::alloc::vec::Vec<i64>,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]

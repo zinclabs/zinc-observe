@@ -46,6 +46,7 @@ message SearchRequest {
     string                 index_type = 10;
     optional string           user_id = 11;
     optional string search_event_type = 12;
+    repeated int64       file_id_list = 13;
 }
 
 message SearchResponse {

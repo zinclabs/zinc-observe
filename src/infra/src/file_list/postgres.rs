@@ -15,7 +15,7 @@
 
 use async_trait::async_trait;
 use config::{
-    meta::stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+    meta::stream::{FileKey, FileMeta, FileQueryData, PartitionTimeLevel, StreamStats, StreamType},
     utils::{hash::Sum64, parquet::parse_file_key_columns},
 };
 use hashbrown::HashMap;
@@ -322,6 +322,89 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                     format!("files/{}/{}/{}", r.stream, r.date, r.file),
                     FileMeta::from(&r),
                 )
+            })
+            .collect())
+    }
+
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
+        if ids.len() < 1 {
+            return Ok(Vec::default());
+        }
+
+        let pool = CLIENT.clone();
+
+        let params = format!("?{}", ", ?".repeat(ids.len() - 1));
+        let query_str = format!(
+            r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
+            WHERE id IN ( { } )"#,
+            params
+        );
+
+        let mut query = sqlx::query_as::<_, super::FileRecord>(&query_str);
+        for id in ids {
+            query = query.bind(id);
+        }
+
+        let ret = query.fetch_all(&pool).await?;
+
+        Ok(ret
+            .into_iter()
+            .map(|r| {
+                (
+                    format!("files/{}/{}/{}", r.stream, r.date, r.file),
+                    FileMeta::from(&r),
+                )
+            })
+            .collect())
+    }
+
+    async fn query_ids(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        _time_level: PartitionTimeLevel,
+        time_range: Option<(i64, i64)>,
+        flattened: Option<bool>,
+    ) -> Result<Vec<FileQueryData>> {
+        if let Some((start, end)) = time_range {
+            if start == 0 && end == 0 {
+                return Ok(Vec::new());
+            }
+        }
+
+        let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
+
+        let pool = CLIENT.clone();
+        let ret = if flattened.is_some() {
+            sqlx::query_as::<_, (i64, i64,String)>(
+                r#"
+            SELECT id, original_size,concat(stream,'/',date,'/',file) as key FROM file_list WHERE stream = $1 AND flattened = $2 LIMIT 1000;
+                "#,
+            )
+            .bind(stream_key)
+            .bind(flattened.unwrap())
+            .fetch_all(&pool)
+            .await
+        } else {
+            let (time_start, time_end) = time_range.unwrap_or((0, 0));
+            sqlx::query_as::<_, (i64,i64,String)>(
+                r#"
+            SELECT id, original_size,concat(stream,'/',date,'/',file) as key FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
+                "#,
+            )
+            .bind(stream_key)
+            .bind(time_start)
+            .bind(time_end)
+            .fetch_all(&pool)
+            .await
+        };
+        Ok(ret?
+            .into_iter()
+            .map(|r| FileQueryData {
+                id: r.0,
+                key: r.2,
+                original_size: r.1,
             })
             .collect())
     }

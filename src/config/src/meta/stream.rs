@@ -108,6 +108,13 @@ impl std::fmt::Display for StreamType {
     }
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct FileQueryData {
+    pub id: i64,
+    pub key: String,
+    pub original_size: i64,
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FileKey {
     pub key: String,

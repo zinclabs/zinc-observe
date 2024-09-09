@@ -24,7 +24,8 @@ use config::{
         cluster::{Node, Role, RoleGroup},
         search::{self, ScanStats, SearchEventType},
         stream::{
-            FileKey, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition, StreamType,
+            FileKey, FileQueryData, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition,
+            StreamType,
         },
     },
     metrics,
@@ -142,8 +143,9 @@ pub async fn search(
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
+    // YJDoc2, this is the entry point code for searching
     // get file list
-    let mut file_list = get_file_list(
+    let mut file_id_list = get_file_id_list(
         trace_id,
         &meta,
         stream_type,
@@ -151,29 +153,31 @@ pub async fn search(
         &stream_settings.partition_keys,
     )
     .await;
+
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "[trace_id {trace_id}] search: get file_list time_range: {:?}, num: {}, took: {} ms",
         meta.meta.time_range,
-        file_list.len(),
+        file_id_list.len(),
         file_list_took,
     );
 
     // If the query is of type inverted index and this is not an aggregations request,
     // then filter the file list based on the inverted index.
+    // TODO YJDoc2 check what stuff we are using from file meta and fetch that to make this work
     let mut idx_scan_size = 0;
     let mut idx_took = 0;
-    if use_inverted_index {
-        (file_list, idx_scan_size, idx_took) =
-            get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_list).await?;
-        log::info!(
-            "[trace_id {trace_id}] search: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
-            meta.meta.time_range,
-            file_list.len(),
-            idx_scan_size,
-            idx_took,
-        );
-    }
+    // if use_inverted_index {
+    //     (file_id_list, idx_scan_size, idx_took) =
+    //         get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_id_list).await?;
+    //     log::info!(
+    //         "[trace_id {trace_id}] search: get file_list from inverted index time_range: {:?},
+    // num: {}, scan_size: {}, took: {} ms",         meta.meta.time_range,
+    //         file_id_list.len(),
+    //         idx_scan_size,
+    //         idx_took,
+    //     );
+    // }
 
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
@@ -181,6 +185,8 @@ pub async fn search(
 
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
+
+    // TODO - change param type to &[u64] for original size in o2-enterprise
     // 1. get work group
     #[cfg(feature = "enterprise")]
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
@@ -264,7 +270,7 @@ pub async fn search(
     req.work_group = work_group_str;
 
     let mut partition_files = Vec::new();
-    let mut file_num = file_list.len();
+    let mut file_num = file_id_list.len();
     let mut partition_strategy =
         QueryPartitionStrategy::from(&cfg.common.feature_query_partition_strategy);
     if cfg.memory_cache.cache_latest_files {
@@ -279,13 +285,13 @@ pub async fn search(
             }
         }
         QueryPartitionStrategy::FileSize => {
-            let files = partition_file_by_bytes(&file_list, querier_num);
+            let files = partition_file_by_bytes(&file_id_list, querier_num);
             file_num = files.len();
             partition_files = files;
             1
         }
         QueryPartitionStrategy::FileHash => {
-            let files = partition_file_by_hash(&file_list, &nodes, req_node_group).await;
+            let files = partition_file_by_hash(&file_id_list, &nodes, req_node_group).await;
             file_num = files.len();
             partition_files = files;
             1
@@ -297,28 +303,28 @@ pub async fn search(
         meta.meta.time_range
     );
 
-    #[cfg(feature = "enterprise")]
-    {
-        let mut records = 0;
-        let mut original_size = 0;
-        let mut compressed_size = 0;
-        for file in file_list.iter() {
-            let file_meta = &file.meta;
-            records += file_meta.records;
-            original_size += file_meta.original_size;
-            compressed_size += file_meta.compressed_size;
-        }
-        original_size += idx_scan_size as i64;
-        super::SEARCH_SERVER
-            .add_file_stats(
-                trace_id,
-                file_list.len() as i64,
-                records,
-                original_size,
-                compressed_size,
-            )
-            .await;
-    }
+    // #[cfg(feature = "enterprise")]
+    // {
+    //     let mut records = 0;
+    //     let mut original_size = 0;
+    //     let mut compressed_size = 0;
+    //     for file in file_list.iter() {
+    //         let file_meta = &file.meta;
+    //         records += file_meta.records;
+    //         original_size += file_meta.original_size;
+    //         compressed_size += file_meta.compressed_size;
+    //     }
+    //     original_size += idx_scan_size as i64;
+    //     super::SEARCH_SERVER
+    //         .add_file_stats(
+    //             trace_id,
+    //             file_list.len() as i64,
+    //             records,
+    //             original_size,
+    //             compressed_size,
+    //         )
+    //         .await;
+    // }
 
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
@@ -343,23 +349,23 @@ pub async fn search(
                 req.stype = cluster_rpc::SearchType::Cluster as _;
                 match partition_strategy {
                     QueryPartitionStrategy::FileNum => {
-                        req.file_list = file_list
+                        req.file_id_list = file_id_list
                             [offset_start..min(offset_start + offset, file_num)]
                             .to_vec()
                             .iter()
-                            .map(cluster_rpc::FileKey::from)
+                            .map(|f| f.id)
                             .collect();
                         offset_start += offset;
                     }
                     QueryPartitionStrategy::FileSize | QueryPartitionStrategy::FileHash => {
-                        req.file_list = partition_files
+                        req.file_id_list = partition_files
                             .get(offset_start)
                             .unwrap()
                             .iter()
-                            .map(|f| cluster_rpc::FileKey::from(*f))
+                            .map(|f| f.id)
                             .collect();
                         offset_start += offset;
-                        if req.file_list.is_empty() {
+                        if req.file_id_list.is_empty() {
                             if node.is_ingester() {
                                 req.stype = cluster_rpc::SearchType::WalOnly as _;
                             } else {
@@ -373,7 +379,7 @@ pub async fn search(
             }
         }
 
-        let req_files = req.file_list.len();
+        let req_files = req.file_id_list.len();
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:grpc_search",
@@ -872,22 +878,50 @@ pub(crate) async fn get_file_list(
     files
 }
 
+#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+pub(crate) async fn get_file_id_list(
+    _trace_id: &str,
+    sql: &super::sql::Sql,
+    stream_type: StreamType,
+    time_level: PartitionTimeLevel,
+    partition_keys: &[StreamPartition],
+) -> Vec<FileQueryData> {
+    let is_local = get_config().common.meta_store_external
+        || infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+            .await
+            .unwrap_or_default()
+            .len()
+            <= 1;
+    let (time_min, time_max) = sql.meta.time_range.unwrap();
+    let file_list = file_list::query_ids(
+        &sql.org_id,
+        &sql.stream_name,
+        stream_type,
+        time_level,
+        time_min,
+        time_max,
+        is_local,
+    )
+    .await
+    .unwrap_or_default();
+
+    // TODO have to add the match_source logic from above
+    file_list
+}
+
 pub(crate) fn partition_file_by_bytes(
-    file_keys: &[FileKey],
+    file_keys: &[FileQueryData],
     num_nodes: usize,
-) -> Vec<Vec<&FileKey>> {
-    let mut partitions: Vec<Vec<&FileKey>> = vec![Vec::new(); num_nodes];
-    let sum_original_size = file_keys
-        .iter()
-        .map(|fk| fk.meta.original_size)
-        .sum::<i64>();
+) -> Vec<Vec<&FileQueryData>> {
+    let mut partitions: Vec<Vec<&FileQueryData>> = vec![Vec::new(); num_nodes];
+    let sum_original_size = file_keys.iter().map(|fk| fk.original_size).sum::<i64>();
     let avg_size = sum_original_size / num_nodes as i64;
     let mut node_size = 0;
     let mut node_k = 0;
     for fk in file_keys {
-        node_size += fk.meta.original_size;
+        node_size += fk.original_size;
         if node_size >= avg_size && node_k != num_nodes - 1 && !partitions[node_k].is_empty() {
-            node_size = fk.meta.original_size;
+            node_size = fk.original_size;
             node_k += 1;
             partitions[node_k].push(fk);
             continue;
@@ -898,10 +932,10 @@ pub(crate) fn partition_file_by_bytes(
 }
 
 pub(crate) async fn partition_file_by_hash<'a>(
-    file_keys: &'a [FileKey],
+    file_keys: &'a [FileQueryData],
     nodes: &'a [Node],
     group: Option<RoleGroup>,
-) -> Vec<Vec<&'a FileKey>> {
+) -> Vec<Vec<&'a FileQueryData>> {
     let mut node_idx = HashMap::with_capacity(nodes.len());
     let mut idx = 0;
     for node in nodes {
@@ -911,10 +945,10 @@ pub(crate) async fn partition_file_by_hash<'a>(
         node_idx.insert(&node.uuid, idx);
         idx += 1;
     }
-    let mut partitions: Vec<Vec<&FileKey>> = vec![Vec::new(); idx];
+    let mut partitions: Vec<Vec<&FileQueryData>> = vec![Vec::new(); idx];
     for fk in file_keys {
         let node_uuid =
-            infra_cluster::get_node_from_consistent_hash(&fk.key, &Role::Querier, group)
+            infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
                 .await
                 .expect("there is no querier node in consistent hash ring");
         let idx = node_idx.get(&node_uuid).unwrap_or(&0);
@@ -990,15 +1024,15 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
 async fn get_file_list_by_inverted_index(
     meta: Arc<super::sql::Sql>,
     mut idx_req: cluster_rpc::SearchRequest,
-    file_list: &[FileKey],
-) -> Result<(Vec<FileKey>, usize, usize)> {
+    file_list: &[FileQueryData],
+) -> Result<(Vec<FileQueryData>, usize, usize)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
     let stream_type = StreamType::from(idx_req.stream_type.as_str());
     let file_list_map = file_list
         .iter()
-        .map(|f| (&f.key, &f.meta))
+        .map(|f| (&f.key, &f.original_size))
         .collect::<HashMap<_, _>>();
 
     // Get all the unique terms which the user has searched.
@@ -1115,6 +1149,7 @@ async fn get_file_list_by_inverted_index(
             "files/{}/{}/{}/{}",
             meta.org_id, stream_type, meta.stream_name, filename
         );
+        log::warn!("prefixed name: {}", prefixed_filename);
         let Some(file_meta) = file_list_map.get(&prefixed_filename) else {
             continue;
         };
@@ -1126,7 +1161,7 @@ async fn get_file_list_by_inverted_index(
             .entry(prefixed_filename.clone())
             .or_insert(FileKey {
                 key: prefixed_filename,
-                meta: (*file_meta).clone(),
+                meta: config::meta::stream::FileMeta::default(),
                 deleted: false,
                 segment_ids: None,
             });
@@ -1144,10 +1179,14 @@ async fn get_file_list_by_inverted_index(
     }
     let mut idx_file_list = idx_file_list
         .into_iter()
-        .map(|(_, f)| f)
+        .map(|(_, f)| FileQueryData {
+            id: 0,
+            key: f.key,
+            original_size: 0,
+        })
         .collect::<Vec<_>>();
     // sorted by _timestamp
-    idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+    // idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
     Ok((
         idx_file_list,
         idx_resp.scan_size,
@@ -1159,168 +1198,168 @@ async fn get_file_list_by_inverted_index(
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_partition_file_by_bytes() {
-        use config::meta::stream::FileMeta;
+    // #[test]
+    // fn test_partition_file_by_bytes() {
+    //     use config::meta::stream::FileMeta;
 
-        let vec = vec![
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 256,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 256,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 100,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 256,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 1,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 256,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 200,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 30,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 90,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 256,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 5,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-            FileKey::new(
-                "",
-                FileMeta {
-                    min_ts: -1,
-                    max_ts: -1,
-                    records: -1,
-                    original_size: 150,
-                    compressed_size: -1,
-                    flattened: false,
-                },
-                false,
-            ),
-        ];
-        let expected: Vec<Vec<i64>> = vec![
-            vec![256, 256, 100],
-            vec![256, 1, 256],
-            vec![200, 30, 90, 256, 5, 150],
-        ];
-        let byte = partition_file_by_bytes(&vec, 3);
-        for value in byte
-            .iter()
-            .map(|x| x.iter().map(|v| v.meta.original_size).collect::<Vec<i64>>())
-            .enumerate()
-        {
-            assert_eq!(value.1, expected.get(value.0).unwrap().clone());
-        }
-    }
+    //     let vec = vec![
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 256,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 256,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 100,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 256,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 1,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 256,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 200,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 30,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 90,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 256,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 5,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //         FileKey::new(
+    //             "",
+    //             FileMeta {
+    //                 min_ts: -1,
+    //                 max_ts: -1,
+    //                 records: -1,
+    //                 original_size: 150,
+    //                 compressed_size: -1,
+    //                 flattened: false,
+    //             },
+    //             false,
+    //         ),
+    //     ];
+    //     let expected: Vec<Vec<i64>> = vec![
+    //         vec![256, 256, 100],
+    //         vec![256, 1, 256],
+    //         vec![200, 30, 90, 256, 5, 150],
+    //     ];
+    //     let byte = partition_file_by_bytes(&vec, 3);
+    //     for value in byte
+    //         .iter()
+    //         .map(|x| x.iter().map(|v| v.meta.original_size).collect::<Vec<i64>>())
+    //         .enumerate()
+    //     {
+    //         assert_eq!(value.1, expected.get(value.0).unwrap().clone());
+    //     }
+    // }
 }

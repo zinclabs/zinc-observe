@@ -16,7 +16,7 @@
 use async_trait::async_trait;
 use config::meta::{
     meta_store::MetaStore,
-    stream::{FileKey, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
+    stream::{FileKey, FileMeta, FileQueryData, PartitionTimeLevel, StreamStats, StreamType},
 };
 use once_cell::sync::Lazy;
 
@@ -69,6 +69,16 @@ pub trait FileList: Sync + Send + 'static {
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_ids(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        time_level: PartitionTimeLevel,
+        time_range: Option<(i64, i64)>,
+        flattened: Option<bool>,
+    ) -> Result<Vec<FileQueryData>>;
     async fn query_deleted(
         &self,
         org_id: &str,
@@ -226,6 +236,43 @@ pub async fn query(
     }
     CLIENT
         .query(
+            org_id,
+            stream_type,
+            stream_name,
+            time_level,
+            time_range,
+            flattened,
+        )
+        .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:query_db", skip_all)]
+pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
+    CLIENT.query_by_ids(ids).await
+}
+
+#[inline]
+#[tracing::instrument(
+    name = "infra:file_list:query_db",
+    skip_all,
+    fields(org_id = org_id, stream_name = stream_name)
+)]
+pub async fn query_ids(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    time_level: PartitionTimeLevel,
+    time_range: Option<(i64, i64)>,
+    flattened: Option<bool>,
+) -> Result<Vec<FileQueryData>> {
+    if let Some((start, end)) = time_range {
+        if start > end || start == 0 || end == 0 {
+            return Err(Error::Message("[file_list] invalid time range".to_string()));
+        }
+    }
+    CLIENT
+        .query_ids(
             org_id,
             stream_type,
             stream_name,

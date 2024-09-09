@@ -468,6 +468,7 @@ impl From<Request> for cluster_rpc::SearchRequest {
             agg_mode: cluster_rpc::AggregateMode::Final.into(),
             query: Some(req_query),
             file_list: vec![],
+            file_id_list: vec![],
             stream_type: "".to_string(),
             timeout: req.timeout,
             work_group: "".to_string(),

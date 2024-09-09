@@ -21,10 +21,13 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        bitvec::BitVec,
+        cluster::RoleGroup,
         search::{ScanStats, SearchType, StorageType},
-        stream::{FileKey, StreamType},
+        stream::{FileKey, StreamPartition, StreamType},
     },
-    utils::record_batch_ext::format_recordbatch_by_schema,
+    utils::{inverted_index::split_token, record_batch_ext::format_recordbatch_by_schema},
+    INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -33,12 +36,16 @@ use infra::{
 };
 use proto::cluster_rpc;
 
-use crate::service::{
-    db,
-    search::{
-        datafusion::exec,
-        generate_search_schema, generate_select_start_search_schema,
-        sql::{Sql, RE_SELECT_WILDCARD},
+use crate::{
+    common::infra::cluster as infra_cluster,
+    service::{
+        db,
+        file_list::query_by_ids,
+        search::{
+            datafusion::exec,
+            generate_search_schema, generate_select_start_search_schema,
+            sql::{Sql, RE_SELECT_WILDCARD},
+        },
     },
 };
 mod storage;
@@ -137,6 +144,19 @@ pub async fn search(
     // search in object storage
     let req_stype = req.stype;
     if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
+        let ids = &req.file_id_list;
+        let mut file_list = get_file_list_by_ids(
+            &trace_id,
+            ids,
+            &sql,
+            stream_type,
+            &stream_settings.partition_keys,
+        )
+        .await;
+
+        // YJDoc2, here we will need to fetch stuff from the ids
+        log::warn!("HERERE I AM!!!!! This is the worker node code");
+        log::warn!("req :{:?}", req);
         let file_list: Vec<FileKey> = req.file_list.iter().map(FileKey::from).collect();
         let (tbls, stats) =
             storage::search(&trace_id, sql.clone(), &file_list, stream_type, &work_group).await?;
@@ -359,6 +379,36 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
         }
     }
     Ok(())
+}
+
+#[tracing::instrument(skip(sql), fields(org_id = sql.org_id, stream_name = sql.stream_name))]
+pub(crate) async fn get_file_list_by_ids(
+    _trace_id: &str,
+    ids: &[i64],
+    sql: &super::sql::Sql,
+    stream_type: StreamType,
+    partition_keys: &[StreamPartition],
+) -> Vec<FileKey> {
+    let is_local = get_config().common.meta_store_external
+        || infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+            .await
+            .unwrap_or_default()
+            .len()
+            <= 1;
+    let file_list = query_by_ids(ids, is_local).await.unwrap_or_default();
+
+    let mut files = Vec::with_capacity(file_list.len());
+    for file in file_list {
+        if sql
+            .match_source(&file, false, false, stream_type, partition_keys)
+            .await
+        {
+            files.push(file.to_owned());
+        }
+    }
+    files.sort_by(|a, b| a.key.cmp(&b.key));
+    files.dedup_by(|a, b| a.key == b.key);
+    files
 }
 
 struct ReleaseFileGuard {
