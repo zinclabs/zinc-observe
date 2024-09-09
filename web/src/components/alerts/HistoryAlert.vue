@@ -1,8 +1,8 @@
 <template >
     <div 
     class="store.state.theme === 'dark' ? 'dark-theme-history-page' : 'light-theme-history-page'"
-     style="width: 100vw; padding: 16px; ">
-    <div class="flex items-center">
+     style="width: 100vw;  ">
+    <div class="flex items-center q-pl-md">
         <div
           data-test="add-alert-back-btn"
           class="flex justify-center items-center q-mr-md cursor-pointer"
@@ -22,7 +22,7 @@
         </div>
       </div>
 
- <div>
+ <div class="q-mx-md ">
   <div class="info-box">
     <div class="info-item">
       <div class="info-heading">Alert Name</div>
@@ -47,16 +47,39 @@
   </div>
  </div>
 
+ <div class="full-width">
+    <q-table
+      :rows="dataToBeLoaded || []"
+      :columns="columnsToBeRendered || []"
+      :loading="isLoading"
+      row-key="id"
+      class="col-8 custom-table"
+      :hide-bottom="true"
+      style="width: 100%"> 
 
+      <template #body-cell-status="props">
+        <q-td :props="props">
+          {{ props.row.status }}
+
+          <!-- Exclamatory icon with tooltip for 'failed' status -->
+          <q-icon
+            v-if="props.row.status === 'failed'"
+            name="warning"
+            color="red"
+            class="q-ml-sm"
+          >
+            <!-- Tooltip to show error message on hover -->
+            <q-tooltip>
+              {{ props.row.error || 'Unknown error' }}
+            </q-tooltip>
+          </q-icon>
+        </q-td>
+      </template>
+    </q-table>
+  </div>
   
     </div>
-    <tenstack-table
-        :loading = isLoading
-        :columns="columnsToBeRendered || []"
-        :rows="dataToBeLoaded || []"
-        class="col-8"
-        :default-columns="false"
-        />
+ 
 </template>
 
 <script>
@@ -71,7 +94,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from 'vue-i18n';
-import { date } from 'quasar';
+import { date , QTable } from 'quasar';
 
 
 
@@ -109,50 +132,36 @@ export default defineComponent({
 
     const columnsToBeRendered = ref([]);
     const isLoading = ref(false);
-
+    const desiredOrder = [
+    '_timestamp', 'start_time', 'end_time',
+ 'retries', 'status'
+  ];
     const generateColumns = (data) => {
   if (data.length === 0) return [];
   
-  const desiredOrder = [
-    '_timestamp', 'key', 'start_time', 'end_time', 'next_run_at',
-    'is_realtime', 'is_silenced', 'retries', 'status'
-  ];
+ 
 
   const keys = Object.keys(data[0])
-    .filter(key => key !== 'module' && key !== 'org'); // Remove 'module' and 'org'
+    .filter(key => key !== 'module' && key !== 'key' && key !== 'org' && key !== 'next_run_at' && key !== 'is_realtime' && key !== 'is_silenced'); // Remove 'module' and 'org'
 
-  // Order the keys according to the desired order, putting others at the end
   const orderedKeys = desiredOrder.concat(keys.filter(key => !desiredOrder.includes(key)));
   
   return orderedKeys.map(key => {
-    let columnWidth = 200; // Default width
+    let columnWidth = 120; // Default width
     
     // Customize widths for specific columns
-    if (key === '_timestamp' || key === 'key') {
-      columnWidth = 200;
-    } else if (key === 'is_realtime' || key === 'is_silenced' || key === 'retries') {
-      columnWidth = 100;
-    } else if (key === 'status') {
-      columnWidth = 200;
-    }
-    
+
     return {
-      id: key,
-      header: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '), 
-      accessorKey: key,
-      label: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '), 
-      sortable: true,
+      name: key,  // field name
+      label: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),  // Column label
+      field: key,  // Field accessor
       align: "center",
-      enableResizing: true,
-      size: columnWidth, // Add column size
-      meta: {
-        closable: false,
-        showWrap: false,
-        wrapContent: false,
-      },
+      sortable: true,
+      style: `width: ${columnWidth}px`,  // Custom width for each column
     };
   });
 };
+
 
 
 
@@ -177,9 +186,12 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
          return;
         }
         response.data.hits.forEach((hit) => {
+          hit._timestamp = convertUnixToQuasarFormat(hit._timestamp);
+
           hit.next_run_at = convertUnixToQuasarFormat(hit.next_run_at);
           hit.start_time = convertUnixToQuasarFormat(hit.start_time);
           hit.end_time = convertUnixToQuasarFormat(hit.end_time);
+          hit.status = "failed";
         });
 
         dataToBeLoaded.value =  response.data.hits;
@@ -221,6 +233,7 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
       t,
       route,
       isLoading,
+      desiredOrder,
     };
 
     // Watch the searchObj for changes
@@ -232,19 +245,19 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
 </script>
 
 
-<style scoped>
+<style lang="scss" scoped >
 .info-box {
   display: flex;
   flex-wrap: wrap; /* Allows items to wrap to the next line if there's not enough space */
   border: 2px solid #333; /* Outer border */
-  padding: 16px;
-  margin:30px;
+  margin-top: 10px;
   border-radius: 8px;
 }
 
 .info-item {
-  border-right: 1px solid #ccc; /* Separator border */
-  padding: 8px 16px;
+  border-right: 1px solid #ccc; 
+  padding: 16px;
+  /* Separator border */
   flex: 1 1 20%; /* Makes each item take up a quarter of the width, adjust as needed */
   box-sizing: border-box; /* Ensures padding and border are included in the item's width */
 }
@@ -267,5 +280,17 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
 .light-theme-history-page{
   background-color: #ffffff;
 }
+
+
+.custom-table {
+  font-size: 18px;  
+  margin-top: 10px;
+  border-bottom: 2px  solid #ccc;
+  border-top: 2px solid #ccc;
+
+}
+
+
+
 /* Add any component-specific styles here */
 </style>
