@@ -50,13 +50,19 @@ const alerts = {
       data,
     );
   },
-  history : (
-    org_identifier: string,
-    stream_name: string,
-    alert_name: string,
-  ) => {
+  history: (org_identifier :string, stream_name :string, alert_name:string, startTime = null, endTime = null) => {
+    const params :any = {};
+  
+    if (startTime) {
+      params.from = startTime;  // Add 'from' if startTime is provided
+    }
+  
+    if (endTime) {
+      params.to = endTime;  // Add 'to' if endTime is provided
+    }
     return http().get(
-      `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(alert_name)}/history`,
+      `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(alert_name)}/history?limit=50`,
+      { params }  // Add params to the request
     );
   },
   get_with_name: (

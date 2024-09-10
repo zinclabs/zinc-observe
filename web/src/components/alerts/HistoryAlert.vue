@@ -1,89 +1,113 @@
-<template >
-    <div 
-    class="store.state.theme === 'dark' ? 'dark-theme-history-page' : 'light-theme-history-page'"
-     style="width: 100vw;  ">
-    <div class="flex items-center q-pl-md">
+<template>
+  <div
+    :class="store.state.theme === 'dark' ? 'dark-theme-history-page' : 'light-theme-history-page'"
+    style="width: 100vw;">
+    
+    <div class="flex tw-justify-between tw-items-center" >
+      <div class="flex items-center q-py-sm q-pl-md">
         <div
-          data-test="add-alert-back-btn"
-          class="flex justify-center items-center q-mr-md cursor-pointer"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
-          title="Go Back"
-          @click="closeDialog"
-        >
-          <q-icon name="arrow_back_ios_new" size="14px" />
+        data-test="add-alert-back-btn"
+        class="flex justify-center items-center q-mr-md cursor-pointer"
+        style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
+        title="Go Back"
+        @click="closeDialog">
+        <q-icon name="arrow_back_ios_new" size="14px" />
+      </div>
+      <div class="text-h6" data-test="add-alert-title">
+        {{ t("alerts.historyTitle") }}
+      </div>
+      </div>
+      <div v-if="dataToBeLoaded.length > 0" class="flex items-center q-py-sm q-pr-md">
+        <date-time
+            ref="dateTimeRef"
+            auto-apply
+            :default-type="searchObj.data.datetime.type"
+            :default-absolute-time="{
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            }"
+            :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+            data-test="alerts-history-date-time-dropdown"
+            @on:date-change="updateDateTime"
+            @on:timezone-change="updateTimezone"
+          />
+          <div>
+            <q-btn
+              color="secondary"
+              label="Get History"
+              @click="fetchAlertHistory"
+              class="q-ml-md"
+            />
+          </div>
+          
+      </div>
+    </div>
+
+    <div class="q-mx-md" v-if="dataToBeLoaded.length > 0">
+      <div class="info-box">
+        <div class="info-item">
+          <div class="info-heading">Alert Name</div>
+          <div class="info-value">{{ route.query.name }}</div>
         </div>
-        <div class="text-h6" data-test="add-alert-title">
-          {{ t("alerts.historyTitle") }}
+        <div class="info-item">
+          <div class="info-heading">Org</div>
+          <div class="info-value">{{ route.query.org_identifier }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-heading">Next Run</div>
+          <div class="info-value">{{ dataToBeLoaded[0]?.next_run_at || 'No History' }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-heading">Is Realtime</div>
+          <div class="info-value">{{ dataToBeLoaded[0]?.is_realtime || 'False' }}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-heading">Is Silence</div>
+          <div class="info-value">{{ dataToBeLoaded[0]?.is_silenced || 'False' }}</div>
         </div>
       </div>
+    </div>
+    {{  dataToBeLoaded.length }}
 
- <div class="q-mx-md ">
-  <div class="info-box">
-    <div class="info-item">
-      <div class="info-heading">Alert Name</div>
-      <div class="info-value">{{ route.query.name }}</div>
+    <div class="full-width"  v-if="!isLoading && dataToBeLoaded.length > 0">
+      <q-table
+        ref="qTable"
+        hide-bottom
+        :rows="dataToBeLoaded"
+        :columns="columnsToBeRendered"
+        :pagination="pagination"
+
+        row-key="id"
+        :rows-per-page-options=[]
+        class=" custom-table"
+        style="width: 100% ;">
+        
+        <template #body-cell-status="props">
+          <q-td :props="props">
+            {{ props.row.status }}
+            <q-icon
+              v-if="props.row.status === 'failed'"
+              name="warning"
+              color="red"
+              class="q-ml-sm">
+              <q-tooltip>
+                {{ props.row.error || 'Alert Error' }}
+              </q-tooltip>
+            </q-icon>
+          </q-td>
+        </template>
+      </q-table>
     </div>
-    <div class="info-item">
-      <div class="info-heading">Org</div>
-      <div class="info-value">{{ route.query.org_identifier }}</div>
-    </div>
-    <div class="info-item">
-      <div class="info-heading">Next Run</div>
-      <div class="info-value">{{ dataToBeLoaded[0]?.next_run_at || 'No History' }}</div>
-    </div>
-    <div class="info-item">
-      <div class="info-heading">Is Realtime</div>
-      <div class="info-value">{{ dataToBeLoaded[0]?.is_realtime  || false}}</div>
-    </div>
-    <div class="info-item">
-      <div class="info-heading">Is Silence</div>
-      <div class="info-value">{{ dataToBeLoaded[0]?.is_silenced || false }}</div>
+
+    <!-- Show NoData component if there's no data to display -->
+    <div v-if="!isLoading && dataToBeLoaded.length === 0">
+      <NoData />
     </div>
   </div>
- </div>
-
- <div class="full-width">
-    <q-table
-      :rows="dataToBeLoaded || []"
-      :columns="columnsToBeRendered || []"
-      :loading="isLoading"
-      row-key="id"
-      class="col-8 custom-table"
-      :hide-bottom="true"
-      style="width: 100%"> 
-
-      <template #body-cell-status="props">
-        <q-td :props="props">
-          {{ props.row.status }}
-
-          <!-- Exclamatory icon with tooltip for 'failed' status -->
-          <q-icon
-            v-if="props.row.status === 'failed'"
-            name="warning"
-            color="red"
-            class="q-ml-sm"
-          >
-            <!-- Tooltip to show error message on hover -->
-            <q-tooltip>
-              {{ props.row.error || 'Unknown error' }}
-            </q-tooltip>
-          </q-icon>
-        </q-td>
-      </template>
-    </q-table>
-  </div>
-  
-    </div>
- 
 </template>
 
-<script>
-import { ref, watch, onMounted } from 'vue';
+<script lang="ts">
+import { ref, watch, onMounted  , nextTick} from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useStore } from 'vuex';
 import { defineAsyncComponent ,defineComponent} from 'vue';
@@ -91,11 +115,12 @@ import useLogs from '../../composables/useLogs'
 import TenstackTable from '../../plugins/logs/TenstackTable.vue';
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
-
 import DateTime from "@/components/DateTime.vue";
 import { useI18n } from 'vue-i18n';
-import { date , QTable } from 'quasar';
+import { date , QTable , useQuasar } from 'quasar';
 
+
+import type { Ref } from "vue";
 
 
 export default defineComponent({
@@ -103,6 +128,7 @@ export default defineComponent({
   components: {
     TenstackTable: defineAsyncComponent(() => import("../../plugins/logs/TenstackTable.vue")),
     DateTime,
+    NoData,
   },
   props: {
     alertName: String,
@@ -121,36 +147,47 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const router = useRouter();
+    const $q = useQuasar();
+
     const route = useRoute();
     const store = useStore();
     const {t} = useI18n();
-    
-
+    const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
+    const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
     // Fetch the logs
     const { searchObj } = useLogs();
-    const dataToBeLoaded = ref([]);
-
-    const columnsToBeRendered = ref([]);
+    const dataToBeLoaded :any = ref([]);
+    const dateTimeToBeSent : any = ref({});
+    const columnsToBeRendered :any = ref([]);
     const isLoading = ref(false);
+const pagination = {
+      page: 1,
+        rowsPerPage: 50 
+}
+
     const desiredOrder = [
-    '_timestamp', 'start_time', 'end_time',
+      'triggered_at','start_time', 'end_time',
  'retries', 'status'
   ];
     const generateColumns = (data) => {
   if (data.length === 0) return [];
   
- 
 
   const keys = Object.keys(data[0])
-    .filter(key => key !== 'module' && key !== 'key' && key !== 'org' && key !== 'next_run_at' && key !== 'is_realtime' && key !== 'is_silenced'); // Remove 'module' and 'org'
+    .filter(key => key !== 'module' && key !== '_timestamp' && key !== 'key' && key !== 'org' && key !== 'next_run_at' && key !== 'is_realtime' && key !== 'is_silenced'); // Remove 'module' and 'org'
 
   const orderedKeys = desiredOrder.concat(keys.filter(key => !desiredOrder.includes(key)));
   
   return orderedKeys.map(key => {
-    let columnWidth = 120; // Default width
+    let columnWidth = 250; // Default width
     
     // Customize widths for specific columns
-
+if(key === 'status'){
+  columnWidth = 400;
+}
+if(key === 'retries'){
+  columnWidth = 120;
+}
     return {
       name: key,  // field name
       label: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),  // Column label
@@ -172,7 +209,11 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
       const formattedDate = dateToFormat.toISOString();
       return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
     }
-    const fetchAlertHistory = async () => {
+    const fetchAlertHistory = async ( ) => {
+      q.notify({
+        spinner: true,
+        message: "Please wait while loading history...",
+      });
       const { org_identifier, name, stream_name } = route.query;
       isLoading.value = true;
       if (!org_identifier || !name || !stream_name) {
@@ -180,35 +221,91 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
           return;
         }
       try {
-        const response = await alertsService.history(org_identifier, stream_name, name);
+        const {startTime, endTime} = dateTimeToBeSent.value;
+        const response = await alertsService.history(org_identifier, stream_name, name, startTime, endTime);
         if(response.data.hits.length === 0){
          console.log("No data found");
          return;
         }
+        response.data.hits[2].status = "failed";
         response.data.hits.forEach((hit) => {
           hit._timestamp = convertUnixToQuasarFormat(hit._timestamp);
+          hit.triggered_at = hit._timestamp;
 
           hit.next_run_at = convertUnixToQuasarFormat(hit.next_run_at);
           hit.start_time = convertUnixToQuasarFormat(hit.start_time);
           hit.end_time = convertUnixToQuasarFormat(hit.end_time);
-          hit.status = "failed";
         });
+
 
         dataToBeLoaded.value =  response.data.hits;
 
         
         columnsToBeRendered.value = generateColumns(dataToBeLoaded.value);
         isLoading.value = false;
-        console.log(dataToBeLoaded.value, "dataToBeLoaded");
-        console.log(columnsToBeRendered.value, "columnsToBeRendered");
       } catch (error) {
+        isLoading.value = false;
+
         console.error("Error fetching alert history", error);
       }
       finally {
         isLoading.value = false;
       }
     };
-   
+    
+    const updateDateTime = async (value: object) => {
+      if (
+        value.valueType == "absolute" &&
+        searchObj.data.stream.selectedStream.length > 0 &&
+        searchObj.data.datetime.queryRangeRestrictionInHour > 0 &&
+        value.hasOwnProperty("selectedDate") &&
+        value.hasOwnProperty("selectedTime") &&
+        value.selectedDate.hasOwnProperty("from") &&
+        value.selectedTime.hasOwnProperty("startTime")
+      ) {
+        // Convert hours to microseconds
+        let newStartTime =
+          parseInt(value.endTime) -
+          searchObj.data.datetime.queryRangeRestrictionInHour *
+            60 *
+            60 *
+            1000000;
+
+        if (parseInt(newStartTime) > parseInt(value.startTime)) {
+          value.startTime = newStartTime;
+
+          value.selectedDate.from = timestampToTimezoneDate(
+            value.startTime / 1000,
+            store.state.timezone,
+            "yyyy/MM/DD",
+          );
+          value.selectedTime.startTime = timestampToTimezoneDate(
+            value.startTime / 1000,
+            store.state.timezone,
+            "HH:mm",
+          );
+
+          dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
+          dateTimeRef.value.setDateType("absolute");
+        }
+      }
+      const {startTime, endTime} = value;
+      dateTimeToBeSent.value = {
+        startTime,
+        endTime,
+      };
+      console.log(dateTimeToBeSent.value, "dateTimeToBeSent");
+
+      await nextTick ();
+      await nextTick();
+      await nextTick();
+      await nextTick();
+    };
+    const updateTimezone = () => {
+      if (store.state.zoConfig.query_on_stream_selection == false) {
+        emit("onChangeTimezone");
+      }
+    };
     onMounted(() => {
       fetchAlertHistory(); 
     }),
@@ -219,11 +316,12 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
           fetchAlertHistory(); 
         }
       }
-    );
+    )
 
 
 
     return {
+      $q,
       searchObj,
       store,
       generateColumns,
@@ -234,6 +332,10 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
       route,
       isLoading,
       desiredOrder,
+      qTable,
+      updateDateTime,
+      updateTimezone,  
+      pagination,  
     };
 
     // Watch the searchObj for changes
@@ -283,10 +385,10 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
 
 
 .custom-table {
+  border-radius: 0px;
   font-size: 18px;  
   margin-top: 10px;
-  border-bottom: 2px  solid #ccc;
-  border-top: 2px solid #ccc;
+
 
 }
 
