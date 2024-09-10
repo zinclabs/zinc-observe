@@ -365,6 +365,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.prevent.stop="
                     copyLogToClipboard(
                       column.prop(row, column.name).toString(),
+                      false
                     )
                   "
                   title="Copy"
