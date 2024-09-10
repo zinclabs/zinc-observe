@@ -48,6 +48,7 @@ pub trait PipelineTable: Sync + Send + 'static {
     ) -> Result<Vec<Pipeline>>;
     async fn get_by_id(&self, org_id: &str, pipeline_id: &str) -> Result<Pipeline>;
     async fn list(&self, org_id: &str) -> Result<Vec<Pipeline>>;
+    async fn list_by_source(&self, source_type: &str) -> Result<Vec<Pipeline>>;
     async fn delete(&self, org_id: &str, pipeline_id: &str) -> Result<()>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
 }
@@ -73,7 +74,7 @@ pub async fn get_by_stream(org_id: &str, stream_params: &StreamParams) -> Result
 
 /// Returns all pipelines by id within an organization
 #[inline]
-pub async fn get(org_id: &str, pipeline_id: &str) -> Result<Pipeline> {
+pub async fn get_by_id(org_id: &str, pipeline_id: &str) -> Result<Pipeline> {
     CLIENT.get_by_id(org_id, pipeline_id).await
 }
 
@@ -88,9 +89,3 @@ pub async fn list(org_id: &str) -> Result<Vec<Pipeline>> {
 pub async fn delete(org_id: &str, pipeline_id: &str) -> Result<()> {
     CLIENT.delete(org_id, pipeline_id).await
 }
-
-// impl<R: sqlx::Row> sqlx::FromRow<'_, R> for Pipeline<R> {
-//     fn from_row(row: &'_ R) -> std::result::Result<Self, sqlx::Error> {
-//         Ok(Pipeline::default())
-//     }
-// }

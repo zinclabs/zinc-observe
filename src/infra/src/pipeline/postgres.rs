@@ -209,10 +209,34 @@ INSERT INTO pipeline (id, version, name, description, source_type, org_id, query
     async fn list(&self, org_id: &str) -> Result<Vec<Pipeline>> {
         let pool = CLIENT.clone();
         let query = "SELECT * FROM pipeline WHERE org_id = $1 ORDER BY id;";
-        let pipelines = sqlx::query_as::<_, Pipeline>(query)
+        let pipelines = match sqlx::query_as::<_, Pipeline>(query)
             .bind(org_id)
             .fetch_all(&pool)
-            .await?;
+            .await
+        {
+            Ok(pipelines) => pipelines,
+            Err(e) => {
+                log::debug!("[POSTGRES] list pipeline by org_id error: {}", e);
+                return Err(Error::from(DbError::KeyNotExists(org_id.to_string())));
+            }
+        };
+        Ok(pipelines)
+    }
+
+    async fn list_by_source(&self, source_type: &str) -> Result<Vec<Pipeline>> {
+        let pool = CLIENT.clone();
+        let query = "SELECT * FROM pipeline WHERE source_type = $1 ORDER BY id;";
+        let pipelines = match sqlx::query_as::<_, Pipeline>(query)
+            .bind(source_type)
+            .fetch_all(&pool)
+            .await
+        {
+            Ok(pipelines) => pipelines,
+            Err(e) => {
+                log::debug!("[POSTGRES] list pipelines by source_type error: {}", e);
+                return Err(Error::from(DbError::KeyNotExists(source_type.to_string())));
+            }
+        };
         Ok(pipelines)
     }
 

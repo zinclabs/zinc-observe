@@ -225,6 +225,23 @@ INSERT IGNORE INTO pipeline (id, version, name, description, source_type, org_id
         Ok(pipelines)
     }
 
+    async fn list_by_source(&self, source_type: &str) -> Result<Vec<Pipeline>> {
+        let pool = CLIENT.clone();
+        let query = r#"SELECT * FROM pipeline WHERE source_type = ? ORDER BY id;"#;
+        let pipelines = match sqlx::query_as::<_, Pipeline>(query)
+            .bind(source_type)
+            .fetch_all(&pool)
+            .await
+        {
+            Ok(pipelines) => pipelines,
+            Err(e) => {
+                log::debug!("[MYSQL] list pipelines by source_type error: {}", e);
+                return Err(Error::from(DbError::KeyNotExists(source_type.to_string())));
+            }
+        };
+        Ok(pipelines)
+    }
+
     async fn delete(&self, org_id: &str, pipeline_id: &str) -> Result<()> {
         let pool = CLIENT.clone();
         sqlx::query(r#"DELETE FROM pipeline WHERE id = ? AND org_id = ?;"#)
