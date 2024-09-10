@@ -312,13 +312,13 @@ const getFrequencyValue = (frequency: any) => {
       case "once":
         return `Once`;
       case "hours":
-        return `Every ${frequency.interval} ${frequency.interval > 1 ? "hours" : "hour"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Hours" : "Hour"}`;
       case "weeks":
-        return `Every ${frequency.interval} ${frequency.interval > 1 ? "weeks" : "week"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Weeks" : "Week"}`;
       case "months":
-        return `Every ${frequency.interval} ${frequency.interval > 1 ? "months" : "month"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Months" : "Month"}`;
       case "days":
-        return `Every ${frequency.interval} ${frequency.interval > 1 ? "days" : "day"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Days" : "Day"}`;
       default:
         return "";
     }
