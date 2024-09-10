@@ -52,19 +52,19 @@ impl super::PipelineTable for PostgresPipelineTable {
             r#"
 CREATE TABLE IF NOT EXISTS pipeline
 (
-    id           VARCHAR(256) PRIMARY KEY,
-    version      INT NOT NULL,
-    name         VARCHAR(256) NOT NULL,
-    description  TEXT,
-    org          VARCHAR(100) NOT NULL,
-    source_type  VARCHAR(50) NOT NULL,
-    stream_org   VARCHAR(100),
-    stream_name  VARCHAR(256),
-    stream_type  VARCHAR(50),
-    query_inner  TEXT,
-    nodes        TEXT,
-    edges        TEXT,
-    created_at   TIMESTAMP default CURRENT_TIMESTAMP,
+    id              VARCHAR(256) PRIMARY KEY,
+    version         INT NOT NULL,
+    name            VARCHAR(256) NOT NULL,
+    description     TEXT,
+    org             VARCHAR(100) NOT NULL,
+    source_type     VARCHAR(50) NOT NULL,
+    stream_org      VARCHAR(100),
+    stream_name     VARCHAR(256),
+    stream_type     VARCHAR(50),
+    derived_stream  TEXT,
+    nodes           TEXT,
+    edges           TEXT,
+    created_at      TIMESTAMP default CURRENT_TIMESTAMP,
 );
             "#,
         )
@@ -127,15 +127,16 @@ INSERT INTO pipeline (id, version, name, description, org, source_type, stream_o
                 .execute(&mut *tx)
                 .await
             }
-            PipelineSource::Query(query_inner) => {
-                let (source_type, query_inner) = (
-                    "query",
-                    json::to_string(&query_inner).expect("Serializing pipeline QueryInner error"),
+            PipelineSource::Query(derived_stream) => {
+                let (source_type, derived_stream_str) = (
+                    "derived_stream",
+                    json::to_string(&derived_stream)
+                        .expect("Serializing pipeline DerivedStream error"),
                 );
 
                 sqlx::query(
                     r#"
-INSERT INTO pipeline (id, version, name, description, org, source_type, query_inner, nodes, edges)
+INSERT INTO pipeline (id, version, name, description, org, source_type, derived_stream, nodes, edges)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     ON CONFLICT DO NOTHING;
                     "#,
@@ -146,7 +147,7 @@ INSERT INTO pipeline (id, version, name, description, org, source_type, query_in
                 .bind(pipeline.description)
                 .bind(pipeline.org)
                 .bind(source_type)
-                .bind(query_inner)
+                .bind(derived_stream_str)
                 .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
                 .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
                 .execute(&mut *tx)

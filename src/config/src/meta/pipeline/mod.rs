@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use components::{Edge, Node, PipelineSource, QueryInner};
+use components::{DerivedStream, Edge, Node, PipelineSource};
 use serde::{Deserialize, Serialize};
 use sqlx::{Decode, Error, FromRow, Row, Type};
 use utoipa::ToSchema;
@@ -55,6 +55,13 @@ impl Pipeline {
             }
         }
     }
+
+    pub fn get_derived_stream(&self) -> Option<DerivedStream> {
+        match &self.source {
+            PipelineSource::Query(derived_stream) => Some(derived_stream.to_owned()),
+            PipelineSource::Stream(_) => None,
+        }
+    }
 }
 
 impl<'r, R: Row> FromRow<'r, R> for Pipeline
@@ -83,11 +90,11 @@ where
                 );
                 PipelineSource::Stream(stream_params)
             }
-            "query_inner" => {
-                let query_inner_raw: String = row.try_get("query_inner")?;
-                let query_inner: QueryInner = json::from_str(&query_inner_raw)
-                    .expect("Deserializing QueryInner from ROW error");
-                PipelineSource::Query(query_inner)
+            "derived_stream" => {
+                let derived_stream_raw: String = row.try_get("derived_stream")?;
+                let derived_stream: DerivedStream = json::from_str(&derived_stream_raw)
+                    .expect("Deserializing DerivedStream from ROW error");
+                PipelineSource::Query(derived_stream)
             }
             _ => return Err(sqlx::Error::ColumnNotFound("Invalid source type".into())),
         };

@@ -26,11 +26,12 @@ use crate::meta::{
 #[serde(rename_all = "snake_case")]
 pub enum PipelineSource {
     Stream(StreamParams),
-    Query(QueryInner),
+    Query(DerivedStream),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct QueryInner {
+#[serde(rename_all = "snake_case")]
+pub struct DerivedStream {
     #[serde(default)]
     pub query_condition: QueryCondition,
     #[serde(default)]
