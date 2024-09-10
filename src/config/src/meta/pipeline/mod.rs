@@ -16,7 +16,6 @@
 use components::{Edge, Node, PipelineSource, QueryInner};
 use serde::{Deserialize, Serialize};
 use sqlx::{Decode, Error, FromRow, Row, Type};
-// use sqlx::{mysql::MySqlRow, postgres::PgRow, sqlite::SqliteRow, Error, FromRow, Row};
 use utoipa::ToSchema;
 
 use crate::{
@@ -33,6 +32,8 @@ pub struct Pipeline {
     pub id: String,
     #[serde(default)]
     pub version: i32,
+    #[serde(default)]
+    pub org: String, // org this pipeline belongs to. diff from source stream org_id
     pub name: String,
     #[serde(default)]
     pub description: String,
@@ -41,6 +42,19 @@ pub struct Pipeline {
     pub nodes: Option<Vec<Node>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub edges: Option<Vec<Edge>>,
+}
+
+impl Pipeline {
+    pub fn get_cache_key(&self) -> String {
+        match &self.source {
+            PipelineSource::Stream(stream_params) => {
+                format!("{}/{}", self.org, stream_params)
+            }
+            PipelineSource::Query(_) => {
+                format!("{}/{}", self.org, self.id)
+            }
+        }
+    }
 }
 
 impl<'r, R: Row> FromRow<'r, R> for Pipeline
@@ -52,17 +66,18 @@ where
     fn from_row(row: &'r R) -> Result<Self, Error> {
         let id: String = row.try_get("id")?;
         let version: i32 = row.try_get("version")?;
+        let org: String = row.try_get("org")?;
         let name: String = row.try_get("name")?;
         let description: String = row.try_get("description")?;
         let source_type: String = row.try_get("source_type")?;
-        let org_id: String = row.try_get("org_id")?;
 
         let source = match source_type.as_str() {
             "stream" => {
+                let stream_org: String = row.try_get("stream_org")?;
                 let stream_name: String = row.try_get("stream_name")?;
                 let stream_type: String = row.try_get("stream_name")?;
                 let stream_params = StreamParams::new(
-                    &org_id,
+                    &stream_org,
                     &stream_name,
                     StreamType::from(stream_type.as_str()),
                 );
@@ -70,7 +85,8 @@ where
             }
             "query_inner" => {
                 let query_inner_raw: String = row.try_get("query_inner")?;
-                let query_inner: QueryInner = json::from_str(&query_inner_raw).unwrap();
+                let query_inner: QueryInner = json::from_str(&query_inner_raw)
+                    .expect("Deserializing QueryInner from ROW error");
                 PipelineSource::Query(query_inner)
             }
             _ => return Err(sqlx::Error::ColumnNotFound("Invalid source type".into())),
@@ -80,14 +96,15 @@ where
             let nodes_raw: String = row.try_get("nodes")?;
             let edges_raw: String = row.try_get("edges")?;
             (
-                json::from_str(&nodes_raw).unwrap(),
-                json::from_str(&edges_raw).unwrap(),
+                json::from_str(&nodes_raw).expect("Deserializing Nodes from ROW error"),
+                json::from_str(&edges_raw).expect("Deserializing Edges from ROW error"),
             )
         };
 
         Ok(Pipeline {
             id,
             version,
+            org,
             name,
             description,
             source,
@@ -108,6 +125,7 @@ mod tests {
             {
                 "name": "pipeline test",
                 "description": "with or without this field",
+                "org": "default",
                 "source": {
                   "source_type": "stream",
                   "org_id": "default",
@@ -165,6 +183,7 @@ mod tests {
             "pipeline_id": "uuid",
             "name": "pipeline test",
             "description": "with or without this field",
+            "org": "prod",
             "source": {
               "source_type": "query",
               "query_condition": {
@@ -231,10 +250,11 @@ mod tests {
         let from_value = json::from_value::<Pipeline>(payload);
         assert!(from_value.is_ok());
         let pl = from_value.unwrap();
-        let nodes = json::to_string(&pl.nodes).unwrap();
-        println!("nodes {}", nodes);
-        let new_nodes: Option<Vec<Node>> = json::from_str(&nodes).unwrap();
-        println!("new_nodes {:?}", new_nodes);
+        let nodes = json::to_string(&pl.nodes);
+        assert!(nodes.is_ok());
+        let nodes = nodes.unwrap();
+        let new_nodes = json::from_str::<Option<Vec<Node>>>(&nodes);
+        assert!(new_nodes.is_ok());
     }
 
     #[test]
@@ -255,7 +275,7 @@ mod tests {
         assert!(from_value.is_ok());
         let pl = from_value.unwrap();
         let nodes = json::to_string(&pl.nodes).unwrap();
-        let new_nodes: Option<Vec<Node>> = json::from_str(&nodes).unwrap();
-        println!("new_nodes {:?}", new_nodes);
+        let new_nodes = json::from_str::<Option<Vec<Node>>>(&nodes);
+        assert!(new_nodes.is_ok());
     }
 }

@@ -14,10 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::meta::{
     alerts::{QueryCondition, TriggerCondition},
-    function::Transform,
     stream::{RoutingCondition, StreamParams},
 };
 
@@ -62,8 +62,22 @@ pub struct Edge {
 #[serde(rename_all = "snake_case")]
 enum NodeData {
     Stream(StreamParams),
-    Function(Transform),
+    Function(FunctionParams),
     Condition(ConditionParams),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub struct FunctionParams {
+    #[serde(default)]
+    pub name: String,
+    pub vrl_script: String,
+    #[serde(default)]
+    pub after_flatten: bool,
+    #[serde(default)]
+    pub params: String,
+    #[serde(default)]
+    pub num_args: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -125,20 +139,20 @@ mod tests {
 
     #[test]
     fn test_function_node_serialization() {
-        let func = Transform {
-            function: "vrl_script".to_string(),
+        let func = FunctionParams {
+            vrl_script: "vrl_script".to_string(),
             name: "func".to_string(),
+            after_flatten: false,
             params: "row".to_string(),
             num_args: 0,
-            trans_type: None,
-            streams: None,
         };
         let func_node = NodeData::Function(func);
         let payload = json::json!({
             "node_type": "function",
             "name": "func",
+            "after_flatten": false,
             "params": "row",
-            "function": "vrl_script",
+            "vrl_script": "vrl_script",
         });
         let node_data: NodeData = json::from_value(payload).unwrap();
         assert_eq!(func_node, node_data);

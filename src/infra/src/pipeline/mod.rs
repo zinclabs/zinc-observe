@@ -40,20 +40,17 @@ pub fn connect() -> Box<dyn PipelineTable> {
 pub trait PipelineTable: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
-    async fn put(&self, org_id: &str, pipeline: Pipeline) -> Result<()>;
-    async fn get_by_stream(
-        &self,
-        org_id: &str,
-        stream_params: &StreamParams,
-    ) -> Result<Vec<Pipeline>>;
-    async fn get_by_id(&self, org_id: &str, pipeline_id: &str) -> Result<Pipeline>;
-    async fn list(&self, org_id: &str) -> Result<Vec<Pipeline>>;
-    async fn list_by_source(&self, source_type: &str) -> Result<Vec<Pipeline>>;
-    async fn delete(&self, org_id: &str, pipeline_id: &str) -> Result<()>;
+    async fn put(&self, pipeline: Pipeline) -> Result<()>;
+    async fn get_by_stream(&self, org: &str, stream_params: &StreamParams)
+    -> Result<Vec<Pipeline>>;
+    async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline>;
+    async fn list(&self) -> Result<Vec<Pipeline>>;
+    async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>>;
+    async fn delete(&self, pipeline_id: &str) -> Result<()>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
 }
 
-/// Initializes the cached PipelinedTable - creates table and index
+/// Initializes the PipelineTable - creates table and index
 pub async fn init() -> Result<()> {
     CLIENT.create_table().await?;
     CLIENT.create_table_index().await?;
@@ -62,30 +59,36 @@ pub async fn init() -> Result<()> {
 
 /// Creates a pipeline entry in the table
 #[inline]
-pub async fn put(org_id: &str, pipeline: Pipeline) -> Result<()> {
-    CLIENT.put(org_id, pipeline).await
+pub async fn put(pipeline: Pipeline) -> Result<()> {
+    CLIENT.put(pipeline).await
 }
 
-/// Returns all pipelines associated with StreamParams within an organization
+/// Finds all pipelines associated with the StreamParams within an organization
 #[inline]
-pub async fn get_by_stream(org_id: &str, stream_params: &StreamParams) -> Result<Vec<Pipeline>> {
-    CLIENT.get_by_stream(org_id, stream_params).await
+pub async fn get_by_stream(org: &str, stream_params: &StreamParams) -> Result<Vec<Pipeline>> {
+    CLIENT.get_by_stream(org, stream_params).await
 }
 
-/// Returns all pipelines by id within an organization
+/// Finds the pipeline by id
 #[inline]
-pub async fn get_by_id(org_id: &str, pipeline_id: &str) -> Result<Pipeline> {
-    CLIENT.get_by_id(org_id, pipeline_id).await
+pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline> {
+    CLIENT.get_by_id(pipeline_id).await
 }
 
-/// List all the pipelines within an organization
+/// Lists all pipelines
 #[inline]
-pub async fn list(org_id: &str) -> Result<Vec<Pipeline>> {
-    CLIENT.list(org_id).await
+pub async fn list() -> Result<Vec<Pipeline>> {
+    CLIENT.list().await
 }
 
-/// Deletes the Pipeline identified by org_id and pipeline_id
+/// Lists all pipelines within an organization
 #[inline]
-pub async fn delete(org_id: &str, pipeline_id: &str) -> Result<()> {
-    CLIENT.delete(org_id, pipeline_id).await
+pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>> {
+    CLIENT.list_by_org(org).await
+}
+
+/// Deletes the pipeline by id
+#[inline]
+pub async fn delete(pipeline_id: &str) -> Result<()> {
+    CLIENT.delete(pipeline_id).await
 }
