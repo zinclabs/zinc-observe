@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="scheduled-dashboards tw-bg-white">
     <q-table
       data-test="alert-list-table"
-      ref="tableRef"
+      ref="scheduledDashboardTableRef"
       :rows="formattedReports"
       :columns="columns"
       row-key="id"
@@ -74,7 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <QTablePagination
           :scope="scope"
-          :pageTitle="t('dashboard.scheduledDashboards')"
           :position="'top'"
           :resultTotal="resultTotal"
           :perPageOptions="perPageOptions"
@@ -137,7 +136,7 @@ const scheduledReports = ref<ScheduledDashboardReport[]>(
 
 const formattedReports = ref<ScheduledDashboardReport[]>([]);
 
-const tableRef = ref<InstanceType<typeof QTable> | null>();
+const scheduledDashboardTableRef = ref<InstanceType<typeof QTable> | null>();
 
 const router = useRouter();
 
@@ -165,6 +164,8 @@ watch(
 );
 
 const formatReports = () => {
+  resultTotal.value = props.reports.length;
+
   props.reports.forEach((report: any, index) => {
     scheduledReports.value.push({
       "#": index + 1,
@@ -182,8 +183,6 @@ const formatReports = () => {
   });
 
   filterReports();
-
-  console.log(scheduledReports.value);
 };
 
 const filterReports = () => {
@@ -253,25 +252,24 @@ const columns: any = [
   },
 ];
 
-const pagination: any = reactive({
+const pagination: any = ref({
   rowsPerPage: 20,
 });
 
 const resultTotal = ref(0);
 
-const perPageOptions = ref([
+const perPageOptions: any = [
+  { label: "5", value: 5 },
   { label: "10", value: 10 },
   { label: "20", value: 20 },
   { label: "50", value: 50 },
   { label: "100", value: 100 },
-]);
-
-const selectedPerPage = ref(1);
+  { label: "All", value: 0 },
+];
 
 const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
   pagination.value.rowsPerPage = val.value;
-  tableRef.value?.setPagination(pagination.value);
+  scheduledDashboardTableRef.value?.setPagination(pagination.value);
 };
 
 const filterQuery = ref("");

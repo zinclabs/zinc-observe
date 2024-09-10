@@ -167,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</q-tooltip></q-btn
             >
             <q-btn
+              v-if="!isFullscreen"
               outline
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
