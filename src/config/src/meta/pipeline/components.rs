@@ -22,8 +22,8 @@ use crate::meta::{
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "sourceType")]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "source_type")]
+#[serde(rename_all = "snake_case")]
 pub enum PipelineSource {
     Stream(StreamParams),
     Query(QueryInner),
@@ -58,8 +58,8 @@ pub struct Edge {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(tag = "nodeType")]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "node_type")]
+#[serde(rename_all = "snake_case")]
 enum NodeData {
     Stream(StreamParams),
     Function(Transform),
@@ -86,24 +86,25 @@ mod tests {
     #[test]
     fn test_pipeline_source_serialization() {
         let data = json::json!({
-          "source": "stream",
+          "source_type": "stream",
           "org_id": "default",
           "stream_name": "default",
           "stream_type": "logs"
         });
         let from_json: PipelineSource = json::from_value(data).unwrap();
-        let source = PipelineSource::Stream(StreamParams {
+        let stream_params = StreamParams {
             org_id: "default".into(),
             stream_name: "default".into(),
             stream_type: StreamType::Logs,
-        });
+        };
+        let source = PipelineSource::Stream(stream_params);
         assert_eq!(from_json, source);
     }
 
     #[test]
     fn test_node_data_serialization() {
         let data = json::json!({
-          "type": "stream",
+          "node_type": "stream",
           "org_id": "default",
           "stream_name": "default",
           "stream_type": "logs"

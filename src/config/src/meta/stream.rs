@@ -63,6 +63,18 @@ impl StreamType {
             StreamType::Logs | StreamType::Metrics | StreamType::Traces
         )
     }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            StreamType::Logs => "logs",
+            StreamType::Metrics => "metrics",
+            StreamType::Traces => "traces",
+            StreamType::EnrichmentTables => "enrichment_tables",
+            StreamType::Filelist => "file_list",
+            StreamType::Metadata => "metadata",
+            StreamType::Index => "index",
+        }
+    }
 }
 
 impl From<&str> for StreamType {
@@ -130,6 +142,16 @@ impl Default for StreamParams {
             stream_name: String::default().into(),
             stream_type: StreamType::default(),
         }
+    }
+}
+
+impl std::fmt::Display for StreamParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}/{}/{}",
+            self.org_id, self.stream_name, self.stream_type
+        )
     }
 }
 

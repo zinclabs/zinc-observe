@@ -2080,6 +2080,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlparser",
+ "sqlx",
  "svix-ksuid",
  "sysinfo",
  "tokio",
