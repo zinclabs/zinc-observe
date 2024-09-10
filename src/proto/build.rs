@@ -26,6 +26,7 @@ fn main() -> Result<()> {
         .type_attribute("FileList", "#[derive(serde::Serialize)]")
         .type_attribute("FileKey", "#[derive(Eq)]")
         .type_attribute("FileKey", "#[derive(serde::Serialize)]")
+        .type_attribute("FileId", "#[derive(Eq)]")
         .type_attribute("FileDescriptor", "#[derive(Eq)]")
         .type_attribute("FileDescriptor", "#[derive(serde::Serialize)]")
         .type_attribute("FileMeta", "#[derive(Eq)]")

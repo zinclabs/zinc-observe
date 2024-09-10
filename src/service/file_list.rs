@@ -309,227 +309,232 @@ async fn query_inner(
     Ok(file_keys)
 }
 
-pub async fn query_by_ids(ids: &[i64], is_local: bool) -> Result<Vec<FileKey>, anyhow::Error> {
+pub async fn query_by_ids(
+    ids: &[i64],
+    org_id: &str,
+    is_local: bool,
+) -> Result<Vec<(i64, FileKey)>, anyhow::Error> {
     let cfg = get_config();
-    // if is_local || cfg.common.local_mode {
-    return query_by_ids_inner(ids).await;
-    // }
-
-    // TODO YJDoc2 deal with non-local stuff
+    if is_local || cfg.common.local_mode {
+        return query_by_ids_inner(ids).await;
+    }
 
     // cluster mode
-    // let start: std::time::Instant = std::time::Instant::now();
-    // let nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-    //     .await
-    //     .unwrap_or_default();
-    // if nodes.is_empty() {
-    //     return Ok(Vec::new());
-    // }
-    // let mut tasks = Vec::with_capacity(3);
-    // // get first three nodes to check file list max id
-    // for node in nodes.into_iter().take(3) {
-    //     let cfg = cfg.clone();
-    //     let org_id = org_id.to_string();
-    //     let task = tokio::task::spawn(async move {
-    //         let req = cluster_rpc::EmptyRequest::default();
-    //         let org_id: MetadataValue<_> = org_id
-    //             .parse()
-    //             .map_err(|_| Error::Message("invalid org_id".to_string()))?;
-    //         let mut request = tonic::Request::new(req);
+    let start: std::time::Instant = std::time::Instant::now();
+    let nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
+        .await
+        .unwrap_or_default();
+    if nodes.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut tasks = Vec::with_capacity(3);
+    // get first three nodes to check file list max id
+    for node in nodes.into_iter().take(3) {
+        let cfg = cfg.clone();
+        let org_id = org_id.to_string();
+        let task = tokio::task::spawn(async move {
+            let req = cluster_rpc::EmptyRequest::default();
+            let org_id: MetadataValue<_> = org_id
+                .parse()
+                .map_err(|_| Error::Message("invalid org_id".to_string()))?;
+            let mut request = tonic::Request::new(req);
 
-    //         opentelemetry::global::get_text_map_propagator(|propagator| {
-    //             propagator.inject_context(
-    //                 &tracing::Span::current().context(),
-    //                 &mut MetadataMap(request.metadata_mut()),
-    //             )
-    //         });
+            opentelemetry::global::get_text_map_propagator(|propagator| {
+                propagator.inject_context(
+                    &tracing::Span::current().context(),
+                    &mut MetadataMap(request.metadata_mut()),
+                )
+            });
 
-    //         let org_header_key: MetadataKey<_> = cfg
-    //             .grpc
-    //             .org_header_key
-    //             .parse()
-    //             .map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
-    //         let token: MetadataValue<_> = cluster::get_internal_grpc_token()
-    //             .parse()
-    //             .map_err(|_| Error::Message("invalid token".to_string()))?;
-    //         let channel = Channel::from_shared(node.grpc_addr.clone())
-    //             .unwrap()
-    //             .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-    //             .connect()
-    //             .await
-    //             .map_err(|err| {
-    //                 log::error!(
-    //                     "file_list->grpc: node: {}, connect err: {:?}",
-    //                     &node.grpc_addr,
-    //                     err
-    //                 );
-    //                 Error::ErrorCode(ErrorCodes::ServerInternalError(
-    //                     "connect querier error".to_string(),
-    //                 ))
-    //             })?;
-    //         let mut client = cluster_rpc::filelist_client::FilelistClient::with_interceptor(
-    //             channel,
-    //             move |mut req: Request<()>| {
-    //                 req.metadata_mut().insert("authorization", token.clone());
-    //                 req.metadata_mut()
-    //                     .insert(org_header_key.clone(), org_id.clone());
-    //                 Ok(req)
-    //             },
-    //         );
-    //         client = client
-    //             .send_compressed(CompressionEncoding::Gzip)
-    //             .accept_compressed(CompressionEncoding::Gzip)
-    //             .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-    //             .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    //         let response: cluster_rpc::MaxIdResponse = match client.max_id(request).await {
-    //             Ok(res) => res.into_inner(),
-    //             Err(err) => {
-    //                 log::error!(
-    //                     "file_list->grpc: node: {}, query max_id err: {:?}",
-    //                     &node.grpc_addr,
-    //                     err
-    //                 );
-    //                 if err.code() == tonic::Code::Internal {
-    //                     let err = ErrorCodes::from_json(err.message())?;
-    //                     return Err(Error::ErrorCode(err));
-    //                 }
-    //                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
-    //                     "search node response error: {}",
-    //                     err
-    //                 ))));
-    //             }
-    //         };
-    //         Ok((node, response.max_id))
-    //     });
-    //     tasks.push(task);
-    // }
-    // let mut max_id: i64 = 0;
-    // let mut max_id_node: Option<Node> = None;
-    // let task_results = try_join_all(tasks).await?;
-    // for task in task_results {
-    //     let res = task?;
-    //     if res.1 > max_id {
-    //         max_id = res.1;
-    //         max_id_node = Some(res.0);
-    //     }
-    // }
-    // if max_id_node.is_none() {
-    //     return Ok(Vec::new());
-    // }
-    // let node = max_id_node.unwrap();
-    // if node.uuid.eq(LOCAL_NODE.uuid.as_str()) {
-    //     // local node, no need grpc call
-    //     let files = query_inner(
-    //         org_id,
-    //         stream_name,
-    //         stream_type,
-    //         time_level,
-    //         time_min,
-    //         time_max,
-    //     )
-    //     .await?;
-    //     log::info!(
-    //         "file_list->local: query list: {}, time: {}ms",
-    //         files.len(),
-    //         start.elapsed().as_millis()
-    //     );
-    //     return Ok(files);
-    // }
-    // // use the max_id node to query file_list
-    // let req = cluster_rpc::FileListQueryRequest {
-    //     org_id: org_id.to_string(),
-    //     stream_name: stream_name.to_string(),
-    //     stream_type: stream_type.to_string(),
-    //     time_level: time_level.to_string(),
-    //     start_time: time_min,
-    //     end_time: time_max,
-    // };
-    // let org_id: MetadataValue<_> = org_id
-    //     .parse()
-    //     .map_err(|_| Error::Message("invalid org_id".to_string()))?;
-    // let mut request = tonic::Request::new(req);
+            let org_header_key: MetadataKey<_> = cfg
+                .grpc
+                .org_header_key
+                .parse()
+                .map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
+            let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+                .parse()
+                .map_err(|_| Error::Message("invalid token".to_string()))?;
+            let channel = Channel::from_shared(node.grpc_addr.clone())
+                .unwrap()
+                .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
+                .connect()
+                .await
+                .map_err(|err| {
+                    log::error!(
+                        "file_list->grpc: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    Error::ErrorCode(ErrorCodes::ServerInternalError(
+                        "connect querier error".to_string(),
+                    ))
+                })?;
+            let mut client = cluster_rpc::filelist_client::FilelistClient::with_interceptor(
+                channel,
+                move |mut req: Request<()>| {
+                    req.metadata_mut().insert("authorization", token.clone());
+                    req.metadata_mut()
+                        .insert(org_header_key.clone(), org_id.clone());
+                    Ok(req)
+                },
+            );
+            client = client
+                .send_compressed(CompressionEncoding::Gzip)
+                .accept_compressed(CompressionEncoding::Gzip)
+                .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+            let response: cluster_rpc::MaxIdResponse = match client.max_id(request).await {
+                Ok(res) => res.into_inner(),
+                Err(err) => {
+                    log::error!(
+                        "file_list->grpc: node: {}, query max_id err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    if err.code() == tonic::Code::Internal {
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
+                    }
+                    return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
+                        "search node response error: {}",
+                        err
+                    ))));
+                }
+            };
+            Ok((node, response.max_id))
+        });
+        tasks.push(task);
+    }
+    let mut max_id: i64 = 0;
+    let mut max_id_node: Option<Node> = None;
+    let task_results = try_join_all(tasks).await?;
+    for task in task_results {
+        let res = task?;
+        if res.1 > max_id {
+            max_id = res.1;
+            max_id_node = Some(res.0);
+        }
+    }
+    if max_id_node.is_none() {
+        return Ok(Vec::new());
+    }
+    let node = max_id_node.unwrap();
+    if node.uuid.eq(LOCAL_NODE.uuid.as_str()) {
+        // local node, no need grpc call
+        let files = query_by_ids_inner(ids).await?;
+        log::info!(
+            "file_list->local: query list: {}, time: {}ms",
+            files.len(),
+            start.elapsed().as_millis()
+        );
+        return Ok(files);
+    }
+    // use the max_id node to query file_list
+    let req = cluster_rpc::FileByIdQueryRequest { ids: ids.into() };
+    let org_id: MetadataValue<_> = org_id
+        .parse()
+        .map_err(|_| Error::Message("invalid org_id".to_string()))?;
+    let mut request = tonic::Request::new(req);
 
-    // opentelemetry::global::get_text_map_propagator(|propagator| {
-    //     propagator.inject_context(
-    //         &tracing::Span::current().context(),
-    //         &mut MetadataMap(request.metadata_mut()),
-    //     )
-    // });
+    opentelemetry::global::get_text_map_propagator(|propagator| {
+        propagator.inject_context(
+            &tracing::Span::current().context(),
+            &mut MetadataMap(request.metadata_mut()),
+        )
+    });
 
-    // let org_header_key: MetadataKey<_> = cfg
-    //     .grpc
-    //     .org_header_key
-    //     .parse()
-    //     .map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
-    // let token: MetadataValue<_> = cluster::get_internal_grpc_token()
-    //     .parse()
-    //     .map_err(|_| Error::Message("invalid token".to_string()))?;
-    // let channel = Channel::from_shared(node.grpc_addr.clone())
-    //     .unwrap()
-    //     .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-    //     .connect()
-    //     .await
-    //     .map_err(|err| {
-    //         log::error!(
-    //             "file_list->grpc: node: {}, connect err: {:?}",
-    //             &node.grpc_addr,
-    //             err
-    //         );
-    //         Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
-    //             "connect to search node error: {}",
-    //             err
-    //         )))
-    //     })?;
-    // let mut client = cluster_rpc::filelist_client::FilelistClient::with_interceptor(
-    //     channel,
-    //     move |mut req: Request<()>| {
-    //         req.metadata_mut().insert("authorization", token.clone());
-    //         req.metadata_mut()
-    //             .insert(org_header_key.clone(), org_id.clone());
-    //         Ok(req)
-    //     },
-    // );
+    let org_header_key: MetadataKey<_> = cfg
+        .grpc
+        .org_header_key
+        .parse()
+        .map_err(|_| Error::Message("invalid org_header_key".to_string()))?;
+    let token: MetadataValue<_> = cluster::get_internal_grpc_token()
+        .parse()
+        .map_err(|_| Error::Message("invalid token".to_string()))?;
+    let channel = Channel::from_shared(node.grpc_addr.clone())
+        .unwrap()
+        .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
+        .connect()
+        .await
+        .map_err(|err| {
+            log::error!(
+                "file_list->grpc: node: {}, connect err: {:?}",
+                &node.grpc_addr,
+                err
+            );
+            Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
+                "connect to search node error: {}",
+                err
+            )))
+        })?;
+    let mut client = cluster_rpc::filelist_client::FilelistClient::with_interceptor(
+        channel,
+        move |mut req: Request<()>| {
+            req.metadata_mut().insert("authorization", token.clone());
+            req.metadata_mut()
+                .insert(org_header_key.clone(), org_id.clone());
+            Ok(req)
+        },
+    );
 
-    // client = client
-    //     .send_compressed(CompressionEncoding::Gzip)
-    //     .accept_compressed(CompressionEncoding::Gzip)
-    //     .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-    //     .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    // let response: cluster_rpc::FileList = match client.query(request).await {
-    //     Ok(res) => res.into_inner(),
-    //     Err(err) => {
-    //         log::error!(
-    //             "file_list->grpc: node: {}, query list err: {:?}",
-    //             &node.grpc_addr,
-    //             err
-    //         );
-    //         if err.code() == tonic::Code::Internal {
-    //             let err = ErrorCodes::from_json(err.message())?;
-    //             return Err(anyhow::anyhow!(Error::ErrorCode(err).to_string()));
-    //         }
-    //         return Err(anyhow::anyhow!("search node error".to_string()));
-    //     }
-    // };
-    // let files = response.items.iter().map(FileKey::from).collect::<Vec<_>>();
-    // log::info!(
-    //     "file_list->grpc: node: {}, query list: {}, time: {}ms",
-    //     &node.grpc_addr,
-    //     files.len(),
-    //     start.elapsed().as_millis()
-    // );
-    // Ok(files)
+    client = client
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    // TODO new query here
+    let response: cluster_rpc::FileDataList = match client.query_by_ids(request).await {
+        Ok(res) => res.into_inner(),
+        Err(err) => {
+            log::error!(
+                "file_list->grpc: node: {}, query list err: {:?}",
+                &node.grpc_addr,
+                err
+            );
+            if err.code() == tonic::Code::Internal {
+                let err = ErrorCodes::from_json(err.message())?;
+                return Err(anyhow::anyhow!(Error::ErrorCode(err).to_string()));
+            }
+            return Err(anyhow::anyhow!("search node error".to_string()));
+        }
+    };
+
+    let files = response
+        .items
+        .into_iter()
+        .map(|f| {
+            let res_fk = f.file_key.unwrap();
+            let fk = FileKey {
+                key: res_fk.key,
+                meta: (&res_fk.meta.unwrap()).into(),
+                deleted: res_fk.deleted,
+                segment_ids: res_fk.segment_ids,
+            };
+            (f.id, fk)
+        })
+        .collect::<Vec<_>>();
+    log::info!(
+        "file_list->grpc: node: {}, query list: {}, time: {}ms",
+        &node.grpc_addr,
+        files.len(),
+        start.elapsed().as_millis()
+    );
+    Ok(files)
 }
 
-async fn query_by_ids_inner(ids: &[i64]) -> Result<Vec<FileKey>, anyhow::Error> {
+async fn query_by_ids_inner(ids: &[i64]) -> Result<Vec<(i64, FileKey)>, anyhow::Error> {
     let files = file_list::query_by_ids(ids).await?;
     let mut file_keys = Vec::with_capacity(files.len());
-    for file in files {
-        file_keys.push(FileKey {
-            key: file.0,
-            meta: file.1,
-            deleted: false,
-            segment_ids: None,
-        });
+    for (id, key, meta) in files {
+        file_keys.push((
+            id,
+            FileKey {
+                key,
+                meta,
+                deleted: false,
+                segment_ids: None,
+            },
+        ));
     }
     Ok(file_keys)
 }
@@ -550,17 +555,16 @@ pub async fn query_ids(
 ) -> Result<Vec<FileQueryData>, anyhow::Error> {
     let cfg = get_config();
     if is_local || cfg.common.local_mode {
-    return query_ids_inner(
-        org_id,
-        stream_name,
-        stream_type,
-        time_level,
-        time_min,
-        time_max,
-    )
-    .await;
+        return query_ids_inner(
+            org_id,
+            stream_name,
+            stream_type,
+            time_level,
+            time_min,
+            time_max,
+        )
+        .await;
     }
-    // TODO add stuff in grpc proto and sew things together
     // cluster mode
     let start: std::time::Instant = std::time::Instant::now();
     let nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
@@ -739,7 +743,7 @@ pub async fn query_ids(
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let response: cluster_rpc::FileList = match client.query(request).await {
+    let response: cluster_rpc::IdList = match client.query_ids(request).await {
         Ok(res) => res.into_inner(),
         Err(err) => {
             log::error!(
@@ -754,13 +758,23 @@ pub async fn query_ids(
             return Err(anyhow::anyhow!("search node error".to_string()));
         }
     };
-    let files = response.items.iter().map(FileKey::from).collect::<Vec<_>>();
+    let files = response
+        .items
+        .into_iter()
+        .map(|f| FileQueryData {
+            id: f.id,
+            key: f.key,
+            segment_ids: None,
+            original_size: f.original_size,
+        })
+        .collect::<Vec<_>>();
     log::info!(
         "file_list->grpc: node: {}, query list: {}, time: {}ms",
         &node.grpc_addr,
         files.len(),
         start.elapsed().as_millis()
     );
+
     Ok(files)
 }
 

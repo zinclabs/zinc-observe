@@ -11,11 +11,36 @@ import "cluster/common.proto";
 service Filelist {
     rpc MaxID (EmptyRequest) returns (MaxIdResponse) {}
     rpc Query (FileListQueryRequest) returns (FileList) {}
+    rpc QueryIds (FileListQueryRequest) returns (IdList) {}
+    rpc QueryByIds (FileByIdQueryRequest) returns (FileDataList) {}
 }
 
 
 message MaxIdResponse {
     int64 max_id = 1;
+}
+
+message IdList {
+    repeated FileQueryData items = 1;
+}
+
+message FileQueryData{
+    int64 id = 1;
+    string key = 2;
+    int64 original_size = 3;
+}
+
+message FileByIdQueryRequest{
+    repeated int64 ids = 1;
+}
+
+message FileDataList{
+    repeated FileData items = 1;
+}
+
+message FileData{
+    int64          id           = 1;
+    FileKey        file_key     = 2;
 }
 
 message FileListQueryRequest {

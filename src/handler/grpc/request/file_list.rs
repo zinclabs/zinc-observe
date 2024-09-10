@@ -20,7 +20,8 @@ use config::{
 use infra::file_list as infra_file_list;
 use opentelemetry::global;
 use proto::cluster_rpc::{
-    filelist_server::Filelist, EmptyRequest, FileKey, FileList, FileListQueryRequest, MaxIdResponse,
+    filelist_server::Filelist, EmptyRequest, FileByIdQueryRequest, FileData, FileDataList, FileKey,
+    FileList, FileListQueryRequest, FileQueryData, IdList, MaxIdResponse,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -98,5 +99,91 @@ impl Filelist for Filelister {
             .inc();
 
         Ok(Response::new(FileList { items }))
+    }
+
+    async fn query_ids(
+        &self,
+        req: Request<FileListQueryRequest>,
+    ) -> Result<Response<IdList>, Status> {
+        let start = std::time::Instant::now();
+        let parent_cx = global::get_text_map_propagator(|prop| {
+            prop.extract(&super::MetadataMap(req.metadata()))
+        });
+        tracing::Span::current().set_parent(parent_cx);
+
+        let req: &FileListQueryRequest = req.get_ref();
+        let org_id = &req.org_id;
+        let stream_type = StreamType::from(req.stream_type.as_str());
+        let stream_name = &req.stream_name;
+        let time_level = PartitionTimeLevel::from(req.time_level.as_str());
+        let time_range = Some((req.start_time, req.end_time));
+        let files = infra_file_list::query_ids(
+            org_id,
+            stream_type,
+            stream_name,
+            time_level,
+            time_range,
+            None,
+        )
+        .await
+        .map_err(|e| Status::internal(e.to_string()))?
+        .into_iter()
+        .map(|f| FileQueryData {
+            id: f.id,
+            key: f.key,
+            original_size: f.original_size,
+        })
+        .collect();
+
+        // metrics
+        let time = start.elapsed().as_secs_f64();
+        metrics::GRPC_RESPONSE_TIME
+            .with_label_values(&["/file_list/query_ids", "200", "", "", ""])
+            .observe(time);
+        metrics::GRPC_INCOMING_REQUESTS
+            .with_label_values(&["/file_list/query_ids", "200", "", "", ""])
+            .inc();
+
+        Ok(Response::new(IdList { items: files }))
+    }
+
+    async fn query_by_ids(
+        &self,
+        req: Request<FileByIdQueryRequest>,
+    ) -> Result<Response<FileDataList>, Status> {
+        let start = std::time::Instant::now();
+        let parent_cx = global::get_text_map_propagator(|prop| {
+            prop.extract(&super::MetadataMap(req.metadata()))
+        });
+        tracing::Span::current().set_parent(parent_cx);
+
+        let req: &FileByIdQueryRequest = req.get_ref();
+        let ids = &req.ids;
+        let files = infra_file_list::query_by_ids(ids)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+        let items: Vec<FileData> = files
+            .into_iter()
+            .map(|(id, key, meta)| FileData {
+                id,
+                file_key: Some(FileKey {
+                    key,
+                    meta: Some((&meta).into()),
+                    deleted: false,
+                    segment_ids: None,
+                }),
+            })
+            .collect::<_>();
+
+        // metrics
+        let time = start.elapsed().as_secs_f64();
+        metrics::GRPC_RESPONSE_TIME
+            .with_label_values(&["/file_list/query_by_ids", "200", "", "", ""])
+            .observe(time);
+        metrics::GRPC_INCOMING_REQUESTS
+            .with_label_values(&["/file_list/query_by_ids", "200", "", "", ""])
+            .inc();
+
+        Ok(Response::new(FileDataList { items }))
     }
 }

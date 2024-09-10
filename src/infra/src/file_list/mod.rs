@@ -69,7 +69,7 @@ pub trait FileList: Sync + Send + 'static {
         time_range: Option<(i64, i64)>,
         flattened: Option<bool>,
     ) -> Result<Vec<(String, FileMeta)>>;
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>>;
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>>;
     async fn query_ids(
         &self,
         org_id: &str,
@@ -248,7 +248,7 @@ pub async fn query(
 
 #[inline]
 #[tracing::instrument(name = "infra:file_list:query_db", skip_all)]
-pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
+pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
     CLIENT.query_by_ids(ids).await
 }
 
@@ -406,6 +406,7 @@ pub async fn clean_done_jobs(before_date: i64) -> Result<()> {
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow)]
 pub struct FileRecord {
+    pub id: i64,
     pub stream: String,
     pub date: String,
     pub file: String,

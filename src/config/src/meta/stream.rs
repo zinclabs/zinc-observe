@@ -112,6 +112,7 @@ impl std::fmt::Display for StreamType {
 pub struct FileQueryData {
     pub id: i64,
     pub key: String,
+    pub segment_ids: Option<Vec<u8>>,
     pub original_size: i64,
 }
 

@@ -469,6 +469,42 @@ pub struct MaxIdResponse {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IdList {
+    #[prost(message, repeated, tag = "1")]
+    pub items: ::prost::alloc::vec::Vec<FileQueryData>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileQueryData {
+    #[prost(int64, tag = "1")]
+    pub id: i64,
+    #[prost(string, tag = "2")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(int64, tag = "3")]
+    pub original_size: i64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileByIdQueryRequest {
+    #[prost(int64, repeated, tag = "1")]
+    pub ids: ::prost::alloc::vec::Vec<i64>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileDataList {
+    #[prost(message, repeated, tag = "1")]
+    pub items: ::prost::alloc::vec::Vec<FileData>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileData {
+    #[prost(int64, tag = "1")]
+    pub id: i64,
+    #[prost(message, optional, tag = "2")]
+    pub file_key: ::core::option::Option<FileKey>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileListQueryRequest {
     #[prost(string, tag = "1")]
     pub org_id: ::prost::alloc::string::String,
@@ -606,6 +642,49 @@ pub mod filelist_client {
             req.extensions_mut().insert(GrpcMethod::new("cluster.Filelist", "Query"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn query_ids(
+            &mut self,
+            request: impl tonic::IntoRequest<super::FileListQueryRequest>,
+        ) -> std::result::Result<tonic::Response<super::IdList>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Filelist/QueryIds",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Filelist", "QueryIds"));
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn query_by_ids(
+            &mut self,
+            request: impl tonic::IntoRequest<super::FileByIdQueryRequest>,
+        ) -> std::result::Result<tonic::Response<super::FileDataList>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/cluster.Filelist/QueryByIds",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("cluster.Filelist", "QueryByIds"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -623,6 +702,14 @@ pub mod filelist_server {
             &self,
             request: tonic::Request<super::FileListQueryRequest>,
         ) -> std::result::Result<tonic::Response<super::FileList>, tonic::Status>;
+        async fn query_ids(
+            &self,
+            request: tonic::Request<super::FileListQueryRequest>,
+        ) -> std::result::Result<tonic::Response<super::IdList>, tonic::Status>;
+        async fn query_by_ids(
+            &self,
+            request: tonic::Request<super::FileByIdQueryRequest>,
+        ) -> std::result::Result<tonic::Response<super::FileDataList>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct FilelistServer<T: Filelist> {
@@ -778,6 +865,98 @@ pub mod filelist_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = QuerySvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Filelist/QueryIds" => {
+                    #[allow(non_camel_case_types)]
+                    struct QueryIdsSvc<T: Filelist>(pub Arc<T>);
+                    impl<
+                        T: Filelist,
+                    > tonic::server::UnaryService<super::FileListQueryRequest>
+                    for QueryIdsSvc<T> {
+                        type Response = super::IdList;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::FileListQueryRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Filelist>::query_ids(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = QueryIdsSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Filelist/QueryByIds" => {
+                    #[allow(non_camel_case_types)]
+                    struct QueryByIdsSvc<T: Filelist>(pub Arc<T>);
+                    impl<
+                        T: Filelist,
+                    > tonic::server::UnaryService<super::FileByIdQueryRequest>
+                    for QueryByIdsSvc<T> {
+                        type Response = super::FileDataList;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::FileByIdQueryRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Filelist>::query_by_ids(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = QueryByIdsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
@@ -1365,20 +1544,27 @@ pub struct SearchRequest {
     pub query: ::core::option::Option<SearchQuery>,
     #[prost(enumeration = "AggregateMode", tag = "6")]
     pub agg_mode: i32,
-    #[prost(message, repeated, tag = "7")]
-    pub file_list: ::prost::alloc::vec::Vec<FileKey>,
-    #[prost(int64, tag = "8")]
+    #[prost(int64, tag = "7")]
     pub timeout: i64,
-    #[prost(string, tag = "9")]
+    #[prost(string, tag = "8")]
     pub work_group: ::prost::alloc::string::String,
-    #[prost(string, tag = "10")]
+    #[prost(string, tag = "9")]
     pub index_type: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "11")]
+    #[prost(string, optional, tag = "10")]
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "12")]
+    #[prost(string, optional, tag = "11")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(int64, repeated, tag = "13")]
-    pub file_id_list: ::prost::alloc::vec::Vec<i64>,
+    #[prost(message, repeated, tag = "12")]
+    pub file_ids: ::prost::alloc::vec::Vec<FileId>,
+}
+#[derive(Eq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileId {
+    #[prost(int64, tag = "1")]
+    pub id: i64,
+    #[prost(bytes = "vec", optional, tag = "4")]
+    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]

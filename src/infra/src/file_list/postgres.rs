@@ -220,7 +220,7 @@ impl super::FileList for PostgresFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -291,7 +291,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
         let ret = if flattened.is_some() {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
@@ -304,7 +304,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
                 "#,
@@ -326,7 +326,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .collect())
     }
 
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
         if ids.len() < 1 {
             return Ok(Vec::default());
         }
@@ -335,7 +335,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
 
         let params = format!("?{}", ", ?".repeat(ids.len() - 1));
         let query_str = format!(
-            r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
+            r#"SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
             WHERE id IN ( { } )"#,
             params
         );
@@ -351,6 +351,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
             .into_iter()
             .map(|r| {
                 (
+                    r.id,
                     format!("files/{}/{}/{}", r.stream, r.date, r.file),
                     FileMeta::from(&r),
                 )
@@ -405,6 +406,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
                 id: r.0,
                 key: r.2,
                 original_size: r.1,
+                segment_ids: None,
             })
             .collect())
     }

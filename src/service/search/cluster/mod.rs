@@ -24,8 +24,8 @@ use config::{
         cluster::{Node, Role, RoleGroup},
         search::{self, ScanStats, SearchEventType},
         stream::{
-            FileKey, FileQueryData, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition,
-            StreamType,
+            FileKey, FileMeta, FileQueryData, PartitionTimeLevel, QueryPartitionStrategy,
+            StreamPartition, StreamType,
         },
     },
     metrics,
@@ -38,7 +38,7 @@ use infra::{
     errors::{Error, ErrorCodes, Result},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
-use proto::cluster_rpc;
+use proto::cluster_rpc::{self, FileId};
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
@@ -164,20 +164,21 @@ pub async fn search(
 
     // If the query is of type inverted index and this is not an aggregations request,
     // then filter the file list based on the inverted index.
-    // TODO YJDoc2 check what stuff we are using from file meta and fetch that to make this work
+
     let mut idx_scan_size = 0;
     let mut idx_took = 0;
-    // if use_inverted_index {
-    //     (file_id_list, idx_scan_size, idx_took) =
-    //         get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_id_list).await?;
-    //     log::info!(
-    //         "[trace_id {trace_id}] search: get file_list from inverted index time_range: {:?},
-    // num: {}, scan_size: {}, took: {} ms",         meta.meta.time_range,
-    //         file_id_list.len(),
-    //         idx_scan_size,
-    //         idx_took,
-    //     );
-    // }
+    if use_inverted_index {
+        (file_id_list, idx_scan_size, idx_took) =
+            get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_id_list).await?;
+        log::info!(
+            "[trace_id {trace_id}] search: get file_list from inverted index time_range: {:?},
+    num: {}, scan_size: {}, took: {} ms",
+            meta.meta.time_range,
+            file_id_list.len(),
+            idx_scan_size,
+            idx_took,
+        );
+    }
 
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
@@ -186,7 +187,7 @@ pub async fn search(
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
 
-    // TODO - change param type to &[u64] for original size in o2-enterprise
+    // TODO YJDoc2 - change param type to &[u64] for original size in o2-enterprise
     // 1. get work group
     #[cfg(feature = "enterprise")]
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
@@ -349,23 +350,29 @@ pub async fn search(
                 req.stype = cluster_rpc::SearchType::Cluster as _;
                 match partition_strategy {
                     QueryPartitionStrategy::FileNum => {
-                        req.file_id_list = file_id_list
+                        req.file_ids = file_id_list
                             [offset_start..min(offset_start + offset, file_num)]
                             .to_vec()
                             .iter()
-                            .map(|f| f.id)
+                            .map(|f| FileId {
+                                id: f.id,
+                                segment_ids: f.segment_ids.clone(),
+                            })
                             .collect();
                         offset_start += offset;
                     }
                     QueryPartitionStrategy::FileSize | QueryPartitionStrategy::FileHash => {
-                        req.file_id_list = partition_files
+                        req.file_ids = partition_files
                             .get(offset_start)
                             .unwrap()
-                            .iter()
-                            .map(|f| f.id)
+                            .into_iter()
+                            .map(|f| FileId {
+                                id: f.id,
+                                segment_ids: f.segment_ids.clone(),
+                            })
                             .collect();
                         offset_start += offset;
-                        if req.file_id_list.is_empty() {
+                        if req.file_ids.is_empty() {
                             if node.is_ingester() {
                                 req.stype = cluster_rpc::SearchType::WalOnly as _;
                             } else {
@@ -379,7 +386,7 @@ pub async fn search(
             }
         }
 
-        let req_files = req.file_id_list.len();
+        let req_files = req.file_ids.len();
         let node_addr = node.grpc_addr.clone();
         let grpc_span = info_span!(
             "service:search:cluster:grpc_search",
@@ -905,8 +912,24 @@ pub(crate) async fn get_file_id_list(
     .await
     .unwrap_or_default();
 
-    // TODO have to add the match_source logic from above
-    file_list
+    let mut files = Vec::with_capacity(file_list.len());
+    for file in file_list {
+        let source = FileKey {
+            key: file.key.clone(),
+            meta: FileMeta::default(),
+            deleted: false,
+            segment_ids: None,
+        };
+        if sql
+            .match_source(&source, false, false, stream_type, partition_keys)
+            .await
+        {
+            files.push(file);
+        }
+    }
+    files.sort_by(|a, b| a.key.cmp(&b.key));
+    files.dedup_by(|a, b| a.key == b.key);
+    files
 }
 
 pub(crate) fn partition_file_by_bytes(
@@ -1032,7 +1055,7 @@ async fn get_file_list_by_inverted_index(
     let stream_type = StreamType::from(idx_req.stream_type.as_str());
     let file_list_map = file_list
         .iter()
-        .map(|f| (&f.key, &f.original_size))
+        .map(|f| (f.key.clone(), f))
         .collect::<HashMap<_, _>>();
 
     // Get all the unique terms which the user has searched.
@@ -1128,7 +1151,7 @@ async fn get_file_list_by_inverted_index(
         .iter()
         .filter_map(|hit| {
             if hit.get("deleted").unwrap().as_bool().unwrap() {
-                Some(hit.get("file_name").unwrap().as_str().unwrap().to_string())
+                Some(hit.get("file_name").unwrap().as_str().unwrap())
             } else {
                 None
             }
@@ -1136,35 +1159,36 @@ async fn get_file_list_by_inverted_index(
         .collect::<HashSet<_>>();
 
     // Merge bitmap segment_ids of the same file
-    let mut idx_file_list: HashMap<String, FileKey> = HashMap::default();
+    let mut idx_file_list: HashMap<String, FileQueryData> = HashMap::default();
     for item in idx_resp.hits.iter() {
         let filename = match item.get("file_name") {
             None => continue,
             Some(v) => v.as_str().unwrap(),
         };
-        if deleted_files.contains(filename) {
+        if deleted_files.contains(&filename) {
             continue;
         }
         let prefixed_filename = format!(
             "files/{}/{}/{}/{}",
             meta.org_id, stream_type, meta.stream_name, filename
         );
-        log::warn!("prefixed name: {}", prefixed_filename);
-        let Some(file_meta) = file_list_map.get(&prefixed_filename) else {
+        let Some(query_data) = file_list_map.get(&prefixed_filename) else {
             continue;
         };
         let segment_ids = match item.get("segment_ids") {
             None => None,
             Some(v) => hex::decode(v.as_str().unwrap()).ok(),
         };
+
         let entry = idx_file_list
-            .entry(prefixed_filename.clone())
-            .or_insert(FileKey {
-                key: prefixed_filename,
-                meta: config::meta::stream::FileMeta::default(),
-                deleted: false,
+            .entry(prefixed_filename)
+            .or_insert(FileQueryData {
+                id: query_data.id,
+                key: query_data.key.clone(),
+                original_size: query_data.original_size,
                 segment_ids: None,
             });
+
         match (&entry.segment_ids, &segment_ids) {
             (Some(_), None) => {}
             (Some(bin_data), Some(segment_ids)) => {
@@ -1179,11 +1203,7 @@ async fn get_file_list_by_inverted_index(
     }
     let mut idx_file_list = idx_file_list
         .into_iter()
-        .map(|(_, f)| FileQueryData {
-            id: 0,
-            key: f.key,
-            original_size: 0,
-        })
+        .map(|(_, f)| f)
         .collect::<Vec<_>>();
     // sorted by _timestamp
     // idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));

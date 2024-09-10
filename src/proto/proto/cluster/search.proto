@@ -40,13 +40,17 @@ message SearchRequest {
     SearchType                   stype = 4;
     SearchQuery                  query = 5;
     AggregateMode             agg_mode = 6;
-    repeated FileKey         file_list = 7;
-    int64                      timeout = 8;
-    string                  work_group = 9;
-    string                 index_type = 10;
-    optional string           user_id = 11;
-    optional string search_event_type = 12;
-    repeated int64       file_id_list = 13;
+    int64                      timeout = 7;
+    string                  work_group = 8;
+    string                 index_type = 9;
+    optional string           user_id = 10;
+    optional string search_event_type = 11;
+    repeated FileId         file_ids  = 12;
+}
+
+message FileId{
+    int64          id          = 1;
+    optional bytes segment_ids = 4;
 }
 
 message SearchResponse {

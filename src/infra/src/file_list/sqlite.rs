@@ -212,7 +212,7 @@ impl super::FileList for SqliteFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+SELECT id,  stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -262,7 +262,7 @@ SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, comp
     async fn list(&self) -> Result<Vec<(String, FileMeta)>> {
         let pool = CLIENT_RO.clone();
         let ret = sqlx::query_as::<_, super::FileRecord>(
-            r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list;"#,
+            r#"SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list;"#,
         )
         .fetch_all(&pool)
         .await?;
@@ -333,7 +333,7 @@ SELECT id,stream, date, file, deleted, min_ts, max_ts, records, original_size, c
             .collect())
     }
 
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
         if ids.len() < 1 {
             return Ok(Vec::default());
         }
@@ -341,7 +341,7 @@ SELECT id,stream, date, file, deleted, min_ts, max_ts, records, original_size, c
         let pool = CLIENT_RO.clone();
         let params = format!("?{}", ", ?".repeat(ids.len() - 1));
         let query_str = format!(
-            r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
+            r#"SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
             WHERE id IN ( { } )"#,
             params
         );
@@ -352,10 +352,12 @@ SELECT id,stream, date, file, deleted, min_ts, max_ts, records, original_size, c
         }
 
         let ret = query.fetch_all(&pool).await?;
+
         Ok(ret
             .iter()
             .map(|r| {
                 (
+                    r.id,
                     format!("files/{}/{}/{}", r.stream, r.date, r.file),
                     r.into(),
                 )
@@ -410,6 +412,7 @@ SELECT id,stream, date, file, deleted, min_ts, max_ts, records, original_size, c
                 id: r.0,
                 key: r.2,
                 original_size: r.1,
+                segment_ids: None,
             })
             .collect())
     }
