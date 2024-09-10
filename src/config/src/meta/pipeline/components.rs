@@ -63,7 +63,12 @@ pub struct Edge {
 enum NodeData {
     Stream(StreamParams),
     Function(Transform),
-    Condition(Vec<RoutingCondition>),
+    Condition(ConditionParams),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+struct ConditionParams {
+    conditions: Vec<RoutingCondition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,5 +121,46 @@ mod tests {
             stream_type: StreamType::Logs,
         });
         assert_eq!(node_data, node);
+    }
+
+    #[test]
+    fn test_function_node_serialization() {
+        let func = Transform {
+            function: "vrl_script".to_string(),
+            name: "func".to_string(),
+            params: "row".to_string(),
+            num_args: 0,
+            trans_type: None,
+            streams: None,
+        };
+        let func_node = NodeData::Function(func);
+        let payload = json::json!({
+            "node_type": "function",
+            "name": "func",
+            "params": "row",
+            "function": "vrl_script",
+        });
+        let node_data: NodeData = json::from_value(payload).unwrap();
+        assert_eq!(func_node, node_data);
+    }
+
+    #[test]
+    fn test_condition_node_serialization() {
+        let payload = json::json!({
+            "node_type": "condition",  // required
+            "conditions": [            // required
+              {
+                "column": "body",
+                "operator": ">=",
+                "value": {
+                    "key": "value"
+                },
+                "ignore_case": false    // optional
+              }
+            ]
+        });
+
+        let node_data = json::from_value::<NodeData>(payload);
+        assert!(node_data.is_ok());
     }
 }
