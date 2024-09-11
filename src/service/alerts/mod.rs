@@ -22,7 +22,7 @@ use config::{
     meta::{
         alerts::{AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition},
         search::SearchEventType,
-        stream::StreamParams,
+        stream::StreamType,
     },
     utils::{
         base64,
@@ -48,7 +48,9 @@ pub trait QueryConditionExt: Sync + Send + 'static {
 
     async fn evaluate_scheduled(
         &self,
-        stream_param: &StreamParams,
+        org_id: &str,
+        stream_name: Option<&str>,
+        stream_type: StreamType,
         trigger_condition: &TriggerCondition,
         query_condition: &QueryCondition,
         start_time: Option<i64>,
@@ -85,7 +87,9 @@ impl QueryConditionExt for QueryCondition {
 
     async fn evaluate_scheduled(
         &self,
-        stream_param: &StreamParams,
+        org_id: &str,
+        stream_name: Option<&str>,
+        stream_type: StreamType,
         trigger_condition: &TriggerCondition,
         query_condition: &QueryCondition,
         start_time: Option<i64>,
@@ -93,10 +97,12 @@ impl QueryConditionExt for QueryCondition {
         let now = Utc::now().timestamp_micros();
         let sql = match self.query_type {
             QueryType::Custom => {
-                let Some(v) = self.conditions.as_ref() else {
+                let (Some(stream_name), Some(v)) = (stream_name, self.conditions.as_ref()) else {
+                    // CustomQuery type needs to provide source StreamName.
+                    // CustomQuery is only used by Alerts' triggers.
                     return Ok((None, now));
                 };
-                build_sql(stream_param, self, v).await?
+                build_sql(org_id, &stream_name, stream_type, self, v).await?
             }
             QueryType::SQL => {
                 let Some(v) = self.sql.as_ref() else {
@@ -142,7 +148,7 @@ impl QueryConditionExt for QueryCondition {
                         (end - start) / promql::MAX_DATA_POINTS,
                     ),
                 };
-                let resp = match promql::search::search(&stream_param.org_id, &req, 0, "").await {
+                let resp = match promql::search::search(org_id, &req, 0, "").await {
                     Ok(v) => v,
                     Err(_) => {
                         return Ok((None, now));
@@ -240,15 +246,7 @@ impl QueryConditionExt for QueryCondition {
             index_type: "".to_string(),
         };
         let trace_id = ider::uuid();
-        let resp = match SearchService::search(
-            &trace_id,
-            &stream_param.org_id,
-            stream_param.stream_type,
-            None,
-            &req,
-        )
-        .await
-        {
+        let resp = match SearchService::search(&trace_id, org_id, stream_type, None, &req).await {
             Ok(v) => v,
             Err(e) => {
                 if let infra::errors::Error::ErrorCode(e) = e {
@@ -347,16 +345,13 @@ impl ConditionExt for Condition {
 }
 
 async fn build_sql(
-    stream_params: &StreamParams,
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
     query_condition: &QueryCondition,
     conditions: &[Condition],
 ) -> Result<String, anyhow::Error> {
-    let schema = infra::schema::get(
-        &stream_params.org_id,
-        &stream_params.stream_name,
-        stream_params.stream_type,
-    )
-    .await?;
+    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
     let mut wheres = Vec::with_capacity(conditions.len());
     for cond in conditions.iter() {
         let data_type = match schema.field_with_name(&cond.column) {
@@ -365,7 +360,7 @@ async fn build_sql(
                 return Err(anyhow::anyhow!(
                     "Column {} not found on stream {}",
                     &cond.column,
-                    &stream_params.stream_name
+                    stream_name
                 ));
             }
         };
@@ -378,10 +373,7 @@ async fn build_sql(
         String::new()
     };
     if query_condition.aggregation.is_none() {
-        return Ok(format!(
-            "SELECT * FROM \"{}\" {}",
-            stream_params.stream_name, where_sql
-        ));
+        return Ok(format!("SELECT * FROM \"{}\" {}", stream_name, where_sql));
     }
 
     // handle aggregation
@@ -394,7 +386,7 @@ async fn build_sql(
                 return Err(anyhow::anyhow!(
                     "Aggregation column {} not found on stream {}",
                     &agg.having.column,
-                    &stream_params.stream_name
+                    &stream_name
                 ));
             }
         };
@@ -424,7 +416,7 @@ async fn build_sql(
                 func_expr,
                 cfg.common.column_timestamp,
                 cfg.common.column_timestamp,
-                stream_params.stream_name,
+                stream_name,
                 where_sql,
                 group.join(", "),
                 having_expr
@@ -437,7 +429,7 @@ async fn build_sql(
             func_expr,
             cfg.common.column_timestamp,
             cfg.common.column_timestamp,
-            stream_params.stream_name,
+            stream_name,
             where_sql,
             having_expr
         );

@@ -29,7 +29,7 @@ use config::{
             destinations::{DestinationType, DestinationWithTemplate, HTTPType},
             FrequencyType, Operator, QueryType,
         },
-        stream::{StreamParams, StreamType},
+        stream::StreamType,
     },
     utils::{
         base64,
@@ -358,8 +358,6 @@ pub trait AlertExt: Sync + Send + 'static {
         &self,
         rows: &[Map<String, Value>],
     ) -> Result<(bool, String), anyhow::Error>;
-
-    fn get_stream_params(&self) -> StreamParams;
 }
 
 #[async_trait]
@@ -373,7 +371,9 @@ impl AlertExt for Alert {
         } else {
             self.query_condition
                 .evaluate_scheduled(
-                    &self.get_stream_params(),
+                    &self.org_id,
+                    Some(&self.stream_name),
+                    self.stream_type,
                     &self.trigger_condition,
                     &self.query_condition,
                     None,
@@ -414,14 +414,6 @@ impl AlertExt for Alert {
             Ok((false, message))
         } else {
             Ok((true, "".to_owned()))
-        }
-    }
-
-    fn get_stream_params(&self) -> StreamParams {
-        StreamParams {
-            org_id: self.org_id.clone().into(),
-            stream_name: self.stream_name.clone().into(),
-            stream_type: self.stream_type,
         }
     }
 }
@@ -740,7 +732,9 @@ async fn process_dest_template(
             QueryType::Custom => {
                 if let Some(conditions) = &alert.query_condition.conditions {
                     if let Ok(v) = build_sql(
-                        &alert.get_stream_params(),
+                        &alert.org_id,
+                        &alert.stream_name,
+                        alert.stream_type,
                         &alert.query_condition,
                         conditions,
                     )
