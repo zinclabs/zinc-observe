@@ -58,7 +58,7 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error
     }
 
     // Save DerivedStream details if there's any
-    if let PipelineSource::Query(ref mut derived_stream) = &mut pipeline.source {
+    if let PipelineSource::Scheduled(ref mut derived_stream) = &mut pipeline.source {
         if derived_stream.trigger_condition.period == 0 {
             // Invalid trigger condition
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -146,7 +146,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
     pipeline.version += 1;
 
     // Save DerivedStream details if there's any
-    if let PipelineSource::Query(ref mut derived_stream) = &mut pipeline.source {
+    if let PipelineSource::Scheduled(ref mut derived_stream) = &mut pipeline.source {
         if derived_stream.trigger_condition.period == 0 {
             // Invalid trigger condition
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -227,7 +227,7 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<HttpResponse, Error> {
     };
 
     // delete DerivedStream details if there's any
-    if let PipelineSource::Query(derived_stream) = existing_pipeline.source {
+    if let PipelineSource::Scheduled(derived_stream) = existing_pipeline.source {
         if let Err(error) = super::alerts::derived_streams::delete(
             derived_stream,
             &existing_pipeline.name,
