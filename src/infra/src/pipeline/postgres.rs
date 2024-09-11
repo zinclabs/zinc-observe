@@ -99,9 +99,9 @@ CREATE TABLE IF NOT EXISTS pipeline
         let mut tx = pool.begin().await?;
 
         if let Err(e) = match pipeline.source {
-            PipelineSource::Stream(stream_params) => {
+            PipelineSource::Realtime(stream_params) => {
                 let (source_type, stream_org, stream_name, stream_type): (&str, &str, &str, &str) = (
-                    "stream",
+                    "realtime",
                     stream_params.org_id.as_str(),
                     stream_params.stream_name.as_str(),
                     stream_params.stream_type.as_str(),
@@ -127,9 +127,9 @@ INSERT INTO pipeline (id, version, name, description, org, source_type, stream_o
                 .execute(&mut *tx)
                 .await
             }
-            PipelineSource::Query(derived_stream) => {
+            PipelineSource::Scheduled(derived_stream) => {
                 let (source_type, derived_stream_str) = (
-                    "derived_stream",
+                    "scheduled",
                     json::to_string(&derived_stream)
                         .expect("Serializing pipeline DerivedStream error"),
                 );
@@ -178,7 +178,7 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
         "#;
         let pipelines = match sqlx::query_as::<_, Pipeline>(query)
             .bind(org)
-            .bind("stream")
+            .bind("realtime")
             .bind(stream_params.org_id.as_str())
             .bind(stream_params.stream_name.as_str())
             .bind(stream_params.stream_type.as_str())
@@ -216,12 +216,12 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
     async fn get_by_src_and_struct(&self, pipeline: &Pipeline) -> Result<Pipeline> {
         let pool = CLIENT.clone();
         let existing_pipeline = match &pipeline.source {
-            PipelineSource::Stream(stream_params) => {
+            PipelineSource::Realtime(stream_params) => {
                 sqlx::query_as::<_, Pipeline>(r#"
 SELECT * FROM pipeline 
     WHERE source_type = $1 AND stream_org = $2 AND stream_name = $3 AND stream_type = $4 AND nodes = $5 AND edges = $5;
                 "#)
-                    .bind("stream")
+                    .bind("realtime")
                     .bind(stream_params.org_id.as_str())
                     .bind(stream_params.stream_name.as_str())
                     .bind(stream_params.stream_type.as_str())
@@ -230,12 +230,12 @@ SELECT * FROM pipeline
                     .fetch_one(&pool)
                     .await
             }
-            PipelineSource::Query(derived_stream) => {
+            PipelineSource::Scheduled(derived_stream) => {
                 sqlx::query_as::<_, Pipeline>(r#"
 SELECT * FROM pipeline 
     WHERE source_type = $1 AND derived_stream = $2 AND nodes = $3 AND edges = $4;
                 "#)
-                    .bind("derived_stream")
+                    .bind("scheduled")
                     .bind(json::to_string(&derived_stream).expect("Serializing pipeline DerivedStream error"))
                     .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
                     .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))

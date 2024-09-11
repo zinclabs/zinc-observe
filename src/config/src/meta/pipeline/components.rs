@@ -25,12 +25,13 @@ use crate::meta::{
 #[serde(tag = "source_type")]
 #[serde(rename_all = "snake_case")]
 pub enum PipelineSource {
-    Stream(StreamParams),
-    Query(DerivedStream),
+    Realtime(StreamParams),
+    Scheduled(DerivedStream),
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
+#[serde(default)]
 pub struct DerivedStream {
     #[serde(default)]
     pub org_id: String,
@@ -72,6 +73,7 @@ pub struct Edge {
 #[serde(rename_all = "snake_case")]
 enum NodeData {
     Stream(StreamParams),
+    Query(DerivedStream),
     Function(FunctionParams),
     Condition(ConditionParams),
 }
@@ -115,7 +117,7 @@ mod tests {
     #[test]
     fn test_pipeline_source_serialization() {
         let data = json::json!({
-          "source_type": "stream",
+          "source_type": "realtime",
           "org_id": "default",
           "stream_name": "default",
           "stream_type": "logs"
@@ -126,7 +128,19 @@ mod tests {
             stream_name: "default".into(),
             stream_type: StreamType::Logs,
         };
-        let source = PipelineSource::Stream(stream_params);
+        let source = PipelineSource::Realtime(stream_params);
+        assert_eq!(from_json, source);
+    }
+
+    #[test]
+    fn test_pipeline_empty_source_serialization() {
+        let data = json::json!({
+          "source_type": "scheduled",
+        });
+        let from_json: PipelineSource = json::from_value(data).unwrap();
+        println!("result: {:?}", from_json);
+        let stream_params = DerivedStream::default();
+        let source = PipelineSource::Scheduled(stream_params);
         assert_eq!(from_json, source);
     }
 

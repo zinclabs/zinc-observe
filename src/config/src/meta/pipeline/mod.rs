@@ -48,10 +48,10 @@ pub struct Pipeline {
 impl Pipeline {
     pub fn get_cache_key(&self) -> String {
         match &self.source {
-            PipelineSource::Stream(stream_params) => {
+            PipelineSource::Realtime(stream_params) => {
                 format!("{}/{}", self.org, stream_params)
             }
-            PipelineSource::Query(_) => {
+            PipelineSource::Scheduled(_) => {
                 format!("{}/{}", self.org, self.id)
             }
         }
@@ -59,8 +59,8 @@ impl Pipeline {
 
     pub fn get_derived_stream(&self) -> Option<DerivedStream> {
         match &self.source {
-            PipelineSource::Query(derived_stream) => Some(derived_stream.to_owned()),
-            PipelineSource::Stream(_) => None,
+            PipelineSource::Scheduled(derived_stream) => Some(derived_stream.to_owned()),
+            _ => None,
         }
     }
 
@@ -87,7 +87,7 @@ where
         let source_type: String = row.try_get("source_type")?;
 
         let source = match source_type.as_str() {
-            "stream" => {
+            "realtime" => {
                 let stream_org: String = row.try_get("stream_org")?;
                 let stream_name: String = row.try_get("stream_name")?;
                 let stream_type: String = row.try_get("stream_name")?;
@@ -96,13 +96,13 @@ where
                     &stream_name,
                     StreamType::from(stream_type.as_str()),
                 );
-                PipelineSource::Stream(stream_params)
+                PipelineSource::Realtime(stream_params)
             }
-            "derived_stream" => {
+            "scheduled" => {
                 let derived_stream_raw: String = row.try_get("derived_stream")?;
                 let derived_stream: DerivedStream = json::from_str(&derived_stream_raw)
                     .expect("Deserializing DerivedStream from ROW error");
-                PipelineSource::Query(derived_stream)
+                PipelineSource::Scheduled(derived_stream)
             }
             _ => return Err(sqlx::Error::ColumnNotFound("Invalid source type".into())),
         };
@@ -147,7 +147,7 @@ mod tests {
                 "description": "with or without this field",
                 "org": "default",
                 "source": {
-                  "source_type": "stream",
+                  "source_type": "realtime",
                   "org_id": "default",
                   "stream_name": "default",
                   "stream_type": "logs"
@@ -205,7 +205,7 @@ mod tests {
             "description": "with or without this field",
             "org": "prod",
             "source": {
-              "source_type": "query",
+              "source_type": "scheduled",
               "query_condition": {
                 "type": "sql",
                 "conditions": null,
@@ -284,10 +284,7 @@ mod tests {
             "name": "pipeline test",
             "description": "with or without this field",
             "source": {
-              "source_type": "stream",
-              "org_id": "default",
-              "stream_name": "default",
-              "stream_type": "logs"
+              "source_type": "realtime",
             },
           }
         );

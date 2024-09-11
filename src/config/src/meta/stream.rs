@@ -121,6 +121,7 @@ impl std::fmt::Display for StreamType {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct StreamParams {
     pub org_id: faststr::FastStr,
     pub stream_name: faststr::FastStr,
