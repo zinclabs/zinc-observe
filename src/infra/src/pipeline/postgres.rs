@@ -18,7 +18,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use config::{
     meta::{
-        alerts::derived_streams,
         pipeline::{components::PipelineSource, Pipeline},
         stream::StreamParams,
     },

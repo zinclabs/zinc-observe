@@ -64,6 +64,7 @@ impl Pipeline {
         }
     }
 
+    // TODO(taiming): validate pipeline
     pub fn validate(&self) -> Result<()> {
         // All leaf nodes are Streams
         // ConditionNode routing_condition != empty()
@@ -126,6 +127,11 @@ where
             edges,
         })
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct PipelineList {
+    pub list: Vec<Pipeline>,
 }
 
 #[cfg(test)]
