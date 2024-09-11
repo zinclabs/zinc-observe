@@ -380,7 +380,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
         let ret = if flattened.is_some() {
             sqlx::query_as::<_, (i64, i64,String)>(
                 r#"
-            SELECT id, original_size,concat(stream,'/',date,'/',file) as key FROM file_list WHERE stream = $1 AND flattened = $2 LIMIT 1000;
+            SELECT id, original_size,concat('files/',stream,'/',date,'/',file) as key FROM file_list WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
             )
             .bind(stream_key)
@@ -391,7 +391,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
             sqlx::query_as::<_, (i64,i64,String)>(
                 r#"
-            SELECT id, original_size,concat(stream,'/',date,'/',file) as key FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
+            SELECT id, original_size,concat('files/',stream,'/',date,'/',file) as key FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
                 "#,
             )
             .bind(stream_key)
