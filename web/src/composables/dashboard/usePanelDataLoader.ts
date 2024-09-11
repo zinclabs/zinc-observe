@@ -895,7 +895,7 @@ export const usePanelDataLoader = (
   const processApiError = async (error: any, type: any) => {
     switch (type) {
       case "promql": {
-        const errorDetailValue = error.response?.data?.error || error?.message;
+        const errorDetailValue = error?.response?.data?.error || error?.message;
         const trimmedErrorMessage =
           errorDetailValue?.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."

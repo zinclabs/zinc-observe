@@ -38,7 +38,6 @@ const useCancelQuery = () => {
       : [];
 
     if (traceIdArray.length === 0) {
-      console.error("No trace IDs to cancel");
       return;
     }
 
