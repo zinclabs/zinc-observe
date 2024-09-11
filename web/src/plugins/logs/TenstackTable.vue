@@ -725,12 +725,10 @@ const expandFunctionError = () => {
 };
 // Specific function that updates the active cell action ID
 const updateActiveCell = (cell?: { id: string; column: { id: string } }) => {
-  console.log("cell", activeCellActionId.value);
   if (!cell) {
     activeCellActionId.value = "";
   } else {
     activeCellActionId.value = `${cell.id}_${cell.column.id}`;
-    console.log("cell", activeCellActionId.value);
   }
 };
 

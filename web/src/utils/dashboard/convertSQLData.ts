@@ -215,7 +215,7 @@ export const convertSQLData = async (
     );
   };
 
-  const noValueConfigOption = panelSchema.config?.no_value_replacement;
+  const noValueConfigOption = panelSchema?.config?.no_value_replacement ?? "";
 
   const processedData = processData(searchQueryData, panelSchema);
 
@@ -317,9 +317,7 @@ export const convertSQLData = async (
         };
         if (!currentData) {
           keys.forEach((key) => {
-            if (key !== timeKey)
-              nullEntry[key] =
-                noValueConfigOption === undefined ? null : noValueConfigOption;
+            if (key !== timeKey) nullEntry[key] = noValueConfigOption;
           });
         }
 
@@ -338,10 +336,7 @@ export const convertSQLData = async (
 
             keys.forEach((key) => {
               if (key !== timeKey && key !== uniqueKey) {
-                nullEntry[key] =
-                  noValueConfigOption === undefined
-                    ? null
-                    : noValueConfigOption;
+                nullEntry[key] = noValueConfigOption;
               }
             });
 

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap as stdHashMap;
+
 use async_trait::async_trait;
 use config::{
     meta::stream::{FileKey, FileMeta, FileQueryData, PartitionTimeLevel, StreamStats, StreamType},
@@ -912,6 +914,39 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
             log::warn!("[MYSQL] clean done jobs");
         }
         Ok(())
+    }
+
+    async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>> {
+        let pool = CLIENT.clone();
+
+        let ret =
+            sqlx::query(r#"SELECT stream, status, count(*) as counts FROM file_list_jobs GROUP BY stream, status ORDER BY status desc;"#)
+                .fetch_all(&pool)
+                .await?;
+
+        let mut job_status: stdHashMap<String, stdHashMap<String, i64>> = stdHashMap::new();
+
+        for r in ret.iter() {
+            let stream = r.get::<String, &str>("stream");
+            let status = r.get::<i32, &str>("status");
+            let counts = if status == 0 {
+                r.get::<i64, &str>("counts")
+            } else {
+                0
+            };
+            let parts: Vec<&str> = stream.split('/').collect();
+            if parts.len() >= 2 {
+                let org = parts[0].to_string();
+                let stream_type = parts[1].to_string();
+                job_status
+                    .entry(org)
+                    .or_default()
+                    .entry(stream_type)
+                    .and_modify(|e| *e = counts)
+                    .or_insert(counts);
+            }
+        }
+        Ok(job_status)
     }
 }
 

@@ -1380,8 +1380,8 @@ const useLogs = () => {
                   Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
                 0,
               );
-            partitionDetail.partitionTotal[0] =
-              searchObj.data.queryResults.total;
+            // partitionDetail.partitionTotal[currentPage] =
+            //   searchObj.data.queryResults.total;
           }
         } else {
           searchObj.data.queryResults.total =
@@ -1710,17 +1710,40 @@ const useLogs = () => {
               }
 
               await generateHistogramSkeleton();
-
-              for (const partition of partitions) {
+              let index = 0;
+              for (const partition  of partitions) {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
                 await getHistogramQueryData(searchObj.data.histogramQuery);
-                if (partitions.length > 1) {
-                  setTimeout(async () => {
+       
+               if (partitions.length > 1) {
+                  // setTimeout(async () => {
                     await generateHistogramData();
                     refreshPartitionPagination(true);
-                  }, 100);
+                  // }, 100);
+                
                 }
+                if(index == 0){
+                  searchObj.data.queryResults.partitionDetail.partitionTotal[index] = searchObj.data.queryResults.aggs.reduce(
+                    (accumulator: number, currentValue: any) =>
+                      accumulator +
+                      Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
+                    0,
+                  );
+
+                }
+                else{
+
+                const previousTotal = searchObj.data.queryResults.partitionDetail.partitionTotal
+                .slice(0, index) // Get all elements before the current index
+                .reduce((acc : any, val : any) => acc + val, 0); // Sum them
+              
+              // Subtract the previous total from queryResults.total
+              const result = searchObj.data.queryResults.total - previousTotal;
+              // Assign the result to the current index in partitionTotal
+              searchObj.data.queryResults.partitionDetail.partitionTotal[index] = result;    
+                }
+                index++;
               }
               searchObj.loadingHistogram = false;
             }
@@ -1748,7 +1771,7 @@ const useLogs = () => {
           if (
             queryReq.query.from == 0 &&
             searchObj.data.queryResults.hits.length > 0 &&
-            !aggFlag
+            !aggFlag && !searchObj.meta.showHistogram
           ) {
             setTimeout(async () => {
               searchObjDebug["pagecountStartTime"] = performance.now();

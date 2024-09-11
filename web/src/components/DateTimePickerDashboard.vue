@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <date-time
     ref="dateTimePicker"
-    auto-apply
+    :auto-apply="false"
     :default-type="modelValue.valueType"
     :default-absolute-time="{
       startTime: modelValue.startTime,
@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :default-relative-time="modelValue.relativeTimePeriod"
     @on:date-change="updateDateTime"
     :initialTimezone="initialTimezone"
+    :disable="disable"
   >
   </date-time>
 </template>
@@ -51,6 +52,10 @@ export default defineComponent({
     initialTimezone: {
       required: false,
       default: null,
+    },
+    disable: {
+      required: false,
+      default: false,
     },
   },
   emits: ["update:modelValue"],

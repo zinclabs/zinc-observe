@@ -95,7 +95,7 @@ impl Event for Eventer {
         if cfg.memory_cache.cache_latest_files && LOCAL_NODE.is_querier() {
             let mut cached_field_stream = HashSet::new();
             for item in put_items.iter() {
-                let Some(node) = get_node_from_consistent_hash(
+                let Some(node_name) = get_node_from_consistent_hash(
                     &item.key,
                     &Role::Querier,
                     Some(RoleGroup::Interactive),
@@ -104,7 +104,7 @@ impl Event for Eventer {
                 else {
                     continue; // no querier node
                 };
-                if LOCAL_NODE.uuid.ne(&node) {
+                if LOCAL_NODE.name.ne(&node_name) {
                     continue; // not this node
                 }
                 if infra::cache::file_data::download("download", &item.key)

@@ -533,7 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disable="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.breakdown.length == 0
+          ]?.fields?.breakdown?.length == 0
         "
         data-test="dashboard-config-top_results"
         ><template v-slot:label>
@@ -585,7 +585,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disable="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
-            ].fields.breakdown.length == 0
+            ].fields?.breakdown?.length == 0
           "
         />
 

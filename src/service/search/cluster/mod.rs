@@ -965,17 +965,26 @@ pub(crate) async fn partition_file_by_hash<'a>(
         if !node.is_querier() {
             continue;
         }
-        node_idx.insert(&node.uuid, idx);
+        node_idx.insert(&node.name, idx);
         idx += 1;
     }
     let mut partitions: Vec<Vec<&FileQueryData>> = vec![Vec::new(); idx];
     for fk in file_keys {
-        let node_uuid =
+        let node_name =
             infra_cluster::get_node_from_consistent_hash(&fk.id.to_string(), &Role::Querier, group)
                 .await
                 .expect("there is no querier node in consistent hash ring");
-        let idx = node_idx.get(&node_uuid).unwrap_or(&0);
-        partitions[*idx].push(fk);
+        let idx = match node_idx.get(&node_name) {
+            Some(idx) => *idx,
+            None => {
+                log::error!(
+                    "partition_file_by_hash: {} not found in node_idx",
+                    node_name
+                );
+                0
+            }
+        };
+        partitions[idx].push(fk);
     }
     partitions
 }

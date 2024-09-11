@@ -102,6 +102,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               style="width: 600px"
             />
           </div>
+
+          <div class="tw-flex tw-items-center tw-pt-4">
+            <q-toggle
+              data-test="report-cached-toggle-btn"
+              v-model="isCachedReport"
+              :label="t('reports.cachedReport')"
+            />
+            <q-icon
+              name="info_outline"
+              class="cursor-pointer q-ml-sm"
+              size="16px"
+            >
+              <q-tooltip
+                v-model="showInfoTooltip"
+                anchor="center end"
+                self="center left"
+                class="tw-text-[12px]"
+              >
+                Note: Cached reports are stored for quick access to dashboards;
+                sharing is disabled for these reports.</q-tooltip
+              >
+            </q-icon>
+          </div>
+
           <q-stepper
             v-model="step"
             vertical
@@ -401,31 +425,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template v-else>
-                  <div
-                    class="q-mt-md"
-                    style="
-                      border: 1px solid #d7d7d7;
-                      width: fit-content;
-                      border-radius: 2px;
-                    "
-                  >
-                    <template v-for="visual in timeTabs" :key="visual.value">
-                      <q-btn
-                        :data-test="`add-report-schedule-${visual.value}-btn`"
-                        :color="
-                          visual.value === selectedTimeTab ? 'primary' : ''
-                        "
-                        :flat="visual.value === selectedTimeTab ? false : true"
-                        dense
-                        no-caps
-                        size="12px"
-                        class="q-px-md visual-selection-btn"
-                        style="padding-top: 4px; padding-bottom: 4px"
-                        @click="selectedTimeTab = visual.value"
+                  <div class="q-mt-md tw-flex tw-justify-start tw-items-center">
+                    <div
+                      class="tw-flex tw-justify-center tw-align-center"
+                      style="
+                        border: 1px solid #d7d7d7;
+                        width: fit-content;
+                        border-radius: 2px;
+                      "
+                    >
+                      <template v-for="visual in timeTabs" :key="visual.value">
+                        <q-btn
+                          :data-test="`add-report-schedule-${visual.value}-btn`"
+                          :color="
+                            visual.value === selectedTimeTab ? 'primary' : ''
+                          "
+                          :flat="
+                            visual.value === selectedTimeTab ? false : true
+                          "
+                          dense
+                          no-caps
+                          size="12px"
+                          class="q-px-md visual-selection-btn"
+                          style="padding-top: 4px; padding-bottom: 4px"
+                          @click="selectedTimeTab = visual.value"
+                        >
+                          {{ visual.label }}</q-btn
+                        >
+                      </template>
+                    </div>
+                    <q-icon
+                      name="info_outline"
+                      class="cursor-pointer q-ml-sm"
+                      size="16px"
+                    >
+                      <q-tooltip
+                        anchor="center end"
+                        self="center left"
+                        class="tw-text-[12px]"
                       >
-                        {{ visual.label }}</q-btn
-                      >
-                    </template>
+                        "Schedule Now" will schedule the report using the
+                        current date, time, and timezone.<br />
+                        In "Schedule Later" you can customize the date, time,
+                        and timezone.
+                      </q-tooltip>
+                    </q-icon>
                   </div>
 
                   <div
@@ -479,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <div
                     data-test="add-report-schedule-send-later-section"
-                    v-if="selectedTimeTab === 'sendLater'"
+                    v-if="selectedTimeTab === 'scheduleLater'"
                     class="flex items-center justify-start q-mt-md"
                   >
                     <div
@@ -603,6 +647,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <q-stepper-navigation>
                 <q-btn
+                  v-if="!isCachedReport"
                   data-test="add-report-step2-continue-btn"
                   @click="step = 3"
                   color="secondary"
@@ -622,6 +667,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-step>
 
             <q-step
+              v-if="!isCachedReport"
               data-test="add-report-share-step"
               :name="3"
               title="Share"
@@ -821,10 +867,15 @@ const defaultReport = {
   updatedAt: "",
   owner: "",
   lastEditedBy: "",
+  report_type: "PDF",
 };
 
 const { t } = useI18n();
 const router = useRouter();
+
+const isCachedReport = ref(false);
+
+const showInfoTooltip = ref(false);
 
 const originalReportData: Ref<string> = ref("");
 
@@ -845,12 +896,12 @@ const dialog = ref({
 
 const timeTabs = [
   {
-    label: "Send now",
-    value: "sendNow",
+    label: "Schedule now",
+    value: "scheduleNow",
   },
   {
-    label: "Send later",
-    value: "sendLater",
+    label: "Schedule later",
+    value: "scheduleLater",
   },
 ];
 
@@ -885,7 +936,7 @@ const frequencyTabs = [
   },
 ];
 
-const selectedTimeTab = ref("sendLater");
+const selectedTimeTab = ref("scheduleNow");
 
 const store = useStore();
 
@@ -918,10 +969,12 @@ const frequency = ref({
   cron: "",
 });
 
-onBeforeMount(() => {
-  getDashboaordFolders();
+onBeforeMount(async () => {
+  await getDashboaordFolders();
 
   isEditingReport.value = !!router.currentRoute.value.query?.name;
+
+  if (!isEditingReport.value) setInitialReportData();
 
   if (isEditingReport.value) {
     isEditingReport.value = true;
@@ -969,12 +1022,41 @@ const isValidName = computed(() => {
   return roleNameRegex.test(formData.value.name);
 });
 
-const onFolderSelection = (id: string) => {
+const setInitialReportData = async () => {
+  const queryParams = router.currentRoute.value.query;
+
+  if (queryParams.type === "cached") {
+    isCachedReport.value = true;
+  } else {
+    isCachedReport.value = false;
+  }
+
+  if (queryParams.folderId) {
+    formData.value.dashboards[0].folder = queryParams.folderId as string;
+    onFolderSelection(queryParams.folderId as string);
+  }
+
+  if (queryParams.dashboardId) {
+    formData.value.dashboards[0].dashboard = queryParams.dashboardId as string;
+  }
+
+  if (queryParams.tabId) {
+    formData.value.dashboards[0].tabs = queryParams.tabId as string;
+  }
+};
+
+const onFolderSelection = async (id: string) => {
   formData.value.dashboards.forEach((dashboard: any) => {
     dashboard.dashboard = "";
     dashboard.tabs = "";
   });
-  setDashboardOptions(id);
+
+  try {
+    await setDashboardOptions(id);
+    return true;
+  } catch (err) {
+    return false;
+  }
 };
 
 const setDashboardOptions = (id: string) => {
@@ -1011,11 +1093,12 @@ const setDashboardOptions = (id: string) => {
                 version: dashboard.version,
               });
               options.value["dashboards"] = [...dashboardOptions.value];
-              resolve(true);
             },
           );
+
+        resolve(true);
       })
-      .catch((err) => resolve(false))
+      .catch((err) => reject(true))
       .finally(() => (isFetchingDashboard.value = false));
   });
 };
@@ -1121,21 +1204,25 @@ const removeDashboardVariable = (variable: any) => {
 };
 
 const getDashboaordFolders = () => {
-  isFetchingFolders.value = true;
-  dashboardService
-    .list_Folders(store.state.selectedOrganization.identifier)
-    .then((res) => {
-      res.data.list.forEach((folder: { name: string; folderId: string }) => {
-        folderOptions.value.push({
-          label: folder.name,
-          value: folder.folderId,
+  return new Promise((resolve, reject) => {
+    isFetchingFolders.value = true;
+    dashboardService
+      .list_Folders(store.state.selectedOrganization.identifier)
+      .then((res) => {
+        res.data.list.forEach((folder: { name: string; folderId: string }) => {
+          folderOptions.value.push({
+            label: folder.name,
+            value: folder.folderId,
+          });
+          options.value["folders"] = [...folderOptions.value];
         });
-        options.value["folders"] = [...folderOptions.value];
+        resolve(true);
+      })
+      .catch((err) => reject(true))
+      .finally(() => {
+        isFetchingFolders.value = false;
       });
-    })
-    .finally(() => {
-      isFetchingFolders.value = false;
-    });
+  });
 };
 
 /**
@@ -1174,7 +1261,10 @@ const convertDateToTimestamp = (
 
 const saveReport = async () => {
   // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
-  if (selectedTimeTab.value === "sendNow" || frequency.value.type === "cron") {
+  if (
+    selectedTimeTab.value === "scheduleNow" ||
+    frequency.value.type === "cron"
+  ) {
     const now = new Date();
 
     // Get the day, month, and year from the date object
@@ -1236,6 +1326,8 @@ const saveReport = async () => {
     formData.value.lastEditedBy = store.state.userInfo.email;
     formData.value.updatedAt = new Date().toISOString();
   }
+
+  if (isCachedReport.value) formData.value.destinations = [];
 
   // Check if all report input fields are valid
   try {
@@ -1400,10 +1492,23 @@ const filterOptions = (options: any[], val: String, update: Function) => {
 };
 
 const setupEditingReport = async (report: any) => {
-  formData.value = report;
-
-  // This is unitil we support multiple dashboards and tabs
-  formData.value.dashboards[0].tabs = report.dashboards[0].tabs[0];
+  formData.value = {
+    ...JSON.parse(JSON.stringify(report)),
+    dashboards: [
+      {
+        folder: "",
+        dashboard: "",
+        tabs: "" as string | string[],
+        variables: [] as { key: string; value: string; id: string }[],
+        timerange: {
+          type: "relative",
+          period: "30m",
+          from: 0,
+          to: 0,
+        },
+      },
+    ],
+  };
 
   // set date, time and timezone in scheduling
   const date = new Date(report.start / 1000);
@@ -1425,12 +1530,14 @@ const setupEditingReport = async (report: any) => {
 
   scheduling.value.timezone = report.timezone;
 
-  // set selectedTimeTab to sendLater
-  selectedTimeTab.value = "sendLater";
+  // set selectedTimeTab to scheduleLater
+  selectedTimeTab.value = "scheduleLater";
 
   emails.value = report.destinations
     .map((destination: { email: string }) => destination.email)
     .join(";");
+
+  if (!report.destinations.length) isCachedReport.value = true;
 
   // set frequency
   if (report.frequency.type === "cron") {
@@ -1447,9 +1554,57 @@ const setupEditingReport = async (report: any) => {
     frequency.value.type = report.frequency.type;
   }
 
-  await setDashboardOptions(formData.value.dashboards[0].folder);
+  await setDashboardOptions(report.dashboards[0].folder);
+
+  // Check if folder is present in the options and set the folder
+  if (
+    folderOptions.value.some(
+      (folder) => folder.value === report.dashboards[0].folder,
+    )
+  ) {
+    formData.value.dashboards[0].folder = report.dashboards[0].folder;
+  } else {
+    formData.value.dashboards[0].folder = "";
+    q.notify({
+      type: "negative",
+      message: "Selected folder has been deleted!",
+      timeout: 4000,
+    });
+  }
+
+  // Check if dashboard is present in the options and set the dashboard
+  if (
+    dashboardOptions.value.some(
+      (dashboard) => dashboard.value === report.dashboards[0].dashboard,
+    )
+  ) {
+    formData.value.dashboards[0].dashboard = report.dashboards[0].dashboard;
+  } else {
+    formData.value.dashboards[0].dashboard = "";
+    q.notify({
+      type: "negative",
+      message: "Selected dashboard has been deleted!",
+      timeout: 4000,
+    });
+  }
 
   setDashboardTabOptions(formData.value.dashboards[0].dashboard);
+
+  // Check if tab is present in the options and set the tab
+  const tab = dashboardTabOptions.value.filter(
+    (tab) => tab.value === report.dashboards[0].tabs[0],
+  )[0];
+
+  if (tab) {
+    formData.value.dashboards[0].tabs = tab.value;
+  } else {
+    q.notify({
+      type: "negative",
+      message: "Selected dashboard tab has been deleted!",
+      timeout: 4000,
+    });
+    formData.value.dashboards[0].tabs = "";
+  }
 };
 
 const openCancelDialog = () => {

@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedDate"
           v-model="selectedDate"
           ref="dateTimePickerRef"
+          :disable="disable"
         />
         <q-btn
           class="q-ml-md text-bold"
@@ -82,16 +83,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="savePanelData.execute()"
           :loading="savePanelData.isLoading.value"
         />
-        <q-btn
+        <template
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-          class="q-ml-md text-bold no-border"
-          data-test="dashboard-apply"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          :label="t('panel.apply')"
-          @click="runQuery"
-        />
+        >
+          <q-btn
+            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
+            class="q-ml-md text-bold no-border"
+            data-test="dashboard-cancel"
+            padding="sm lg"
+            color="negative"
+            no-caps
+            :label="t('panel.cancel')"
+            @click="cancelAddPanelQuery"
+          />
+          <q-btn
+            v-else
+            class="q-ml-md text-bold no-border"
+            data-test="dashboard-apply"
+            padding="sm lg"
+            color="secondary"
+            no-caps
+            :label="t('panel.apply')"
+            @click="runQuery"
+          />
+        </template>
       </div>
     </div>
     <q-separator></q-separator>
@@ -186,43 +201,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         :selectedTimeDate="dashboardPanelData.meta.dateTime"
                         @variablesData="variablesDataUpdated"
+                        :initialVariableValues="initialVariableValues"
                       />
 
                       <div
                         v-if="isOutDated"
-                        :style="{
-                          borderColor: '#c3920d',
-                          borderWidth: '1px',
-                          borderStyle: 'solid',
-                          backgroundColor:
-                            store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
-                          padding: '1%',
-                          margin: '1%',
-                          borderRadius: '5px',
-                        }"
+                        class="tw-p-2"
                       >
-                        <div style="font-weight: 700">
-                          Your chart is not up to date
-                        </div>
-                        <div>
-                          Chart Configuration / Variables  has been updated, but
-                          the chart was not updated automatically. Click on the
-                          "Apply" button to run the query again
+                        <div
+                          :style="{
+                            borderColor: '#c3920d',
+                            borderWidth: '1px',
+                            borderStyle: 'solid',
+                            backgroundColor:
+                              store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
+                            padding: '1%',
+                            borderRadius: '5px',
+                          }"
+                        >
+                          <div style="font-weight: 700">
+                            Your chart is not up to date
+                          </div>
+                          <div>
+                            Chart Configuration / Variables has been updated, but
+                            the chart was not updated automatically. Click on the
+                            "Apply" button to run the query again
+                          </div>
                         </div>
                       </div>
-
+                        <div class="tw-flex tw-justify-end tw-mr-2">
+                          <span v-if="lastTriggeredAt" class="lastRefreshedAt">
+                            <span class="lastRefreshedAtIcon">🕑</span
+                            ><RelativeTime
+                              :timestamp="lastTriggeredAt"
+                              fullTimePrefix="Last Refreshed At: "
+                            />
+                          </span>
+                        </div>
                       <div class="col" style="flex: 1">
                         <PanelSchemaRenderer
+                          v-if="chartData"
                           @metadata-update="metaDataValue"
                           :key="dashboardPanelData.data.type"
                           :panelSchema="chartData"
+                          :dashboard-id="queryParams?.dashboard"
+                          :folder-id="queryParams?.folder"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="updatedVariablesData"
+                          :variablesData="variablesData"
                           :width="6"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
                           @updated:vrlFunctionFieldList="
                             updateVrlFunctionFieldList
+                          "
+                          @last-triggered-at-update="
+                            handleLastTriggeredAtUpdate
                           "
                           searchType="Dashboards"
                         />
@@ -333,10 +366,13 @@ import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard
 import DashboardErrorsComponent from "../../../components/dashboards/addPanel/DashboardErrors.vue";
 import VariablesValueSelector from "../../../components/dashboards/VariablesValueSelector.vue";
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
+import RelativeTime from "@/components/common/RelativeTime.vue";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
+import config from "@/aws-exports";
+import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 
 const ConfigPanel = defineAsyncComponent(() => {
   return import("../../../components/dashboards/addPanel/ConfigPanel.vue");
@@ -368,6 +404,7 @@ export default defineComponent({
     ConfigPanel,
     VariablesValueSelector,
     PanelSchemaRenderer,
+    RelativeTime,
     DashboardQueryEditor: defineAsyncComponent(
       () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue"),
     ),
@@ -380,12 +417,13 @@ export default defineComponent({
 
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
-    const chartData = ref({});
+    const chartData = ref();
     const { t } = useI18n();
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
-    const { showErrorNotification } = useNotifications();
+    const { showErrorNotification, showPositiveNotification } =
+      useNotifications();
     const {
       dashboardPanelData,
       resetDashboardPanelData,
@@ -401,8 +439,28 @@ export default defineComponent({
     });
     let variablesData: any = reactive({});
 
+    // to store and show when the panel was last loaded
+    const lastTriggeredAt = ref(null);
+    const handleLastTriggeredAtUpdate = (data: any) => {
+      lastTriggeredAt.value = data;
+    };
+
     // used to provide values to chart only when apply is clicked (same as chart data)
     let updatedVariablesData: any = reactive({});
+
+    // this is used to again assign query params on discard or save
+    let routeQueryParamsOnMount: any = {};
+
+    // ======= [START] default variable values
+
+    const initialVariableValues: any = { value: {} };
+    Object.keys(route.query).forEach((key) => {
+      if (key.startsWith("var-")) {
+        const newKey = key.slice(4);
+        initialVariableValues.value[newKey] = route.query[key];
+      }
+    });
+    // ======= [END] default variable values
 
     const metaData = ref(null);
     const showViewPanel = ref(false);
@@ -420,14 +478,41 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
 
+      // change route query params based on current variables values
+      const variableObj: any = {};
+      data.values.forEach((variable: any) => {
+        if (variable.type === "dynamic_filters") {
+          const filters = (variable.value || []).filter(
+            (item: any) => item.name && item.operator && item.value,
+          );
+          const encodedFilters = filters.map((item: any) => ({
+            name: item.name,
+            operator: item.operator,
+            value: item.value,
+          }));
+          variableObj[`var-${variable.name}`] = encodeURIComponent(
+            JSON.stringify(encodedFilters),
+          );
+        } else {
+          variableObj[`var-${variable.name}`] = variable.value;
+        }
+      });
+      router.replace({
+        query: {
+          ...route.query,
+          ...variableObj,
+          ...getQueryParamsForDuration(selectedDate.value),
+        },
+      });
+
       // when this is called 1st time, we need to set the data for the updated variables data as well
       // from the second time, it will only be updated after the apply button is clicked
       if (
-        !updatedVariablesData?.values?.length    // Previous value of variables is empty
-        && variablesData?.values?.length > 0       // new values of variables is NOT empty
+        !updatedVariablesData?.values?.length && // Previous value of variables is empty
+        variablesData?.values?.length > 0 // new values of variables is NOT empty
       ) {
-          // assing the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
-          Object.assign(updatedVariablesData, variablesData);
+        // assing the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
+        Object.assign(updatedVariablesData, variablesData);
       }
     };
 
@@ -457,6 +542,9 @@ export default defineComponent({
     });
 
     onMounted(async () => {
+      // assign the route query params
+      routeQueryParamsOnMount = JSON.parse(JSON.stringify(route?.query ?? {}));
+
       errorData.errors = [];
 
       // console.time("onMounted");
@@ -514,6 +602,20 @@ export default defineComponent({
 
     const currentDashboard = toRaw(store.state.currentSelectedDashboard);
 
+    /**
+     * Retrieves the selected date from the query parameters.
+     */
+    const getSelectedDateFromQueryParams = (params: any) => ({
+      valueType: params.period
+        ? "relative"
+        : params.from && params.to
+          ? "absolute"
+          : "relative",
+      startTime: params.from ? params.from : null,
+      endTime: params.to ? params.to : null,
+      relativeTimePeriod: params.period ? params.period : "15m",
+    });
+
     // const getDashboard = () => {
     //   return currentDashboard.dashboardId;
     // };
@@ -543,21 +645,33 @@ export default defineComponent({
         variablesData.values = [];
       }
 
-      // get default time for dashboard
-      // if dashboard has relative time settings
-      if ((data?.defaultDatetimeDuration?.type ?? "relative") === "relative") {
-        selectedDate.value = {
-          valueType: "relative",
-          relativeTimePeriod:
-            data?.defaultDatetimeDuration?.relativeTimePeriod ?? "15m",
-        };
+      // check if route has time realated query params
+      // if not, take dashboard default time settings
+      if (!((route.query.from && route.query.to) || route.query.period)) {
+        // if dashboard has relative time settings
+        if (
+          (currentDashboardData.data?.defaultDatetimeDuration?.type ??
+            "relative") === "relative"
+        ) {
+          selectedDate.value = {
+            valueType: "relative",
+            relativeTimePeriod:
+              currentDashboardData.data?.defaultDatetimeDuration
+                ?.relativeTimePeriod ?? "15m",
+          };
+        } else {
+          // else, dashboard will have absolute time settings
+          selectedDate.value = {
+            valueType: "absolute",
+            startTime:
+              currentDashboardData.data?.defaultDatetimeDuration?.startTime,
+            endTime:
+              currentDashboardData.data?.defaultDatetimeDuration?.endTime,
+          };
+        }
       } else {
-        // else, dashboard will have absolute time settings
-        selectedDate.value = {
-          valueType: "absolute",
-          startTime: data?.defaultDatetimeDuration?.startTime,
-          endTime: data?.defaultDatetimeDuration?.endTime,
-        };
+        // take route time related query params
+        selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
     };
 
@@ -582,7 +696,7 @@ export default defineComponent({
       //compare chartdata and dashboardpaneldata and variables data as well
       return (
         !isEqual(chartData.value, dashboardPanelData.data) ||
-        !isEqual(variablesData, updatedVariablesData) 
+        !isEqual(variablesData, updatedVariablesData)
       );
     });
 
@@ -640,7 +754,10 @@ export default defineComponent({
       }
 
       // Also update variables data
-      Object.assign(updatedVariablesData, JSON.parse(JSON.stringify(variablesData)));
+      Object.assign(
+        updatedVariablesData,
+        JSON.parse(JSON.stringify(variablesData)),
+      );
 
       // copy the data object excluding the reactivity
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -650,18 +767,48 @@ export default defineComponent({
       // console.timeEnd("runQuery");
     };
 
-    const updateDateTime = (value: object) => {
-      if (selectedDate.value) {
-        dashboardPanelData.meta.dateTime = {
-          start_time: new Date(selectedDate.value.startTime),
-          end_time: new Date(selectedDate.value.endTime),
-        };
+    const getQueryParamsForDuration = (data: any) => {
+      try {
+        if (data.valueType === "relative") {
+          return {
+            period: data.relativeTimePeriod ?? "15m",
+          };
+        } else if (data.valueType === "absolute") {
+          return {
+            from: data.startTime,
+            to: data.endTime,
+            period: null,
+          };
+        }
+        return {};
+      } catch (error) {
+        return {};
       }
     };
+
+    const updateDateTime = (value: object) => {
+      if (selectedDate.value && dateTimePickerRef?.value) {
+        const date = dateTimePickerRef.value?.getConsumableDateTime();
+
+        dashboardPanelData.meta.dateTime = {
+          start_time: new Date(date.startTime),
+          end_time: new Date(date.endTime),
+        };
+
+        router.replace({
+          query: {
+            ...route.query,
+            ...getQueryParamsForDuration(selectedDate.value),
+          },
+        });
+      }
+    };
+
     const goBack = () => {
       return router.push({
         path: "/dashboards/view",
         query: {
+          ...routeQueryParamsOnMount,
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
@@ -807,6 +954,7 @@ export default defineComponent({
         return router.push({
           path: "/dashboards/view",
           query: {
+            ...routeQueryParamsOnMount,
             org_identifier: store.state.selectedOrganization.identifier,
             dashboard: dashId,
             folder: route.query.folder ?? "default",
@@ -1043,6 +1191,45 @@ export default defineComponent({
     // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
     provide("hoveredSeriesState", hoveredSeriesState);
 
+    // [START] cancel running queries
+
+    //reactive object for loading state of variablesData and panels
+    const variablesAndPanelsDataLoadingState = reactive({
+      variablesData: {},
+      panels: {},
+      searchRequestTraceIds: {},
+    });
+
+    // provide variablesAndPanelsDataLoadingState to share data between components
+    provide(
+      "variablesAndPanelsDataLoadingState",
+      variablesAndPanelsDataLoadingState,
+    );
+
+    const searchRequestTraceIds = computed(() => {
+      const searchIds = Object.values(
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
+      ).filter((item: any) => item.length > 0);
+
+      return searchIds.flat() as string[];
+    });
+    const { traceIdRef, cancelQuery } = useCancelQuery();
+
+    const cancelAddPanelQuery = () => {
+      traceIdRef.value = searchRequestTraceIds.value;
+      cancelQuery();
+    };
+
+    const disable = ref(false);
+
+    watch(variablesAndPanelsDataLoadingState, () => {
+      const panelsValues = Object.values(
+        variablesAndPanelsDataLoadingState.panels,
+      );
+      disable.value = panelsValues.some((item: any) => item === true);
+    });
+
+    // [END] cancel running queries
     return {
       t,
       updateDateTime,
@@ -1076,6 +1263,14 @@ export default defineComponent({
       onDataZoom,
       showTutorial,
       updateVrlFunctionFieldList,
+      queryParams: route.query as any,
+      initialVariableValues,
+      lastTriggeredAt,
+      handleLastTriggeredAtUpdate,
+      searchRequestTraceIds,
+      cancelAddPanelQuery,
+      disable,
+      config,
     };
   },
   methods: {

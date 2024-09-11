@@ -69,13 +69,13 @@ pub async fn run_generate(worker_tx: mpsc::Sender<FileKey>) -> Result<(), anyhow
                 }
 
                 // check running node
-                let Some(node) =
+                let Some(node_name) =
                     get_node_from_consistent_hash(&stream_name, &Role::FlattenCompactor, None)
                         .await
                 else {
                     continue; // no compactor node
                 };
-                if LOCAL_NODE.uuid.ne(&node) {
+                if LOCAL_NODE.name.ne(&node_name) {
                     continue; // not this node
                 }
 

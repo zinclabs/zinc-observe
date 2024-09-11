@@ -57,12 +57,12 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         for stream_type in ALL_STREAM_TYPES {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
-                let Some(node) =
+                let Some(node_name) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
                 else {
                     continue; // no compactor node
                 };
-                if LOCAL_NODE.uuid.ne(&node) {
+                if LOCAL_NODE.name.ne(&node_name) {
                     continue; // not this node
                 }
 
@@ -103,11 +103,12 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
         let stream_name = columns[2];
         let retention = columns[3];
 
-        let Some(node) = get_node_from_consistent_hash(stream_name, &Role::Compactor, None).await
+        let Some(node_name) =
+            get_node_from_consistent_hash(stream_name, &Role::Compactor, None).await
         else {
             continue; // no compactor node
         };
-        if LOCAL_NODE.uuid.ne(&node) {
+        if LOCAL_NODE.name.ne(&node_name) {
             continue; // not this node
         }
 
@@ -150,12 +151,12 @@ pub async fn run_generate_job() -> Result<(), anyhow::Error> {
         for stream_type in ALL_STREAM_TYPES {
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
-                let Some(node) =
+                let Some(node_name) =
                     get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
                 else {
                     continue; // no compactor node
                 };
-                if LOCAL_NODE.uuid.ne(&node) {
+                if LOCAL_NODE.name.ne(&node_name) {
                     // Check if this node holds the stream
                     if let Some((offset, _)) = db::compact::files::get_offset_from_cache(
                         &org_id,
@@ -238,12 +239,12 @@ pub async fn run_merge(
             unwrap_partition_time_level(stream_setting.partition_time_level, stream_type);
         if partition_time_level == PartitionTimeLevel::Daily || cfg.compact.step_secs < 3600 {
             // check if this stream need process by this node
-            let Some(node) =
+            let Some(node_name) =
                 get_node_from_consistent_hash(&stream_name, &Role::Compactor, None).await
             else {
                 continue; // no compactor node
             };
-            if LOCAL_NODE.uuid.ne(&node) {
+            if LOCAL_NODE.name.ne(&node_name) {
                 need_release_ids.push(job.id); // not this node
             }
         }

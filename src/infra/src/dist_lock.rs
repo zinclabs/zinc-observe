@@ -52,7 +52,6 @@ pub async fn lock(
     }
 }
 
-#[inline(always)]
 pub async fn unlock(locker: &Option<Locker>) -> Result<()> {
     if let Some(locker) = locker {
         match &locker.0 {

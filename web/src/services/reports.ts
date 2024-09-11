@@ -24,8 +24,21 @@ import http from "./http";
 // PUT /{org_id}/reports/{name}/trigger -- trigger report immediately
 
 const reports = {
-  list: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/reports`);
+  list: (
+    org_identifier: string = "",
+    folder_id: string = "",
+    dashboard_id: string = "",
+    cache: boolean = false,
+  ) => {
+    let query = "";
+
+    const params = [];
+    if (folder_id) params.push(`folder_id=${folder_id}`);
+    if (dashboard_id) params.push(`dashboard_id=${dashboard_id}`);
+    if (cache) params.push(`cache=${cache}`);
+    query = params.join("&");
+
+    return http().get(`/api/${org_identifier}/reports?${query}`);
   },
   getReport: (org_identifier: string, reportName: string) => {
     return http().get(

@@ -13,8 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export * from "./alert";
-export * from "./ingestion";
-export * from "./query";
-export * from "./global";
-export * from "./iam";
+export interface ScheduledDashboardReport {
+  "#": number;
+  name: string;
+  tab?: string | null;
+  time_range?: string | null;
+  frequency: string;
+  last_triggered_at: string;
+  created_at: string;
+  orgId: string | number;
+  isCached: boolean;
+}

@@ -328,6 +328,9 @@ pub async fn cache_status() -> Result<HttpResponse, Error> {
         json::json!({"file_stat_cache": file_statistics_cache::GLOBAL_CACHE.clone().len()}),
     );
 
+    let consistent_hashing = cluster::print_consistent_hash().await;
+    stats.insert("CONSISTENT_HASHING", json::json!(consistent_hashing));
+
     Ok(HttpResponse::Ok().json(stats))
 }
 

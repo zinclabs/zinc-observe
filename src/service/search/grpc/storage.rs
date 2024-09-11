@@ -85,7 +85,7 @@ pub async fn search(
         schema_versions.len()
     );
     if schema_versions.is_empty() {
-        return Ok((vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new(), 0));
     }
     let schema_latest_id = schema_versions.len() - 1;
 
@@ -109,7 +109,7 @@ pub async fn search(
         false => file_list.to_vec(),
     };
     if files.is_empty() {
-        return Ok((vec![], ScanStats::default()));
+        return Ok((vec![], ScanStats::default(), 0));
     }
     log::info!(
         "[trace_id {trace_id}] search->storage: stream {}/{}/{}, load file_list num {}",
@@ -277,7 +277,7 @@ pub async fn search(
         tables.push(Arc::new(table) as Arc<dyn datafusion::datasource::TableProvider>);
     }
 
-    Ok((tables, scan_stats))
+    Ok((tables, scan_stats, target_partitions))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:get_file_list", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]

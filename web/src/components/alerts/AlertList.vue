@@ -1023,6 +1023,7 @@ export default defineComponent({
     background: #ffffff;
   }
 }
+
 .alerts-tabs {
   .q-tabs {
     &--vertical {

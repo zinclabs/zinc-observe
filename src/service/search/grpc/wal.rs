@@ -27,10 +27,7 @@ use config::{
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
     },
 };
-use datafusion::{
-    arrow::{datatypes::Schema, record_batch::RecordBatch},
-    catalog::TableProvider,
-};
+use datafusion::arrow::{datatypes::Schema, record_batch::RecordBatch};
 use futures::StreamExt;
 use hashbrown::HashMap;
 use infra::{
@@ -58,7 +55,7 @@ pub async fn search_parquet(
     sql: Arc<Sql>,
     stream_type: StreamType,
     work_group: &str,
-) -> Result<(Vec<Arc<dyn TableProvider>>, ScanStats), Error> {
+) -> super::SearchTable {
     let schema = sql.schema.clone();
     let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
     let partition_time_level =
@@ -74,7 +71,7 @@ pub async fn search_parquet(
     )
     .await?;
     if files.is_empty() {
-        return Ok((vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new(), 0));
     }
 
     let mut scan_stats = ScanStats::new();
@@ -135,7 +132,7 @@ pub async fn search_parquet(
     if scan_stats.files == 0 {
         // release all files
         wal::release_files(&lock_files);
-        return Ok((vec![], scan_stats));
+        return Ok((vec![], scan_stats, 0));
     }
 
     // fetch all schema versions, group files by version
@@ -156,7 +153,7 @@ pub async fn search_parquet(
         }
     };
     if schema_versions.is_empty() {
-        return Ok((vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new(), 0));
     }
     let schema_latest_id = schema_versions.len() - 1;
 
@@ -280,7 +277,7 @@ pub async fn search_parquet(
     // lock these files for this request
     wal::lock_request(trace_id, &lock_files);
 
-    Ok((tables, scan_stats))
+    Ok((tables, scan_stats, 0))
 }
 
 /// search in local WAL, which haven't been sync to object storage
@@ -313,7 +310,7 @@ pub async fn search_memtable(
     );
     scan_stats.files = batches.iter().map(|(_, k)| k.len()).sum::<usize>() as i64;
     if scan_stats.files == 0 {
-        return Ok((vec![], ScanStats::new()));
+        return Ok((vec![], ScanStats::new(), 0));
     }
 
     let mut batch_groups: HashMap<Arc<Schema>, Vec<RecordBatch>> = HashMap::with_capacity(2);
@@ -376,7 +373,7 @@ pub async fn search_memtable(
         tables.push(table as _);
     }
 
-    Ok((tables, scan_stats))
+    Ok((tables, scan_stats, 0))
 }
 
 #[tracing::instrument(name = "service:search:grpc:wal:get_file_list_inner", skip_all, fields(org_id = sql.org_id, stream_name = sql.stream_name))]

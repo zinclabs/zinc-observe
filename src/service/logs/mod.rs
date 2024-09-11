@@ -276,6 +276,7 @@ async fn write_logs(
         stream_alerts_map.get(&format!("{}/{}/{}", org_id, StreamType::Logs, stream_name));
     let mut triggers: TriggerAlertData =
         Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
+    let mut evaluated_alerts = HashSet::new();
     // End get stream alert
 
     // start check for schema
@@ -365,8 +366,21 @@ async fn write_logs(
         if let Some(alerts) = cur_stream_alerts {
             if triggers.len() < alerts.len() {
                 for alert in alerts {
+                    let key = format!(
+                        "{}/{}/{}/{}",
+                        org_id,
+                        StreamType::Logs,
+                        alert.stream_name,
+                        alert.name
+                    );
+                    // For one alert, only one trigger per request
+                    // Trigger for this alert is already added.
+                    if evaluated_alerts.contains(&key) {
+                        continue;
+                    }
                     if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val)).await {
                         triggers.push((alert.clone(), v));
+                        evaluated_alerts.insert(key);
                     }
                 }
             }

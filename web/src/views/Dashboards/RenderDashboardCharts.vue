@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <VariablesValueSelector
       :variablesConfig="dashboardData?.variables"
       :showDynamicFilters="dashboardData.variables?.showDynamicFilters"
-      :selectedTimeDate="currentTimeObj"
+      :selectedTimeDate="currentTimeObj['__global']"
       :initialVariableValues="initialVariableValues"
       @variablesData="variablesDataUpdated"
       ref="variablesValueSelectorRef"
@@ -78,8 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @onViewPanel="onViewPanel"
               :viewOnly="viewOnly"
               :data="item"
-              :dashboardId="dashboardData.id"
-              :selectedTimeDate="currentTimeObj"
+              :dashboardId="dashboardData.dashboardId"
+              :folderId="folderId"
+              :selectedTimeDate="
+                currentTimeObj[item.id] || currentTimeObj['__global'] || {}
+              "
               :variablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
@@ -87,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :searchType="searchType"
               @updated:data-zoom="$emit('updated:data-zoom', $event)"
               @onMovePanel="onMovePanel"
+              @refreshPanelRequest="refreshPanelRequest"
               @refresh="refreshDashboard"
               @update:initial-variable-values="updateInitialVariableValues"
             >
@@ -105,6 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <q-card style="overflow: hidden">
         <ViewPanel
+          :folderId="folderId"
+          :dashboardId="dashboardData.dashboardId"
           :panelId="viewPanelId"
           :selectedDateForViewPanel="selectedDateForViewPanel"
           :initialVariableValues="variablesData"
@@ -159,12 +165,16 @@ export default defineComponent({
     "onViewPanel",
     "variablesData",
     "updated:data-zoom",
+    "refreshPanelRequest",
     "refresh",
     "onMovePanel",
+    "panelsValues",
+    "searchRequestTraceIds",
   ],
   props: {
     viewOnly: {},
     dashboardData: {},
+    folderId: {},
     currentTimeObj: {},
     initialVariableValues: { value: {} },
     selectedDateForViewPanel: {},
@@ -209,9 +219,9 @@ export default defineComponent({
 
     const panels: any = computed(() => {
       return selectedTabId.value !== null
-        ? props.dashboardData?.tabs?.find(
-            (it: any) => it.tabId === selectedTabId.value
-          )?.panels ?? []
+        ? (props.dashboardData?.tabs?.find(
+            (it: any) => it.tabId === selectedTabId.value,
+          )?.panels ?? [])
         : [];
     });
     const { showPositiveNotification, showErrorNotification } =
@@ -233,29 +243,50 @@ export default defineComponent({
     const variablesAndPanelsDataLoadingState = reactive({
       variablesData: {},
       panels: {},
+      searchRequestTraceIds: {},
     });
 
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide(
       "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState
+      variablesAndPanelsDataLoadingState,
     );
 
     //computed property based on panels and variables loading state
     const isDashboardVariablesAndPanelsDataLoaded = computed(() => {
       // Get values of variablesData and panels
       const variablesDataValues = Object.values(
-        variablesAndPanelsDataLoadingState.variablesData
+        variablesAndPanelsDataLoadingState.variablesData,
       );
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels
+        variablesAndPanelsDataLoadingState.panels,
       );
 
       // Check if every value in both variablesData and panels is false
       const isAllVariablesAndPanelsDataLoaded =
         variablesDataValues.every((value) => value === false) &&
         panelsValues.every((value) => value === false);
+
       return isAllVariablesAndPanelsDataLoaded;
+    });
+
+    watch(isDashboardVariablesAndPanelsDataLoaded, () => {
+      emit("panelsValues", isDashboardVariablesAndPanelsDataLoaded.value);
+    });
+
+    const currentQueryTraceIds = computed(() => {
+      const traceIds = Object.values(
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
+      );
+
+      if (traceIds.length > 0) {
+        return traceIds?.flat();
+      }
+      return [];
+    });
+
+    watch(currentQueryTraceIds, () => {
+      emit("searchRequestTraceIds", currentQueryTraceIds.value);
     });
 
     // Create debouncer for isDashboardVariablesAndPanelsDataLoaded
@@ -299,7 +330,7 @@ export default defineComponent({
                 ...obj,
                 [item.name]: item.isLoading,
               }),
-              {}
+              {},
             );
         }
       } catch (error) {
@@ -322,7 +353,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any
+        hoveredTime?: any,
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -343,7 +374,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           props.dashboardData.dashboardId,
           props.dashboardData,
-          route.query.folder ?? "default"
+          route.query.folder ?? "default",
         );
 
         showPositiveNotification("Dashboard updated successfully");
@@ -447,8 +478,12 @@ export default defineComponent({
       // NOTE: after variables in variables feature, it works without changing the initial variable values
       // then, update the initial variable values
       await variablesValueSelectorRef.value.changeInitialVariableValues(
-        ...args
+        ...args,
       );
+    };
+
+    const refreshPanelRequest = (panelId) => {
+      emit("refreshPanelRequest", panelId);
     };
 
     return {
@@ -471,9 +506,11 @@ export default defineComponent({
       panels,
       refreshDashboard,
       onMovePanel,
+      refreshPanelRequest,
       variablesValueSelectorRef,
       updateInitialVariableValues,
       isDashboardVariablesAndPanelsDataLoadedDebouncedValue,
+      currentQueryTraceIds,
     };
   },
   methods: {

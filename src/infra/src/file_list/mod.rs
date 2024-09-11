@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap as stdHashMap;
+
 use async_trait::async_trait;
 use config::meta::{
     meta_store::MetaStore,
@@ -133,6 +135,7 @@ pub trait FileList: Sync + Send + 'static {
         offset: i64,
     ) -> Result<()>;
     async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
+    async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
     async fn set_job_pending(&self, ids: &[i64]) -> Result<()>;
     async fn set_job_done(&self, id: i64) -> Result<()>;
     async fn update_running_jobs(&self, id: i64) -> Result<()>;
@@ -377,6 +380,11 @@ pub async fn add_job(
 #[inline]
 pub async fn get_pending_jobs(node: &str, limit: i64) -> Result<Vec<MergeJobRecord>> {
     CLIENT.get_pending_jobs(node, limit).await
+}
+
+#[inline]
+pub async fn get_pending_jobs_count() -> Result<stdHashMap<String, stdHashMap<String, i64>>> {
+    CLIENT.get_pending_jobs_count().await
 }
 
 #[inline]

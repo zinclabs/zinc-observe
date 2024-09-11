@@ -106,7 +106,7 @@ pub async fn sql(
 
     // register empty table
     let empty_table = NewEmptyTable::new("tbl", schema.clone(), sort_by_timestamp_desc)
-        .with_partitions(cfg.limit.cpu_num);
+        .with_partitions(session.target_partitions);
     ctx.register_table("tbl", Arc::new(empty_table))?;
 
     let union_table = Arc::new(NewUnionTable::try_new(schema.clone(), tables)?);

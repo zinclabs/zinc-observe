@@ -453,8 +453,8 @@ const useStreams = () => {
       return objA === objB;
     }
 
-    const keysA = Object.keys(objA).filter((key: string) => key !== "disabled");
-    const keysB = Object.keys(objB).filter((key: string) => key !== "disabled");
+    const keysA = Object.keys(objA)
+    const keysB = Object.keys(objB)
 
     if (keysA.length !== keysB.length) return false;
 
@@ -517,8 +517,13 @@ const useStreams = () => {
         const result: any = compareArrays(previousArray, currentArray);
         add = result.add;
         remove = result.remove;
-
-        remove = remove.filter((item: any) => item.disabled !== true);
+        remove = remove.filter((item: any) => {
+          const isInAdd = add.some((addItem: any) => addItem.field === item.field);
+        
+          // Only keep in `remove` if not in `add` and `disabled` is false
+          return !isInAdd && item.disabled === false;
+        });
+        
       } else {
         // For other attributes, do a simple array comparison
         add = currentArray.filter((item: any) => !previousArray.includes(item));

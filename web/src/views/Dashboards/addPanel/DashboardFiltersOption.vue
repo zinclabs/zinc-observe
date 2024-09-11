@@ -235,11 +235,17 @@ export default defineComponent({
 <style lang="scss" scoped>
 .layout-name {
   font-size: 14px;
-  margin-top: 10px;
+  white-space: nowrap;
+  min-width: 130px;
+  display: flex;
+  align-items: center;
 }
 
 .layout-separator {
-  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  margin-left: 2px;
+  margin-right: 2px;
 }
 
 .axis-container {

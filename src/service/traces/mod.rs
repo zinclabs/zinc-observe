@@ -29,6 +29,7 @@ use config::{
     utils::{flatten, json, schema_ext::SchemaExt},
     DISTINCT_FIELDS,
 };
+use hashbrown::HashSet;
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::{
@@ -537,6 +538,7 @@ async fn write_traces(
     ));
     let mut triggers: TriggerAlertData =
         Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
+    let mut evaluated_alerts = HashSet::new();
     // End get stream alert
 
     // Start check for schema
@@ -606,8 +608,20 @@ async fn write_traces(
         if let Some(alerts) = cur_stream_alerts {
             if triggers.len() < alerts.len() {
                 for alert in alerts {
+                    let key = format!(
+                        "{}/{}/{}/{}",
+                        org_id,
+                        StreamType::Traces,
+                        stream_name,
+                        alert.name
+                    );
+                    // check if alert already evaluated
+                    if evaluated_alerts.contains(&key) {
+                        continue;
+                    }
                     if let Ok((Some(v), _)) = alert.evaluate(Some(&record_val)).await {
                         triggers.push((alert.clone(), v));
+                        evaluated_alerts.insert(key);
                     }
                 }
             }

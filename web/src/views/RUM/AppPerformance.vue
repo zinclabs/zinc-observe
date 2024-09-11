@@ -186,7 +186,7 @@ export default defineComponent({
       () => activePerformanceTab.value,
       () => {
         updateRoute();
-      }
+      },
     );
 
     const route = useRoute();
@@ -218,7 +218,7 @@ export default defineComponent({
 
     watch(
       () => routeName.value,
-      () => updateTabOnRouteChange()
+      () => updateTabOnRouteChange(),
     );
 
     const updateTabOnRouteChange = () => {
@@ -285,8 +285,8 @@ export default defineComponent({
       valueType: params.period
         ? "relative"
         : params.from && params.to
-        ? "absolute"
-        : "relative",
+          ? "absolute"
+          : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : null,
@@ -307,8 +307,10 @@ export default defineComponent({
     watch(selectedDate, (value) => {
       performanceState.data.datetime = value;
       currentTimeObj.value = {
-        start_time: new Date(selectedDate.value.startTime),
-        end_time: new Date(selectedDate.value.endTime),
+        __global: {
+          start_time: new Date(selectedDate.value.startTime),
+          end_time: new Date(selectedDate.value.endTime),
+        },
       };
     });
 
@@ -367,7 +369,7 @@ export default defineComponent({
         store,
         route.query.dashboard,
         panelId,
-        route.query.folder ?? "default"
+        route.query.folder ?? "default",
       );
       await loadDashboard();
     };

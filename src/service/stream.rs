@@ -77,6 +77,10 @@ pub async fn get_streams(
         .unwrap_or_default();
 
     let filtered_indices = if let Some(s_type) = stream_type {
+        let s_type = match s_type {
+            StreamType::EnrichmentTables => "enrichment_table".to_string(),
+            _ => s_type.to_string(),
+        };
         match permitted_streams {
             Some(permitted_streams) => {
                 if permitted_streams.contains(&format!("{}:_all_{}", s_type, org_id)) {

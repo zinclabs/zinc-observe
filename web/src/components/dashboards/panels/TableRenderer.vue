@@ -55,7 +55,8 @@ export default defineComponent({
   emits: ["row-click"],
   setup(props: any) {
     const tableRef: any = ref(null);
-    const { showErrorNotification } = useNotifications();
+    const { showErrorNotification, showPositiveNotification } =
+      useNotifications();
     function wrapCsvValue(val: any, formatFn?: any, row?: any) {
       let formatted = formatFn !== void 0 ? formatFn(val, row) : val;
 
@@ -87,22 +88,22 @@ export default defineComponent({
                     ? col.field(row)
                     : row[col.field === void 0 ? col.name : col.field],
                   col.format,
-                  row
-                )
+                  row,
+                ),
               )
-              .join(",")
-          )
+              .join(","),
+          ),
         )
         .join("\r\n");
 
       const status = exportFile(
         (title ?? "table-export") + ".csv",
         content,
-        "text/csv"
+        "text/csv",
       );
 
       if (status === true) {
-        showErrorNotification("Table downloaded as a CSV file", {
+        showPositiveNotification("Table downloaded as a CSV file", {
           timeout: 2000,
         });
       } else {

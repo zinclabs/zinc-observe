@@ -163,6 +163,7 @@ import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
+import { onUnmounted } from "vue";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -215,12 +216,24 @@ export default defineComponent({
       default: null,
       type: String || null,
     },
+    dashboardId: {
+      default: "",
+      required: false,
+      type: String,
+    },
+    folderId: {
+      default: "",
+      required: false,
+      type: String,
+    },
   },
   emits: [
     "updated:data-zoom",
     "error",
     "metadata-update",
     "result-metadata-update",
+    "last-triggered-at-update",
+    "is-cached-data-differ-with-current-time-range-update",
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
   ],
@@ -242,17 +255,29 @@ export default defineComponent({
       variablesData,
       forceLoad,
       searchType,
+      dashboardId,
+      folderId,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
-    let { data, loading, errorDetail, metadata, resultMetaData } =
-      usePanelDataLoader(
-        panelSchema,
-        selectedTimeObj,
-        variablesData,
-        chartPanelRef,
-        forceLoad,
-        searchType,
-      );
+    let {
+      data,
+      loading,
+      errorDetail,
+      metadata,
+      resultMetaData,
+      lastTriggeredAt,
+      isCachedDataDifferWithCurrentTimeRange,
+      searchRequestTraceIds,
+    } = usePanelDataLoader(
+      panelSchema,
+      selectedTimeObj,
+      variablesData,
+      chartPanelRef,
+      forceLoad,
+      searchType,
+      dashboardId,
+      folderId,
+    );
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef = ref(null);
@@ -267,7 +292,7 @@ export default defineComponent({
     // default values will be empty object of panels and variablesData
     const variablesAndPanelsDataLoadingState: any = inject(
       "variablesAndPanelsDataLoadingState",
-      { panels: {}, variablesData: {} },
+      { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
     );
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -280,14 +305,37 @@ export default defineComponent({
         };
       }
     });
-
+    //watch trace id and add in the searchRequestTraceIds
+    watch(searchRequestTraceIds, (updatedSearchRequestTraceIds) => {
+      if (variablesAndPanelsDataLoadingState) {
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds = {
+          ...variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+          [panelSchema?.value?.id]: updatedSearchRequestTraceIds,
+        };
+      }
+    });
     // ======= [END] dashboard PrintMode =======
 
+    // When switching of tab was done, reset the loading state of the panels in variablesAndPanelsDataLoadingState
+    // As some panels were getting true cancel button and datetime picker were not getting updated
+    onUnmounted(() => {
+      if (variablesAndPanelsDataLoadingState) {
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds = {
+          ...variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+          [panelSchema?.value?.id]: [],
+        };
+        variablesAndPanelsDataLoadingState.panels = {
+          ...variablesAndPanelsDataLoadingState?.panels,
+          [panelSchema?.value?.id]: false,
+        };
+      }
+    }),
+    
     watch(
       [data, store?.state],
       async () => {
         // emit vrl function field list
-        if (data.value.length && data.value[0] && data.value[0].length) {
+        if (data.value?.length && data.value[0] && data.value[0].length) {
           // Find the index of the record with max attributes
           const maxAttributesIndex = data.value[0].reduce(
             (
@@ -362,6 +410,17 @@ export default defineComponent({
       },
       { deep: true },
     );
+
+    watch(lastTriggeredAt, () => {
+      emit("last-triggered-at-update", lastTriggeredAt.value);
+    });
+
+    watch(isCachedDataDifferWithCurrentTimeRange, () => {
+      emit(
+        "is-cached-data-differ-with-current-time-range-update",
+        isCachedDataDifferWithCurrentTimeRange.value,
+      );
+    });
 
     const handleNoData = (panelType: any) => {
       const xAlias = panelSchema.value.queries[0].fields.x.map(
@@ -439,7 +498,7 @@ export default defineComponent({
       // Check if the queryType is 'promql'
       else if (panelSchema.value?.queryType == "promql") {
         // Check if the 'data' array has elements and every item has a non-empty 'result' array
-        return data.value.length &&
+        return data.value?.length &&
           data.value.some((item: any) => item?.result?.length)
           ? "" // Return an empty string if there is data
           : "No Data"; // Return "No Data" if there is no data
@@ -788,6 +847,7 @@ export default defineComponent({
       chartPanelRef,
       data,
       loading,
+      searchRequestTraceIds,
       errorDetail,
       panelData,
       noData,

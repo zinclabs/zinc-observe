@@ -942,7 +942,7 @@ pub struct Limit {
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
     pub distinct_values_hourly: bool,
-    #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 16)]
+    #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 100)]
     pub consistent_hash_vnodes: usize,
     #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
     pub datafusion_file_stat_cache_max_entries: usize,
@@ -996,6 +996,8 @@ pub struct Compact {
         help = "Clean the jobs which are finished more than this time"
     )]
     pub job_clean_wait_time: i64,
+    #[env_config(name = "ZO_COMPACT_PENDING_JOBS_METRIC_INTERVAL", default = 300)] // seconds
+    pub pending_jobs_metric_interval: u64,
 }
 
 #[derive(EnvConfig)]
@@ -1423,6 +1425,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.compact.max_file_size *= 1024 * 1024;
     if cfg.compact.interval == 0 {
         cfg.compact.interval = 60;
+    }
+    if cfg.compact.pending_jobs_metric_interval == 0 {
+        cfg.compact.pending_jobs_metric_interval = 300;
     }
     // check compact_step_secs, min value is 600s
     if cfg.compact.step_secs == 0 {

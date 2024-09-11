@@ -494,9 +494,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="text-caption text-weight-bold text-center q-py-xs"
               v-if="
-                dashboardPanelData.data.queries[
+                !dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields?.breakdown?.length < 1
+                ].fields?.breakdown?.length
               "
               style="
                 width: 100%;

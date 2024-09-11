@@ -180,6 +180,21 @@ impl Metadata for DistinctValues {
                 .await
                 .map_err(|v| Error::Message(v.to_string()))?;
         }
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_enterprise::enterprise::{
+                common::infra::config::O2_CONFIG,
+                openfga::authorizer::authz::set_ownership_if_not_exists,
+            };
+
+            if O2_CONFIG.openfga.enabled {
+                set_ownership_if_not_exists(
+                    org_id,
+                    &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
+                )
+                .await;
+            }
+        }
         Ok(())
     }
 

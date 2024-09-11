@@ -19,7 +19,10 @@ use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 
 use crate::{
     common::{
-        meta::{dashboards::reports::Report, http::HttpResponse as MetaHttpResponse},
+        meta::{
+            dashboards::reports::{Report, ReportListFilters},
+            http::HttpResponse as MetaHttpResponse,
+        },
         utils::auth::UserEmail,
     },
     service::dashboards::reports,
@@ -118,14 +121,29 @@ async fn update_report(
     ),
 )]
 #[get("/{org_id}/reports")]
-async fn list_reports(org_id: web::Path<String>, _req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+
+    let folder = query.get("folder_id").map(|field| field.to_owned());
+    let dashboard = query.get("dashboard_id").map(|field| field.to_owned());
+    let destination_less = query
+        .get("cache")
+        .and_then(|field| match field.parse::<bool>() {
+            Ok(value) => Some(value),
+            Err(_) => None,
+        });
+    let filters = ReportListFilters {
+        folder,
+        dashboard,
+        destination_less,
+    };
 
     let mut _permitted = None;
     // Get List of allowed objects
     #[cfg(feature = "enterprise")]
     {
-        let user_id = _req.headers().get("user_id").unwrap();
+        let user_id = req.headers().get("user_id").unwrap();
         match crate::handler::http::auth::validator::list_objects_for_user(
             &org_id,
             user_id.to_str().unwrap(),
@@ -146,7 +164,7 @@ async fn list_reports(org_id: web::Path<String>, _req: HttpRequest) -> Result<Ht
         // Get List of allowed objects ends
     }
 
-    match reports::list(&org_id, _permitted).await {
+    match reports::list(&org_id, filters, _permitted).await {
         Ok(data) => Ok(MetaHttpResponse::json(data)),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }

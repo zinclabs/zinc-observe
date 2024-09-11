@@ -17,7 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" :key="store.state.selectedOrganization.identifier">
+  <q-page
+    class="q-pa-none dashboards-list-page"
+    :key="store.state.selectedOrganization.identifier"
+  >
     <!-- searchBar at top -->
     <div
       class="q-table__top"
@@ -71,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-slot:before>
         <div class="text-bold q-px-md q-pt-sm">
-          {{ t("dashboard.folderLabel") }} 
+          {{ t("dashboard.folderLabel") }}
         </div>
         <div class="dashboards-tabs">
           <q-tabs
@@ -85,8 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in store.state.organizationData.folders"
               :key="tab.folderId"
               :name="tab.folderId"
-
-
               content-class="tab_content full-width"
               class="test-class"
               :data-test="`dashboard-folder-tab-${tab.folderId}`"
@@ -102,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     flat
                     no-caps
                     icon="more_vert"
-                    style="cursor: pointer; justify-self: end ;height:0.5rem;"
+                    style="cursor: pointer; justify-self: end; height: 0.5rem"
                     size="sm"
                     data-test="dashboard-more-icon"
                   >
@@ -141,15 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <q-separator />
             </q-tab>
-         
           </q-tabs>
           <div
             class="row justify-center full-width q-px-xs q-pb-xs"
-            style="position: sticky; bottom: 0px;"
+            style="position: sticky; bottom: 0px"
           >
             <q-btn
-              
-              class="text-bold  no-border full-width"
+              class="text-bold no-border full-width"
               padding="sm lg"
               color="secondary"
               no-caps
@@ -480,7 +479,7 @@ export default defineComponent({
       if (
         route.query.folder &&
         store.state.organizationData.folders.find(
-          (it: any) => it.folderId === route.query.folder
+          (it: any) => it.folderId === route.query.folder,
         )
       ) {
         activeFolderId.value = route.query.folder;
@@ -506,7 +505,7 @@ export default defineComponent({
           },
         });
       },
-      { deep: true }
+      { deep: true },
     );
 
     const changePagination = (val: { label: string; value: any }) => {
@@ -547,7 +546,7 @@ export default defineComponent({
         const dashboard = await getDashboard(
           store,
           dashboardId,
-          activeFolderId.value ?? "default"
+          activeFolderId.value ?? "default",
         );
 
         // Duplicate the dashboard
@@ -561,7 +560,7 @@ export default defineComponent({
         await dashboardService.create(
           store.state.selectedOrganization.identifier,
           data,
-          activeFolderId.value || "default"
+          activeFolderId.value || "default",
         );
 
         await getDashboards();
@@ -603,7 +602,7 @@ export default defineComponent({
     const dashboards = computed(function () {
       const dashboardList = toRaw(
         store.state.organizationData?.allDashboardList[activeFolderId.value] ??
-          []
+          [],
       );
       return dashboardList.map((board: any, index) => {
         return {
@@ -633,7 +632,7 @@ export default defineComponent({
           await deleteDashboardById(
             store,
             selectedDelete.value.id,
-            activeFolderId.value ?? "default"
+            activeFolderId.value ?? "default",
           );
           showPositiveNotification("Dashboard deleted successfully.");
         } catch (err) {
@@ -695,7 +694,7 @@ export default defineComponent({
               "Folder deletion failed",
             {
               timeout: 2000,
-            }
+            },
           );
         } finally {
           confirmDeleteFolderDialog.value = false;
@@ -787,13 +786,12 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-
 .dashboards-tabs {
-  .test-class{
-   min-height: 1.5rem; 
-  margin-bottom: 6px; 
-  border-bottom: 1px lightgray dotted;
-}
+  .test-class {
+    min-height: 1.5rem;
+    margin-bottom: 6px;
+    border-bottom: 1px lightgray dotted;
+  }
   .folder-item {
     display: flex;
     justify-content: space-between;
@@ -849,6 +847,14 @@ export default defineComponent({
         }
       }
     }
+  }
+}
+
+.dashboards-list-page {
+  :deep(.q-table th),
+  :deep(.q-table td) {
+    padding: 0px 16px;
+    height: 32px;
   }
 }
 </style>

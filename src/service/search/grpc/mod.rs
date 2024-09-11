@@ -49,7 +49,7 @@ use crate::{
 mod storage;
 mod wal;
 
-pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats), Error>;
+pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats, usize), Error>;
 
 #[tracing::instrument(name = "service:search:grpc:search", skip_all, fields(org_id = req.org_id))]
 pub async fn search(
@@ -124,19 +124,23 @@ pub async fn search(
     let _release_file_guard = ReleaseFileGuard::new(&trace_id);
 
     // search in WAL parquet
+    let mut target_partitions = cfg.limit.cpu_num;
     let skip_wal = req.query.as_ref().unwrap().skip_wal;
     if LOCAL_NODE.is_ingester() && !skip_wal {
-        let (tbls, stats) =
+        let (tbls, stats, partitions) =
             wal::search_parquet(&trace_id, sql.clone(), stream_type, &work_group).await?;
         tables.extend(tbls);
         scan_stats.add(&stats);
+        target_partitions = std::cmp::max(target_partitions, partitions);
     }
 
     // search in WAL memory
     if LOCAL_NODE.is_ingester() && !skip_wal {
-        let (tbls, stats) = wal::search_memtable(&trace_id, sql.clone(), stream_type).await?;
+        let (tbls, stats, partitions) =
+            wal::search_memtable(&trace_id, sql.clone(), stream_type).await?;
         tables.extend(tbls);
         scan_stats.add(&stats);
+        target_partitions = std::cmp::max(target_partitions, partitions);
     }
 
     // search in object storage
@@ -165,10 +169,11 @@ pub async fn search(
             })
             .collect::<Vec<_>>();
         // and correspondingly update req proto for this
-        let (tbls, stats) =
+        let (tbls, stats, partitions) =
             storage::search(&trace_id, sql.clone(), &file_list, stream_type, &work_group).await?;
         tables.extend(tbls);
         scan_stats.add(&stats);
+        target_partitions = std::cmp::max(target_partitions, partitions);
     }
 
     let session = config::meta::search::Session {
@@ -180,7 +185,7 @@ pub async fn search(
             SearchType::Normal
         },
         work_group: Some(work_group.to_string()),
-        target_partitions: cfg.limit.cpu_num,
+        target_partitions,
     };
 
     // run and get the RecordBatch

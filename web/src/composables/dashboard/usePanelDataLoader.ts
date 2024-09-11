@@ -20,7 +20,7 @@ import {
   toRefs,
   onMounted,
   onUnmounted,
-  inject,
+  toRaw,
 } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
@@ -35,7 +35,13 @@ import {
   formateRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
-import { b64EncodeUnicode, generateTraceContext, escapeSingleQuotes } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  generateTraceContext,
+  escapeSingleQuotes,
+} from "@/utils/zincutils";
+import { usePanelCache } from "./usePanelCache";
+import { isEqual, omit } from "lodash-es";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -49,12 +55,34 @@ export const usePanelDataLoader = (
   chartPanelRef: any,
   forceLoad: any,
   searchType: any,
+  dashboardId: any,
+  folderId: any,
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
     //   console.log(panelSchema?.value?.title + ": ", ...args);
     // }
   };
+  let runCount = 0;
+
+  /**
+   * Calculate cache key for panel
+   * @returns cache key
+   */
+  const getCacheKey = () => ({
+    panelSchema: toRaw(panelSchema.value),
+    variablesData: toRaw(variablesData.value),
+    forceLoad: toRaw(forceLoad.value),
+    // searchType: toRaw(searchType.value),
+    dashboardId: toRaw(dashboardId?.value),
+    folderId: toRaw(folderId?.value),
+  });
+
+  const { getPanelCache, savePanelCache } = usePanelCache(
+    folderId?.value,
+    dashboardId?.value,
+    panelSchema.value.id,
+  );
 
   const state = reactive({
     data: [] as any,
@@ -64,6 +92,9 @@ export const usePanelDataLoader = (
       queries: [] as any,
     },
     resultMetaData: [] as any,
+    lastTriggeredAt: null as any,
+    isCachedDataDifferWithCurrentTimeRange: false,
+    searchRequestTraceIds: <string[]>[],
   });
 
   // observer for checking if panel is visible on the screen
@@ -72,8 +103,19 @@ export const usePanelDataLoader = (
   // is panel currently visible or not
   const isVisible: any = ref(false);
 
+  const saveCurrentStateToCache = () => {
+    savePanelCache(
+      getCacheKey(),
+      { ...toRaw(state) },
+      {
+        start_time: selectedTimeObj?.value?.start_time?.getTime(),
+        end_time: selectedTimeObj?.value?.end_time?.getTime(),
+      },
+    );
+  };
+
   // currently dependent variables data
-  let currentDependentVariablesData = variablesData.value?.values
+  let currentDependentVariablesData = variablesData?.value?.values
     ? JSON.parse(
         JSON.stringify(
           variablesData.value?.values
@@ -91,17 +133,7 @@ export const usePanelDataLoader = (
       )
     : [];
 
-  // console.log(
-  //   "variablesData.value currentAdHocVariablesData",
-  //   JSON.parse(JSON.stringify(variablesData.value))
-  // );
-
-  // console.log(
-  //   "variablesData.value.values currentAdHocVariablesData",
-  //   JSON.parse(JSON.stringify(variablesData.value.values))
-  // );
-
-  let currentDynamicVariablesData = variablesData.value?.values
+  let currentDynamicVariablesData = variablesData?.value?.values
     ? JSON.parse(
         JSON.stringify(
           variablesData.value?.values
@@ -113,7 +145,6 @@ export const usePanelDataLoader = (
       )
     : [];
   // let currentAdHocVariablesData: any = null;
-  // console.log("currentAdHocVariablesData", currentDynamicVariablesData);
 
   const store = useStore();
 
@@ -200,10 +231,51 @@ export const usePanelDataLoader = (
     });
   };
 
+  /**
+   * Call a function with an AbortController, and propagate the abort
+   * signal to the function. This allows the function to be cancelled
+   * when the AbortController is aborted.
+   *
+   * @param fn The function to call
+   * @param signal The AbortSignal to use
+   * @returns A promise that resolves with the result of the function, or
+   * rejects with an error if the function is cancelled or throws an error
+   */
+  const callWithAbortController = async <T>(
+    fn: () => Promise<T>,
+    signal: AbortSignal,
+  ): Promise<T> => {
+    return new Promise<T>((resolve, reject) => {
+      const result = fn();
+
+      // Listen to the abort signal and reject the promise if it is
+      // received
+      signal.addEventListener("abort", () => {
+        reject();
+      });
+
+      // Handle the result of the function
+      result
+        .then((res) => {
+          resolve(res);
+        })
+        .catch((error) => {
+          reject(error);
+        });
+    });
+  };
+
+  const cancelQueryAbort = () => {
+    if (abortController) {
+      abortController?.abort();
+    }
+  };
+
   const loadData = async () => {
     try {
       log("loadData: entering...");
 
+      // Check and abort the previous call if necessary
       if (abortController) {
         log("loadData: aborting previous function call (if any)");
         abortController.abort();
@@ -211,7 +283,7 @@ export const usePanelDataLoader = (
 
       // Create a new AbortController for the new operation
       abortController = new AbortController();
-
+      window.addEventListener("cancelQuery", cancelQueryAbort);
       // Checking if there are queries to execute
       if (!panelSchema.value.queries?.length || !hasAtLeastOneQuery()) {
         log("loadData: there are no queries to execute");
@@ -229,6 +301,8 @@ export const usePanelDataLoader = (
       await waitForTimeout(abortController.signal);
 
       log("loadData: now waiting for the panel to become visible");
+
+      state.lastTriggeredAt = new Date().getTime();
 
       // Wait for isVisible to become true
       await waitForThePanelToBecomeVisible(abortController.signal);
@@ -257,7 +331,28 @@ export const usePanelDataLoader = (
         return;
       }
 
+      if (runCount == 0) {
+        log("loadData: panelcache: run count is 0");
+        // restore from the cache and return
+        const isRestoredFromCache = restoreFromCache();
+        log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
+        if (isRestoredFromCache) {
+          state.loading = false;
+          log("loadData: panelcache: restored from cache");
+          runCount++;
+          return;
+        }
+      }
+
+      log(
+        "loadData: panelcache: no cache restored, continue firing, runCount ",
+        runCount,
+      );
+
+      runCount++;
+
       state.loading = true;
+      state.isCachedDataDifferWithCurrentTimeRange = false;
 
       // Check if the query type is "promql"
       if (panelSchema.value.queryType == "promql") {
@@ -270,7 +365,6 @@ export const usePanelDataLoader = (
               endISOTimestamp,
               panelSchema.value.queryType,
             );
-            // console.log("Calling queryPromises", query1);
 
             const { query: query2, metadata: metadata2 } =
               await applyDynamicVariables(query1, panelSchema.value.queryType);
@@ -284,24 +378,28 @@ export const usePanelDataLoader = (
               queryType: panelSchema.value.queryType,
               variables: [...(metadata1 || []), ...(metadata2 || [])],
             };
-            // console.log("Calling metrics_query_range API");
-            return queryService
-              .metrics_query_range({
-                org_identifier: store.state.selectedOrganization.identifier,
-                query: query,
-                start_time: startISOTimestamp,
-                end_time: endISOTimestamp,
-              })
-              .then((res) => {
-                state.errorDetail = "";
-                // console.log("API response received");
-                return { result: res.data.data, metadata: metadata };
-              })
-              .catch((error) => {
-                // Process API error for "promql"
-                processApiError(error, "promql");
-                return { result: null, metadata: metadata };
-              });
+            const { traceparent, traceId } = generateTraceContext();
+            addTraceId(traceId);
+            try {
+              const res = await callWithAbortController(
+                () =>
+                  queryService.metrics_query_range({
+                    org_identifier: store.state.selectedOrganization.identifier,
+                    query: query,
+                    start_time: startISOTimestamp,
+                    end_time: endISOTimestamp,
+                  }),
+                abortController.signal,
+              );
+
+              state.errorDetail = "";
+              return { result: res.data.data, metadata: metadata };
+            } catch (error) {
+              processApiError(error, "promql");
+              return { result: null, metadata: metadata };
+            } finally {
+              removeTraceId(traceId);
+            }
           },
         );
 
@@ -312,6 +410,8 @@ export const usePanelDataLoader = (
         state.metadata = {
           queries: queryResults.map((it: any) => it?.metadata),
         };
+
+        saveCurrentStateToCache();
       } else {
         // copy of current abortController
         // which is used to check whether the current query has been aborted
@@ -330,7 +430,10 @@ export const usePanelDataLoader = (
         const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
 
         // Handle each query sequentially
-        for (const it of panelSchema.value.queries) {
+        for (const [
+          panelQueryIndex,
+          it,
+        ] of panelSchema.value.queries.entries()) {
           const { query: query1, metadata: metadata1 } = replaceQueryValue(
             it.query,
             startISOTimestamp,
@@ -351,27 +454,29 @@ export const usePanelDataLoader = (
             queryType: panelSchema.value.queryType,
             variables: [...(metadata1 || []), ...(metadata2 || [])],
           };
-
+          const { traceparent, traceId } = generateTraceContext();
+          addTraceId(traceId);
           try {
-            // trace context
-            const { traceparent } = generateTraceContext();
-
             // partition api call
-            const res = await queryService.partition({
-              org_identifier: store.state.selectedOrganization.identifier,
-              query: {
-                sql: query,
-                query_fn: it.vrlFunctionQuery
-                  ? b64EncodeUnicode(it.vrlFunctionQuery)
-                  : null,
-                sql_mode: "full",
-                start_time: startISOTimestamp,
-                end_time: endISOTimestamp,
-                size: -1,
-              },
-              page_type: pageType,
-              traceparent,
-            });
+            const res = await callWithAbortController(
+              async () =>
+                queryService.partition({
+                  org_identifier: store.state.selectedOrganization.identifier,
+                  query: {
+                    sql: query,
+                    query_fn: it.vrlFunctionQuery
+                      ? b64EncodeUnicode(it.vrlFunctionQuery)
+                      : null,
+                    sql_mode: "full",
+                    start_time: startISOTimestamp,
+                    end_time: endISOTimestamp,
+                    size: -1,
+                  },
+                  page_type: pageType,
+                  traceparent,
+                }),
+              abortControllerRef.signal,
+            );
 
             // if aborted, return
             if (abortControllerRef?.signal?.aborted) {
@@ -411,106 +516,132 @@ export const usePanelDataLoader = (
               if (abortControllerRef?.signal?.aborted) {
                 break;
               }
-              const searchRes = await queryService.search(
-                {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                  query: {
-                    query: {
-                      sql: await changeHistogramInterval(
-                        query,
-                        histogramInterval,
-                      ),
-                      query_fn: it.vrlFunctionQuery
-                        ? b64EncodeUnicode(it.vrlFunctionQuery)
-                        : null,
-                      sql_mode: "full",
-                      start_time: partition[0],
-                      end_time: partition[1],
-                      size: -1,
-                    },
-                  },
-                  page_type: pageType,
-                },
-                searchType.value ?? "Dashboards",
-              );
+              const { traceparent, traceId } = generateTraceContext();
+              addTraceId(traceId);
 
-              // remove past error detail
-              state.errorDetail = "";
+              try {
+                const searchRes = await callWithAbortController(
+                  async () =>
+                    queryService.search(
+                      {
+                        org_identifier:
+                          store.state.selectedOrganization.identifier,
+                        query: {
+                          query: {
+                            sql: await changeHistogramInterval(
+                              query,
+                              histogramInterval,
+                            ),
+                            query_fn: it.vrlFunctionQuery
+                              ? b64EncodeUnicode(it.vrlFunctionQuery)
+                              : null,
+                            sql_mode: "full",
+                            start_time: partition[0],
+                            end_time: partition[1],
+                            size: -1,
+                          },
+                        },
+                        page_type: pageType,
+                        traceparent,
+                      },
+                      searchType.value ?? "Dashboards",
+                    ),
+                  abortControllerRef.signal,
+                );
+                // remove past error detail
+                state.errorDetail = "";
 
-              // if there is an function error and which not related to stream range, throw error
-              if (
-                searchRes.data.function_error &&
-                searchRes.data.is_partial != true
-              ) {
-                // abort on unmount
-                if (abortControllerRef) {
-                  // this will stop partition api call
-                  abortControllerRef?.abort();
+                // if there is an function error and which not related to stream range, throw error
+                if (
+                  searchRes.data.function_error &&
+                  searchRes.data.is_partial != true
+                ) {
+                  // abort on unmount
+                  if (abortControllerRef) {
+                    // this will stop partition api call
+                    abortControllerRef?.abort();
+                  }
+
+                  // throw error
+                  throw new Error(
+                    `Function error: ${searchRes.data.function_error}`,
+                  );
                 }
 
-                // throw error
-                throw new Error(
-                  `Function error: ${searchRes.data.function_error}`,
-                );
-              }
+                // if the query is aborted or the response is partial, break the loop
+                if (abortControllerRef?.signal?.aborted) {
+                  break;
+                }
 
-              // if the query is aborted or the response is partial, break the loop
-              if (abortControllerRef?.signal?.aborted) {
-                break;
-              }
+                state.data[currentQueryIndex] = [
+                  ...searchRes.data.hits,
+                  ...(state.data[currentQueryIndex] ?? []),
+                ];
 
-              state.data[currentQueryIndex] = [
-                ...searchRes.data.hits,
-                ...(state.data[currentQueryIndex] ?? []),
-              ];
+                // update result metadata
+                state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
 
-              // update result metadata
-              state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
+                if (searchRes.data.is_partial == true) {
+                  // set the new start time as the start time of query
+                  state.resultMetaData[currentQueryIndex].new_end_time =
+                    endISOTimestamp;
 
-              if (searchRes.data.is_partial == true) {
-                // set the new start time as the start time of query
-                state.resultMetaData[currentQueryIndex].new_end_time =
-                  endISOTimestamp;
-                break;
-              }
+                  // need to break the loop, save the cache
+                  saveCurrentStateToCache();
 
-              if (max_query_range != 0) {
-                // calculate the current partition time range
-                // convert timerange from milliseconds to hours
-                const timeRange = (partition[1] - partition[0]) / 3600000000;
+                  break;
+                }
 
-                // get result cache ratio(it will be from 0 to 100)
-                const resultCacheRatio = searchRes.data.result_cache_ratio ?? 0;
+                if (max_query_range != 0) {
+                  // calculate the current partition time range
+                  // convert timerange from milliseconds to hours
+                  const timeRange = (partition[1] - partition[0]) / 3600000000;
 
-                // calculate the remaining query range
-                // remaining query range = remaining query range - queried time range for the current partition
-                // queried time range = time range * ((100 - result cache ratio) / 100)
+                  // get result cache ratio(it will be from 0 to 100)
+                  const resultCacheRatio =
+                    searchRes.data.result_cache_ratio ?? 0;
 
-                const queriedTimeRange =
-                  timeRange * ((100 - resultCacheRatio) / 100);
+                  // calculate the remaining query range
+                  // remaining query range = remaining query range - queried time range for the current partition
+                  // queried time range = time range * ((100 - result cache ratio) / 100)
 
-                remainingQueryRange = remainingQueryRange - queriedTimeRange;
+                  const queriedTimeRange =
+                    timeRange * ((100 - resultCacheRatio) / 100);
 
-                // if the remaining query range is less than 0, break the loop
-                // we exceeded the max query range
-                if (remainingQueryRange < 0) {
-                  // set that is_partial to true if it is not last partition which we need to call
-                  if (i != 0) {
-                    // set that is_partial to true
-                    state.resultMetaData[currentQueryIndex].is_partial = true;
-                    // set function error
-                    state.resultMetaData[currentQueryIndex].function_error =
-                      `Query duration is modified due to query range restriction of ${max_query_range} hours`;
-                    // set the new start time and end time
-                    state.resultMetaData[currentQueryIndex].new_end_time =
-                      endISOTimestamp;
+                  remainingQueryRange = remainingQueryRange - queriedTimeRange;
 
-                    // set the new start time as the start time of query
-                    state.resultMetaData[currentQueryIndex].new_start_time =
-                      partition[0];
-                    break;
+                  // if the remaining query range is less than 0, break the loop
+                  // we exceeded the max query range
+                  if (remainingQueryRange < 0) {
+                    // set that is_partial to true if it is not last partition which we need to call
+                    if (i != 0) {
+                      // set that is_partial to true
+                      state.resultMetaData[currentQueryIndex].is_partial = true;
+                      // set function error
+                      state.resultMetaData[currentQueryIndex].function_error =
+                        `Query duration is modified due to query range restriction of ${max_query_range} hours`;
+                      // set the new start time and end time
+                      state.resultMetaData[currentQueryIndex].new_end_time =
+                        endISOTimestamp;
+
+                      // set the new start time as the start time of query
+                      state.resultMetaData[currentQueryIndex].new_start_time =
+                        partition[0];
+
+                      // need to break the loop, save the cache
+                      saveCurrentStateToCache();
+
+                      break;
+                    }
                   }
                 }
+              } finally {
+                removeTraceId(traceId);
+              }
+
+              if (i == 0) {
+                // if it is last partition, cache the result
+                saveCurrentStateToCache();
               }
             }
           } catch (error) {
@@ -520,7 +651,7 @@ export const usePanelDataLoader = (
           } finally {
             // set loading to false
             state.loading = false;
-
+            removeTraceId(traceId);
             // abort on done
             if (abortControllerRef) {
               abortControllerRef?.abort();
@@ -547,7 +678,7 @@ export const usePanelDataLoader = (
 
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
-    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad.value],
+    () => [panelSchema?.value, selectedTimeObj?.value, forceLoad?.value],
     async () => {
       log("PanelSchema/Time Wather: called");
       loadData(); // Loading the data
@@ -704,20 +835,13 @@ export const usePanelDataLoader = (
 
   const applyDynamicVariables = async (query: any, queryType: any) => {
     const metadata: any[] = [];
-    // console.log(
-    //   "variablesDataaaa currentAdHocVariablesData",
-    //   JSON.stringify(variablesData.value, null, 2)
-    // );
-
     const adHocVariables = variablesData.value?.values
       ?.filter((it: any) => it.type === "dynamic_filters")
       ?.map((it: any) => it?.value)
       .flat()
       ?.filter((it: any) => it?.operator && it?.name && it?.value);
-    // console.log("adHocVariables", adHocVariables);
 
     if (!adHocVariables?.length) {
-      // console.log("No adhoc variables found");
       return { query, metadata };
     }
 
@@ -730,7 +854,7 @@ export const usePanelDataLoader = (
           value: variable.value,
           operator: variable.operator,
         });
-        // console.log(`Adding label to PromQL query: ${variable.name}`);
+
         query = addLabelToPromQlQuery(
           query,
           variable.name,
@@ -756,7 +880,6 @@ export const usePanelDataLoader = (
           operator: variable.operator,
         });
       });
-      // console.log("Adding labels to SQL query");
       query = await addLabelsToSQlQuery(query, applicableAdHocVariables);
     }
 
@@ -772,7 +895,7 @@ export const usePanelDataLoader = (
   const processApiError = async (error: any, type: any) => {
     switch (type) {
       case "promql": {
-        const errorDetailValue = error.response?.data?.error || error.message;
+        const errorDetailValue = error.response?.data?.error || error?.message;
         const trimmedErrorMessage =
           errorDetailValue?.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
@@ -782,9 +905,9 @@ export const usePanelDataLoader = (
       }
       case "sql": {
         const errorDetailValue =
-          error.response?.data.error_detail ||
-          error.response?.data.message ||
-          error.message;
+          error?.response?.data.error_detail ||
+          error?.response?.data.message ||
+          error?.message;
         const trimmedErrorMessage =
           errorDetailValue?.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
@@ -797,6 +920,20 @@ export const usePanelDataLoader = (
     }
   };
 
+  const addTraceId = (traceId: string) => {
+    if (state.searchRequestTraceIds.includes(traceId)) {
+      return;
+    }
+
+    state.searchRequestTraceIds = [...state.searchRequestTraceIds, traceId];
+  };
+
+  const removeTraceId = (traceId: string) => {
+    state.searchRequestTraceIds = state.searchRequestTraceIds.filter(
+      (id: any) => id !== traceId,
+    );
+  };
+
   const hasAtLeastOneQuery = () =>
     panelSchema.value.queries?.some((q: any) => q?.query);
 
@@ -807,7 +944,7 @@ export const usePanelDataLoader = (
   // 2. compare the dependent variables data with the old dependent variables Data
   // 3. if the value of any current variable is changed, call the api
   watch(
-    () => variablesData.value?.values,
+    () => variablesData?.value?.values,
     () => {
       // console.log("inside watch variablesData");
       // ensure the query is there
@@ -1172,7 +1309,7 @@ export const usePanelDataLoader = (
       threshold: 0.1, // Adjust as needed
     });
 
-    observer.observe(chartPanelRef.value);
+    if (chartPanelRef?.value) observer.observe(chartPanelRef?.value);
   });
 
   // remove intersection observer
@@ -1185,10 +1322,71 @@ export const usePanelDataLoader = (
     if (observer) {
       observer.disconnect();
     }
+
+    // remove cancelquery event
+    window.removeEventListener("cancelQuery", cancelQueryAbort);
   });
 
-  log("PanelSchema/Time Initial: should load the data");
-  loadData(); // Loading the data
+  onMounted(async () => {
+    log("PanelSchema/Time Initial: should load the data");
+    loadData(); // Loading the data
+  });
+
+  const restoreFromCache: () => boolean = () => {
+    const cache = getPanelCache();
+
+    if (!cache) {
+      log("usePanelDataLoader: panelcache: cache is not there");
+      // cache is not there, we need to load the data
+      return false;
+    }
+    // now we have a cache
+    const { key: tempPanelCacheKey, value: tempPanelCacheValue } = cache;
+    log("usePanelDataLoader: panelcache: tempPanelCache", tempPanelCacheValue);
+
+    let isRestoredFromCache = false;
+
+    const keysToIgnore = [
+      "panelSchema.version",
+      "panelSchema.layout",
+      "panelSchema.htmlContent",
+      "panelSchema.markdownContent",
+    ];
+
+    // check if it is stale or not
+    if (
+      tempPanelCacheValue &&
+      Object.keys(tempPanelCacheValue).length > 0 &&
+      isEqual(
+        omit(getCacheKey(), keysToIgnore),
+        omit(tempPanelCacheKey, keysToIgnore),
+      )
+    ) {
+      // const cache = getPanelCache();
+      state.data = tempPanelCacheValue.data;
+      state.loading = tempPanelCacheValue.loading;
+      state.errorDetail = tempPanelCacheValue.errorDetail;
+      state.metadata = tempPanelCacheValue.metadata;
+      state.resultMetaData = tempPanelCacheValue.resultMetaData;
+      state.lastTriggeredAt = tempPanelCacheValue.lastTriggeredAt;
+
+      // set that the cache is restored
+      isRestoredFromCache = true;
+
+      // if selected time range is not matched with the cache time range
+      if (
+        selectedTimeObj?.value?.end_time -
+          selectedTimeObj?.value?.start_time !==
+        cache?.cacheTimeRange?.end_time - cache?.cacheTimeRange?.start_time
+      ) {
+        state.isCachedDataDifferWithCurrentTimeRange = true;
+      }
+
+      log("usePanelDataLoader: panelcache: panel data loaded from cache");
+    }
+
+    return isRestoredFromCache;
+  };
 
   return {
     ...toRefs(state),

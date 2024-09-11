@@ -377,6 +377,18 @@ pub static COMPACT_DELAY_HOURS: Lazy<IntGaugeVec> = Lazy::new(|| {
     )
     .expect("Metric created")
 });
+pub static COMPACT_PENDING_JOBS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "compact_pending_jobs",
+            "Compactor pending jobs count. Please include 'organization and 'stream type' labels for this metric.".to_owned(),
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type"],
+    )
+    .expect("Metric created")
+});
 // TODO deletion / archiving stats
 
 // storage stats
@@ -745,6 +757,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(COMPACT_DELAY_HOURS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(COMPACT_PENDING_JOBS.clone()))
         .expect("Metric registered");
 
     // storage stats
