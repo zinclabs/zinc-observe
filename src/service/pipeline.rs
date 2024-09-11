@@ -32,23 +32,6 @@ use crate::common::{
 
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error> {
-    // TODO(taiming): check similar pipeline exists?
-    // depends on this function is called
-    // if check_existing_pipeline(
-    //     &org_id,
-    //     pipeline.stream_type,
-    //     &pipeline.stream_name,
-    //     &pipeline.name,
-    // )
-    // .await
-    // .is_some()
-    // {
-    //     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-    //         StatusCode::BAD_REQUEST.into(),
-    //         "Pipeline already exits".to_string(),
-    //     )));
-    // }
-
     // validate pipeline
     if let Err(e) = pipeline.validate() {
         return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -59,14 +42,6 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error
 
     // Save DerivedStream details if there's any
     if let PipelineSource::Scheduled(ref mut derived_stream) = &mut pipeline.source {
-        if derived_stream.trigger_condition.period == 0 {
-            // Invalid trigger condition
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Invalid Pipeline: DerivedStream source's TriggerCondition period missing or is 0"
-                    .to_string(),
-            )));
-        }
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         // save derived_stream to triggers table
         if let Err(e) = super::alerts::derived_streams::save(
@@ -107,6 +82,9 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
             )));
         }
         Ok(existing_pipeline) => {
+            if existing_pipeline == pipeline {
+                return Ok(HttpResponse::Ok().json("No changes found".to_string()));
+            }
             // check version
             if existing_pipeline.version != pipeline.version {
                 return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
@@ -117,19 +95,18 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
                     ),
                 )));
             }
-            if existing_pipeline == pipeline {
-                return Ok(HttpResponse::Ok().json(pipeline));
-            }
-            // now check if there's a pipeline with the same source and structure
-            if let Ok(similar_pl) = db::pipeline::get_by_src_and_struct(&pipeline).await {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    format!(
-                        "A pipeline with the same source and structure exists in org: {} with name: {}",
-                        similar_pl.org,
-                        similar_pl.name
-                    ),
-                )));
+            // if the source is changed, check if the new source exists in another pipeline
+            if existing_pipeline.source != pipeline.source {
+                if let Ok(similar_pl) = db::pipeline::get_with_same_source_stream(&pipeline).await {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        format!(
+                            "The new source already exists in another pipeline in org: {} with name: {}",
+                            similar_pl.org,
+                            similar_pl.name
+                        ),
+                    )));
+                }
             }
         }
     };
@@ -147,14 +124,6 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
 
     // Save DerivedStream details if there's any
     if let PipelineSource::Scheduled(ref mut derived_stream) = &mut pipeline.source {
-        if derived_stream.trigger_condition.period == 0 {
-            // Invalid trigger condition
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Invalid Pipeline: DerivedStream source's TriggerCondition period missing or is 0"
-                    .to_string(),
-            )));
-        }
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
         // save derived_stream to triggers table
         if let Err(e) = super::alerts::derived_streams::save(
@@ -171,7 +140,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
         }
     }
 
-    match db::pipeline::set(pipeline).await {
+    match db::pipeline::update(pipeline).await {
         Err(error) => Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -180,7 +149,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
         ),
         Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
-            "Pipeline saved successfully".to_string(),
+            "Pipeline updated successfully".to_string(),
         ))),
     }
 }

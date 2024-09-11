@@ -89,6 +89,11 @@ impl Pipeline {
                 self.source = PipelineSource::Realtime(stream_params)
             }
             NodeData::Query(derived_stream) => {
+                if derived_stream.trigger_condition.period == 0 {
+                    return Err(anyhow!(
+                        "DerivedStream source's TriggerCondition period missing or is 0"
+                    ));
+                }
                 self.source = PipelineSource::Scheduled(derived_stream)
             }
             _ => return Err(anyhow!("source must be either a StreamNode or QueryNode")),

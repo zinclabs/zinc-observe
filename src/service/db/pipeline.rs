@@ -34,6 +34,19 @@ pub async fn set(pipeline: Pipeline) -> Result<()> {
     }
     Ok(())
 }
+/// Updates a pipeline entry with the sane values.
+///
+/// Pipeline validation should be handled by the caller.
+pub async fn update(pipeline: Pipeline) -> Result<()> {
+    match infra_pipeline::update(pipeline).await {
+        Ok(_) => {}
+        Err(e) => {
+            log::error!("Error updating pipeline: {}", e);
+            return Err(anyhow::anyhow!("Error updating pipeline: {}", e));
+        }
+    }
+    Ok(())
+}
 
 /// Returns all pipelines associated with a stream.
 ///
@@ -64,13 +77,13 @@ pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline> {
     })
 }
 
-/// Finds the pipeline with the same source and structure
+/// Finds the pipeline with the same source
 ///
 /// Used to validate if a duplicate pipeline exists.
-pub async fn get_by_src_and_struct(pipeline: &Pipeline) -> Result<Pipeline> {
-    infra_pipeline::get_by_src_and_struct(pipeline)
+pub async fn get_with_same_source_stream(pipeline: &Pipeline) -> Result<Pipeline> {
+    infra_pipeline::get_with_same_source_stream(pipeline)
         .await
-        .map_err(|_| anyhow::anyhow!("No pipeline with the same source and structure found"))
+        .map_err(|_| anyhow::anyhow!("No pipeline with the same source found"))
 }
 
 /// Lists all pipelines across all orgs.

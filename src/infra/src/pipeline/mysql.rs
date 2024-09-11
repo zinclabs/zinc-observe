@@ -167,6 +167,79 @@ INSERT IGNORE INTO pipeline (id, version, name, description, org, source_type, d
         Ok(())
     }
 
+    async fn update(&self, pipeline: Pipeline) -> Result<()> {
+        let pool = CLIENT.clone();
+        let mut tx = pool.begin().await?;
+
+        if let Err(e) = match pipeline.source {
+            PipelineSource::Realtime(stream_params) => {
+                let (source_type, stream_org, stream_name, stream_type): (&str, &str, &str, &str) = (
+                    "realtime",
+                    stream_params.org_id.as_str(),
+                    stream_params.stream_name.as_str(),
+                    stream_params.stream_type.as_str(),
+                );
+                sqlx::query(
+                    r#"
+UPDATE pipeline
+    SET version = ?, name = ?, description = ?, org = ?, source_type = ?, stream_org = ?, stream_name = ?, stream_type = ?, nodes = ?, edges = ?
+    WHERE id =?;
+                    "#,
+                )
+                .bind(pipeline.version)
+                .bind(pipeline.name)
+                .bind(pipeline.description)
+                .bind(pipeline.org)
+                .bind(source_type)
+                .bind(stream_org)
+                .bind(stream_name)
+                .bind(stream_type)
+                .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
+                .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
+                .bind(pipeline.id)
+                .execute(&mut *tx)
+                .await
+            }
+            PipelineSource::Scheduled(derived_stream) => {
+                let (source_type, derived_stream_str) = (
+                    "scheduled",
+                    json::to_string(&derived_stream)
+                        .expect("Serializing pipeline DerivedStream error"),
+                );
+                sqlx::query(
+                    r#"
+UPDATE pipeline
+    SET version = ?, name = ?, description = ?, org = ?, source_type = ?, derived_stream = ?, nodes = ?, edges = ?
+    WHERE id = ?;
+                    "#,
+                )
+                .bind(pipeline.version)
+                .bind(pipeline.name)
+                .bind(pipeline.description)
+                .bind(pipeline.org)
+                .bind(source_type)
+                .bind(derived_stream_str)
+                .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
+                .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
+                .bind(pipeline.id)
+                .execute(&mut *tx)
+                .await
+            }
+        } {
+            if let Err(e) = tx.rollback().await {
+                log::error!("[MYSQL] rollback push pipeline error: {}", e);
+            }
+            return Err(e.into());
+        }
+
+        if let Err(e) = tx.commit().await {
+            log::error!("[MYSQL] commit push pipeline error: {}", e);
+            return Err(e.into());
+        }
+
+        Ok(())
+    }
+
     async fn get_by_stream(
         &self,
         org: &str,
@@ -213,37 +286,30 @@ SELECT * FROM pipeline WHERE org = ? AND source_type = ? AND stream_org = ? AND 
         Ok(pipeline)
     }
 
-    async fn get_by_src_and_struct(&self, pipeline: &Pipeline) -> Result<Pipeline> {
+    async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Pipeline> {
         let pool = CLIENT.clone();
-        let existing_pipeline = match &pipeline.source {
+        let similar_pipeline = match &pipeline.source {
             PipelineSource::Realtime(stream_params) => {
-                sqlx::query_as::<_, Pipeline>(r#"
+                sqlx::query_as::<_, Pipeline>(
+                    r#"
 SELECT * FROM pipeline 
-    WHERE source_type = ? AND stream_org = ? AND stream_name = ? AND stream_type = ? AND nodes = ? AND edges = ?;
-                "#)
-                    .bind("realtime")
-                    .bind(stream_params.org_id.as_str())
-                    .bind(stream_params.stream_name.as_str())
-                    .bind(stream_params.stream_type.as_str())
-                    .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
-                    .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
-                    .fetch_one(&pool)
-                    .await
+    WHERE source_type = ? AND stream_org = ? AND stream_name = ? AND stream_type = ?;
+                "#,
+                )
+                .bind("realtime")
+                .bind(stream_params.org_id.as_str())
+                .bind(stream_params.stream_name.as_str())
+                .bind(stream_params.stream_type.as_str())
+                .fetch_one(&pool)
+                .await?
             }
-            PipelineSource::Scheduled(derived_stream) => {
-                sqlx::query_as::<_, Pipeline>(r#"
-SELECT * FROM pipeline 
-    WHERE source_type = ? AND derived_stream = ? AND nodes = ? AND edges = ?;
-                "#)
-                    .bind("scheduled")
-                    .bind(json::to_string(&derived_stream).expect("Serializing pipeline DerivedStream error"))
-                    .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
-                    .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
-                    .fetch_one(&pool)
-                    .await
+            PipelineSource::Scheduled(_) => {
+                // only checks for realtime pipelines
+                return Err(Error::from(DbError::KeyNotExists("".to_string())));
             }
-        }?;
-        Ok(existing_pipeline)
+        };
+
+        Ok(similar_pipeline)
     }
 
     async fn list(&self) -> Result<Vec<Pipeline>> {
