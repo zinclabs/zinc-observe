@@ -149,7 +149,7 @@ pub async fn search(
         let file_id_data = &req.file_ids;
         let ids = file_id_data.iter().map(|f| f.id).collect::<Vec<_>>();
         let mut id_map: HashMap<_, _> = file_id_data
-            .into_iter()
+            .iter()
             .map(|f| (f.id, &f.segment_ids))
             .collect();
         let file_list = get_file_list_by_ids(

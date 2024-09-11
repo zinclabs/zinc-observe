@@ -329,7 +329,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
     }
 
     async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
-        if ids.len() < 1 {
+        if ids.is_empty() {
             return Ok(Vec::default());
         }
         let mut ret = Vec::new();

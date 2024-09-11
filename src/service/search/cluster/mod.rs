@@ -186,7 +186,6 @@ pub async fn search(
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
 
-    // TODO YJDoc2 - change param type to &[u64] for original size in o2-enterprise
     // 1. get work group
     #[cfg(feature = "enterprise")]
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
@@ -364,7 +363,7 @@ pub async fn search(
                         req.file_ids = partition_files
                             .get(offset_start)
                             .unwrap()
-                            .into_iter()
+                            .iter()
                             .map(|f| FileId {
                                 id: f.id,
                                 segment_ids: f.segment_ids.clone(),
