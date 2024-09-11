@@ -29,6 +29,12 @@ pub enum PipelineSource {
     Scheduled(DerivedStream),
 }
 
+impl Default for PipelineSource {
+    fn default() -> Self {
+        Self::Realtime(StreamParams::default())
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "snake_case")]
 #[serde(default)]
@@ -61,17 +67,27 @@ impl PartialEq for Node {
     }
 }
 
+impl Node {
+    pub(crate) fn get_node_data(&self) -> NodeData {
+        self.data.clone()
+    }
+
+    pub(crate) fn get_node_id(&self) -> String {
+        self.id.clone()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Edge {
     id: String,
-    source: String,
-    target: String,
+    pub(crate) source: String,
+    pub(crate) target: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "node_type")]
 #[serde(rename_all = "snake_case")]
-enum NodeData {
+pub(crate) enum NodeData {
     Stream(StreamParams),
     Query(DerivedStream),
     Function(FunctionParams),
@@ -93,8 +109,8 @@ pub struct FunctionParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-struct ConditionParams {
-    conditions: Vec<RoutingCondition>,
+pub(crate) struct ConditionParams {
+    pub(crate) conditions: Vec<RoutingCondition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
