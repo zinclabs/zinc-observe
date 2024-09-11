@@ -312,7 +312,9 @@ onBeforeMount(() => {
       reportsTableRows.value = res.data.map((report: any, index: number) => ({
         "#": index + 1,
         ...report,
-        lastTriggeredAt: convertUnixToQuasarFormat(report.lastTriggeredAt),
+        lastTriggeredAt: report.lastTriggeredAt
+          ? convertUnixToQuasarFormat(report.lastTriggeredAt)
+          : "-",
       }));
       resultTotal.value = reportsTableRows.value.length;
       staticReportsList.value = JSON.parse(

@@ -423,7 +423,11 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
     let mut trigger_data_stream = TriggerData {
         _timestamp: triggered_at,
         org: trigger.org.clone(),
-        module: TriggerDataType::Report,
+        module: if report.destinations.is_empty() {
+            TriggerDataType::CachedReport
+        } else {
+            TriggerDataType::Report
+        },
         key: trigger.module_key.clone(),
         next_run_at: new_trigger.next_run_at,
         is_realtime: trigger.is_realtime,

@@ -747,7 +747,7 @@ impl Locker {
             let expiration = expiration.parse::<i64>().unwrap();
             if (expiration < chrono::Utc::now().timestamp_micros())
                 || (ret_parts.len() == 3 // Backward compatibility: previous values only have 2 parts
-                    && node_ids.is_some_and(|node_ids| !node_ids.contains(ret_parts[2])))
+                    && node_ids.is_some_and(|node_ids| !node_ids.contains(ret_parts[1])))
             {
                 if let Err(err) = bucket.purge(&key).await {
                     log::error!("nats purge lock for key: {}, error: {}", self.key, err);

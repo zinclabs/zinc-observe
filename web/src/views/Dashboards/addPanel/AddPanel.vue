@@ -204,17 +204,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :initialVariableValues="initialVariableValues"
                       />
 
-                      <div
-                        v-if="isOutDated"
-                        class="tw-p-2"
-                      >
+                      <div v-if="isOutDated" class="tw-p-2">
                         <div
                           :style="{
                             borderColor: '#c3920d',
                             borderWidth: '1px',
                             borderStyle: 'solid',
                             backgroundColor:
-                              store.state.theme == 'dark' ? '#2a1f03' : '#faf2da',
+                              store.state.theme == 'dark'
+                                ? '#2a1f03'
+                                : '#faf2da',
                             padding: '1%',
                             borderRadius: '5px',
                           }"
@@ -223,21 +222,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             Your chart is not up to date
                           </div>
                           <div>
-                            Chart Configuration / Variables has been updated, but
-                            the chart was not updated automatically. Click on the
-                            "Apply" button to run the query again
+                            Chart Configuration / Variables has been updated,
+                            but the chart was not updated automatically. Click
+                            on the "Apply" button to run the query again
                           </div>
                         </div>
                       </div>
-                        <div class="tw-flex tw-justify-end tw-mr-2">
-                          <span v-if="lastTriggeredAt" class="lastRefreshedAt">
-                            <span class="lastRefreshedAtIcon">🕑</span
-                            ><RelativeTime
-                              :timestamp="lastTriggeredAt"
-                              fullTimePrefix="Last Refreshed At: "
-                            />
-                          </span>
-                        </div>
+                      <div class="tw-flex tw-justify-end tw-mr-2">
+                        <span v-if="lastTriggeredAt" class="lastRefreshedAt">
+                          <span class="lastRefreshedAtIcon">🕑</span
+                          ><RelativeTime
+                            :timestamp="lastTriggeredAt"
+                            fullTimePrefix="Last Refreshed At: "
+                          />
+                        </span>
+                      </div>
                       <div class="col" style="flex: 1">
                         <PanelSchemaRenderer
                           v-if="chartData"

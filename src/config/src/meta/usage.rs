@@ -39,6 +39,8 @@ pub enum TriggerDataStatus {
 pub enum TriggerDataType {
     #[serde(rename = "report")]
     Report,
+    #[serde(rename = "cached_report")]
+    CachedReport,
     #[serde(rename = "alert")]
     Alert,
     #[serde(rename = "derived_stream")]

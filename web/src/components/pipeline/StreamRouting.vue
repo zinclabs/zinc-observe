@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineAsyncComponent, onMounted, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import RealTimeAlert from "../alerts/RealTimeAlert.vue";
-import { getUUID } from "@/utils/zincutils";
+import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -506,6 +506,7 @@ const saveRouting = async () => {
   emit("update:node", {
     data: {
       ...getRoutePayload(),
+      tz_offset: getTimezoneOffset(),
       name: streamRoute.value.name,
     },
     link: nodeLink.value,

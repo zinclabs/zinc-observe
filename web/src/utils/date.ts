@@ -241,9 +241,14 @@ export const isInvalidDate = (date: any) => {
 };
 
 export const convertUnixToQuasarFormat = (unixMicroseconds: any) => {
-  if (!unixMicroseconds) return "";
-  const unixSeconds = unixMicroseconds / 1e6;
-  const dateToFormat = new Date(unixSeconds * 1000);
-  const formattedDate = dateToFormat.toISOString();
-  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+  try {
+    if (!unixMicroseconds) return "";
+    const unixSeconds = unixMicroseconds / 1e6;
+    const dateToFormat = new Date(unixSeconds * 1000);
+    const formattedDate = dateToFormat.toISOString();
+    return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+  } catch (error) {
+    console.log("Error converting unix to quasar format");
+    return "";
+  }
 };

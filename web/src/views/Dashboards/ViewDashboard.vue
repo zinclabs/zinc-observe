@@ -243,6 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :folderId="folderId"
           :dashboardId="dashboardId"
           :tabId="tabId"
+          :tabs="currentDashboardData?.data?.tabs || []"
         />
       </q-dialog>
     </div>
@@ -616,6 +617,9 @@ export default defineComponent({
 
       // set it as a absolute time
       dateTimePicker?.value?.setCustomDate("absolute", selectedDateObj);
+
+      // refresh dashboard
+      dateTimePicker.value.refresh();
     };
 
     // ------- work with query params ----------
@@ -784,9 +788,12 @@ export default defineComponent({
     };
 
     const openScheduledReports = () => {
+      if (isLoadingReports.value) return;
+
       showScheduledReportsDialog.value = true;
-      scheduledReports.value.length = 0;
+      scheduledReports.value = [];
       isLoadingReports.value = true;
+
       reports
         .list(
           store.state.selectedOrganization.identifier,
