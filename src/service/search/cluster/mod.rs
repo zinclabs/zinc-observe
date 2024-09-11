@@ -190,7 +190,7 @@ pub async fn search(
     // 1. get work group
     #[cfg(feature = "enterprise")]
     let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
-        o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_list),
+        o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_id_list),
     );
     #[cfg(feature = "enterprise")]
     super::SEARCH_SERVER
