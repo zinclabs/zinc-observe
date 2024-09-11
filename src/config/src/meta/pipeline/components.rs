@@ -51,7 +51,13 @@ pub struct Node {
     style: Option<NodeStyle>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl PartialEq for Node {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.data == other.data
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Edge {
     id: String,
     source: String,

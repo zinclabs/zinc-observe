@@ -214,6 +214,39 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
         Ok(pipeline)
     }
 
+    async fn get_by_src_and_struct(&self, pipeline: &Pipeline) -> Result<Pipeline> {
+        let pool = CLIENT_RO.clone();
+        let existing_pipeline = match &pipeline.source {
+            PipelineSource::Stream(stream_params) => {
+                sqlx::query_as::<_, Pipeline>(r#"
+SELECT * FROM pipeline 
+    WHERE source_type = $1 AND stream_org = $2 AND stream_name = $3 AND stream_type = $4 AND nodes = $5 AND edges = $5;
+                "#)
+                    .bind("stream")
+                    .bind(stream_params.org_id.as_str())
+                    .bind(stream_params.stream_name.as_str())
+                    .bind(stream_params.stream_type.as_str())
+                    .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
+                    .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
+                    .fetch_one(&pool)
+                    .await
+            }
+            PipelineSource::Query(derived_stream) => {
+                sqlx::query_as::<_, Pipeline>(r#"
+SELECT * FROM pipeline 
+    WHERE source_type = $1 AND derived_stream = $2 AND nodes = $3 AND edges = $4;
+                "#)
+                    .bind("derived_stream")
+                    .bind(json::to_string(&derived_stream).expect("Serializing pipeline DerivedStream error"))
+                    .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))
+                    .bind(json::to_string(&pipeline.edges).expect("Serializing pipeline edges error"))
+                    .fetch_one(&pool)
+                    .await
+            }
+        }?;
+        Ok(existing_pipeline)
+    }
+
     async fn list(&self) -> Result<Vec<Pipeline>> {
         let client = CLIENT_RO.clone();
         let query = "SELECT * FROM pipeline ORDER BY id;";

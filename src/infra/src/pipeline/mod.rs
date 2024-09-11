@@ -44,6 +44,7 @@ pub trait PipelineTable: Sync + Send + 'static {
     async fn get_by_stream(&self, org: &str, stream_params: &StreamParams)
     -> Result<Vec<Pipeline>>;
     async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline>;
+    async fn get_by_src_and_struct(&self, pipeline: &Pipeline) -> Result<Pipeline>;
     async fn list(&self) -> Result<Vec<Pipeline>>;
     async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>>;
     async fn delete(&self, pipeline_id: &str) -> Result<()>;
@@ -73,6 +74,12 @@ pub async fn get_by_stream(org: &str, stream_params: &StreamParams) -> Result<Ve
 #[inline]
 pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline> {
     CLIENT.get_by_id(pipeline_id).await
+}
+
+/// Finds the pipeline with the same source and structure
+#[inline]
+pub async fn get_by_src_and_struct(pipeline: &Pipeline) -> Result<Pipeline> {
+    CLIENT.get_by_src_and_struct(pipeline).await
 }
 
 /// Lists all pipelines

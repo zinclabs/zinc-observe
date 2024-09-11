@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use anyhow::Result;
 use components::{DerivedStream, Edge, Node, PipelineSource};
 use serde::{Deserialize, Serialize};
 use sqlx::{Decode, Error, FromRow, Row, Type};
@@ -25,7 +26,7 @@ use crate::{
 
 pub mod components;
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct Pipeline {
     #[serde(default)]
     #[serde(rename = "pipeline_id")]
@@ -61,6 +62,12 @@ impl Pipeline {
             PipelineSource::Query(derived_stream) => Some(derived_stream.to_owned()),
             PipelineSource::Stream(_) => None,
         }
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        // All leaf nodes are Streams
+        // ConditionNode routing_condition != empty()
+        Ok(())
     }
 }
 
