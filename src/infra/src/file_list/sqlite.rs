@@ -339,21 +339,27 @@ SELECT id,stream, date, file, deleted, min_ts, max_ts, records, original_size, c
         if ids.len() < 1 {
             return Ok(Vec::default());
         }
-        // TODO YJDoc2 handle id length greater tha 6000 by chinking and multiple queries
+
+        let mut ret = Vec::new();
         let pool = CLIENT_RO.clone();
-        let params = format!("?{}", ", ?".repeat(ids.len() - 1));
-        let query_str = format!(
-            r#"SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
-            WHERE id IN ( { } )"#,
-            params
-        );
 
-        let mut query = sqlx::query_as::<_, super::FileRecord>(&query_str);
-        for id in ids {
-            query = query.bind(id);
+        // 5000 is arbitrary
+        for chunk in ids.chunks(5000) {
+            let params = format!("?{}", ", ?".repeat(chunk.len() - 1));
+            let query_str = format!(
+                r#"SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
+                WHERE id IN ( { } )"#,
+                params
+            );
+
+            let mut query = sqlx::query_as::<_, super::FileRecord>(&query_str);
+            for id in chunk {
+                query = query.bind(*id);
+            }
+
+            let res = query.fetch_all(&pool).await?;
+            ret.extend_from_slice(&res);
         }
-
-        let ret = query.fetch_all(&pool).await?;
 
         Ok(ret
             .iter()

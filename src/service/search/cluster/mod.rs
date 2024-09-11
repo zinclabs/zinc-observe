@@ -143,7 +143,6 @@ pub async fn search(
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
-    // YJDoc2, this is the entry point code for searching
     // get file list
     let mut file_id_list = get_file_id_list(
         trace_id,
@@ -1210,12 +1209,10 @@ async fn get_file_list_by_inverted_index(
             }
         }
     }
-    let mut idx_file_list = idx_file_list
+    let idx_file_list = idx_file_list
         .into_iter()
         .map(|(_, f)| f)
         .collect::<Vec<_>>();
-    // sorted by _timestamp
-    // idx_file_list.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
     Ok((
         idx_file_list,
         idx_resp.scan_size,
