@@ -482,6 +482,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(pipeline::save_pipeline)
             .service(pipeline::update_pipeline)
             .service(pipeline::list_pipelines)
+            .service(pipeline::list_pipeline_by_stream)
             .service(pipeline::delete_pipeline)
             .service(search::multi_streams::search_multi)
             .service(search::multi_streams::_search_partition_multi)

@@ -240,11 +240,7 @@ UPDATE pipeline
         Ok(())
     }
 
-    async fn get_by_stream(
-        &self,
-        org: &str,
-        stream_params: &StreamParams,
-    ) -> Result<Vec<Pipeline>> {
+    async fn get_by_stream(&self, org: &str, stream_params: &StreamParams) -> Result<Pipeline> {
         let pool = CLIENT.clone();
         let query = r#"
 SELECT * FROM pipeline WHERE org = ? AND source_type = ? AND stream_org = ? AND stream_name = ? AND stream_type = ?;
@@ -255,7 +251,7 @@ SELECT * FROM pipeline WHERE org = ? AND source_type = ? AND stream_org = ? AND 
             .bind(stream_params.org_id.as_str())
             .bind(stream_params.stream_name.as_str())
             .bind(stream_params.stream_type.as_str())
-            .fetch_all(&pool)
+            .fetch_one(&pool)
             .await
         {
             Ok(pipeline) => pipeline,

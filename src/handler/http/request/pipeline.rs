@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use config::{ider, meta::pipeline::Pipeline};
+
+use crate::common::utils::http::get_stream_type_from_request;
 
 /// CreatePipeline
 #[utoipa::path(
@@ -95,6 +97,38 @@ async fn list_pipelines(
     }
 
     crate::service::pipeline::list_pipelines(org_id.into_inner(), _permitted).await
+}
+
+/// GetPipelineByStream
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "getPipelineByStream",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = PipelineList),
+    )
+)]
+#[get("/{org_id}/pipelines/{stream_name}")]
+async fn list_pipeline_by_stream(
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or_default(),
+        Err(e) => {
+            return Ok(crate::common::meta::http::HttpResponse::bad_request(e));
+        }
+    };
+    crate::service::pipeline::get_pipeline_by_stream(&org_id, &stream_name, stream_type).await
 }
 
 /// DeletePipeline

@@ -42,8 +42,7 @@ pub trait PipelineTable: Sync + Send + 'static {
     async fn create_table_index(&self) -> Result<()>;
     async fn put(&self, pipeline: Pipeline) -> Result<()>;
     async fn update(&self, pipeline: Pipeline) -> Result<()>;
-    async fn get_by_stream(&self, org: &str, stream_params: &StreamParams)
-    -> Result<Vec<Pipeline>>;
+    async fn get_by_stream(&self, org: &str, stream_params: &StreamParams) -> Result<Pipeline>;
     async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline>;
     async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Pipeline>;
     async fn list(&self) -> Result<Vec<Pipeline>>;
@@ -73,7 +72,7 @@ pub async fn update(pipeline: Pipeline) -> Result<()> {
 
 /// Finds all pipelines associated with the StreamParams within an organization
 #[inline]
-pub async fn get_by_stream(org: &str, stream_params: &StreamParams) -> Result<Vec<Pipeline>> {
+pub async fn get_by_stream(org: &str, stream_params: &StreamParams) -> Result<Pipeline> {
     CLIENT.get_by_stream(org, stream_params).await
 }
 

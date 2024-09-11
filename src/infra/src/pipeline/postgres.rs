@@ -240,25 +240,21 @@ UPDATE pipeline
         Ok(())
     }
 
-    async fn get_by_stream(
-        &self,
-        org: &str,
-        stream_params: &StreamParams,
-    ) -> Result<Vec<Pipeline>> {
+    async fn get_by_stream(&self, org: &str, stream_params: &StreamParams) -> Result<Pipeline> {
         let pool = CLIENT.clone();
         let query = r#"
 SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 AND stream_name = $4 AND stream_type = $5;
         "#;
-        let pipelines = match sqlx::query_as::<_, Pipeline>(query)
+        let pipeline = match sqlx::query_as::<_, Pipeline>(query)
             .bind(org)
             .bind("realtime")
             .bind(stream_params.org_id.as_str())
             .bind(stream_params.stream_name.as_str())
             .bind(stream_params.stream_type.as_str())
-            .fetch_all(&pool)
+            .fetch_one(&pool)
             .await
         {
-            Ok(pipelines) => pipelines,
+            Ok(pipeline) => pipeline,
             Err(e) => {
                 log::debug!("[POSTGRES] get pipeline by stream error: {}", e);
                 return Err(Error::from(DbError::KeyNotExists(format!(
@@ -266,7 +262,7 @@ SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 AND stream_org = $3 A
                 ))));
             }
         };
-        Ok(pipelines)
+        Ok(pipeline)
     }
 
     async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline> {
