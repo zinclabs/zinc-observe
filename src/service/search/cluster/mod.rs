@@ -163,7 +163,7 @@ pub async fn search(
 
     // If the query is of type inverted index and this is not an aggregations request,
     // then filter the file list based on the inverted index.
-
+    log::debug!("ids before inverted index at leader : {:?}",file_id_list);
     let mut idx_scan_size = 0;
     let mut idx_took = 0;
     if use_inverted_index {
@@ -178,6 +178,7 @@ pub async fn search(
             idx_took,
         );
     }
+    log::debug!("ids after inverted index at leader : {:?}",file_id_list);
 
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
