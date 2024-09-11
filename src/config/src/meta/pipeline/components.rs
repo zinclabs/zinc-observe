@@ -18,7 +18,7 @@ use utoipa::ToSchema;
 
 use crate::meta::{
     alerts::{QueryCondition, TriggerCondition},
-    stream::{RoutingCondition, StreamParams},
+    stream::{RoutingCondition, StreamParams, StreamType},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -32,6 +32,9 @@ pub enum PipelineSource {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub struct DerivedStream {
+    #[serde(default)]
+    pub org_id: String,
+    pub stream_type: StreamType,
     #[serde(default)]
     pub query_condition: QueryCondition,
     #[serde(default)]

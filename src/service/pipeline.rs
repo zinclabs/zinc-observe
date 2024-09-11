@@ -68,16 +68,19 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error
             )));
         }
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
-        // TODO(taiming):
         // save derived_stream to triggers table
-        // if let Err(e) =
-        //     super::alerts::derived_streams::save(derived_stream.clone(), &pipeline.name).await
-        // {
-        //     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-        //         http::StatusCode::BAD_REQUEST.into(),
-        //         format!("Failed to save DerivedStream details error: {}", e),
-        //     )));
-        // }
+        if let Err(e) = super::alerts::derived_streams::save(
+            derived_stream.clone(),
+            &pipeline.name,
+            &pipeline.id,
+        )
+        .await
+        {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("Failed to save DerivedStream details error: {}", e),
+            )));
+        }
     }
 
     match db::pipeline::set(pipeline).await {
@@ -153,16 +156,19 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
             )));
         }
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
-        // TODO(taiming):
         // save derived_stream to triggers table
-        // if let Err(e) =
-        //     super::alerts::derived_streams::save(derived_stream.clone(), &pipeline.name).await
-        // {
-        //     return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-        //         http::StatusCode::BAD_REQUEST.into(),
-        //         format!("Failed to save DerivedStream details error: {}", e),
-        //     )));
-        // }
+        if let Err(e) = super::alerts::derived_streams::save(
+            derived_stream.clone(),
+            &pipeline.name,
+            &pipeline.id,
+        )
+        .await
+        {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("Failed to save DerivedStream details error: {}", e),
+            )));
+        }
     }
 
     match db::pipeline::set(pipeline).await {
@@ -221,17 +227,21 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<HttpResponse, Error> {
     };
 
     // delete DerivedStream details if there's any
-    if let PipelineSource::Query(_derived_stream) = existing_pipeline.source {
-        // if let Err(error) =
-        //     super::alerts::derived_streams::delete(derived_stream, &existing_pipeline.name).await
-        // {
-        //     return Ok(
-        //         HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-        //             http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-        //             error.to_string(),
-        //         )),
-        //     );
-        // }
+    if let PipelineSource::Query(derived_stream) = existing_pipeline.source {
+        if let Err(error) = super::alerts::derived_streams::delete(
+            derived_stream,
+            &existing_pipeline.name,
+            &existing_pipeline.id,
+        )
+        .await
+        {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    error.to_string(),
+                )),
+            );
+        }
     }
 
     let result = db::pipeline::delete(pipeline_id).await;

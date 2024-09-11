@@ -20,6 +20,7 @@ use config::{
     get_config,
     meta::{
         alerts::FrequencyType,
+        pipeline::components::DerivedStream,
         stream::StreamType,
         usage::{TriggerData, TriggerDataStatus, TriggerDataType},
     },
@@ -34,7 +35,7 @@ use crate::{
     service::{
         alerts::{
             alert::{get_alert_start_end_time, get_row_column_map, AlertExt},
-            derived_streams::DerivedStreamMetaExt,
+            derived_streams::DerivedStreamExt,
         },
         db::{self, scheduler::DerivedTriggerData},
         ingestion::ingestion_service,
@@ -509,14 +510,13 @@ async fn handle_derived_stream_triggers(
         trigger.module_key
     );
 
-    // module_key format: stream_type/stream_name/pipeline_name/derived_stream_name
+    // module_key format: stream_type/org_id/pipeline_name/pipeline_id
     let columns = trigger.module_key.split('/').collect::<Vec<_>>();
     assert_eq!(columns.len(), 4);
-    let org_id = &trigger.org;
     let stream_type: StreamType = columns[0].into();
-    let stream_name = columns[1];
+    let org_id = columns[1];
     let pipeline_name = columns[2];
-    let name = columns[3];
+    let pipeline_id = columns[3];
 
     let is_real_time = trigger.is_realtime;
     let is_silenced = trigger.is_silenced;
@@ -536,27 +536,22 @@ async fn handle_derived_stream_triggers(
         return Ok(());
     }
 
-    let Ok(pipeline) = db::pipelines::get(org_id, stream_type, stream_name, pipeline_name).await
-    else {
+    let Ok(pipeline) = db::pipeline::get_by_id(pipeline_id).await else {
         return Err(anyhow::anyhow!(
             "Pipeline associated with trigger not found: {}/{}/{}/{}",
             org_id,
-            stream_name,
             stream_type,
-            pipeline_name
+            pipeline_name,
+            pipeline_id
         ));
     };
 
-    let Some(derived_stream) = pipeline
-        .derived_streams
-        .and_then(|ds| ds.into_iter().find(|ds| ds.name == name))
-    else {
+    let Some(derived_stream) = pipeline.get_derived_stream() else {
         return Err(anyhow::anyhow!(
-            "DerivedStream associated with the trigger not found in pipeline: {}/{}/{}/{}",
+            "DerivedStream associated with the trigger not found in pipeline: {}/{}/{}",
             org_id,
-            stream_name,
-            stream_type,
-            name,
+            pipeline_name,
+            pipeline_id,
         ));
     };
     let start_time = if trigger.data.is_empty() {
@@ -578,7 +573,7 @@ async fn handle_derived_stream_triggers(
     };
 
     // evaluate trigger and configure trigger next run time
-    let (ret, end_time) = derived_stream.evaluate(None, start_time).await?;
+    let (ret, end_time) = derived_stream.evaluate(start_time).await?;
     if ret.is_some() {
         log::info!(
             "DerivedStream conditions satisfied, org: {}, module_key: {}",
@@ -666,6 +661,10 @@ async fn handle_derived_stream_triggers(
             db::scheduler::update_trigger(new_trigger).await?;
             trigger_data_stream.status = TriggerDataStatus::ConditionNotSatisfied;
         } else {
+            // TODO(taiming): pass search results to pipeline to get modified results before
+            // ingesting
+            // let results = pipeline.execute()
+
             // Ingest result into destination stream
             let (org_id, stream_name, stream_type): (String, String, i32) = {
                 (
