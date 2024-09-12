@@ -337,18 +337,14 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
 
         // 5000 is arbitrary
         for chunk in ids.chunks(5000) {
-            let params = format!("?{}", ", ?".repeat(chunk.len() - 1));
-            let query_str = format!(
+            // for postgres binding is a little weird , and the following way
+            // is recommended instead of using ? , 
+            // see https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
+            let query = sqlx::query_as::<_, super::FileRecord>(
                 r#"SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
-                WHERE id IN ( { } )"#,
-                params
-            );
-
-            let mut query = sqlx::query_as::<_, super::FileRecord>(&query_str);
-            for id in chunk {
-                query = query.bind(*id);
-            }
-
+                WHERE id = ANY($1)"#
+            )
+                .bind(chunk);
             let res = query.fetch_all(&pool).await?;
             ret.extend_from_slice(&res);
         }

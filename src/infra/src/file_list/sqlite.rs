@@ -345,6 +345,9 @@ SELECT id,stream, date, file, deleted, min_ts, max_ts, records, original_size, c
 
         // 5000 is arbitrary
         for chunk in ids.chunks(5000) {
+            //  unfortunately sqlite does not have any specific support for arrays,
+            // so we have to build the query manually, id-by-id.
+            // see https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
             let params = format!("?{}", ", ?".repeat(chunk.len() - 1));
             let query_str = format!(
                 r#"SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
