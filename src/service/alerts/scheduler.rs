@@ -663,63 +663,65 @@ async fn handle_derived_stream_triggers(
         } else {
             // pass search results to pipeline to get modified results before ingesting
             let mut json_data_by_stream = HashMap::new();
+            let mut ingestion_error_msg = None;
             for record in local_val {
-                let Ok(pl_result) = pipeline.execute(record) else {
-                    // TODO(taiming): check what to do with the trigger here!
-                    log::error!(
-                        "DerivedStream query results failed to be executed through the associated pipeline: {}/{}",
-                        org_id,
-                        pipeline_name
-                    );
-                    return Err(anyhow::anyhow!(
-                        "DerivedStream query results failed to be executed through the associated pipeline: {}/{}",
-                        org_id,
-                        pipeline_name
-                    ));
-                };
-                for (stream_params, (record, _)) in pl_result {
-                    json_data_by_stream
-                        .entry(stream_params)
-                        .or_insert_with(Vec::new)
-                        .push(record);
+                match pipeline.execute(record) {
+                    Err(e) => {
+                        let err_msg = format!(
+                            "DerivedStream query results failed to pass through the associated pipeline: {}/{}. Caused by: {}",
+                            org_id, pipeline_name, e
+                        );
+                        log::error!("{err_msg}");
+                        ingestion_error_msg = Some(err_msg);
+                        break;
+                    }
+                    Ok(pl_results) => {
+                        for (stream_params, (record, _)) in pl_results {
+                            json_data_by_stream
+                                .entry(stream_params)
+                                .or_insert_with(Vec::new)
+                                .push(record);
+                        }
+                    }
                 }
             }
 
             // Ingest result into destination stream
-            let mut ingestion_error_msg = None;
-            for (dest_stream, records) in json_data_by_stream {
-                let (org_id, stream_name, stream_type): (String, String, i32) = {
-                    (
-                        dest_stream.org_id.into(),
-                        dest_stream.stream_name.into(),
-                        cluster_rpc::StreamType::from(dest_stream.stream_type).into(),
-                    )
-                };
-                let req = cluster_rpc::IngestionRequest {
-                    org_id: org_id.clone(),
-                    stream_name: stream_name.clone(),
-                    stream_type,
-                    data: Some(cluster_rpc::IngestionData::from(records)),
-                    ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
-                };
-                match ingestion_service::ingest(&org_id, req).await {
-                    Ok(resp) if resp.status_code == 200 => {
-                        log::info!(
-                            "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
-                        );
-                    }
-                    error => {
-                        let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
-                        log::error!(
-                            "Error in ingesting DerivedStream result to destination {:?}, org: {}, module_key: {}",
-                            err,
-                            new_trigger.org,
-                            new_trigger.module_key
-                        );
-                        ingestion_error_msg = Some(err);
-                        break;
-                    }
-                };
+            if ingestion_error_msg.is_none() {
+                for (dest_stream, records) in json_data_by_stream {
+                    let (org_id, stream_name, stream_type): (String, String, i32) = {
+                        (
+                            dest_stream.org_id.into(),
+                            dest_stream.stream_name.into(),
+                            cluster_rpc::StreamType::from(dest_stream.stream_type).into(),
+                        )
+                    };
+                    let req = cluster_rpc::IngestionRequest {
+                        org_id: org_id.clone(),
+                        stream_name: stream_name.clone(),
+                        stream_type,
+                        data: Some(cluster_rpc::IngestionData::from(records)),
+                        ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
+                    };
+                    match ingestion_service::ingest(&org_id, req).await {
+                        Ok(resp) if resp.status_code == 200 => {
+                            log::info!(
+                                "DerivedStream result ingested to destination {org_id}/{stream_name}/{stream_type}",
+                            );
+                        }
+                        error => {
+                            let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
+                            log::error!(
+                                "Error in ingesting DerivedStream result to destination {:?}, org: {}, module_key: {}",
+                                err,
+                                new_trigger.org,
+                                new_trigger.module_key
+                            );
+                            ingestion_error_msg = Some(err);
+                            break;
+                        }
+                    };
+                }
             }
             match ingestion_error_msg {
                 None => db::scheduler::update_trigger(new_trigger).await?,
