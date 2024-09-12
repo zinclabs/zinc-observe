@@ -29,7 +29,6 @@
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="alerts-history-date-time-dropdown"
             @on:date-change="updateDateTime"
-            @on:timezone-change="updateTimezone"
           />
           <div>
             <q-btn
@@ -112,7 +111,10 @@
 </template>
 
 <script lang="ts">
+//@ts-nocheck
 import { ref, watch, onMounted  , nextTick} from 'vue';
+import {
+  timestampToTimezoneDate} from "@/utils/zincutils";
 import { useRouter, useRoute } from 'vue-router';
 import { useStore } from 'vuex';
 import { defineAsyncComponent ,defineComponent} from 'vue';
@@ -202,24 +204,16 @@ if(key === 'retries'){
       style: `width: ${columnWidth}px`,  // Custom width for each column
     };
   });
-};
-
-
-
-
-const convertUnixToQuasarFormat = (unixMicroseconds : any) => {
-      if (!unixMicroseconds) return "";
-      const unixSeconds = unixMicroseconds / 1e6;
-      const dateToFormat = new Date(unixSeconds * 1000);
-      const formattedDate = dateToFormat.toISOString();
-      return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
-    }
+};   
     const fetchAlertHistory = async ( ) => {
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading history...",
       });
       const { org_identifier, name, stream_name } = route.query;
+      if(typeof org_identifier !== 'string' || typeof name !== 'string' || typeof stream_name !== 'string'){
+        return;
+      }
       isLoading.value = true;
       if (!org_identifier || !name || !stream_name) {
           return;
@@ -234,13 +228,28 @@ const convertUnixToQuasarFormat = (unixMicroseconds : any) => {
           isLoading.value = false;
          return;
         }
-        response.data.hits.forEach((hit) => {
-          hit._timestamp = convertUnixToQuasarFormat(hit._timestamp);
-          hit.triggered_at = hit._timestamp;
+        response.data.hits.forEach((hit :any) => {
+          hit.triggered_at =timestampToTimezoneDate(
+               hit._timestamp / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS",
+              )
 
-          hit.next_run_at = convertUnixToQuasarFormat(hit.next_run_at);
-          hit.start_time = convertUnixToQuasarFormat(hit.start_time);
-          hit.end_time = convertUnixToQuasarFormat(hit.end_time);
+          hit.next_run_at = timestampToTimezoneDate(
+            hit.next_run_at / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS",
+              );
+          hit.start_time = timestampToTimezoneDate(
+            hit.start_time / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS",
+              );
+          hit.end_time = timestampToTimezoneDate(
+            hit.end_time / 1000,
+                store.state.timezone,
+                "yyyy-MM-dd HH:mm:ss.SSS",
+              );
         });
 
 
@@ -267,7 +276,7 @@ const convertUnixToQuasarFormat = (unixMicroseconds : any) => {
       }
     };
     
-    const updateDateTime = async (value: object) => {
+    const updateDateTime = async (value: any) => {
       if (
         value.valueType == "absolute" &&
         searchObj.data.stream.selectedStream.length > 0 &&
@@ -278,7 +287,7 @@ const convertUnixToQuasarFormat = (unixMicroseconds : any) => {
         value.selectedTime.hasOwnProperty("startTime")
       ) {
         // Convert hours to microseconds
-        let newStartTime =
+        let newStartTime: any =
           parseInt(value.endTime) -
           searchObj.data.datetime.queryRangeRestrictionInHour *
             60 *
@@ -298,9 +307,9 @@ const convertUnixToQuasarFormat = (unixMicroseconds : any) => {
             store.state.timezone,
             "HH:mm",
           );
-
-          dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
-          dateTimeRef.value.setDateType("absolute");
+            dateTimeRef.value?.setAbsoluteTime(value.startTime, value.endTime);
+            dateTimeRef.value?.setDateType("absolute");
+          
         }
       }
       const {startTime, endTime} = value;
@@ -313,11 +322,6 @@ const convertUnixToQuasarFormat = (unixMicroseconds : any) => {
       await nextTick();
       await nextTick();
       await nextTick();
-    };
-    const updateTimezone = () => {
-      if (store.state.zoConfig.query_on_stream_selection == false) {
-        emit("onChangeTimezone");
-      }
     };
     onMounted(() => {
       fetchAlertHistory(); 
@@ -346,7 +350,6 @@ const convertUnixToQuasarFormat = (unixMicroseconds : any) => {
       desiredOrder,
       qTable,
       updateDateTime,
-      updateTimezone,  
       pagination,  
       dateTimeRef,
     };
