@@ -664,26 +664,37 @@ async fn handle_derived_stream_triggers(
             // pass search results to pipeline to get modified results before ingesting
             let mut json_data_by_stream = HashMap::new();
             let mut ingestion_error_msg = None;
-            for record in local_val {
-                match pipeline.execute(record) {
-                    Err(e) => {
-                        let err_msg = format!(
-                            "DerivedStream query results failed to pass through the associated pipeline: {}/{}. Caused by: {}",
-                            org_id, pipeline_name, e
-                        );
-                        log::error!("{err_msg}");
-                        ingestion_error_msg = Some(err_msg);
-                        break;
-                    }
-                    Ok(pl_results) => {
-                        for (stream_params, (record, _)) in pl_results {
-                            json_data_by_stream
-                                .entry(stream_params)
-                                .or_insert_with(Vec::new)
-                                .push(record);
+
+            let pl_node_map = pipeline.get_node_map();
+            if let Ok(pl_graph) = pipeline.build_adjacency_list(&pl_node_map) {
+                for record in local_val {
+                    match pipeline.execute(record, &pl_node_map, &pl_graph) {
+                        Err(e) => {
+                            let err_msg = format!(
+                                "DerivedStream query results failed to pass through the associated pipeline: {}/{}. Caused by: {}",
+                                org_id, pipeline_name, e
+                            );
+                            log::error!("{err_msg}");
+                            ingestion_error_msg = Some(err_msg);
+                            break;
+                        }
+                        Ok(pl_results) => {
+                            for (stream_params, (record, _)) in pl_results {
+                                json_data_by_stream
+                                    .entry(stream_params)
+                                    .or_insert_with(Vec::new)
+                                    .push(record);
+                            }
                         }
                     }
                 }
+            } else {
+                let err_msg = format!(
+                    "[DerivedStream] associated pipeline failed to construct graph representation: {}/{}.",
+                    org_id, pipeline_name
+                );
+                log::error!("{err_msg}");
+                ingestion_error_msg = Some(err_msg);
             }
 
             // Ingest result into destination stream

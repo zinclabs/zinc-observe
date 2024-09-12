@@ -26,6 +26,7 @@ use config::{
     meta::{
         alerts::alert::Alert,
         function::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
+        pipeline::Pipeline,
         stream::{
             PartitionTimeLevel, PartitioningDetails, Routing, StreamParams, StreamPartition,
             StreamType,
@@ -179,6 +180,17 @@ pub async fn get_stream_partition_keys(
         partition_keys: stream_settings.partition_keys,
         partition_time_level: stream_settings.partition_time_level,
     }
+}
+
+pub async fn get_stream_pipeline(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: &StreamType,
+) -> Option<Pipeline> {
+    let stream_params = StreamParams::new(org_id, stream_name, *stream_type);
+    infra::pipeline::get_by_stream(org_id, &stream_params)
+        .await
+        .ok()
 }
 
 pub async fn get_stream_alerts(

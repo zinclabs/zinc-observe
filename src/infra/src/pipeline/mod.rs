@@ -70,7 +70,7 @@ pub async fn update(pipeline: Pipeline) -> Result<()> {
     CLIENT.update(pipeline).await
 }
 
-/// Finds all pipelines associated with the StreamParams within an organization
+/// Finds the pipeline associated with the StreamParams within an organization
 #[inline]
 pub async fn get_by_stream(org: &str, stream_params: &StreamParams) -> Result<Pipeline> {
     CLIENT.get_by_stream(org, stream_params).await

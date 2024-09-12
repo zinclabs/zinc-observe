@@ -42,8 +42,14 @@ pub trait PipelinedExt {
     /// Executes the given input [Value] through this pipeline, under the assumption the pipeline is
     /// valid.
     ///
+    /// `node_map` and `graph` to be constructed prior to pipeline execution to avoid repeated work.
     /// Returned hashmap indicates pairs of `DestinationStream: (output, flattened)`
-    fn execute(&self, input: Value) -> Result<HashMap<StreamParams, (Value, bool)>>;
+    fn execute(
+        &self,
+        input: Value,
+        node_map: &HashMap<String, Node>,
+        graph: &HashMap<String, Vec<String>>,
+    ) -> Result<HashMap<StreamParams, (Value, bool)>>;
 }
 
 impl PipelinedExt for Pipeline {
@@ -72,17 +78,12 @@ impl PipelinedExt for Pipeline {
         vrl_map
     }
 
-    fn execute(&self, input: Value) -> Result<HashMap<StreamParams, (Value, bool)>> {
-        let node_map = self.get_node_map();
-        let Ok(graph) = self.build_adjacency_list(&node_map) else {
-            return Err(anyhow::anyhow!(
-                "[Pipeline]: {}/{}/{} failed to create graph representation from nodes and edges list. Skip pipeline execution",
-                self.org,
-                self.name,
-                self.id,
-            ));
-        };
-
+    fn execute(
+        &self,
+        input: Value,
+        node_map: &HashMap<String, Node>,
+        graph: &HashMap<String, Vec<String>>,
+    ) -> Result<HashMap<StreamParams, (Value, bool)>> {
         let source_node_id = self.nodes[0].get_node_id();
         let vrl_map = self.register_functions();
         let mut runtime = crate::service::ingestion::init_functions_runtime();
@@ -93,8 +94,8 @@ impl PipelinedExt for Pipeline {
             input,
             false,
             &source_node_id,
-            &node_map,
-            &graph,
+            node_map,
+            graph,
             &vrl_map,
             &mut runtime,
             &mut results,

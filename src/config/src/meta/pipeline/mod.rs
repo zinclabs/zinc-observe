@@ -111,7 +111,7 @@ impl Pipeline {
         let adjacency_list = self.build_adjacency_list(&node_map)?;
         // any leaf nodes not a StreamNode
         if self.nodes.iter().any(|node| {
-            if !adjacency_list.contains_key(&node.get_node_id()) {
+            if !adjacency_list.contains_key(&node.id) {
                 // leaf node
                 !matches!(node.get_node_data(), NodeData::Stream(_)) // not a StreamNode
             } else {
@@ -135,7 +135,6 @@ impl Pipeline {
     /// Builds the graph representation of this pipeline's nodes structure.
     ///
     /// Used for pipeline validation and execution.
-    /// `node_map` is returned for fast node lookup
     pub fn build_adjacency_list(
         &self,
         node_map: &HashMap<String, Node>,
@@ -156,6 +155,29 @@ impl Pipeline {
         }
 
         Ok(adjacency_list)
+    }
+
+    /// Finds all the destination streams in the pipeline.
+    pub fn get_all_destination_streams(&self) -> Result<Vec<StreamParams>> {
+        let node_map = self.get_node_map();
+        let adj_list = self.build_adjacency_list(&node_map)?;
+
+        let streams = node_map
+            .iter()
+            .filter_map(|(id, node)| {
+                if !adj_list.contains_key(id) {
+                    if let NodeData::Stream(stream_params) = node.get_node_data() {
+                        Some(stream_params)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Ok(streams)
     }
 
     /// Returns the number of functions nodes in this pipeline.
