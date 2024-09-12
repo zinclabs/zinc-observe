@@ -102,7 +102,7 @@ impl QueryConditionExt for QueryCondition {
                     // CustomQuery is only used by Alerts' triggers.
                     return Ok((None, now));
                 };
-                build_sql(org_id, &stream_name, stream_type, self, v).await?
+                build_sql(org_id, stream_name, stream_type, self, v).await?
             }
             QueryType::SQL => {
                 let Some(v) = self.sql.as_ref() else {

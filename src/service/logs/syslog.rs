@@ -160,7 +160,7 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                 let mut is_routed = true;
                 let val = &route.routing;
                 for q_condition in val.iter() {
-                    if !q_condition.evaluate(value.as_object().unwrap()).await {
+                    if !q_condition.evaluate(value.as_object().unwrap()) {
                         is_routed = false;
                         break;
                     }

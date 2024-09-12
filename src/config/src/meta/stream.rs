@@ -120,20 +120,12 @@ impl std::fmt::Display for StreamType {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(default)]
 pub struct StreamParams {
     pub org_id: faststr::FastStr,
     pub stream_name: faststr::FastStr,
     pub stream_type: StreamType,
-}
-
-impl PartialEq for StreamParams {
-    fn eq(&self, other: &Self) -> bool {
-        self.org_id == other.org_id
-            && self.stream_name == other.stream_name
-            && self.stream_type == other.stream_type
-    }
 }
 
 impl Default for StreamParams {
@@ -809,7 +801,7 @@ pub struct RoutingCondition {
 }
 // Code Duplicated from alerts
 impl RoutingCondition {
-    pub async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+    pub fn evaluate(&self, row: &Map<String, Value>) -> bool {
         let val = match row.get(&self.column) {
             Some(val) => val,
             None => {
@@ -994,8 +986,15 @@ mod tests {
     #[test]
     fn test_stream_params() {
         let params = StreamParams::new("org_id", "stream_name", StreamType::Logs);
+        let param2 = StreamParams::new("org_id", "stream_name", StreamType::Logs);
+        let param3 = StreamParams::new("org_id", "stream_name", StreamType::Index);
         assert_eq!(params.org_id, "org_id");
         assert_eq!(params.stream_name, "stream_name");
         assert_eq!(params.stream_type, StreamType::Logs);
+        let mut map = HashMap::new();
+        map.insert(params, 1);
+        map.insert(param2, 2);
+        map.insert(param3, 2);
+        assert_eq!(map.len(), 2);
     }
 }

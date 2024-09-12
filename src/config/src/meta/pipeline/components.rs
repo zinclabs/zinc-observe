@@ -54,8 +54,8 @@ pub struct DerivedStream {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
-    id: String,
-    data: NodeData,
+    pub id: String,
+    pub data: NodeData,
     position: Position,
     #[serde(skip_serializing_if = "Option::is_none")]
     style: Option<NodeStyle>,
@@ -72,8 +72,12 @@ impl Node {
         self.data.clone()
     }
 
-    pub(crate) fn get_node_id(&self) -> String {
+    pub fn get_node_id(&self) -> String {
         self.id.clone()
+    }
+
+    pub fn is_function_node(&self) -> bool {
+        matches!(&self.data, NodeData::Function(_))
     }
 }
 
@@ -87,7 +91,7 @@ pub struct Edge {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "node_type")]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum NodeData {
+pub enum NodeData {
     Stream(StreamParams),
     Query(DerivedStream),
     Function(FunctionParams),
@@ -109,8 +113,8 @@ pub struct FunctionParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub(crate) struct ConditionParams {
-    pub(crate) conditions: Vec<RoutingCondition>,
+pub struct ConditionParams {
+    pub conditions: Vec<RoutingCondition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

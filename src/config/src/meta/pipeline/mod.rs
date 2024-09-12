@@ -84,7 +84,7 @@ impl Pipeline {
         };
 
         // ck 3
-        match self.nodes.get(0).unwrap().get_node_data() {
+        match self.nodes.first().unwrap().get_node_data() {
             NodeData::Stream(stream_params) => {
                 self.source = PipelineSource::Realtime(stream_params)
             }
@@ -129,7 +129,7 @@ impl Pipeline {
     /// `node_map` is returned for fast node lookup
     pub fn build_node_map_and_adjacency_list(
         &self,
-    ) -> Result<(HashMap<String, Node>, HashMap<String, Vec<Node>>)> {
+    ) -> Result<(HashMap<String, Node>, HashMap<String, Vec<String>>)> {
         let node_map: HashMap<String, Node> = self
             .nodes
             .iter()
@@ -137,21 +137,30 @@ impl Pipeline {
             .collect();
         let mut adjacency_list = HashMap::new();
 
-        for edge in &self.edges {
+        for (idx, edge) in self.edges.iter().enumerate() {
             if !node_map.contains_key(&edge.source) {
-                return Err(anyhow!("Node not found from Edge's source"));
+                return Err(anyhow!("Edge #{idx}'s source node not found in nodes list"));
             }
-            let target_node = node_map
-                .get(&edge.target)
-                .ok_or(anyhow!("Node not found from Edge's source"))?
-                .clone();
+            if !node_map.contains_key(&edge.target) {
+                return Err(anyhow!("Edge #{idx}'s target node not found in nodes list"));
+            }
             adjacency_list
                 .entry(edge.source.clone())
                 .or_insert_with(Vec::new)
-                .push(target_node);
+                .push(edge.target.clone());
         }
 
         Ok((node_map, adjacency_list))
+    }
+
+    /// Returns the number of functions nodes in this pipeline.
+    ///
+    /// Used for usage report.
+    pub fn num_of_func(&self) -> usize {
+        self.nodes
+            .iter()
+            .filter(|node| node.is_function_node())
+            .count()
     }
 }
 

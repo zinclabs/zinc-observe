@@ -31,6 +31,8 @@ use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse,
 };
 
+pub mod execution;
+
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error> {
     // validate pipeline
