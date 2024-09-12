@@ -232,42 +232,29 @@ export default defineComponent({
     onMounted(async () => {
       provider.value?.dispose();
 
-      if (props.language === "vrl") {
-        monaco.languages.register({ id: "vrl" });
-
-        // Register a tokens provider for the language
-        monaco.languages.setMonarchTokensProvider(
-          "vrl",
-          vrlLanguageDefinition as any,
-        );
-      }
-
-      if (props.language === "sql") {
-        await import(
-          "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js"
-        );
-      }
-
-      if (props.language === "json") {
-        await import(
-          "monaco-editor/esm/vs/language/json/monaco.contribution.js"
-        );
-      }
-
-      if (props.language === "html") {
-        await import(
-          "monaco-editor/esm/vs/language/html/monaco.contribution.js"
-        );
-      }
-
-      if (props.language === "markdown") {
-        await import(
-          "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js"
-        );
-      }
+      await setupLanguage();
 
       setupEditor();
     });
+
+    watch(
+      () => props.language,
+      async (newLanguage) => {
+        if (!editorObj) return;
+
+        // Dispose of the previous provider
+        provider.value?.dispose();
+
+        // Dynamically load the necessary language files
+        await setupLanguage();
+
+        // After loading dependencies, set the new language
+        monaco.editor.setModelLanguage(editorObj.getModel(), newLanguage);
+
+        // Re-register the autocomplete provider for the new language
+        registerAutoCompleteProvider();
+      },
+    );
 
     onActivated(async () => {
       provider.value?.dispose();
@@ -322,6 +309,60 @@ export default defineComponent({
       if (editorObj?.setValue) {
         editorObj.setValue(value);
         editorObj?.layout();
+      }
+    };
+
+    const setupLanguage = async () => {
+      if (props.language === "vrl") {
+        monaco.languages.register({ id: "vrl" });
+
+        // Register a tokens provider for the language
+        monaco.languages.setMonarchTokensProvider(
+          "vrl",
+          vrlLanguageDefinition as any,
+        );
+      }
+
+      if (props.language === "sql") {
+        await import(
+          "monaco-editor/esm/vs/basic-languages/sql/sql.contribution.js"
+        );
+      }
+
+      if (props.language === "json") {
+        await import(
+          "monaco-editor/esm/vs/language/json/monaco.contribution.js"
+        );
+      }
+
+      if (props.language === "html") {
+        await import(
+          "monaco-editor/esm/vs/language/html/monaco.contribution.js"
+        );
+      }
+
+      if (props.language === "markdown") {
+        await import(
+          "monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js"
+        );
+      }
+
+      if (props.language === "graphql") {
+        await import(
+          "monaco-editor/esm/vs/basic-languages/graphql/graphql.contribution.js"
+        );
+      }
+
+      if (props.language === "javascript") {
+        await import(
+          "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js"
+        );
+      }
+
+      if (props.language === "xml") {
+        await import(
+          "monaco-editor/esm/vs/basic-languages/xml/xml.contribution.js"
+        );
       }
     };
 
