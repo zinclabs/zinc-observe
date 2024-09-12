@@ -402,6 +402,9 @@ pub fn lock_request(trace_id: &str, files: &[String]) {
 }
 
 pub fn release_request(trace_id: &str) {
+    if !config::cluster::LOCAL_NODE.is_ingester() {
+        return;
+    }
     log::info!("[trace_id {}] release_request for wal files", trace_id);
     let mut locker = SEARCHING_REQUESTS.write();
     let files = locker.remove(trace_id);

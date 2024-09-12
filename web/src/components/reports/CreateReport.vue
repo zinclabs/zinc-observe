@@ -1033,14 +1033,15 @@ const setInitialReportData = async () => {
 
   if (queryParams.folderId) {
     formData.value.dashboards[0].folder = queryParams.folderId as string;
-    onFolderSelection(queryParams.folderId as string);
+    await onFolderSelection(queryParams.folderId as string);
   }
 
-  if (queryParams.dashboardId) {
+  if (queryParams.folderId && queryParams.dashboardId) {
     formData.value.dashboards[0].dashboard = queryParams.dashboardId as string;
+    setDashboardTabOptions(queryParams.dashboardId);
   }
 
-  if (queryParams.tabId) {
+  if (queryParams.dashboardId && queryParams.tabId) {
     formData.value.dashboards[0].tabs = queryParams.tabId as string;
   }
 };
