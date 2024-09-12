@@ -107,7 +107,8 @@ impl Pipeline {
         }
 
         // ck 5: build adjacency list and check leaf notes
-        let (_, adjacency_list) = self.build_node_map_and_adjacency_list()?;
+        let node_map = self.get_node_map();
+        let adjacency_list = self.build_adjacency_list(&node_map)?;
         // any leaf nodes not a StreamNode
         if self.nodes.iter().any(|node| {
             if !adjacency_list.contains_key(&node.get_node_id()) {
@@ -123,18 +124,22 @@ impl Pipeline {
         Ok(())
     }
 
+    /// Converts pipeline's node list to a map for quick lookup
+    pub fn get_node_map(&self) -> HashMap<String, Node> {
+        self.nodes
+            .iter()
+            .map(|node| (node.get_node_id(), node.clone()))
+            .collect()
+    }
+
     /// Builds the graph representation of this pipeline's nodes structure.
     ///
     /// Used for pipeline validation and execution.
     /// `node_map` is returned for fast node lookup
-    pub fn build_node_map_and_adjacency_list(
+    pub fn build_adjacency_list(
         &self,
-    ) -> Result<(HashMap<String, Node>, HashMap<String, Vec<String>>)> {
-        let node_map: HashMap<String, Node> = self
-            .nodes
-            .iter()
-            .map(|node| (node.get_node_id(), node.clone()))
-            .collect();
+        node_map: &HashMap<String, Node>,
+    ) -> Result<HashMap<String, Vec<String>>> {
         let mut adjacency_list = HashMap::new();
 
         for (idx, edge) in self.edges.iter().enumerate() {
@@ -150,7 +155,7 @@ impl Pipeline {
                 .push(edge.target.clone());
         }
 
-        Ok((node_map, adjacency_list))
+        Ok(adjacency_list)
     }
 
     /// Returns the number of functions nodes in this pipeline.
@@ -282,7 +287,7 @@ mod tests {
         let from_value = json::from_value::<Pipeline>(payload);
         assert!(from_value.is_ok());
         let mut pl = from_value.unwrap();
-        assert!(pl.build_node_map_and_adjacency_list().is_ok());
+        assert!(pl.build_adjacency_list(&pl.get_node_map()).is_ok());
         assert!(pl.validate().is_ok());
         let nodes = json::to_string(&pl.nodes);
         assert!(nodes.is_ok());
@@ -361,7 +366,7 @@ mod tests {
         let from_value = json::from_value::<Pipeline>(payload);
         assert!(from_value.is_ok());
         let mut pl = from_value.unwrap();
-        assert!(pl.build_node_map_and_adjacency_list().is_ok());
+        assert!(pl.build_adjacency_list(&pl.get_node_map()).is_ok());
         assert!(pl.validate().is_ok());
         let nodes = json::to_string(&pl.nodes);
         assert!(nodes.is_ok());

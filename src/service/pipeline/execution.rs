@@ -73,9 +73,13 @@ impl PipelinedExt for Pipeline {
     }
 
     fn execute(&self, input: Value) -> Result<HashMap<StreamParams, (Value, bool)>> {
-        let Ok((node_map, graph)) = self.build_node_map_and_adjacency_list() else {
+        let node_map = self.get_node_map();
+        let Ok(graph) = self.build_adjacency_list(&node_map) else {
             return Err(anyhow::anyhow!(
-                "[Pipeline] failed to create graph representation from nodes and edges list. Skip pipeline execution"
+                "[Pipeline]: {}/{}/{} failed to create graph representation from nodes and edges list. Skip pipeline execution",
+                self.org,
+                self.name,
+                self.id,
             ));
         };
 
@@ -98,8 +102,8 @@ impl PipelinedExt for Pipeline {
             return Err(anyhow::anyhow!(
                 "[Pipeline]: {}/{}/{} execution error: {}. Skip",
                 self.org,
-                self.id,
                 self.name,
+                self.id,
                 e
             ));
         }
@@ -109,6 +113,7 @@ impl PipelinedExt for Pipeline {
 }
 
 #[tracing::instrument(skip_all)]
+#[allow(clippy::too_many_arguments)]
 fn dfs(
     org_id: &str,
     mut current_value: Value,
@@ -128,11 +133,12 @@ fn dfs(
                 // leaf node
                 results.insert(stream_params.clone(), (current_value, flattened));
             } else {
+                let next_nodes = graph.get(current_node_id).unwrap();
                 process_next_nodes(
                     org_id,
                     current_value,
                     flattened,
-                    current_node_id,
+                    next_nodes,
                     node_map,
                     graph,
                     vrl_map,
@@ -149,11 +155,12 @@ fn dfs(
                 }
             }
             // current_node_id must be in graph because a ConditionNode can't be a leaf node
+            let next_nodes = graph.get(current_node_id).unwrap();
             process_next_nodes(
                 org_id,
                 current_value,
                 flattened,
-                current_node_id,
+                next_nodes,
                 node_map,
                 graph,
                 vrl_map,
@@ -175,11 +182,12 @@ fn dfs(
                     apply_vrl_fn(runtime, vrl_runtime, &current_value, org_id, "pipeline");
             }
             // current_node_id must be in graph because a FunctionNode can't be a leaf node
+            let next_nodes = graph.get(current_node_id).unwrap();
             process_next_nodes(
                 org_id,
                 current_value,
                 flattened,
-                current_node_id,
+                next_nodes,
                 node_map,
                 graph,
                 vrl_map,
@@ -189,11 +197,12 @@ fn dfs(
         }
         NodeData::Query(_) => {
             // source node for Scheduled pipeline. Must have next nodes
+            let next_nodes = graph.get(current_node_id).unwrap();
             process_next_nodes(
                 org_id,
                 current_value,
                 flattened,
-                current_node_id,
+                next_nodes,
                 node_map,
                 graph,
                 vrl_map,
@@ -206,20 +215,18 @@ fn dfs(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn process_next_nodes(
     org_id: &str,
     current_value: Value,
     flattened: bool,
-    current_node_id: &str,
+    next_nodes: &Vec<String>,
     node_map: &HashMap<String, Node>,
     graph: &HashMap<String, Vec<String>>,
     vrl_map: &HashMap<String, VRLResultResolver>,
     runtime: &mut Runtime,
     results: &mut HashMap<StreamParams, (Value, bool)>,
 ) -> Result<()> {
-    let next_nodes = graph
-        .get(current_node_id)
-        .ok_or_else(|| anyhow::anyhow!("No next nodes found for: {}", current_node_id))?;
     if next_nodes.len() == 1 {
         // HACK to avoid cloning the json record
         dfs(
