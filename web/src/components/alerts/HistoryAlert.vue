@@ -45,23 +45,23 @@
     <div class="q-mx-md" v-if="dataToBeLoaded.length > 0">
       <div class="info-box">
         <div class="info-item">
-          <div class="info-heading">Alert Name</div>
+          <div class="info-heading">{{t("alerts.alertName")}}</div>
           <div class="info-value">{{ route.query.name }}</div>
         </div>
         <div class="info-item">
-          <div class="info-heading">Org</div>
+          <div class="info-heading">{{t("alerts.alertOrg")}}</div>
           <div class="info-value">{{ route.query.org_identifier }}</div>
         </div>
         <div class="info-item">
-          <div class="info-heading">Next Run</div>
+          <div class="info-heading">{{ t("alerts.alertNextRun") }}</div>
           <div class="info-value">{{ dataToBeLoaded[0]?.next_run_at || 'No History' }}</div>
         </div>
         <div class="info-item">
-          <div class="info-heading">Is Realtime</div>
+          <div class="info-heading">{{ t("alerts.alertIsRealTime") }}</div>
           <div class="info-value">{{ dataToBeLoaded[0]?.is_realtime || 'False' }}</div>
         </div>
         <div class="info-item">
-          <div class="info-heading">Is Silence</div>
+          <div class="info-heading">{{ t("alerts.alertIsSilence") }}</div>
           <div class="info-value">{{ dataToBeLoaded[0]?.is_silenced || 'False' }}</div>
         </div>
       </div>
@@ -161,7 +161,6 @@ export default defineComponent({
     const {t} = useI18n();
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
     const dateTimeRef = ref(null)
-    // Fetch the logs
     const { searchObj } = useLogs();
     const dataToBeLoaded :any = ref([]);
     const dateTimeToBeSent : any = ref({});
@@ -181,23 +180,40 @@ const pagination = {
   
 
   const keys = Object.keys(data[0])
-    .filter(key => key !== 'module' && key !== '_timestamp' && key !== 'key' && key !== 'org' && key !== 'next_run_at' && key !== 'is_realtime' && key !== 'is_silenced'); // Remove 'module' and 'org'
+    .filter(key => key !== 'module' && key !== '_timestamp' && key !== 'key' && key !== 'org' && key !== 'next_run_at' && key !== 'is_realtime' && key !== 'is_silenced');
 
   const orderedKeys = desiredOrder.concat(keys.filter(key => !desiredOrder.includes(key)));
   
   return orderedKeys.map(key => {
-    let columnWidth = 250; // Default width
-    
-    // Customize widths for specific columns
-if(key === 'status'){
-  columnWidth = 400;
-}
-if(key === 'retries'){
-  columnWidth = 120;
-}
+    let columnWidth = 250; 
+    let columnLabel = key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');  // Column label
+    switch (key) {
+      case 'status':
+        columnWidth = 400;
+        columnLabel = t("alerts.alertHistoryStatus");
+        break;
+      case 'retries':
+        columnWidth = 120;
+        columnLabel = t("alerts.alertHistoryRetries");
+        break;
+      case 'triggered_at':
+        columnLabel = t("alerts.alertHistoryTriggeredAt");
+        break;
+      case 'start_time':
+        columnLabel = t("alerts.alertHistoryStartTime");
+        break;
+      case 'end_time':
+        columnLabel = t("alerts.alertHistoryEndTime");
+        break;
+      default:
+        break;
+  }
+
+
+
     return {
       name: key,  // field name
-      label: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),  // Column label
+      label: columnLabel,  // Column label
       field: key,  // Field accessor
       align: "center",
       sortable: true,
@@ -366,8 +382,8 @@ if(key === 'retries'){
 <style lang="scss" scoped >
 .info-box {
   display: flex;
-  flex-wrap: wrap; /* Allows items to wrap to the next line if there's not enough space */
-  border: 2px solid #333; /* Outer border */
+  flex-wrap: wrap;
+  border: 2px solid #333; 
   margin-top: 10px;
   border-radius: 8px;
 }
@@ -375,13 +391,12 @@ if(key === 'retries'){
 .info-item {
   border-right: 1px solid #ccc; 
   padding: 16px;
-  /* Separator border */
-  flex: 1 1 20%; /* Makes each item take up a quarter of the width, adjust as needed */
-  box-sizing: border-box; /* Ensures padding and border are included in the item's width */
+  flex: 1 1 20%; 
+  box-sizing: border-box;
 }
 
 .info-item:last-child {
-  border-right: none; /* Remove the border for the last item */
+  border-right: none; 
 }
 
 .info-heading {
@@ -408,7 +423,4 @@ if(key === 'retries'){
 
 }
 
-
-
-/* Add any component-specific styles here */
 </style>

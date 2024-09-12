@@ -812,7 +812,17 @@
     "lastSatisfied": "Last Satisfied At",
     "owner": "Owner",
     "title": "Title",
-    "history": "History"
+    "history": "History",
+    "alertName": "Alert Name",
+    "alertOrg": "Organization",
+    "alertNextRun": "Next Run",
+    "alertIsRealTime": "Is RealTime",
+    "alertIsSilence": "Is Silenced",
+    "alertHistoryRetries": "Retries",
+    "alertHistoryStatus": "Status",
+    "alertHistoryTriggeredAt": "Triggered At",
+    "alertHistoryStartTime": "Start Time",
+    "alertHistoryEndTime": "End Time"
   },
   "alert_templates": {
     "header": "Templates",
