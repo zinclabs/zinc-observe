@@ -55,13 +55,15 @@
             />
 
             <q-stepper-navigation>
-              <q-btn
-                data-test="add-report-step2-continue-btn"
-                @click="step = 2"
-                color="secondary"
-                label="Continue"
-                no-caps
-              />
+              <div class="q-ml-sm">
+                <q-btn
+                  data-test="add-report-step2-continue-btn"
+                  @click="step = 2"
+                  color="secondary"
+                  label="Continue"
+                  no-caps
+                />
+              </div>
             </q-stepper-navigation>
           </q-step>
 
@@ -79,22 +81,27 @@
               v-model="apiConfig.assertions"
               @update:model-value="onRequestConfigUpdate"
             />
-            <q-btn
-              data-test="add-report-step2-continue-btn"
-              @click="step = 3"
-              color="secondary"
-              label="Continue"
-              no-caps
-            />
-            <q-btn
-              data-test="add-report-step2-back-btn"
-              flat
-              @click="step = 1"
-              color="primary"
-              label="Back"
-              class="q-ml-sm"
-              no-caps
-            />
+
+            <div
+              class="tw-flex tw-items-center tw-justify-start q-ml-sm q-mt-lg"
+            >
+              <q-btn
+                data-test="add-report-step2-continue-btn"
+                @click="step = 3"
+                color="secondary"
+                label="Continue"
+                no-caps
+              />
+              <q-btn
+                data-test="add-report-step2-back-btn"
+                flat
+                @click="step = 1"
+                color="primary"
+                label="Back"
+                class="q-ml-sm"
+                no-caps
+              />
+            </div>
           </q-step>
 
           <q-step
@@ -109,22 +116,27 @@
               v-model="apiConfig.retry"
               @update:model-value="onRequestConfigUpdate"
             />
-            <q-btn
-              data-test="add-report-step2-continue-btn"
-              @click="step = 4"
-              color="secondary"
-              label="Continue"
-              no-caps
-            />
-            <q-btn
-              data-test="add-report-step2-back-btn"
-              flat
-              @click="step = 2"
-              color="primary"
-              label="Back"
-              class="q-ml-sm"
-              no-caps
-            />
+
+            <div
+              class="tw-flex tw-items-center tw-justify-start q-ml-sm q-mt-lg"
+            >
+              <q-btn
+                data-test="add-report-step2-continue-btn"
+                @click="step = 4"
+                color="secondary"
+                label="Continue"
+                no-caps
+              />
+              <q-btn
+                data-test="add-report-step2-back-btn"
+                flat
+                @click="step = 2"
+                color="primary"
+                label="Back"
+                class="q-ml-sm"
+                no-caps
+              />
+            </div>
           </q-step>
 
           <q-step
@@ -140,22 +152,26 @@
               v-model="apiConfig.schedule"
               @update:model-value="onRequestConfigUpdate"
             />
-            <q-btn
-              data-test="add-report-step2-continue-btn"
-              @click="step = 5"
-              color="secondary"
-              label="Continue"
-              no-caps
-            />
-            <q-btn
-              data-test="add-report-step2-back-btn"
-              flat
-              @click="step = 3"
-              color="primary"
-              label="Back"
-              class="q-ml-sm"
-              no-caps
-            />
+            <div
+              class="tw-flex tw-items-center tw-justify-start q-ml-sm q-mt-lg"
+            >
+              <q-btn
+                data-test="add-report-step2-continue-btn"
+                @click="step = 5"
+                color="secondary"
+                label="Continue"
+                no-caps
+              />
+              <q-btn
+                data-test="add-report-step2-back-btn"
+                flat
+                @click="step = 3"
+                color="primary"
+                label="Back"
+                class="q-ml-sm"
+                no-caps
+              />
+            </div>
           </q-step>
           <q-step
             data-test="add-report-select-schedule-step"
@@ -345,7 +361,7 @@ onBeforeMount(() => {
   syntheticsService
     .getTest(
       store.state.selectedOrganization.identifier,
-      router.currentRoute.value.params.name as string
+      router.currentRoute.value.params.name as string,
     )
     .then((response) => {
       if (response.data) {
@@ -361,16 +377,12 @@ onBeforeMount(() => {
 
 watch(
   () => apiConfig.value.request,
-  (newVal) => {
-    console.log(newVal);
-  },
+  (newVal) => {},
   {
     deep: true,
-  }
+  },
 );
-const onRequestConfigUpdate = (config: any) => {
-  console.log("updated config", apiConfig.value);
-};
+const onRequestConfigUpdate = (config: any) => {};
 
 const saveReport = () => {
   console.log("save report", apiConfig.value);
@@ -399,9 +411,7 @@ const openCancelDialog = () => {
 const saveTest = () => {
   syntheticsService
     .updateTest(store.state.selectedOrganization.identifier, apiConfig.value)
-    .then((response) => {
-      console.log(response);
-    })
+    .then((response) => {})
     .catch((error) => {
       console.log(error);
     });

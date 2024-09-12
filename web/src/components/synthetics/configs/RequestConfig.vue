@@ -177,7 +177,6 @@
 
             <div class="query-editor">
               <QueryEditor
-                :key="bodyMeta.type"
                 style="height: 300px; width: 100%"
                 editorId="synthetics-request-body-editor"
                 v-model:query="bodyMeta.content"
@@ -198,7 +197,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { getUUID } from "@/utils/zincutils";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import QueryEditor from "../QueryEditor.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 
 const props = defineProps({
   modelValue: {
@@ -216,6 +215,10 @@ const props = defineProps({
 const { t } = useI18n();
 
 const emit = defineEmits(["update:modelValue"]);
+
+const bodyContentData = ref<{ [key: string]: string }>({
+  json: "",
+});
 
 // create array of strings
 const requestTypeOptions = [
@@ -362,8 +365,18 @@ const updateActiveTab = (tab: string) => {
 
 const editorLanguage = ref<string>("json");
 
+const bodyMeta = computed({
+  get: () => props.modelValue.body,
+  set: (val) => {
+    emit("update:modelValue", {
+      ...props.modelValue,
+      body: val,
+    });
+  },
+});
+
 watch(
-  () => request.value.body.type,
+  () => bodyMeta.value.type,
   (newVal) => {
     if (newVal === "graphql") {
       editorLanguage.value = "graphql";
@@ -388,7 +401,14 @@ watch(
     if (newVal === "text_javaScript") {
       editorLanguage.value = "javascript";
     }
-  }
+  },
+);
+
+watch(
+  () => bodyMeta.value.type,
+  (newVal, oldVal) => {
+    onBodyTypeChange(newVal, oldVal);
+  },
 );
 
 const requestTypeValue = computed({
@@ -415,7 +435,6 @@ const queryParams = computed({
 const requestHeaders = computed({
   get: () => props.modelValue.headers,
   set: (val) => {
-    console.log(val);
     emit("update:modelValue", { ...props.modelValue, headers: val });
   },
 });
@@ -430,16 +449,6 @@ const authMeta = computed({
   },
 });
 
-const bodyMeta = computed({
-  get: () => props.modelValue.body,
-  set: (val) => {
-    emit("update:modelValue", {
-      ...props.modelValue,
-      body: val,
-    });
-  },
-});
-
 const addQueryParam = () => {
   queryParams.value.push({
     id: getUUID(),
@@ -450,7 +459,7 @@ const addQueryParam = () => {
 
 const removeQueryParam = (tab: { id: string }) => {
   queryParams.value = queryParams.value.filter(
-    (param: { id: string }) => param.id !== tab.id
+    (param: { id: string }) => param.id !== tab.id,
   );
 };
 
@@ -464,12 +473,20 @@ const addHeader = () => {
 
 const removeHeader = (tab: { id: string }) => {
   requestHeaders.value = requestHeaders.value.filter(
-    (param: { id: string }) => param.id !== tab.id
+    (param: { id: string }) => param.id !== tab.id,
   );
 };
 
-const onQueryUpdate = (query: string) => {
-  console.log(query);
+const onQueryUpdate = (query: string) => {};
+
+const onBodyTypeChange = (Newtype: string, oldType: string) => {
+  bodyContentData.value[oldType] = bodyMeta.value.content;
+
+  if (bodyContentData.value[Newtype]) {
+    bodyMeta.value.content = bodyContentData.value[Newtype];
+  } else {
+    bodyMeta.value.content = "";
+  }
 };
 </script>
 

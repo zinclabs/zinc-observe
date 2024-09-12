@@ -148,7 +148,7 @@
 
       <div
         data-test="add-report-schedule-send-later-section"
-        v-if="selectedTimeTab === 'sendLater'"
+        v-if="selectedTimeTab === 'scheduleLater'"
         class="flex items-center justify-start q-mt-md"
       >
         <div
@@ -290,7 +290,7 @@ const store = useStore();
 
 const cronError = ref("");
 
-const selectedTimeTab = ref("sendLater");
+const selectedTimeTab = ref("scheduleNow");
 
 const filteredTimezone: any = ref([]);
 
@@ -350,12 +350,12 @@ const frequencyTabs = [
 
 const timeTabs = [
   {
-    label: "Send now",
-    value: "sendNow",
+    label: "Schedule now",
+    value: "scheduleNow",
   },
   {
-    label: "Send later",
-    value: "sendLater",
+    label: "Schedule later",
+    value: "scheduleLater",
   },
 ];
 
@@ -395,7 +395,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1
+      (column: any) => column.toLowerCase().indexOf(value) > -1,
     );
   });
   return filteredOptions;
