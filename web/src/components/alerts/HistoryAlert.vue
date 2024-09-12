@@ -17,7 +17,7 @@
         {{ t("alerts.historyTitle") }}
       </div>
       </div>
-      <div v-if="dataToBeLoaded.length > 0" class="flex items-center q-py-sm q-pr-md">
+      <div class="flex items-center q-py-sm q-pr-md">
         <date-time
             ref="dateTimeRef"
             auto-apply
@@ -67,7 +67,6 @@
         </div>
       </div>
     </div>
-    {{  dataToBeLoaded.length }}
 
     <div class="full-width"  v-if="!isLoading && dataToBeLoaded.length > 0">
       <q-table
@@ -103,6 +102,12 @@
     <div v-if="!isLoading && dataToBeLoaded.length === 0">
       <NoData />
     </div>
+    <div
+          v-if="isLoading"
+          class="text-center full-width full-height q-mt-lg tw-flex tw-justify-center"
+        >
+          <q-spinner-hourglass color="primary" size="lg" />
+        </div>
   </div>
 </template>
 
@@ -153,13 +158,13 @@ export default defineComponent({
     const store = useStore();
     const {t} = useI18n();
     const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
-    const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
+    const dateTimeRef = ref(null)
     // Fetch the logs
     const { searchObj } = useLogs();
     const dataToBeLoaded :any = ref([]);
     const dateTimeToBeSent : any = ref({});
     const columnsToBeRendered :any = ref([]);
-    const isLoading = ref(false);
+    const isLoading = ref(true);
 const pagination = {
       page: 1,
         rowsPerPage: 50 
@@ -169,7 +174,7 @@ const pagination = {
       'triggered_at','start_time', 'end_time',
  'retries', 'status'
   ];
-    const generateColumns = (data) => {
+    const generateColumns = (data :any) => {
   if (data.length === 0) return [];
   
 
@@ -202,7 +207,7 @@ if(key === 'retries'){
 
 
 
-const convertUnixToQuasarFormat = (unixMicroseconds) => {
+const convertUnixToQuasarFormat = (unixMicroseconds : any) => {
       if (!unixMicroseconds) return "";
       const unixSeconds = unixMicroseconds / 1e6;
       const dateToFormat = new Date(unixSeconds * 1000);
@@ -210,24 +215,25 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
       return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
     }
     const fetchAlertHistory = async ( ) => {
-      q.notify({
+      const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading history...",
       });
       const { org_identifier, name, stream_name } = route.query;
       isLoading.value = true;
       if (!org_identifier || !name || !stream_name) {
-          console.log("Skipping fetch due to missing params");
           return;
         }
       try {
+        dismiss();
         const {startTime, endTime} = dateTimeToBeSent.value;
-        const response = await alertsService.history(org_identifier, stream_name, name, startTime, endTime);
+        const response = await alertsService.history(org_identifier , stream_name, name, startTime, endTime);
         if(response.data.hits.length === 0){
-         console.log("No data found");
+          dataToBeLoaded.value = [];
+          columnsToBeRendered.value = [];
+          isLoading.value = false;
          return;
         }
-        response.data.hits[2].status = "failed";
         response.data.hits.forEach((hit) => {
           hit._timestamp = convertUnixToQuasarFormat(hit._timestamp);
           hit.triggered_at = hit._timestamp;
@@ -242,11 +248,19 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
 
         
         columnsToBeRendered.value = generateColumns(dataToBeLoaded.value);
-        isLoading.value = false;
-      } catch (error) {
+
         isLoading.value = false;
 
-        console.error("Error fetching alert history", error);
+      } catch (error) {
+        isLoading.value = false;
+        dataToBeLoaded.value = [];
+        columnsToBeRendered.value = [];
+        console.error(error);
+          $q.notify({
+            type: "negative",
+            message: "Error while pulling history.",
+            timeout: 2000,
+          });
       }
       finally {
         isLoading.value = false;
@@ -294,7 +308,6 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
         startTime,
         endTime,
       };
-      console.log(dateTimeToBeSent.value, "dateTimeToBeSent");
 
       await nextTick ();
       await nextTick();
@@ -321,7 +334,6 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
 
 
     return {
-      $q,
       searchObj,
       store,
       generateColumns,
@@ -336,6 +348,7 @@ const convertUnixToQuasarFormat = (unixMicroseconds) => {
       updateDateTime,
       updateTimezone,  
       pagination,  
+      dateTimeRef,
     };
 
     // Watch the searchObj for changes

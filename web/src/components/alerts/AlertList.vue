@@ -618,7 +618,6 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.action,
       (action) => {
-        console.log(action,"action")
         if (!action) {
           showAddAlertDialog.value = false;
           showHistoryDialog.value = false;
