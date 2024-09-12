@@ -138,13 +138,7 @@ export default defineComponent({
     NoData,
   },
   props: {
-    alertName: String,
-    alertTitle: String,
-    additionalInfo: String,
   },
-
-
-
   emits: ['closeDialog'],
   methods: {
 

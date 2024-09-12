@@ -266,9 +266,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <HistoryAlert
         v-model="showHistoryDialog"
-        :alertName="alertName"
-        :alertTitle="alertTitle"
-        :additionalInfo="additionalInfo"
         @closeDialog="closeDialog"
       />
     </template>
@@ -427,9 +424,6 @@ export default defineComponent({
     const selectedAlert = ref({});
     const isUpdated: any = ref(false);
     const showHistoryDialog = ref(false);
-      const alertTitle = ref("");
-     const  alertName =  ref("");  // This will store the alert name sent on click
-      const additionalInfo = ref(""); // This will store the additional info sent on click
     const confirmDelete = ref<boolean>(false);
     const splitterModel = ref(220);
     const showForm = ref(false);
@@ -841,9 +835,6 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         }).then(() => {
-          alertName.value = props.row.name;
-          alertTitle.value = "Alert History";
-          additionalInfo.value = "Additional Info";
           showHistoryDialog.value  = true;
         });
       
@@ -1107,9 +1098,6 @@ export default defineComponent({
       alertStateLoadingMap,
       templates,
       routeTo,
-      alertTitle,
-      alertName,
-      additionalInfo,
       showHistoryDialog,
       showAlertDetails,
       closeDialog,
