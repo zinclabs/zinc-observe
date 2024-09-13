@@ -53,10 +53,12 @@ pub struct DerivedStream {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub struct Node {
     pub id: String,
     pub data: NodeData,
     position: Position,
+    io_type: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     style: Option<NodeStyle>,
 }
@@ -192,8 +194,6 @@ mod tests {
             "node_type": "function",
             "name": "func",
             "after_flatten": false,
-            "params": "row",
-            "vrl_script": "vrl_script",
         });
         let node_data: NodeData = json::from_value(payload).unwrap();
         assert_eq!(func_node, node_data);

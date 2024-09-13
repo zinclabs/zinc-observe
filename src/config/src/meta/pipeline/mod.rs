@@ -79,10 +79,11 @@ impl Pipeline {
     /// Verifies the pipeline is valid by:
     /// 1. non-empty nodes list
     /// 2. non-empty edges list
-    /// 3. 1st node in nodes list is either [components::NodeData::Stream] or
-    ///    [components::NodeData::Query]
-    /// 4. non-empty `conditions` in all [components::NodeData::Condition] nodes in nodes list
-    /// 5. all leaf nodes are of type [components::NodeData::Stream]
+    /// 3. 1st node in nodes list is either StreamNode or QueryNode
+    /// 4. non-empty `conditions` in all ConditionNode nodes in nodes list
+    /// 5. all leaf nodes are of type StreamNode
+    /// 6. In the same branch, unchecked `after_flattened` FunctionNode can't follow checked
+    ///    `after_flattened` checked FunctionNode
     ///
     /// If all satisfies, populates the [Pipeline::source] with the first node in nodes list
     pub fn validate(&mut self) -> Result<()> {
@@ -117,20 +118,11 @@ impl Pipeline {
             return Err(anyhow!("ConditionNode must have non-empty conditions"));
         }
 
-        // ck 5: build adjacency list and check leaf notes
+        // build adjacency list for ck 5 & 6
+        let source_node_id = self.nodes[0].id.as_str();
         let node_map = self.get_node_map();
         let adjacency_list = self.build_adjacency_list(&node_map)?;
-        // any leaf nodes not a StreamNode
-        if self.nodes.iter().any(|node| {
-            if !adjacency_list.contains_key(&node.id) {
-                // leaf node
-                !matches!(node.get_node_data(), NodeData::Stream(_)) // not a StreamNode
-            } else {
-                false
-            }
-        }) {
-            return Err(anyhow!("All leaf nodes must be StreamNode"));
-        }
+        dfs_traversal_check(source_node_id, &adjacency_list, &node_map, false)?;
 
         Ok(())
     }
@@ -263,6 +255,46 @@ pub struct PipelineList {
     pub list: Vec<Pipeline>,
 }
 
+/// DFS traversal to check:
+/// 1. all leaf nodes are of StreamNode
+/// 2. No `After Flattened` unchecked FunctionNode follows `After Flatten` checked FunctionNode in
+///    the same branch
+///
+/// `graph` and `node_map` already validated for unwrap
+fn dfs_traversal_check(
+    current_id: &str,
+    graph: &HashMap<String, Vec<String>>,
+    node_map: &HashMap<String, Node>,
+    mut flattened: bool,
+) -> Result<()> {
+    // Check if the current node is a leaf node
+    if !graph.contains_key(current_id) {
+        // Ensure leaf nodes are Stream nodes
+        if let Some(node) = node_map.get(current_id) {
+            if !matches!(node.get_node_data(), NodeData::Stream(_)) {
+                return Err(anyhow!("All leaf nodes must be StreamNode"));
+            }
+        } else {
+            return Err(anyhow!("Node with id {} not found in node_map", current_id));
+        }
+        return Ok(());
+    }
+
+    for next_node_id in graph.get(current_id).unwrap() {
+        if let NodeData::Function(func_params) = &node_map.get(next_node_id).unwrap().data {
+            if flattened && func_params.after_flatten {
+                return Err(anyhow!(
+                    "After Flatten unchecked FunctionNode following After Flatten checked FunctionNode in the same branch"
+                ));
+            }
+            flattened |= func_params.after_flatten;
+        };
+        dfs_traversal_check(next_node_id, graph, node_map, flattened)?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -291,7 +323,8 @@ mod tests {
                 },
                 "style": {
                   "backgroundColor": "#f0f0f0"
-                }
+                },
+                "io_type": "input",
               },
               {
                 "id": "2",
@@ -301,6 +334,7 @@ mod tests {
                   "stream_name": "default",
                   "stream_type": "logs"
                 },
+                "io_type": "input",
                 "position": {
                   "x": 300,
                   "y": 100
@@ -368,6 +402,7 @@ mod tests {
                   "x": 100,
                   "y": 100
                 },
+                "io_type": "input",
                 "style": {
                   "backgroundColor": "#f0f0f0"
                 }
@@ -380,10 +415,11 @@ mod tests {
                   "stream_name": "default",
                   "stream_type": "logs"
                 },
+                "io_type": "output",
                 "position": {
                   "x": 300,
                   "y": 100
-                }
+                },
               }
             ],
             "edges": [
