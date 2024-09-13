@@ -1556,6 +1556,24 @@ pub struct SearchRequest {
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, repeated, tag = "12")]
     pub file_ids: ::prost::alloc::vec::Vec<FileId>,
+    #[prost(message, optional, tag = "13")]
+    pub idx_files: ::core::option::Option<IdxFileList>,
+}
+#[derive(Eq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IdxFileList {
+    #[prost(message, repeated, tag = "1")]
+    pub items: ::prost::alloc::vec::Vec<FileName>,
+}
+#[derive(Eq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct FileName {
+    #[prost(string, tag = "1")]
+    pub key: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", optional, tag = "2")]
+    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]

@@ -20,7 +20,6 @@ use async_recursion::async_recursion;
 use config::{
     get_config,
     meta::{
-        bitvec::BitVec,
         cluster::{Node, Role, RoleGroup},
         search::{self, ScanStats, SearchEventType},
         stream::{
@@ -38,7 +37,7 @@ use infra::{
     errors::{Error, ErrorCodes, Result},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
-use proto::cluster_rpc::{self, FileId};
+use proto::cluster_rpc::{self, FileId, FileName, IdxFileList};
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
@@ -144,7 +143,7 @@ pub async fn search(
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
     // get file list
-    let mut file_id_list = get_file_id_list(
+    let file_id_list = get_file_id_list(
         trace_id,
         &meta,
         stream_type,
@@ -163,12 +162,13 @@ pub async fn search(
 
     // If the query is of type inverted index and this is not an aggregations request,
     // then filter the file list based on the inverted index.
-    log::debug!("ids before inverted index at leader : {:?}",file_id_list);
+    log::debug!("ids before inverted index at leader : {:?}", file_id_list);
     let mut idx_scan_size = 0;
     let mut idx_took = 0;
+    let idx_file_list;
     if use_inverted_index {
-        (file_id_list, idx_scan_size, idx_took) =
-            get_file_list_by_inverted_index(meta.clone(), req.clone(), &file_id_list).await?;
+        (idx_file_list, idx_scan_size, idx_took) =
+            get_file_list_by_inverted_index(meta.clone(), req.clone()).await?;
         log::info!(
             "[trace_id {trace_id}] search: get file_list from inverted index time_range: {:?},
     num: {}, scan_size: {}, took: {} ms",
@@ -177,8 +177,15 @@ pub async fn search(
             idx_scan_size,
             idx_took,
         );
+
+        log::debug!("idx files : {:?}", idx_file_list);
+        req.idx_files = idx_file_list.map(|v| IdxFileList {
+            items: v
+                .into_iter()
+                .map(|(key, segment_ids)| FileName { key, segment_ids })
+                .collect(),
+        });
     }
-    log::debug!("ids after inverted index at leader : {:?}",file_id_list);
 
     metrics::QUERY_PENDING_NUMS
         .with_label_values(&[&req.org_id])
@@ -1055,16 +1062,11 @@ fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
 async fn get_file_list_by_inverted_index(
     meta: Arc<super::sql::Sql>,
     mut idx_req: cluster_rpc::SearchRequest,
-    file_list: &[FileQueryData],
-) -> Result<(Vec<FileQueryData>, usize, usize)> {
+) -> Result<(Option<Vec<(String, Option<Vec<u8>>)>>, usize, usize)> {
     let start = std::time::Instant::now();
     let cfg = get_config();
 
     let stream_type = StreamType::from(idx_req.stream_type.as_str());
-    let file_list_map = file_list
-        .iter()
-        .map(|f| (f.key.clone(), f))
-        .collect::<HashMap<_, _>>();
 
     // Get all the unique terms which the user has searched.
     let terms = meta
@@ -1124,7 +1126,7 @@ async fn get_file_list_by_inverted_index(
     // If both empty return original file list with other params as 0
     let search_condition = match (index_condition.is_empty(), fts_condition.is_empty()) {
         (true, true) => {
-            return Ok((file_list.to_vec(), 0, 0));
+            return Ok((None, 0, 0));
         }
         (true, false) => fts_condition,
         (false, true) => index_condition,
@@ -1166,8 +1168,8 @@ async fn get_file_list_by_inverted_index(
         })
         .collect::<HashSet<_>>();
 
-    // Merge bitmap segment_ids of the same file
-    let mut idx_file_list: HashMap<String, FileQueryData> = HashMap::default();
+    // Make idx file list to return
+    let mut ret = Vec::new();
     for item in idx_resp.hits.iter() {
         let filename = match item.get("file_name") {
             None => continue,
@@ -1180,41 +1182,16 @@ async fn get_file_list_by_inverted_index(
             "files/{}/{}/{}/{}",
             meta.org_id, stream_type, meta.stream_name, filename
         );
-        let Some(query_data) = file_list_map.get(&prefixed_filename) else {
-            continue;
-        };
+
         let segment_ids = match item.get("segment_ids") {
             None => None,
             Some(v) => hex::decode(v.as_str().unwrap()).ok(),
         };
-
-        let entry = idx_file_list
-            .entry(prefixed_filename)
-            .or_insert(FileQueryData {
-                id: query_data.id,
-                key: query_data.key.clone(),
-                original_size: query_data.original_size,
-                segment_ids: None,
-            });
-
-        match (&entry.segment_ids, &segment_ids) {
-            (Some(_), None) => {}
-            (Some(bin_data), Some(segment_ids)) => {
-                let mut bv = BitVec::from_slice(bin_data);
-                bv |= BitVec::from_slice(segment_ids);
-                entry.segment_ids = Some(bv.into_vec());
-            }
-            (None, _) => {
-                entry.segment_ids = segment_ids;
-            }
-        }
+        ret.push((prefixed_filename, segment_ids));
     }
-    let idx_file_list = idx_file_list
-        .into_iter()
-        .map(|(_, f)| f)
-        .collect::<Vec<_>>();
+
     Ok((
-        idx_file_list,
+        Some(ret),
         idx_resp.scan_size,
         start.elapsed().as_millis() as usize,
     ))
@@ -1222,7 +1199,7 @@ async fn get_file_list_by_inverted_index(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
 
     // #[test]
     // fn test_partition_file_by_bytes() {

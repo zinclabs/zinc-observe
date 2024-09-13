@@ -46,6 +46,17 @@ message SearchRequest {
     optional string           user_id = 10;
     optional string search_event_type = 11;
     repeated FileId         file_ids  = 12;
+    optional IdxFileList    idx_files = 13;
+
+}
+
+message IdxFileList{
+    repeated FileName items = 1;
+}
+
+message FileName{
+    string key =1;
+    optional bytes segment_ids = 2;
 }
 
 message FileId{

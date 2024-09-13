@@ -21,6 +21,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        bitvec::BitVec,
         cluster::RoleGroup,
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, StreamPartition, StreamType},
@@ -147,30 +148,54 @@ pub async fn search(
     let req_stype = req.stype;
     if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
         let file_id_data = &req.file_ids;
+        let idx_file_list = &req.idx_files;
         let ids = file_id_data.iter().map(|f| f.id).collect::<Vec<_>>();
         log::debug!("id list at grpc handler len {} {:?}", ids.len(), ids);
-        let mut id_map: HashMap<_, _> = file_id_data
-            .iter()
-            .map(|f| (f.id, &f.segment_ids))
-            .collect();
-        let file_list = get_file_list_by_ids(
+
+        let file_list_map: HashMap<String, _> = get_file_list_by_ids(
             &trace_id,
             &ids,
             &sql,
             stream_type,
             &stream_settings.partition_keys,
         )
-        .await;
+        .await
+        .into_iter()
+        .map(|(_, f)| (f.key.clone(), f))
+        .collect();
+        let file_list: Vec<FileKey>;
+        if let Some(idx_files) = idx_file_list {
+            let mut file_map = HashMap::new();
+            for idx_file in &idx_files.items {
+                let Some(file) = file_list_map.get(&idx_file.key) else {
+                    continue;
+                };
+                let segment_ids = &idx_file.segment_ids;
+                let entry = file_map.entry(&idx_file.key).or_insert(FileKey {
+                    key: file.key.clone(),
+                    meta: file.meta.clone(),
+                    deleted: file.deleted,
+                    segment_ids: file.segment_ids.clone(),
+                });
+                match (&entry.segment_ids, &segment_ids) {
+                    (Some(_), None) => {}
+                    (Some(bin_data), Some(segment_ids)) => {
+                        let mut bv = BitVec::from_slice(bin_data);
+                        bv |= BitVec::from_slice(segment_ids);
+                        entry.segment_ids = Some(bv.into_vec());
+                    }
+                    (None, _) => {
+                        entry.segment_ids = segment_ids.clone();
+                    }
+                }
+            }
+
+            file_list = file_map.into_values().collect();
+        } else {
+            file_list = file_list_map.into_values().collect();
+        }
+
         log::debug!("file list len at grpc handler {}", file_list.len());
-        let file_list = file_list
-            .into_iter()
-            .map(|(id, mut f)| {
-                let segments = id_map.remove(&id).unwrap_or(&None);
-                f.segment_ids = segments.clone();
-                f
-            })
-            .collect::<Vec<_>>();
-        // and correspondingly update req proto for this
         let (tbls, stats, partitions) =
             storage::search(&trace_id, sql.clone(), &file_list, stream_type, &work_group).await?;
         tables.extend(tbls);
@@ -410,9 +435,8 @@ pub(crate) async fn get_file_list_by_ids(
             .unwrap_or_default()
             .len()
             <= 1;
-    let file_list = query_by_ids(ids, &sql.org_id, is_local)
-        .await;
-    log::debug!("in grpc, file list : {:?}",file_list);
+    let file_list = query_by_ids(ids, &sql.org_id, is_local).await;
+    log::debug!("in grpc, file list : {:?}", file_list);
     let file_list = file_list.unwrap_or_default();
     log::debug!(
         "in grpc, file list before match source by id, query return length : {} , return {:?}",
