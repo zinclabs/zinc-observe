@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       />
     </div>
-    <div v-else class="stream-routing-container full-width full-height q-pa-md">
+    <div v-else class="stream-routing-container full-width q-pa-md">
       <q-toggle
         data-test="create-function-toggle"
         class="q-mb-sm"
@@ -88,7 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('function.order') + ' *'"
               color="input-border"
               bg-color="input-bg"
-              class="showLabelOnTop"
               stack-label
               outlined
               filled
@@ -113,6 +112,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
+        <div class="o2-input full-width" style="padding-top: 12px" v-if="!createNewFunction">
+          <q-toggle
+            data-test="pipeline-function-after-flattening-toggle"
+            class="q-mb-sm"
+            :label="t('pipeline.flatteningLbl')"
+            v-model="afterFlattening"
+          />
+        </div>
+        <div v-else class="q-pb-sm container text-body2" style="width: 500px;">
+          {{t("alerts.newFunctionAssociationMsg")}}
+        </div>
+
         <div
           class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
@@ -128,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="associate-function-save-btn"
-            :label="t('alerts.save')"
+            :label="createNewFunction ? t('alerts.createFunction') : t('alerts.save')"
             class="text-bold no-border q-ml-md"
             color="secondary"
             padding="sm xl"
@@ -170,6 +181,7 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
+import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 interface RouteCondition {
   column: string;
@@ -222,6 +234,11 @@ const props = defineProps({
       return [];
     },
   },
+  afterFlattening: {
+    type: Boolean,
+    required: false,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -241,6 +258,8 @@ const selectedFunction = ref("");
 
 const functionOrder = ref(props.defaultOrder);
 
+const afterFlattening = ref(props.afterFlattening || false);
+
 const filteredFunctions: Ref<any[]> = ref([]);
 
 const createNewFunction = ref(false);
@@ -248,6 +267,8 @@ const createNewFunction = ref(false);
 const store = useStore();
 
 const functionExists = ref(false);
+
+const { addNode } = useDragAndDrop();
 
 const nodeLink = ref({
   from: "",
@@ -322,10 +343,16 @@ const saveFunction = () => {
     return;
   }
 
-  emit("update:node", {
-    data: { name: selectedFunction.value, order: functionOrder.value },
-    link: nodeLink.value,
-  });
+  const functionNode = {
+    name: selectedFunction.value,
+    order: functionOrder.value,
+    afterFlattening: afterFlattening.value,
+  };
+  addNode(functionNode);
+  // emit("update:node", {
+  //   data: { name: selectedFunction.value, order: functionOrder.value },
+  //   link: nodeLink.value,
+  // });
   emit("cancel:hideform");
 };
 

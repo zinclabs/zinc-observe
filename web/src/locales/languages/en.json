@@ -414,7 +414,10 @@
     "routing": "Routing",
     "nodes": "Nodes",
     "associateFunction": "Associate Function",
-    "derivedStream": "Derived Stream"
+    "derivedStream": "Derived Stream",
+    "pipelineName": "Enter Pipeline Name",
+    "flatteningLbl": "After Flattening",
+    "streamTitle": "Associate Stream"
   },
   "function": {
     "header": "Functions",
@@ -810,7 +813,9 @@
     "lastTriggered":"Last Triggered At",
     "lastSatisfied":"Last Satisfied At",
     "owner": "Owner",
-    "title": "Title"
+    "title": "Title",
+    "createFunction": "Create Function",
+    "newFunctionAssociationMsg": "Note: The function will be created, after which you will be redirected to the previous form to associate the newly created function with the pipeline."
   },
   "alert_templates": {
     "header": "Templates",

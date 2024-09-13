@@ -31,7 +31,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <q-icon name="arrow_back_ios_new" size="14px" />
       </div>
-      <div class="text-h6">{{ pipeline.name }}</div>
+      <div class="text-h6" v-if="pipelineObj.isEditMode == true">
+        {{ pipelineObj.currentSelectedPipeline.name }}
+      </div>
+      <div class="text-h6" v-if="pipelineObj.isEditMode == false">
+        <q-input
+          v-model="pipelineObj.currentSelectedPipeline.name"
+          :label="t('pipeline.pipelineName')"
+          style="border: 1px solid #eaeaea"
+          filled
+          dense
+        />
+      </div>
     </div>
 
     <div class="flex justify-end">
@@ -69,60 +80,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <q-separator class="q-mb-md" />
 
-      <template v-for="nodeType in nodeTypes" :key="nodeType.value">
-        <div
-          :data-test="`pipeline-editor-${nodeType.value}-node`"
-          :id="nodeType.value + '_node'"
-          :draggable="true"
-          @dragstart="(ev) => onNodeDragStart(ev, nodeType.value)"
-          class="flex items-center node-type-row q-mt-sm q-mx-sm"
-        >
-          <img width="30" :src="symbolMapping[nodeType.value]" />
-          <div
-            :data-test="`pipeline-editor-${nodeType.value}-node-title`"
-            class="q-px-sm"
-          >
-            {{ nodeType.label }}
-          </div>
-        </div>
-      </template>
+      <div class="flex q-mt-sm">
+        <NodeSidebar :nodeTypes="nodeTypes" />
+      </div>
     </div>
     <div
       id="pipelineChartContainer"
       ref="chartContainerRef"
-      class="relative-position pipeline-chart-container"
+      class="relative-position pipeline-chart-container o2vf_node"
       :class="store.state.theme === 'dark' ? '' : 'bg-grey-2'"
     >
-      <div
-        class="q-pl-sm q-pt-xs"
-        :class="store.state.theme === 'dark' ? 'text-white' : 'text-black'"
-        data-test="pipeline-editor-execution-note"
-      >
-        Note: During execution of pipeline, routes will get executed before
-        functions
-      </div>
-      <ChartRenderer
-        data-test="pipeline-editor-pipeline-chart"
-        :data="plotChart"
-        render-type="svg"
-        style="height: calc(100vh - 165px)"
-        @click="onChartClick"
-        @mouseout="onMouseOut"
-        @drop="onNodeDrop"
-        @dragover="onNodeDragOver"
-      />
-
-      <!-- <div ref="nodeActions" id="node-actions" class="node-actions absolute">
-      <q-icon name="delete" class="q-mr-xs cursor-pointer" />
-      <q-icon name="add" class="cursor-pointer" size="16px" />
-    </div> -->
+      <PipelineFlow />
     </div>
   </div>
 
-  <q-dialog v-model="dialog.show" position="right" full-height maximized>
+  <q-dialog
+    v-model="pipelineObj.dialog.show"
+    position="right"
+    full-height
+    maximized
+  >
     <div class="stream-routing-dialog-container full-height">
       <StreamRouting
-        v-if="dialog.name === 'streamRouting'"
+        v-if="pipelineObj.dialog.name === 'streamRouting'"
         :stream-name="pipeline.stream_name"
         :stream-type="pipeline.stream_type"
         :editing-route="streamRoutes[editingStreamRouteName]"
@@ -133,15 +113,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <AssociateFunction
-        v-if="dialog.name === 'associateFunction'"
+        v-if="pipelineObj.dialog.name === 'function'"
         :loading="isFetchingFunctions"
         :function-data="functions[editingFunctionName]"
         :functions="functionOptions"
         :associated-functions="associatedFunctions"
-        @update:node="addFunctionNode"
         @delete:node="deleteNode"
         @cancel:hideform="resetDialog"
         @add:function="updateNewFunction"
+      />
+
+      <StreamNode
+        v-if="pipelineObj.dialog.name === 'stream'"
+        :loading="isFetchingStreams"
+        @cancel:hideform="resetDialog"
       />
     </div>
   </q-dialog>
@@ -173,14 +158,17 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import jstransform from "@/services/jstransform";
+import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
+import useDragAndDrop from "@/plugins/pipelines/useDnD";
+import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 
-const ChartRenderer = defineAsyncComponent(
-  () => import("@/components/dashboards/panels/ChartRenderer.vue"),
+const PipelineFlow = defineAsyncComponent(
+  () => import("@/plugins/pipelines/PipelineFlow.vue"),
 );
 
 interface Routing {
@@ -278,12 +266,52 @@ const confirmDialogMeta: any = ref({
   onConfirm: () => {},
 });
 
-const nodeTypes = [
-  { label: "Function", value: "function" },
-  { label: "Route", value: "streamRoute" },
+const nodeTypes: any = [
+  {
+    label: "Stream",
+    subtype: "stream",
+    io_type: "input",
+    icon: "input",
+    tooltip: "Source: Stream Node",
+  },
+  {
+    label: "Query",
+    subtype: "query",
+    io_type: "input",
+    icon: "input",
+    tooltip: "Source: Query Node",
+  },
+  {
+    label: "Function",
+    subtype: "function",
+    io_type: "default",
+    icon: "functions",
+    tooltip: "Function Node",
+  },
+  {
+    label: "Conditions",
+    subtype: "condition",
+    io_type: "default",
+    icon: "filter",
+    tooltip: "Condition Node",
+  },
+  {
+    label: "Stream",
+    subtype: "stream",
+    io_type: "output",
+    icon: "output",
+    tooltip: "Destination: Stream Node",
+  },
 ];
 
+const { pipelineObj } = useDragAndDrop();
+pipelineObj.nodeTypes = nodeTypes;
+
 const nodes: Ref<Node[]> = ref([]);
+
+const hasInputType = computed(() => {
+  return pipelineObj.currentSelectedPipeline.nodes.some((node) => node.io_type === "input");
+});
 
 const nodeLinks = ref<{ [key: string]: NodeLink }>({});
 
@@ -317,30 +345,15 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const onChartClick = (params: any) => {
-  const { type, name } = params.data;
-
-  resetDialog();
-
-  if (type === "streamRoute" || type === "condition") {
-    if (type === "condition") editingStreamRouteName.value = name.split(":")[0];
-    else editingStreamRouteName.value = name;
-    dialog.value.show = true;
-    dialog.value.name = "streamRouting";
-  }
-
-  if (type === "function") {
-    getFunctions();
-    editingFunctionName.value = name;
-    dialog.value.show = true;
-    dialog.value.name = "associateFunction";
-  }
-};
-
 onBeforeMount(() => {
-  getPipeline();
-
-  updateGraph();
+  const route = router.currentRoute.value;
+  if (route.name == "pipelineEditor") {
+    getPipeline();
+    pipelineObj.isEditMode = true;
+  } else {
+    pipelineObj.isEditMode = false;
+  }
+  getFunctions();
 });
 
 const getPipeline = () => {
@@ -462,7 +475,7 @@ const getFunctionFrom = (stream: string) => {
   let fromNodeName = stream;
 
   const functions = nodes.value.filter(
-    (node) => node.type === "function" && node.stream === stream,
+    (node) => node.io_type === "function" && node.stream === stream,
   );
 
   if (functions.length) {
@@ -474,7 +487,7 @@ const getFunctionFrom = (stream: string) => {
 
 // TODO OK : create separate functions for each type node i.e. function, streamRoute, stream
 const getNodePosition = (type: string, node?: any) => {
-  let lastNode = nodes.value.filter((node) => node.type === type).pop();
+  let lastNode = nodes.value.filter((node) => node.io_type === type).pop();
 
   // If this if first function node, adding offset to left from the main stream node
   const nodeGap = !lastNode ? 130 : 50;
@@ -535,65 +548,65 @@ const getNodePosition = (type: string, node?: any) => {
   }
 };
 
-const addFunctionNode = (data: { data: Function }) => {
-  const nodeName = data.data.name;
+// const addFunctionNode = (data: { data: Function }) => {
+//   const nodeName = data.data.name;
 
-  // TODO OK: Optimize this function node creation
-  // Get all function nodes
-  // Get the editing node
-  // Remove function nodes from the nodes state
-  // Create functions nodes again and sort function nodes by order
+//   // TODO OK: Optimize this function node creation
+//   // Get all function nodes
+//   // Get the editing node
+//   // Remove function nodes from the nodes state
+//   // Create functions nodes again and sort function nodes by order
 
-  const functionNodes = nodes.value.filter((node) => node.type === "function");
+//   const functionNodes = nodes.value.filter((node) => node.type === "function");
 
-  if (editingFunctionName.value) {
-    const editedNode = nodes.value.find(
-      (node) => node.name === editingFunctionName.value,
-    );
+//   if (editingFunctionName.value) {
+//     const editedNode = nodes.value.find(
+//       (node) => node.name === editingFunctionName.value,
+//     );
 
-    if (editedNode) editedNode.order = data.data.order;
+//     if (editedNode) editedNode.order = data.data.order;
 
-    editingFunctionName.value = "";
-  } else {
-    functionNodes.push(
-      createFunctionNode(
-        nodeName,
-        pipeline.value.stream_name,
-        data.data.order,
-      ) as Node,
-    );
-  }
+//     editingFunctionName.value = "";
+//   } else {
+//     functionNodes.push(
+//       createFunctionNode(
+//         nodeName,
+//         pipeline.value.stream_name,
+//         data.data.order,
+//       ) as Node,
+//     );
+//   }
 
-  nodes.value = nodes.value.filter((node) => node.type !== "function");
+//   nodes.value = nodes.value.filter((node) => node.type !== "function");
 
-  functionNodes
-    .sort((a, b) =>
-      a.order?.toString() && b.order?.toString()
-        ? Number(a.order) - Number(b.order)
-        : 0,
-    )
-    .forEach((node) => {
-      createFunctionNode(
-        node.name,
-        node.stream as string,
-        node.order as number,
-      );
-    });
+//   functionNodes
+//     .sort((a, b) =>
+//       a.order?.toString() && b.order?.toString()
+//         ? Number(a.order) - Number(b.order)
+//         : 0,
+//     )
+//     .forEach((node) => {
+//       createFunctionNode(
+//         node.name,
+//         node.stream as string,
+//         node.order as number,
+//       );
+//     });
 
-  if (!functions.value[nodeName]) {
-    functions.value[nodeName] = data.data;
-    functionOptions.value.push(nodeName);
-  }
+//   if (!functions.value[nodeName]) {
+//     functions.value[nodeName] = data.data;
+//     functionOptions.value.push(nodeName);
+//   }
 
-  functions.value[nodeName].order = data.data.order;
+//   functions.value[nodeName].order = data.data.order;
 
-  associatedFunctions.value.push(nodeName);
+//   associatedFunctions.value.push(nodeName);
 
-  // reorder function nodes with order key and its links too
-  updateFunctionNodesOrder();
+//   // reorder function nodes with order key and its links too
+//   updateFunctionNodesOrder();
 
-  updateGraph();
-};
+//   updateGraph();
+// };
 
 const createFunctionNode = (
   nodeName: string,
@@ -626,7 +639,7 @@ const createFunctionNode = (
 
 const updateFunctionNodesOrder = () => {
   const sortedFunctionNodes = nodes.value
-    .filter((node) => node.type === "function")
+    .filter((node) => node.io_type === "function")
     .sort((a, b) =>
       a.order?.toString() && b.order?.toString()
         ? Number(a.order) - Number(b.order)
@@ -721,9 +734,9 @@ const updateGraph = () => {
     name: node.name,
     x: node.x, // You may want to adjust these manually if needed (like x: 100 for 'k8s_event')
     y: node.y,
-    symbol: getNodeSymbol(node.type),
+    symbol: getNodeSymbol(node.io_type),
     fixed: node.fixed,
-    type: node.type,
+    type: node.io_type,
     label: {
       show: true,
       position: "bottom",
@@ -788,14 +801,14 @@ const deleteNode = (node: { data: Node; type: string }) => {
 
   delete nodeLinks.value[node.data.name];
 
-  if (node.type === "function") {
+  if (node.io_type === "function") {
     associatedFunctions.value = associatedFunctions.value.filter(
       (func) => func !== node.data.name,
     );
     editingFunctionName.value = "";
   }
 
-  if (node.type === "streamRoute") {
+  if (node.io_type === "streamRoute") {
     delete streamRoutes.value[node.data.name];
     editingStreamRouteName.value = "";
   }
@@ -810,32 +823,10 @@ const deleteNode = (node: { data: Node; type: string }) => {
 };
 
 const resetDialog = () => {
-  dialog.value.show = false;
-  dialog.value.name = "";
+  pipelineObj.dialog.show = false;
+  pipelineObj.dialog.name = "";
   editingFunctionName.value = "";
   editingStreamRouteName.value = "";
-};
-
-const getPipelinePayload = () => {
-  const payload = {
-    name: pipeline.value.name,
-    description: pipeline.value.description,
-    stream_name: pipeline.value.stream_name,
-    stream_type: pipeline.value.stream_type,
-    routing: {} as Routing,
-    derived_streams: [] as any[],
-  };
-
-  Object.values(streamRoutes.value).forEach((route: any) => {
-    if (!route.is_real_time) {
-      payload.derived_streams.push(route);
-      return;
-    } else {
-      payload.routing[route.name] = route.conditions;
-    }
-  });
-
-  return payload;
 };
 
 const associateFunctions = async () => {
@@ -886,27 +877,55 @@ const deleteFunctionAssociation = (name: string) => {
 };
 
 const savePipeline = async () => {
-  const payload = getPipelinePayload();
+  if (pipelineObj.currentSelectedPipeline.name == "") {
+    q.notify({
+      message: "Pipeline name is required",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+    return;
+  }
 
+  const node = pipelineObj.currentSelectedPipeline.nodes.find(
+    (node) => node.io_type === "input" && node.data.node_type === "stream"
+  );
+
+  if (node == undefined) {
+    q.notify({
+      message: "Source node is required",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+    return;
+  } else {
+    if (node.data.node_type == "stream") {
+      pipelineObj.currentSelectedPipeline.source.source_type = "realtime";
+    } else {
+      pipelineObj.currentSelectedPipeline.source.source_type = "schedule";
+    }
+  }
+  pipelineObj.currentSelectedPipeline.org = store.state.selectedOrganization.identifier;
   const dismiss = q.notify({
     message: "Saving pipeline...",
     position: "bottom",
     spinner: true,
   });
 
-  if (pipeline.value.functions.length) {
-    const deleteFunctionPromises = [];
-    for (let i = 0; i < pipeline.value.functions.length; i++) {
-      if (!associatedFunctions.value.includes(pipeline.value.functions[i].name))
-        deleteFunctionPromises.push(
-          deleteFunctionAssociation(pipeline.value.functions[i].name),
-        );
-    }
+  // if (pipeline.value.functions.length) {
+  //   const deleteFunctionPromises = [];
+  //   for (let i = 0; i < pipeline.value.functions.length; i++) {
+  //     if (!associatedFunctions.value.includes(pipeline.value.functions[i].name))
+  //       deleteFunctionPromises.push(
+  //         deleteFunctionAssociation(pipeline.value.functions[i].name),
+  //       );
+  //   }
 
-    await Promise.all(deleteFunctionPromises);
-  }
+  //   await Promise.all(deleteFunctionPromises);
+  // }
 
-  await associateFunctions();
+  // await associateFunctions();
 
   pipelineService
     .updatePipeline({
@@ -1010,5 +1029,32 @@ const updateNewFunction = (_function: Function) => {
 <style lang="scss">
 .stream-routing-dialog-container {
   min-width: 540px !important;
+}
+
+.o2vf_node {
+  width: auto;
+
+  .vue-flow__node {
+    padding: 0px;
+    width: auto;
+  }
+
+  .o2vf_node_input,
+  .vue-flow__node-input {
+    background-color: #c8d6f5;
+    border-color: 1px solid #2c6b2f;
+  }
+
+  .o2vf_node_output,
+  .vue-flow__node-output {
+    background-color: #8fd4b8;
+    border-color: 1px solid #3b6f3f;
+  }
+
+  .o2vf_node_default,
+  .vue-flow__node-default {
+    background-color: #efefef;
+    border-color: 1px solid #171e25;
+  }
 }
 </style>

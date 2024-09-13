@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="secondary"
             no-caps
             :label="t(`pipeline.addPipeline`)"
-            @click="createPipeline"
+            :to="{ name: 'createPipeline' }"
           />
 
           <q-table-pagination

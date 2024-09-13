@@ -34,23 +34,14 @@ const pipelines = {
   },
 
   createPipeline: ({
-    stream_name,
-    name,
-    stream_type,
-    description,
+    payload,
     org_identifier,
   }: {
-    stream_name: string;
-    stream_type: string;
-    name: string;
+    payload: object;
     org_identifier: string;
-    description: string;
   }) => {
-    const url = `/api/${org_identifier}/streams/${stream_name}/pipelines?type=${stream_type}`;
-    return http({}).post(url, {
-      name,
-      description,
-    });
+    const url = `/api/${org_identifier}/pipelines`;
+    return http({}).post(url, payload);
   },
 
   updatePipeline: ({
