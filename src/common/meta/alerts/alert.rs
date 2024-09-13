@@ -113,4 +113,5 @@ pub struct AlertHistoryFilter {
     pub offset: i64,
     pub period: i64,
     pub track_total_hits: bool,
+    pub status: Option<String>,
 }

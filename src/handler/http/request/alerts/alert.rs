@@ -492,8 +492,123 @@ async fn show_alert_history(
         offset,
         period,
         track_total_hits,
+        status: None, // TODO: Add success filter
     };
     match alert::history(&org_id, stream_type, &stream_name, &name, user_id, filters).await {
+        Ok(res) => Ok(MetaHttpResponse::json(res)),
+        Err(e) => match e {
+            (http::StatusCode::SERVICE_UNAVAILABLE, e) => {
+                Ok(MetaHttpResponse::service_unavailable(e))
+            }
+            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
+        },
+    }
+}
+
+/// ShowAllAlertHistory
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ShowAllAlertHistory",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("stream_name" = String, Path, description = "Stream name"),
+        ("alert_name" = String, Path, description = "Alert name"),
+    ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure", content_type = "application/json", body = HttpResponse),
+        (status = 503, description = "Service Unavailable",  content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/alerts/history")]
+async fn show_all_alert_history(
+    path: web::Path<(String, String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, stream_name, name) = path.into_inner();
+    let user_id = req.headers().get("user_id").unwrap().to_str().unwrap();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let stream_type = match get_stream_type_from_request(&query) {
+        Ok(v) => v.unwrap_or_default(),
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    };
+
+    let mut _alert_list_from_rbac = None;
+    // Get List of allowed objects
+    #[cfg(feature = "enterprise")]
+    {
+        let user_id = req.headers().get("user_id").unwrap();
+        match crate::handler::http::auth::validator::list_objects_for_user(
+            &org_id,
+            user_id.to_str().unwrap(),
+            "GET",
+            "alert",
+        )
+        .await
+        {
+            Ok(stream_list) => {
+                _alert_list_from_rbac = stream_list;
+            }
+            Err(e) => {
+                return Ok(crate::common::meta::http::HttpResponse::forbidden(
+                    e.to_string(),
+                ));
+            }
+        }
+        // Get List of allowed objects ends
+    }
+
+    let track_total_hits = match query.get("track_total_hits") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
+    let limit = match query.get("limit") {
+        Some(v) => v.parse::<i64>().unwrap_or_default(),
+        None => 20,
+    };
+    let offset = match query.get("offset") {
+        Some(v) => v.parse::<i64>().unwrap_or_default(),
+        None => 0,
+    };
+    let from = match query.get("from") {
+        Some(v) => v.parse::<i64>().unwrap_or_default(),
+        None => 0,
+    };
+    let to = match query.get("to") {
+        Some(v) => v.parse::<i64>().unwrap_or_default(),
+        None => 0,
+    };
+    let period = match query.get("period") {
+        Some(v) => v.parse::<i64>().unwrap_or_default(),
+        None => 0,
+    };
+    let status = match query.get("status") {
+        Some(v) => {
+            let v = v.to_lowercase();
+            if v.eq("completed") || v.eq("failed") || v.eq("condition_not_satisfied") {
+                Some(v)
+            } else {
+                None
+            }
+        }
+        None => None,
+    };
+    let filters = AlertHistoryFilter {
+        from,
+        to,
+        limit,
+        offset,
+        period,
+        track_total_hits,
+        status,
+    };
+    match alert::all_history(&org_id, user_id, filters, _alert_list_from_rbac).await {
         Ok(res) => Ok(MetaHttpResponse::json(res)),
         Err(e) => match e {
             (http::StatusCode::SERVICE_UNAVAILABLE, e) => {
