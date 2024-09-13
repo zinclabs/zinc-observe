@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use config::{
     get_config,
     meta::{
@@ -178,7 +178,13 @@ fn dfs(
                 current_value = flatten::flatten_with_level(
                     current_value,
                     get_config().limit.ingest_flatten_level,
-                )?;
+                )
+                .map_err(|e| {
+                    anyhow!(
+                        "FunctionNode {current_node_id} error with flattening: {}",
+                        e
+                    )
+                })?;
                 flattened = true;
             }
             let vrl_runtime = vrl_map.get(current_node_id).unwrap();
