@@ -126,6 +126,10 @@ fn dfs(
     runtime: &mut Runtime,
     results: &mut HashMap<StreamParams, (Value, bool)>,
 ) -> Result<()> {
+    if current_value.is_null() || !current_value.is_object() {
+        return Ok(());
+    }
+
     let current_node = node_map.get(current_node_id).unwrap();
 
     match &current_node.data {
@@ -177,11 +181,8 @@ fn dfs(
                 )?;
                 flattened = true;
             }
-            if !current_value.is_null() {
-                let vrl_runtime = vrl_map.get(current_node_id).unwrap();
-                current_value =
-                    apply_vrl_fn(runtime, vrl_runtime, &current_value, org_id, "pipeline");
-            }
+            let vrl_runtime = vrl_map.get(current_node_id).unwrap();
+            current_value = apply_vrl_fn(runtime, vrl_runtime, &current_value, org_id, "pipeline");
             // current_node_id must be in graph because a FunctionNode can't be a leaf node
             let next_nodes = graph.get(current_node_id).unwrap();
             process_next_nodes(

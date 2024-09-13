@@ -28,6 +28,13 @@ use crate::{
 
 pub mod components;
 
+// (pipeline, node_map, graph)
+pub type PipelineParams = (
+    Pipeline,
+    HashMap<String, Node>,
+    HashMap<String, Vec<String>>,
+);
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct Pipeline {
     #[serde(default)]
@@ -158,14 +165,15 @@ impl Pipeline {
     }
 
     /// Finds all the destination streams in the pipeline.
-    pub fn get_all_destination_streams(&self) -> Result<Vec<StreamParams>> {
-        let node_map = self.get_node_map();
-        let adj_list = self.build_adjacency_list(&node_map)?;
-
-        let streams = node_map
+    pub fn get_all_destination_streams(
+        &self,
+        node_map: &HashMap<String, Node>,
+        graph: &HashMap<String, Vec<String>>,
+    ) -> Vec<StreamParams> {
+        node_map
             .iter()
             .filter_map(|(id, node)| {
-                if !adj_list.contains_key(id) {
+                if !graph.contains_key(id) {
                     if let NodeData::Stream(stream_params) = node.get_node_data() {
                         Some(stream_params)
                     } else {
@@ -175,9 +183,7 @@ impl Pipeline {
                     None
                 }
             })
-            .collect();
-
-        Ok(streams)
+            .collect()
     }
 
     /// Returns the number of functions nodes in this pipeline.

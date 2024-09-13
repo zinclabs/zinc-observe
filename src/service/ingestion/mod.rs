@@ -26,7 +26,7 @@ use config::{
     meta::{
         alerts::alert::Alert,
         function::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-        pipeline::Pipeline,
+        pipeline::PipelineParams,
         stream::{
             PartitionTimeLevel, PartitioningDetails, Routing, StreamParams, StreamPartition,
             StreamType,
@@ -182,15 +182,33 @@ pub async fn get_stream_partition_keys(
     }
 }
 
-pub async fn get_stream_pipeline(
+pub async fn get_stream_pipeline_params(
     org_id: &str,
     stream_name: &str,
     stream_type: &StreamType,
-) -> Option<Pipeline> {
+) -> Option<PipelineParams> {
     let stream_params = StreamParams::new(org_id, stream_name, *stream_type);
-    infra::pipeline::get_by_stream(org_id, &stream_params)
+    let pipeline = infra::pipeline::get_by_stream(org_id, &stream_params)
         .await
-        .ok()
+        .ok();
+    pipeline.and_then(|pl| {
+        let node_map = pl.get_node_map();
+        match pl.build_adjacency_list(&node_map) {
+            Err(e) => {
+                log::error!(
+                    "[Pipeline] {}/{}/{}: Error construct graph representation caused by {}. Skip pipeline execution",
+                    pl.org,
+                    pl.name,
+                    pl.id,
+                    e
+                );
+                None
+            }
+            Ok(graph) => {
+                Some((pl, node_map, graph))
+            }
+        }
+    })
 }
 
 pub async fn get_stream_alerts(
