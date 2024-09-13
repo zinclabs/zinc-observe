@@ -22,7 +22,7 @@ use actix_web::{
 use config::meta::{
     pipeline::{components::PipelineSource, Pipeline, PipelineList},
     search::SearchEventType,
-    stream::{StreamParams, StreamType},
+    stream::ListStreamParams,
 };
 
 use super::db;
@@ -187,15 +187,10 @@ pub async fn list_pipelines(
 }
 
 #[tracing::instrument]
-pub async fn get_pipeline_by_stream(
-    org: &str,
-    stream_name: &str,
-    stream_type: StreamType,
-) -> Result<HttpResponse, Error> {
-    let stream_params = StreamParams::new(org, stream_name, stream_type);
-    match db::pipeline::get_by_stream(org, &stream_params).await {
-        Ok(pipeline) => Ok(HttpResponse::Ok().json(PipelineList {
-            list: vec![pipeline],
+pub async fn list_streams_with_pipeline(org: &str) -> Result<HttpResponse, Error> {
+    match db::pipeline::list_streams_with_pipeline(org).await {
+        Ok(stream_params) => Ok(HttpResponse::Ok().json(ListStreamParams {
+            list: stream_params,
         })),
         Err(_) => Ok(HttpResponse::Ok().json(PipelineList { list: vec![] })),
     }

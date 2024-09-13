@@ -338,6 +338,28 @@ SELECT * FROM pipeline
         Ok(pipelines)
     }
 
+    async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>> {
+        let pool = CLIENT.clone();
+        let query = r#"
+SELECT * FROM pipeline WHERE org = ? AND source_type = ? ORDER BY id;
+        "#;
+        let pipelines = match sqlx::query_as::<_, Pipeline>(query)
+            .bind(org)
+            .bind("realtime")
+            .fetch_all(&pool)
+            .await
+        {
+            Ok(pipelines) => pipelines,
+            Err(e) => {
+                log::debug!("[MYSQL] list streams with pipelines error: {}", e);
+                return Err(Error::from(DbError::KeyNotExists(format!(
+                    "{org}/realtime"
+                ))));
+            }
+        };
+        Ok(pipelines)
+    }
+
     async fn delete(&self, pipeline_id: &str) -> Result<()> {
         let pool = CLIENT.clone();
         sqlx::query(r#"DELETE FROM pipeline WHERE id = ?;"#)

@@ -162,6 +162,11 @@ impl StreamParams {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct ListStreamParams {
+    pub list: Vec<StreamParams>,
+}
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FileKey {
     pub key: String,

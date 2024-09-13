@@ -16,7 +16,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use config::meta::{meta_store::MetaStore, pipeline::Pipeline, stream::StreamParams};
+use config::meta::{
+    meta_store::MetaStore,
+    pipeline::{components::PipelineSource, Pipeline},
+    stream::StreamParams,
+};
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc;
 
@@ -47,6 +51,7 @@ pub trait PipelineTable: Sync + Send + 'static {
     async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Pipeline>;
     async fn list(&self) -> Result<Vec<Pipeline>>;
     async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>>;
+    async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>>;
     async fn delete(&self, pipeline_id: &str) -> Result<()>;
     async fn watch(&self, prefix: &str) -> Result<Arc<mpsc::Receiver<Event>>>;
 }
@@ -74,6 +79,23 @@ pub async fn update(pipeline: Pipeline) -> Result<()> {
 #[inline]
 pub async fn get_by_stream(org: &str, stream_params: &StreamParams) -> Result<Pipeline> {
     CLIENT.get_by_stream(org, stream_params).await
+}
+
+/// Finds all streams with existing pipelines.
+#[inline]
+pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>> {
+    CLIENT
+        .list_streams_with_pipeline(org)
+        .await
+        .map(|pipelines| {
+            pipelines
+                .into_iter()
+                .filter_map(|pl| match pl.source {
+                    PipelineSource::Realtime(stream_params) => Some(stream_params),
+                    PipelineSource::Scheduled(_) => None,
+                })
+                .collect()
+        })
 }
 
 /// Finds the pipeline by id

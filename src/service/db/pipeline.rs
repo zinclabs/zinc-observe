@@ -48,22 +48,13 @@ pub async fn update(pipeline: Pipeline) -> Result<()> {
     Ok(())
 }
 
-/// Returns all pipelines associated with a stream.
-///
-/// Used to get all pipelines associated with a stream during the Stream's ingestion time.
-/// `org` is the organization the pipelines belong to, not the pipeline source Stream's org_id
-pub async fn get_by_stream(org: &str, stream_params: &StreamParams) -> Result<Pipeline> {
-    infra_pipeline::get_by_stream(org, stream_params)
+/// Returns all streams with existing pipelines.
+pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>> {
+    infra_pipeline::list_streams_with_pipeline(org)
         .await
         .map_err(|e| {
-            log::debug!(
-                "Error getting pipelines for org/stream({org}/{stream_params}): {}",
-                e
-            );
-            anyhow::anyhow!(
-                "Error getting pipelines for org/stream({org}/{stream_params}): {}",
-                e
-            )
+            log::error!("Error getting streams with pipeline for org({org}): {}", e);
+            anyhow::anyhow!("Error getting streams with pipeline for org({org}): {}", e)
         })
 }
 

@@ -345,6 +345,26 @@ SELECT * FROM pipeline
         Ok(pipelines)
     }
 
+    async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>> {
+        let client = CLIENT_RO.clone();
+        let query = r#"
+SELECT * FROM pipeline WHERE org = $1 AND source_type = $2 ORDER BY id;
+        "#;
+        let pipelines = match sqlx::query_as::<_, Pipeline>(query)
+            .bind(org)
+            .bind("realtime")
+            .fetch_all(&client)
+            .await
+        {
+            Ok(pipelines) => pipelines,
+            Err(e) => {
+                log::debug!("[SQLITE] list streams with pipelines error: {}", e);
+                return Err(Error::from(DbError::KeyNotExists(org.to_string())));
+            }
+        };
+        Ok(pipelines)
+    }
+
     async fn delete(&self, pipeline_id: &str) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
