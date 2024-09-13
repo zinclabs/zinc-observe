@@ -128,11 +128,7 @@ impl Filelist for Filelister {
         .await
         .map_err(|e| Status::internal(e.to_string()))?
         .into_iter()
-        .map(|f| FileQueryData {
-            id: f.id,
-            key: f.key,
-            original_size: f.original_size,
-        })
+        .map(|f| FileQueryData { id: f.id })
         .collect();
 
         // metrics

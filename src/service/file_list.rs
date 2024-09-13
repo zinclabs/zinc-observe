@@ -761,12 +761,7 @@ pub async fn query_ids(
     let files = response
         .items
         .into_iter()
-        .map(|f| FileQueryData {
-            id: f.id,
-            key: f.key,
-            segment_ids: None,
-            original_size: f.original_size,
-        })
+        .map(|f| FileQueryData { id: f.id })
         .collect::<Vec<_>>();
     log::info!(
         "file_list->grpc: node: {}, query list: {}, time: {}ms",

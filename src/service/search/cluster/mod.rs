@@ -23,7 +23,7 @@ use config::{
         cluster::{Node, Role, RoleGroup},
         search::{self, ScanStats, SearchEventType},
         stream::{
-            FileKey, FileMeta, FileQueryData, PartitionTimeLevel, QueryPartitionStrategy,
+            FileKey, FileQueryData, PartitionTimeLevel, QueryPartitionStrategy,
             StreamPartition, StreamType,
         },
     },
@@ -194,15 +194,17 @@ pub async fn search(
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
 
+    // TODO YJDoc2 fix: as we are not querying the original size,
+    // how to choose work_group
     // 1. get work group
-    #[cfg(feature = "enterprise")]
-    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
-        o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_id_list),
-    );
-    #[cfg(feature = "enterprise")]
-    super::SEARCH_SERVER
-        .add_work_group(trace_id, work_group.clone())
-        .await;
+    // #[cfg(feature = "enterprise")]
+    // let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = Some(
+    //     o2_enterprise::enterprise::search::work_group::predict(&nodes, &file_id_list),
+    // );
+    // #[cfg(feature = "enterprise")]
+    // super::SEARCH_SERVER
+    //     .add_work_group(trace_id, work_group.clone())
+    //     .await;
     // 2. check concurrency
     let work_group_str = if let Some(wg) = &work_group {
         wg.to_string()
@@ -291,12 +293,12 @@ pub async fn search(
                 (file_num / querier_num) + 1
             }
         }
-        QueryPartitionStrategy::FileSize => {
-            let files = partition_file_by_bytes(&file_id_list, querier_num);
-            file_num = files.len();
-            partition_files = files;
-            1
-        }
+        // QueryPartitionStrategy::FileSize => {
+        //     let files = partition_file_by_bytes(&file_id_list, querier_num);
+        //     file_num = files.len();
+        //     partition_files = files;
+        //     1
+        // }
         QueryPartitionStrategy::FileHash => {
             let files = partition_file_by_hash(&file_id_list, &nodes, req_node_group).await;
             file_num = files.len();
@@ -360,22 +362,16 @@ pub async fn search(
                             [offset_start..min(offset_start + offset, file_num)]
                             .to_vec()
                             .iter()
-                            .map(|f| FileId {
-                                id: f.id,
-                                segment_ids: f.segment_ids.clone(),
-                            })
+                            .map(|f| FileId { id: f.id })
                             .collect();
                         offset_start += offset;
                     }
-                    QueryPartitionStrategy::FileSize | QueryPartitionStrategy::FileHash => {
+                    QueryPartitionStrategy::FileHash => {
                         req.file_ids = partition_files
                             .get(offset_start)
                             .unwrap()
                             .iter()
-                            .map(|f| FileId {
-                                id: f.id,
-                                segment_ids: f.segment_ids.clone(),
-                            })
+                            .map(|f| FileId { id: f.id })
                             .collect();
                         offset_start += offset;
                         if req.file_ids.is_empty() {
@@ -906,7 +902,7 @@ pub(crate) async fn get_file_id_list(
             .len()
             <= 1;
     let (time_min, time_max) = sql.meta.time_range.unwrap();
-    let file_list = file_list::query_ids(
+    file_list::query_ids(
         &sql.org_id,
         &sql.stream_name,
         stream_type,
@@ -916,49 +912,30 @@ pub(crate) async fn get_file_id_list(
         is_local,
     )
     .await
-    .unwrap_or_default();
-
-    let mut files = Vec::with_capacity(file_list.len());
-    for file in file_list {
-        let source = FileKey {
-            key: file.key.clone(),
-            meta: FileMeta::default(),
-            deleted: false,
-            segment_ids: None,
-        };
-        if sql
-            .match_source(&source, false, false, stream_type, partition_keys)
-            .await
-        {
-            files.push(file);
-        }
-    }
-    files.sort_by(|a, b| a.key.cmp(&b.key));
-    files.dedup_by(|a, b| a.key == b.key);
-    files
+    .unwrap_or_default()
 }
 
-pub(crate) fn partition_file_by_bytes(
-    file_keys: &[FileQueryData],
-    num_nodes: usize,
-) -> Vec<Vec<&FileQueryData>> {
-    let mut partitions: Vec<Vec<&FileQueryData>> = vec![Vec::new(); num_nodes];
-    let sum_original_size = file_keys.iter().map(|fk| fk.original_size).sum::<i64>();
-    let avg_size = sum_original_size / num_nodes as i64;
-    let mut node_size = 0;
-    let mut node_k = 0;
-    for fk in file_keys {
-        node_size += fk.original_size;
-        if node_size >= avg_size && node_k != num_nodes - 1 && !partitions[node_k].is_empty() {
-            node_size = fk.original_size;
-            node_k += 1;
-            partitions[node_k].push(fk);
-            continue;
-        }
-        partitions[node_k].push(fk);
-    }
-    partitions
-}
+// pub(crate) fn partition_file_by_bytes(
+//     file_keys: &[FileQueryData],
+//     num_nodes: usize,
+// ) -> Vec<Vec<&FileQueryData>> {
+//     let mut partitions: Vec<Vec<&FileQueryData>> = vec![Vec::new(); num_nodes];
+//     let sum_original_size = file_keys.iter().map(|fk| fk.original_size).sum::<i64>();
+//     let avg_size = sum_original_size / num_nodes as i64;
+//     let mut node_size = 0;
+//     let mut node_k = 0;
+//     for fk in file_keys {
+//         node_size += fk.original_size;
+//         if node_size >= avg_size && node_k != num_nodes - 1 && !partitions[node_k].is_empty() {
+//             node_size = fk.original_size;
+//             node_k += 1;
+//             partitions[node_k].push(fk);
+//             continue;
+//         }
+//         partitions[node_k].push(fk);
+//     }
+//     partitions
+// }
 
 pub(crate) async fn partition_file_by_hash<'a>(
     file_keys: &'a [FileQueryData],

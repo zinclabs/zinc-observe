@@ -163,7 +163,7 @@ pub async fn search(
         .into_iter()
         .map(|(_, f)| (f.key.clone(), f))
         .collect();
-        let file_list: Vec<FileKey>;
+        let mut file_list: Vec<FileKey>;
         if let Some(idx_files) = idx_file_list {
             let mut file_map = HashMap::new();
             for idx_file in &idx_files.items {
@@ -194,6 +194,32 @@ pub async fn search(
         } else {
             file_list = file_list_map.into_values().collect();
         }
+        let mut files = Vec::with_capacity(file_list.len());
+        // cannot use .iter().filter() as the function is async cannot be used in filter closure
+        for file in file_list {
+            let source = FileKey {
+                key: file.key.clone(),
+                meta: file.meta.clone(),
+                deleted: false,
+                segment_ids: None,
+            };
+            if sql
+                .match_source(
+                    &source,
+                    false,
+                    false,
+                    stream_type,
+                    &stream_settings.partition_keys,
+                )
+                .await
+            {
+                files.push(file);
+            }
+        }
+        files.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
+        files.dedup_by(|a, b| a.key == b.key);
+
+        file_list = files;
 
         log::debug!("file list len at grpc handler {}", file_list.len());
         let (tbls, stats, partitions) =

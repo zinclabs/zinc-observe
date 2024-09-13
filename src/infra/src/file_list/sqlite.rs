@@ -395,10 +395,8 @@ SELECT id,stream, date, file, deleted, min_ts, max_ts, records, original_size, c
 
         let pool = CLIENT_RO.clone();
         let ret = if flattened.is_some() {
-            sqlx::query_as::<_, (i64, i64,String)>(
-                r#"
-    SELECT id, original_size, concat('files/',stream,'/',date,'/',file) as key FROM file_list WHERE stream = $1 AND flattened = $2 LIMIT 1000;
-                "#,
+            sqlx::query_as::<_, (i64,)>(
+                r#"SELECT id FROM file_list WHERE stream = $1 AND flattened = $2 LIMIT 1000;"#,
             )
             .bind(stream_key)
             .bind(flattened.unwrap())
@@ -406,10 +404,8 @@ SELECT id,stream, date, file, deleted, min_ts, max_ts, records, original_size, c
             .await
         } else {
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
-            sqlx::query_as::<_, (i64, i64,String)>(
-                r#"
-    SELECT id,original_size, concat('files/',stream,'/',date,'/',file) as key FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
-                "#,
+            sqlx::query_as::<_, (i64,)>(
+                r#"SELECT id FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;"#,
             )
             .bind(stream_key)
             .bind(time_start)
@@ -419,12 +415,7 @@ SELECT id,stream, date, file, deleted, min_ts, max_ts, records, original_size, c
         };
         Ok(ret?
             .into_iter()
-            .map(|r| FileQueryData {
-                id: r.0,
-                key: r.2,
-                original_size: r.1,
-                segment_ids: None,
-            })
+            .map(|r| FileQueryData { id: r.0 })
             .collect())
     }
 

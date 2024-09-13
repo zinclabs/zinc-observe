@@ -478,10 +478,6 @@ pub struct IdList {
 pub struct FileQueryData {
     #[prost(int64, tag = "1")]
     pub id: i64,
-    #[prost(string, tag = "2")]
-    pub key: ::prost::alloc::string::String,
-    #[prost(int64, tag = "3")]
-    pub original_size: i64,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1575,14 +1571,13 @@ pub struct FileName {
     #[prost(bytes = "vec", optional, tag = "2")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
+/// TODO YJDoc2 maybe collapse this into the original req message
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileId {
     #[prost(int64, tag = "1")]
     pub id: i64,
-    #[prost(bytes = "vec", optional, tag = "4")]
-    pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]

@@ -59,9 +59,9 @@ message FileName{
     optional bytes segment_ids = 2;
 }
 
+// TODO YJDoc2 maybe collapse this into the original req message
 message FileId{
     int64          id          = 1;
-    optional bytes segment_ids = 4;
 }
 
 message SearchResponse {

@@ -338,7 +338,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
         // 5000 is arbitrary
         for chunk in ids.chunks(5000) {
             // for postgres binding is a little weird , and the following way
-            // is recommended instead of using ? , 
+            // is recommended instead of using ? ,
             // see https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
             let query = sqlx::query_as::<_, super::FileRecord>(
                 r#"SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
@@ -380,10 +380,8 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
 
         let pool = CLIENT.clone();
         let ret = if flattened.is_some() {
-            sqlx::query_as::<_, (i64, i64,String)>(
-                r#"
-            SELECT id, original_size,concat('files/',stream,'/',date,'/',file) as key FROM file_list WHERE stream = $1 AND flattened = $2 LIMIT 1000;
-                "#,
+            sqlx::query_as::<_, (i64,)>(
+                r#"SELECT id FROM file_list WHERE stream = $1 AND flattened = $2 LIMIT 1000;"#,
             )
             .bind(stream_key)
             .bind(flattened.unwrap())
@@ -391,10 +389,8 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
             .await
         } else {
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
-            sqlx::query_as::<_, (i64,i64,String)>(
-                r#"
-            SELECT id, original_size,concat('files/',stream,'/',date,'/',file) as key FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
-                "#,
+            sqlx::query_as::<_, (i64,)>(
+                r#"SELECT id FROM file_list WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;"#,
             )
             .bind(stream_key)
             .bind(time_start)
@@ -404,12 +400,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
         };
         Ok(ret?
             .into_iter()
-            .map(|r| FileQueryData {
-                id: r.0,
-                key: r.2,
-                original_size: r.1,
-                segment_ids: None,
-            })
+            .map(|r| FileQueryData { id: r.0 })
             .collect())
     }
 

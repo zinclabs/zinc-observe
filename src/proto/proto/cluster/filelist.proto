@@ -26,8 +26,6 @@ message IdList {
 
 message FileQueryData{
     int64 id = 1;
-    string key = 2;
-    int64 original_size = 3;
 }
 
 message FileByIdQueryRequest{
