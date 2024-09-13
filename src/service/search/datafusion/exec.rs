@@ -75,6 +75,7 @@ use crate::service::search::{
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
 
+#[tracing::instrument(name = "service:search:datafusion", skip_all)]
 pub async fn sql(
     session: &SearchSession,
     sql: &Arc<Sql>,
@@ -123,6 +124,7 @@ pub async fn sql(
     Ok(result)
 }
 
+#[tracing::instrument(name = "service:search:datafusion::exec_query", skip_all)]
 async fn exec_query(
     ctx: &SessionContext,
     session: &SearchSession,

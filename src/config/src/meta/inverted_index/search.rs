@@ -1,6 +1,9 @@
 use anyhow::Result;
 use bitvec::vec::BitVec;
-use fst::{automaton::Str, Automaton, IntoStreamer, Streamer};
+use fst::{
+    automaton::{StartsWith, Str},
+    Automaton, IntoStreamer, Streamer,
+};
 use futures::{AsyncRead, AsyncSeek};
 
 use super::{
@@ -14,7 +17,7 @@ pub struct SubstringSearch<'b> {
 }
 
 impl<'b> SubstringSearch<'b> {
-    pub async fn new(terms: &[String], meta: &'b ColumnIndexMeta) -> Self {
+    pub fn new(terms: &[String], meta: &'b ColumnIndexMeta) -> Self {
         SubstringSearch {
             terms: terms.to_owned(),
             meta,
@@ -36,6 +39,44 @@ impl<'b> SubstringSearch<'b> {
 
     fn filter(&mut self) {
         self.terms.retain(|term| term.len() <= self.meta.max_len);
+    }
+}
+
+pub struct PrefixSearch<'b> {
+    terms: Vec<String>,
+    meta: &'b ColumnIndexMeta,
+}
+
+impl<'b> PrefixSearch<'b> {
+    pub fn new(terms: &[String], meta: &'b ColumnIndexMeta) -> Self {
+        PrefixSearch {
+            terms: terms.to_owned(),
+            meta,
+        }
+    }
+
+    pub async fn search<R>(&mut self, index_reader: &mut IndexReader<R>) -> Result<BitVec<u8>>
+    where
+        R: AsyncRead + AsyncSeek + Unpin + Send,
+    {
+        self.filter();
+        let matchers = self
+            .terms
+            .iter()
+            .map(|term| Str::new(term).starts_with())
+            .collect::<Vec<StartsWith<Str>>>();
+        inverted_index_search(index_reader, &matchers, self.meta).await
+    }
+
+    fn filter(&mut self) {
+        self.terms.retain(|term| {
+            // Check if the term is within the min and max length
+            term.len() <= self.meta.max_len
+                && term.len() >= self.meta.min_len
+                // Check if the term is within the min and max values
+                && self.meta.min_val.as_slice() <= term.as_bytes()
+                && term.as_bytes() <= self.meta.max_val.as_slice()
+        });
     }
 }
 

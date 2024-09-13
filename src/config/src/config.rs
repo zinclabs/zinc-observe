@@ -707,6 +707,12 @@ pub struct Common {
     )]
     pub inverted_index_search_format: String,
     #[env_config(
+        name = "ZO_FULL_TEXT_SEARCH_TYPE",
+        default = "prefix",
+        help = "Search through full text fields with either 'contains' , 'eq' or 'prefix' match."
+    )]
+    pub full_text_search_type: String,
+    #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
         help = "Toggle search to be trigger based on button click event."
@@ -1139,16 +1145,16 @@ pub struct Nats {
     #[env_config(
         name = "ZO_NATS_REPLICAS",
         default = 3,
-        help = "the copies of a given message to store in the NATS cluster. 
-        Can not be modified after bucket is initialized. 
+        help = "the copies of a given message to store in the NATS cluster.
+        Can not be modified after bucket is initialized.
         To update this, delete and recreate the bucket."
     )]
     pub replicas: usize,
     #[env_config(
         name = "ZO_NATS_HISTORY",
         default = 3,
-        help = "in the context of KV to configure how many historical entries to keep for a given bucket. 
-        Can not be modified after bucket is initialized. 
+        help = "in the context of KV to configure how many historical entries to keep for a given bucket.
+        Can not be modified after bucket is initialized.
         To update this, delete and recreate the bucket."
     )]
     pub history: i64,

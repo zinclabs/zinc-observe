@@ -73,6 +73,7 @@ pub static SEARCH_SERVER: Lazy<Searcher> = Lazy::new(Searcher::new);
 pub(crate) static QUEUE_LOCKER: Lazy<Arc<Mutex<bool>>> =
     Lazy::new(|| Arc::new(Mutex::const_new(false)));
 
+#[tracing::instrument(name = "service:search:enter", skip(in_req))]
 pub async fn search(
     trace_id: &str,
     org_id: &str,

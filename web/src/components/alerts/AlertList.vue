@@ -273,6 +273,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="streamNames"
                 @change="updateStreamName"
                 @filter="filterStreams"
+                use-input
+                fill-input
+                hide-selected
+                :input-debounce="400"
+
               />
               <div class="flex justify-center q-mt-lg">
                 <q-btn

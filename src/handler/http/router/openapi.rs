@@ -64,6 +64,7 @@ use crate::{common::meta, handler::http::request};
         request::search::search_partition,
         request::search::around,
         request::search::values,
+        request::search::search_history,
         request::search::saved_view::create_view,
         request::search::saved_view::delete_view,
         request::search::saved_view::get_view,

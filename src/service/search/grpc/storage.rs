@@ -19,7 +19,7 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        inverted_index::search::{ExactSearch, SubstringSearch},
+        inverted_index::search::{ExactSearch, PrefixSearch, SubstringSearch},
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamPartition, StreamType},
     },
@@ -126,11 +126,10 @@ pub async fn search(
         && sql.use_inverted_index
         && (sql.inverted_index_type == "fst" || sql.inverted_index_type == "both")
         && (!sql.fts_terms.is_empty() || !sql.index_terms.is_empty());
-    let mut scan_stats = ScanStats::new();
+    let mut idx_took = 0i64;
     if use_inverted_index {
-        let idx_took =
-            filter_file_list_by_inverted_index(trace_id, &mut files, &sql, stream_type).await?;
-        scan_stats.idx_took = idx_took as i64;
+        idx_took = filter_file_list_by_inverted_index(trace_id, &mut files, &sql, stream_type)
+            .await? as i64;
         log::info!(
             "[trace_id {trace_id}] search->storage: stream {}/{}/{}, FST inverted index reduced file_list num to {} in {}ms",
             &sql.org_id,
@@ -141,6 +140,7 @@ pub async fn search(
         );
     }
 
+    let mut scan_stats = ScanStats::new();
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
     if !cfg.common.widening_schema_evolution || schema_versions.len() == 1 {
@@ -277,6 +277,7 @@ pub async fn search(
         tables.push(Arc::new(table) as Arc<dyn datafusion::datasource::TableProvider>);
     }
 
+    scan_stats.idx_took = idx_took;
     Ok((tables, scan_stats, target_partitions))
 }
 
@@ -514,15 +515,18 @@ async fn filter_file_list_by_inverted_index(
     let full_text_terms = Arc::new(
         sql.fts_terms
             .iter()
-            .map(|term| {
-                let tokens = split_token(
-                    term,
-                    &config::get_config().common.inverted_index_split_chars,
-                );
-                tokens
-                    .into_iter()
-                    .max_by_key(|t| t.len())
-                    .unwrap_or_default()
+            .filter_map(|t| {
+                let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
+                // If tokens empty return None so that full_text_terms will not have empty strings
+                if tokens.is_empty() {
+                    return None;
+                }
+                Some(
+                    tokens
+                        .into_iter()
+                        .max_by_key(|key| key.len())
+                        .unwrap_or_default(),
+                )
             })
             .collect_vec(),
     );
@@ -622,6 +626,7 @@ async fn inverted_index_search_in_file(
     fts_terms: Arc<Vec<String>>,
     index_terms: Arc<Vec<(String, Vec<String>)>>,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
+    let cfg = config::get_config();
     let Some(index_file_name) = convert_parquet_idx_file_name(parquet_file_name) else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to convert parquet file name {} to index file name",
@@ -641,16 +646,30 @@ async fn inverted_index_search_in_file(
         Ok(bytes) => bytes,
     };
 
-    let mut index_reader =
-        create_index_reader_from_puffin_bytes(compressed_index_blob.to_vec()).await?;
+    let mut index_reader = create_index_reader_from_puffin_bytes(compressed_index_blob).await?;
     let file_meta = index_reader.metadata().await?;
 
     let mut res = BitVec::new();
 
     if let Some(column_index_meta) = &file_meta.metas.get(INDEX_FIELD_NAME_FOR_ALL) {
-        let mut full_text_search =
-            SubstringSearch::new(fts_terms.as_ref(), column_index_meta).await;
-        match full_text_search.search(&mut index_reader).await {
+        // TODO: Add Eq and check performance
+        let matched_bv = match cfg.common.full_text_search_type.as_str() {
+            "eq" => {
+                let mut searcher = ExactSearch::new(fts_terms.as_ref(), column_index_meta);
+                searcher.search(&mut index_reader).await
+            }
+            "contains" => {
+                let mut searcher = SubstringSearch::new(fts_terms.as_ref(), column_index_meta);
+                searcher.search(&mut index_reader).await
+            }
+            // Default to prefix search
+            _ => {
+                let mut searcher = PrefixSearch::new(fts_terms.as_ref(), column_index_meta);
+                searcher.search(&mut index_reader).await
+            }
+        };
+
+        match matched_bv {
             Ok(bitmap) => {
                 if res.len() < bitmap.len() {
                     res.resize(bitmap.len(), false);

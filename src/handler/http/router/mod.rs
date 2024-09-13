@@ -391,6 +391,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(search::search_partition)
             .service(search::around)
             .service(search::values)
+            .service(search::search_history)
             .service(search::saved_view::create_view)
             .service(search::saved_view::update_view)
             .service(search::saved_view::get_view)

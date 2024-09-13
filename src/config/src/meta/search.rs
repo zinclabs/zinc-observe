@@ -368,6 +368,156 @@ pub struct SearchPartitionResponse {
     pub partitions: Vec<[i64; 2]>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, ToSchema)]
+pub struct SearchHistoryRequest {
+    pub org_id: Option<String>,
+    pub stream_type: Option<String>,
+    pub stream_name: Option<String>,
+    pub start_time: i64,
+    pub end_time: i64,
+    pub trace_id: Option<String>,
+    pub user_email: Option<String>,
+    #[serde(default = "default_size")]
+    pub size: i64,
+}
+
+impl SearchHistoryRequest {
+    pub fn validate(&self) -> Result<bool, String> {
+        if self.start_time >= self.end_time {
+            return Err("start_time must be less than end_time".to_string());
+        }
+        Ok(true)
+    }
+
+    fn build_query(&self, search_stream_name: &str) -> Result<String, String> {
+        self.validate()?;
+
+        // Create the query
+        let query = search_history_utils::SearchHistoryQueryBuilder::new()
+            .with_org_id(&self.org_id)
+            .with_stream_type(&self.stream_type)
+            .with_stream_name(&self.stream_name)
+            .with_trace_id(&self.trace_id)
+            .with_user_email(&self.user_email)
+            .build(search_stream_name);
+
+        Ok(query)
+    }
+
+    pub fn to_query_req(&self, search_stream_name: &str, sort_by: &str) -> Result<Request, String> {
+        let sql = self.build_query(search_stream_name)?;
+
+        let search_req = Request {
+            query: Query {
+                sql,
+                from: 0,
+                size: self.size,
+                start_time: self.start_time,
+                end_time: self.end_time,
+                sort_by: Some(format!("{} DESC", sort_by)),
+                quick_mode: false,
+                query_type: "".to_string(),
+                track_total_hits: false,
+                uses_zo_fn: false,
+                query_fn: None,
+                skip_wal: false,
+            },
+            encoding: RequestEncoding::Empty,
+            regions: Vec::new(),
+            clusters: Vec::new(),
+            timeout: 0,
+            search_type: Some(SearchEventType::Other),
+            index_type: "".to_string(),
+        };
+        Ok(search_req)
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct SearchHistoryHitResponse {
+    pub org_id: String,
+    pub stream_type: String,
+    pub stream_name: String,
+    pub user_email: String,
+    #[serde(rename = "start_time")]
+    pub min_ts: i64,
+    #[serde(rename = "end_time")]
+    pub max_ts: i64,
+    #[serde(rename = "sql")]
+    pub request_body: String,
+    #[serde(rename = "scan_size")]
+    pub size: f64,
+    #[serde(rename = "scan_records")]
+    pub num_records: i64,
+    #[serde(rename = "took")]
+    pub response_time: f64,
+    pub cached_ratio: i64,
+    pub trace_id: String,
+}
+
+impl TryFrom<json::Value> for SearchHistoryHitResponse {
+    type Error = String;
+
+    fn try_from(value: json::Value) -> Result<Self, Self::Error> {
+        Ok(SearchHistoryHitResponse {
+            org_id: value
+                .get("org_id")
+                .and_then(|v| v.as_str())
+                .ok_or("org_id missing".to_string())?
+                .to_string(),
+            stream_type: value
+                .get("stream_type")
+                .and_then(|v| v.as_str())
+                .ok_or("stream_type missing".to_string())?
+                .to_string(),
+            stream_name: value
+                .get("stream_name")
+                .and_then(|v| v.as_str())
+                .ok_or("stream_name missing".to_string())?
+                .to_string(),
+            user_email: value
+                .get("user_email")
+                .and_then(|v| v.as_str())
+                .ok_or("user_email missing".to_string())?
+                .to_string(),
+            min_ts: value
+                .get("min_ts")
+                .and_then(|v| v.as_i64())
+                .ok_or("min_ts missing".to_string())?,
+            max_ts: value
+                .get("max_ts")
+                .and_then(|v| v.as_i64())
+                .ok_or("max_ts missing".to_string())?,
+            request_body: value
+                .get("request_body")
+                .and_then(|v| v.as_str())
+                .ok_or("request_body".to_string())?
+                .to_string(),
+            size: value
+                .get("size")
+                .and_then(|v| v.as_f64())
+                .ok_or("size missing".to_string())?,
+            num_records: value
+                .get("num_records")
+                .and_then(|v| v.as_i64())
+                .ok_or("num_records missing".to_string())?,
+            response_time: value
+                .get("response_time")
+                .and_then(|v| v.as_f64())
+                .ok_or("response_time missing".to_string())?,
+            cached_ratio: value
+                .get("cached_ratio")
+                .and_then(|v| v.as_i64())
+                .ok_or("cached_ratio missing".to_string())?,
+            trace_id: value
+                .get("trace_id")
+                .and_then(|v| v.as_str())
+                .ok_or("trace_id missing".to_string())?
+                .to_string(),
+        })
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct QueryStatusResponse {
     pub status: Vec<QueryStatus>,
@@ -427,7 +577,7 @@ impl ScanStats {
         self.querier_memory_cached_files += other.querier_memory_cached_files;
         self.querier_disk_cached_files += other.querier_disk_cached_files;
         self.idx_scan_size += other.idx_scan_size;
-        self.idx_took += other.idx_took;
+        self.idx_took = std::cmp::max(self.idx_took, other.idx_took);
     }
 
     pub fn format_to_mb(&mut self) {
@@ -730,5 +880,183 @@ mod tests {
 
         assert_eq!(rpc_req.query.as_ref().unwrap().sql, req.query.sql);
         assert_eq!(rpc_req.query.as_ref().unwrap().size, req.query.size as i32);
+    }
+}
+
+mod search_history_utils {
+    pub struct SearchHistoryQueryBuilder {
+        pub org_id: Option<String>,
+        pub stream_type: Option<String>,
+        pub stream_name: Option<String>,
+        pub user_email: Option<String>,
+        pub trace_id: Option<String>,
+    }
+
+    impl SearchHistoryQueryBuilder {
+        pub fn new() -> Self {
+            Self {
+                org_id: None,
+                stream_type: None,
+                stream_name: None,
+                user_email: None,
+                trace_id: None,
+            }
+        }
+
+        pub fn with_org_id(mut self, org_id: &Option<String>) -> Self {
+            self.org_id = org_id.to_owned();
+            self
+        }
+
+        pub fn with_stream_type(mut self, stream_type: &Option<String>) -> Self {
+            self.stream_type = stream_type.to_owned();
+            self
+        }
+
+        pub fn with_stream_name(mut self, stream_name: &Option<String>) -> Self {
+            self.stream_name = stream_name.to_owned();
+            self
+        }
+
+        pub fn with_trace_id(mut self, trace_id: &Option<String>) -> Self {
+            self.trace_id = trace_id.to_owned();
+            self
+        }
+
+        pub fn with_user_email(mut self, email: &Option<String>) -> Self {
+            self.user_email = email.to_owned();
+            self
+        }
+
+        // Method to build the SQL query
+        pub fn build(self, search_stream_name: &str) -> String {
+            let mut query = format!("SELECT * FROM {} WHERE 1=1", search_stream_name);
+
+            if let Some(org_id) = self.org_id {
+                if !org_id.is_empty() {
+                    query.push_str(&format!(" AND org_id = '{}'", org_id));
+                }
+            }
+            if let Some(stream_type) = self.stream_type {
+                if !stream_type.is_empty() {
+                    query.push_str(&format!(" AND stream_type = '{}'", stream_type));
+                }
+            }
+            if let Some(stream_name) = self.stream_name {
+                if !stream_name.is_empty() {
+                    query.push_str(&format!(" AND stream_name = '{}'", stream_name));
+                }
+            }
+            if let Some(user_email) = self.user_email {
+                if !user_email.is_empty() {
+                    query.push_str(&format!(" AND user_email = '{}'", user_email));
+                }
+            }
+            if let Some(trace_id) = self.trace_id {
+                if !trace_id.is_empty() {
+                    query.push_str(&format!(" AND trace_id = '{}'", trace_id));
+                }
+            }
+
+            query
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::SearchHistoryQueryBuilder;
+        const SEARCH_STREAM_NAME: &str = "usage";
+
+        #[test]
+        fn test_empty_query() {
+            let query = SearchHistoryQueryBuilder::new().build(SEARCH_STREAM_NAME);
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1");
+        }
+
+        #[test]
+        fn test_with_org_id() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_org_id(&Some("org123".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(query, "SELECT * FROM usage WHERE 1=1 AND org_id = 'org123'");
+        }
+
+        #[test]
+        fn test_with_stream_type() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_stream_type(&Some("logs".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE 1=1 AND stream_type = 'logs'"
+            );
+        }
+
+        #[test]
+        fn test_with_stream_name() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_stream_name(&Some("streamA".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE 1=1 AND stream_name = 'streamA'"
+            );
+        }
+
+        #[test]
+        fn test_with_user_email() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_user_email(&Some("user123@gmail.com".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE 1=1 AND user_email = 'user123@gmail.com'"
+            );
+        }
+
+        #[test]
+        fn test_with_trace_id() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_trace_id(&Some("trace123".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE 1=1 AND trace_id = 'trace123'"
+            );
+        }
+
+        #[test]
+        fn test_combined_query() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_org_id(&Some("org123".to_string()))
+                .with_stream_type(&Some("logs".to_string()))
+                .with_stream_name(&Some("streamA".to_string()))
+                .with_user_email(&Some("user123@gmail.com".to_string()))
+                .with_trace_id(&Some("trace123".to_string()))
+                .build(SEARCH_STREAM_NAME);
+
+            let expected_query = "SELECT * FROM usage WHERE 1=1 \
+            AND org_id = 'org123' \
+            AND stream_type = 'logs' \
+            AND stream_name = 'streamA' \
+            AND user_email = 'user123@gmail.com' \
+            AND trace_id = 'trace123'";
+
+            assert_eq!(query, expected_query);
+        }
+
+        #[test]
+        fn test_partial_query() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_org_id(&Some("org123".to_string()))
+                .with_user_email(&Some("user123@gmail.com".to_string()))
+                .build(SEARCH_STREAM_NAME);
+
+            let expected_query = "SELECT * FROM usage WHERE 1=1 \
+            AND org_id = 'org123' \
+            AND user_email = 'user123@gmail.com'";
+
+            assert_eq!(query, expected_query);
+        }
     }
 }

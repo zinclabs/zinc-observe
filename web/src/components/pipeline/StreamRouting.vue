@@ -132,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disableVrlFunction="true"
             :isValidSqlQuery="isValidSqlQuery"
             :disableQueryTypeSelection="true"
+            :showTimezoneWarning="showTimezoneWarning"
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
             v-model:query_type="streamRoute.query_condition.type"
@@ -202,7 +203,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineAsyncComponent, onMounted, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import RealTimeAlert from "../alerts/RealTimeAlert.vue";
-import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
+import {
+  getTimezoneOffset,
+  getUUID,
+  getTimezonesByOffset,
+} from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
@@ -211,6 +216,7 @@ import { useQuasar } from "quasar";
 import ScheduledPipeline from "@/components/pipeline/ScheduledPipeline.vue";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
+import { convertDateToTimestamp } from "@/utils/date";
 
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
@@ -245,10 +251,12 @@ interface StreamRoute {
     frequency_type: string;
     frequency: number;
     cron: string;
+    timezone: string;
   };
   context_attributes: any;
   description: string;
   enabled: boolean;
+  tz_offset?: number;
 }
 
 const props = defineProps({
@@ -308,6 +316,8 @@ const isAggregationEnabled = ref(false);
 
 const routeFormRef = ref<any>(null);
 
+const showTimezoneWarning = ref(false);
+
 const nodeLink = ref({
   from: "",
   to: "",
@@ -340,6 +350,7 @@ const getDefaultStreamRoute = () => {
       frequency_type: "minutes",
       cron: "",
       frequency: 15,
+      timezone: "UTC",
     },
     context_attributes: [
       {
@@ -365,6 +376,19 @@ onMounted(() => {
       // If aggregation was present enable aggregation toggle
       isAggregationEnabled.value =
         !!props.editingRoute.query_condition.aggregation;
+
+      if (!streamRoute.value.trigger_condition?.timezone) {
+        if (streamRoute.value.tz_offset === 0 || !streamRoute.value.tz_offset) {
+          streamRoute.value.trigger_condition.timezone = "UTC";
+        } else {
+          getTimezonesByOffset(streamRoute.value.tz_offset as number).then(
+            (res: any) => {
+              if (res.length > 1) showTimezoneWarning.value = true;
+              streamRoute.value.trigger_condition.timezone = res[0];
+            },
+          );
+        }
+      }
 
       // If context attributes are present, convert them to array
       streamRoute.value.context_attributes = Object.keys(
@@ -506,7 +530,6 @@ const saveRouting = async () => {
   emit("update:node", {
     data: {
       ...getRoutePayload(),
-      tz_offset: getTimezoneOffset(),
       name: streamRoute.value.name,
     },
     link: nodeLink.value,
@@ -616,6 +639,35 @@ const getRoutePayload = () => {
 
     if (payload.query_condition.aggregation?.having) {
       delete payload.query_condition?.aggregation?.having;
+    }
+
+    payload.tz_offset = getTimezoneOffset();
+
+    if (payload.trigger_condition.frequency_type == "cron") {
+      const now = new Date();
+
+      // Get the day, month, and year from the date object
+      const day = String(now.getDate()).padStart(2, "0");
+      const month = String(now.getMonth() + 1).padStart(2, "0"); // January is 0!
+      const year = now.getFullYear();
+
+      // Combine them in the DD-MM-YYYY format
+      const date = `${day}-${month}-${year}`;
+
+      // Get the hours and minutes, ensuring they are formatted with two digits
+      const hours = String(now.getHours()).padStart(2, "0");
+      const minutes = String(now.getMinutes()).padStart(2, "0");
+
+      // Combine them in the HH:MM format
+      const time = `${hours}:${minutes}`;
+
+      const convertedDateTime = convertDateToTimestamp(
+        date,
+        time,
+        payload.trigger_condition.timezone,
+      );
+
+      payload.tz_offset = convertedDateTime.offset;
     }
 
     delete payload?.conditions;

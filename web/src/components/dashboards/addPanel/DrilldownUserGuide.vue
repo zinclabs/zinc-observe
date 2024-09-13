@@ -49,6 +49,27 @@
       </li>
     </ul>
 
+    <br />
+
+    <div class="header">Use current selected time period</div>
+    <p>
+      You can reference current selected Time period with the following format:
+    </p>
+    <ul>
+      <li><span class="bg-highlight">${start_time}</span></li>
+      <li><span class="bg-highlight">${end_time}</span></li>
+    </ul>
+    For Example:
+    <span class="bg-highlight">from=${start_time}&to=${end_time}</span>
+    <br />
+    <span class="header">Note: </span>
+    <span
+      >Even with a relative time period, you can still use
+      <span class="bg-highlight">start_time</span> and
+      <span class="bg-highlight">end_time</span>.</span
+    >
+    <br />
+    <br />
     <div class="header">Use Series name and value</div>
     <p>
       You can reference the series name and value with the following variables:
@@ -57,6 +78,8 @@
       <li><span class="bg-highlight">${series.__name}</span></li>
       <li><span class="bg-highlight">${series.__value}</span></li>
     </ul>
+
+    <br />
 
     <div class="header">For table chart drilldown</div>
     <p>
@@ -74,6 +97,8 @@
       </li>
       <li><span class="bg-highlight">${row.index}</span></li>
     </ul>
+
+    <br />
 
     <div class="header">For Sankey chart drilldown</div>
     <p>

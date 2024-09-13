@@ -140,7 +140,23 @@ pub async fn watch_syslog_settings() -> Result<(), anyhow::Error> {
         };
         match ev {
             db::Event::Put(ev) => {
-                let item_value: bool = json::from_slice(&ev.value.unwrap()).unwrap();
+                let item_value: bool = if config::get_config().common.meta_store_external {
+                    match db::get(&ev.key).await {
+                        Ok(val) => match json::from_slice(&val) {
+                            Ok(val) => val,
+                            Err(e) => {
+                                log::error!("Error getting value: {}", e);
+                                continue;
+                            }
+                        },
+                        Err(e) => {
+                            log::error!("Error getting value: {}", e);
+                            continue;
+                        }
+                    }
+                } else {
+                    json::from_slice(&ev.value.unwrap()).unwrap()
+                };
                 let mut syslog_enabled = SYSLOG_ENABLED.write();
                 *syslog_enabled = item_value;
             }

@@ -652,6 +652,25 @@ export default defineComponent({
         // also, if value is an array, then last value will be taken
         const drilldownVariables: any = {};
 
+        // selected start time and end time
+        if (
+          selectedTimeObj?.value?.start_time &&
+          selectedTimeObj?.value?.start_time != "Invalid Date"
+        ) {
+          drilldownVariables.start_time = new Date(
+            selectedTimeObj?.value?.start_time?.toISOString()
+          ).getTime();
+        }
+
+        if (
+          selectedTimeObj?.value?.end_time &&
+          selectedTimeObj?.value?.end_time != "Invalid Date"
+        ) {
+          drilldownVariables.end_time = new Date(
+            selectedTimeObj?.value?.end_time?.toISOString()
+          ).getTime();
+        }
+
         // if chart type is 'table' then we need to pass the table name
         if (panelSchema.value.type == "table") {
           const fields: any = {};

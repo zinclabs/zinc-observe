@@ -153,7 +153,8 @@ impl From<UsageType> for UsageEvent {
             UsageType::Search
             | UsageType::SearchAround
             | UsageType::SearchTopNValues
-            | UsageType::MetricSearch => UsageEvent::Search,
+            | UsageType::MetricSearch
+            | UsageType::SearchHistory => UsageEvent::Search,
             UsageType::Functions => UsageEvent::Functions,
             UsageType::Retention => UsageEvent::Other,
         }
@@ -192,6 +193,8 @@ pub enum UsageType {
     SearchAround,
     #[serde(rename = "/_values")]
     SearchTopNValues,
+    #[serde(rename = "/_search_history")]
+    SearchHistory,
     #[serde(rename = "functions")]
     Functions,
     #[serde(rename = "data_retention")]
@@ -220,6 +223,7 @@ impl std::fmt::Display for UsageType {
             UsageType::MetricSearch => write!(f, "/metrics/_search"),
             UsageType::SearchAround => write!(f, "/_around"),
             UsageType::SearchTopNValues => write!(f, "/_values"),
+            UsageType::SearchHistory => write!(f, "/_search_history"),
             UsageType::Functions => write!(f, "functions"),
             UsageType::Retention => write!(f, "data_retention"),
             UsageType::Syslog => write!(f, "syslog"),

@@ -422,6 +422,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="width: 100%"
                       />
                     </div>
+                    <div class="o2-input">
+                      <q-select
+                        data-test="add-report-schedule-start-timezone-select"
+                        v-model="scheduling.timezone"
+                        :options="filteredTimezone"
+                        @blur="
+                          timezone =
+                            timezone == ''
+                              ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                              : timezone
+                        "
+                        use-input
+                        @filter="timezoneFilterFn"
+                        input-debounce="0"
+                        dense
+                        filled
+                        emit-value
+                        fill-input
+                        hide-selected
+                        :label="t('logStream.timezone') + ' *'"
+                        :display-value="`Timezone: ${timezone}`"
+                        :rules="[(val: any) => !!val || 'Field is required!']"
+                        class="timezone-select showLabelOnTop"
+                        stack-label
+                        outlined
+                        style="width: 300px"
+                      />
+                    </div>
                   </div>
                 </template>
                 <template v-else>
@@ -817,6 +845,7 @@ import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import cronParser from "cron-parser";
 import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import { convertDateToTimestamp } from "@/utils/date";
 
 const props = defineProps({
   report: {
@@ -1226,40 +1255,6 @@ const getDashboaordFolders = () => {
   });
 };
 
-/**
- * @param {string} date - date in DD-MM-YYYY format
- * @param {string} time - time in HH:MM 24hr format
- * @param {string} timezone - timezone
- */
-const convertDateToTimestamp = (
-  date: string,
-  time: string,
-  timezone: string,
-) => {
-  const [day, month, year] = date.split("-");
-  const [hour, minute] = time.split(":");
-
-  const _date = {
-    year: Number(year),
-    month: Number(month),
-    day: Number(day),
-    hour: Number(hour),
-    minute: Number(minute),
-  };
-
-  if (timezone.toLowerCase() == browserTime.toLowerCase()) {
-    timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  }
-
-  // Create a DateTime instance from date and time, then set the timezone
-  const dateTime = _DateTime.fromObject(_date, { zone: timezone });
-
-  // Convert the DateTime to a Unix timestamp in milliseconds
-  const unixTimestampMillis = dateTime.toMillis();
-
-  return { timestamp: unixTimestampMillis * 1000, offset: dateTime.offset }; // timestamp in microseconds
-};
-
 const saveReport = async () => {
   // If frequency is cron, then we set the start timestamp as current time and timezone as browser timezone
   const reportPayload = JSON.parse(JSON.stringify(formData.value));
@@ -1284,9 +1279,6 @@ const saveReport = async () => {
 
     // Combine them in the HH:MM format
     scheduling.value.time = `${hours}:${minutes}`;
-
-    scheduling.value.timezone =
-      Intl.DateTimeFormat().resolvedOptions().timeZone;
   }
 
   const convertedDateTime = convertDateToTimestamp(

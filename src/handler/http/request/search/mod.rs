@@ -21,7 +21,7 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        search::SearchEventType,
+        search::{SearchEventType, SearchHistoryHitResponse},
         stream::StreamType,
         usage::{RequestStats, UsageType},
     },
@@ -1330,4 +1330,240 @@ pub async fn search_partition(
             })
         }
     }
+}
+
+/// Search History
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Search",
+    operation_id = "SearchHistory",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization ID"),
+    ),
+    request_body(
+        content = SearchHistoryRequest,
+        description = "Search history request parameters",
+        content_type = "application/json",
+        example = json!({
+            "stream_name": "default",
+            "stream_type": "logs",
+            "min_ts": 1632960000,
+            "max_ts": 1633046400,
+            "trace_id": "7f7898fd19424c47ba830a6fa9b25e1f",
+            "size": 100
+        })
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = SearchHistoryResponse, example = json ! ({
+            "took": 40,
+            "took_detail": {
+                "total": 0,
+                "idx_took": 0,
+                "wait_queue": 0,
+                "cluster_total": 40,
+                "cluster_wait_queue": 0
+            },
+            "hits": [
+                {
+                "cached_ratio": 0,
+                "end_time": 15,
+                "org_id": "default",
+                "scan_records": 1,
+                "scan_size": 7.0,
+                "sql": "SELECT COUNT(*) from \"default\"",
+                "start_time": 0,
+                "stream_name": "default",
+                "stream_type": "logs",
+                "took": 0.056222333,
+                "trace_id": "7f7898fd19424c47ba830a6fa9b25e1f",
+                "user_email": "root@example.com"
+                },
+            ],
+            "total": 3,
+            "from": 0,
+            "size": 20,
+            "cached_ratio": 0,
+            "scan_size": 0,
+            "idx_scan_size": 0,
+            "scan_records": 3,
+            "trace_id": "2lsPBWjwZxUJ5ugvZ4jApESZEpk",
+            "is_partial": false,
+            "result_cache_ratio": 0
+        })),
+        (status = 400, description = "Bad Request - Invalid parameters or body", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Internal Server Error", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[post("/{org_id}/_search_history")]
+pub async fn search_history(
+    org_id: web::Path<String>,
+    in_req: HttpRequest,
+    body: web::Bytes,
+) -> Result<HttpResponse, Error> {
+    let start = std::time::Instant::now();
+    let started_at = Utc::now().timestamp_micros();
+    let org_id = org_id.into_inner();
+    let cfg = get_config();
+    let http_span = if cfg.common.tracing_search_enabled {
+        tracing::info_span!("/api/{org_id}/_search_history", org_id = org_id.clone())
+    } else {
+        Span::none()
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .map(|v| v.to_str().unwrap_or("").to_string());
+
+    let mut req: config::meta::search::SearchHistoryRequest = match json::from_slice(&body) {
+        Ok(v) => v,
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    };
+    // restrict history only to path org_id
+    req.org_id = Some(org_id.clone());
+    // restrict history only to requested user_id
+    req.user_email = user_id.clone();
+
+    // Search
+    let stream_name = "usage";
+    let search_query_req = match req.to_query_req(stream_name, &cfg.common.column_timestamp) {
+        Ok(r) => r,
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    };
+
+    // increment query queue
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .inc();
+
+    // handle search queue lock and timing
+    #[cfg(not(feature = "enterprise"))]
+    let locker = SearchService::QUEUE_LOCKER.clone();
+    #[cfg(not(feature = "enterprise"))]
+    let locker = locker.lock().await;
+    #[cfg(not(feature = "enterprise"))]
+    if !cfg.common.feature_query_queue_enabled {
+        drop(locker);
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let took_wait = start.elapsed().as_millis() as usize;
+    #[cfg(feature = "enterprise")]
+    let took_wait = 0;
+
+    log::info!(
+        "http search history API wait in queue took: {} ms",
+        took_wait
+    );
+
+    metrics::QUERY_PENDING_NUMS
+        .with_label_values(&[&org_id])
+        .dec();
+
+    let history_org_id = "_meta";
+    let stream_type = StreamType::Logs;
+    let search_res = SearchService::search(
+        &trace_id,
+        history_org_id,
+        stream_type,
+        user_id.clone(),
+        &search_query_req,
+    )
+    .instrument(http_span)
+    .await;
+
+    let mut search_res = match search_res {
+        Ok(res) => res,
+        Err(err) => {
+            http_report_metrics(
+                start,
+                &org_id,
+                stream_type,
+                stream_name,
+                "500",
+                "_search_history",
+            );
+            log::error!("[trace_id {}] Search history error : {:?}", trace_id, err);
+            return Ok(match err {
+                errors::Error::ErrorCode(code) => HttpResponse::InternalServerError().json(
+                    meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
+                ),
+                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    err.to_string(),
+                )),
+            });
+        }
+    };
+
+    search_res.hits = search_res
+        .hits
+        .into_iter()
+        .filter_map(|hit| match SearchHistoryHitResponse::try_from(hit) {
+            Ok(response) => match serde_json::to_value(response) {
+                Ok(json_value) => Some(json_value),
+                Err(e) => {
+                    log::error!("[trace_id {}] Serialization error: {:?}", trace_id, e);
+                    None
+                }
+            },
+            Err(e) => {
+                log::error!("[trace_id {}] Deserialization error: {:?}", trace_id, e);
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    search_res.trace_id = trace_id.clone();
+
+    // report http metrics
+    http_report_metrics(
+        start,
+        &org_id,
+        stream_type,
+        stream_name,
+        "200",
+        "_search_history",
+    );
+
+    // prepare usage metrics
+    let time_taken = start.elapsed().as_secs_f64();
+    let took_wait_in_queue = if search_res.took_detail.is_some() {
+        let resp_took = search_res.took_detail.as_ref().unwrap();
+        Some(resp_took.cluster_wait_queue)
+    } else {
+        None
+    };
+    let req_stats = RequestStats {
+        records: search_res.hits.len() as i64,
+        response_time: time_taken,
+        size: search_res.scan_size as f64,
+        request_body: Some(search_query_req.query.sql),
+        user_email: user_id,
+        min_ts: Some(req.start_time),
+        max_ts: Some(req.end_time),
+        cached_ratio: Some(search_res.cached_ratio),
+        search_type: Some(SearchEventType::Other),
+        trace_id: Some(trace_id),
+        took_wait_in_queue,
+        ..Default::default()
+    };
+    let num_fn = search_query_req.query.query_fn.is_some() as u16;
+    report_request_usage_stats(
+        req_stats,
+        &org_id,
+        stream_name,
+        StreamType::Logs,
+        UsageType::SearchHistory,
+        num_fn,
+        started_at,
+    )
+    .await;
+
+    Ok(HttpResponse::Ok().json(search_res))
 }

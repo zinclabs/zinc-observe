@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { date } from "quasar";
+import { DateTime as _DateTime } from "luxon";
 
 // Parses the duration string and returns the number is seconds
 export const parseDuration = (durationString: string) => {
@@ -250,5 +251,47 @@ export const convertUnixToQuasarFormat = (unixMicroseconds: any) => {
   } catch (error) {
     console.log("Error converting unix to quasar format");
     return "";
+  }
+};
+
+/**
+ * @param {string} date - date in DD-MM-YYYY format
+ * @param {string} time - time in HH:MM 24hr format
+ * @param {string} timezone - timezone
+ */
+export const convertDateToTimestamp = (
+  date: string,
+  time: string,
+  timezone: string,
+) => {
+  try {
+    const browserTime =
+      "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+
+    const [day, month, year] = date.split("-");
+    const [hour, minute] = time.split(":");
+
+    const _date = {
+      year: Number(year),
+      month: Number(month),
+      day: Number(day),
+      hour: Number(hour),
+      minute: Number(minute),
+    };
+
+    if (timezone.toLowerCase() == browserTime.toLowerCase()) {
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    }
+
+    // Create a DateTime instance from date and time, then set the timezone
+    const dateTime = _DateTime.fromObject(_date, { zone: timezone });
+
+    // Convert the DateTime to a Unix timestamp in milliseconds
+    const unixTimestampMillis = dateTime.toMillis();
+
+    return { timestamp: unixTimestampMillis * 1000, offset: dateTime.offset }; // timestamp in microseconds
+  } catch (error) {
+    console.log("Error converting date to timestamp");
+    return { timestamp: 0, offset: 0 };
   }
 };
