@@ -43,7 +43,7 @@ use vrl::{
     prelude::state,
 };
 
-use super::usage::publish_triggers_usage;
+use super::{pipeline::execution::PipelinedExt, usage::publish_triggers_usage};
 use crate::{
     common::{
         infra::config::{
@@ -191,24 +191,27 @@ pub async fn get_stream_pipeline_params(
     let pipeline = infra::pipeline::get_by_stream(org_id, &stream_params)
         .await
         .ok();
-    pipeline.and_then(|pl| {
-        let node_map = pl.get_node_map();
-        match pl.build_adjacency_list(&node_map) {
-            Err(e) => {
-                log::error!(
-                    "[Pipeline] {}/{}/{}: Error construct graph representation caused by {}. Skip pipeline execution",
-                    pl.org,
-                    pl.name,
-                    pl.id,
-                    e
-                );
-                None
-            }
-            Ok(graph) => {
-                Some((pl, node_map, graph))
+    match pipeline {
+        Some(pl) => {
+            let node_map = pl.get_node_map();
+            match (
+                pl.build_adjacency_list(&node_map),
+                pl.register_functions().await,
+            ) {
+                (Ok(graph), Ok(vrl_map)) => Some((pl, node_map, graph, vrl_map)),
+                _ => {
+                    log::error!(
+                        "[Pipeline] {}/{}/{}: Error prep pipeline execution parameters. Skip pipeline execution",
+                        pl.org,
+                        pl.name,
+                        pl.id,
+                    );
+                    None
+                }
             }
         }
-    })
+        None => None,
+    }
 }
 
 pub async fn get_stream_alerts(

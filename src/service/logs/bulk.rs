@@ -74,6 +74,7 @@ pub async fn ingest(
 
     let mut blocked_stream_warnings: HashMap<String, bool> = HashMap::new();
 
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
     let mut stream_pipeline_params: HashMap<String, PipelineParams> = HashMap::new();
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -118,7 +119,7 @@ pub async fn ingest(
             }];
 
             // Start retrieve associated pipeline and construct pipeline components
-            if let Some((pl, node_map, graph)) =
+            if let Some((pl, node_map, graph, vrl_map)) =
                 crate::service::ingestion::get_stream_pipeline_params(
                     org_id,
                     &stream_name,
@@ -130,7 +131,7 @@ pub async fn ingest(
                 streams.extend(pl_destinations);
                 stream_pipeline_params
                     .entry(stream_name.clone())
-                    .or_insert((pl, node_map, graph));
+                    .or_insert((pl, node_map, graph, vrl_map));
             }
             // End pipeline construction
 
@@ -144,10 +145,11 @@ pub async fn ingest(
         } else {
             next_line_is_data = false;
 
-            if let Some((pipeline, pl_node_map, pl_graph)) =
+            if let Some((pipeline, pl_node_map, pl_graph, vrl_map)) =
                 stream_pipeline_params.get(&stream_name)
             {
-                match pipeline.execute(value.clone(), pl_node_map, pl_graph) {
+                match pipeline.execute(value.clone(), pl_node_map, pl_graph, vrl_map, &mut runtime)
+                {
                     Err(e) => {
                         log::error!(
                             "[Pipeline] {}/{}/{}: Execution error: {}",

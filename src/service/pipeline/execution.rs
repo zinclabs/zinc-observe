@@ -16,10 +16,11 @@
 use std::collections::HashMap;
 
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use config::{
     get_config,
     meta::{
-        function::VRLResultResolver,
+        function::{Transform, VRLResultResolver},
         pipeline::{
             self,
             components::{Node, NodeData},
@@ -32,12 +33,16 @@ use config::{
 use vector_enrichment::TableRegistry;
 use vrl::compiler::runtime::Runtime;
 
-use crate::service::ingestion::{apply_vrl_fn, compile_vrl_function};
+use crate::{
+    common::infra::config::QUERY_FUNCTIONS,
+    service::ingestion::{apply_vrl_fn, compile_vrl_function},
+};
 
-pub trait PipelinedExt {
+#[async_trait]
+pub trait PipelinedExt: Sync + Send + 'static {
     /// Registers the function of all the FunctionNode of this pipeline once for execution.
     /// Returns a map of node_id -> VRLResultResolver for quick lookup
-    fn register_functions(&self) -> HashMap<String, VRLResultResolver>;
+    async fn register_functions(&self) -> Result<HashMap<String, VRLResultResolver>>;
 
     /// Executes the given input [Value] through this pipeline, under the assumption the pipeline is
     /// valid.
@@ -49,16 +54,19 @@ pub trait PipelinedExt {
         input: Value,
         node_map: &HashMap<String, Node>,
         graph: &HashMap<String, Vec<String>>,
+        vrl_map: &HashMap<String, VRLResultResolver>,
+        runtime: &mut Runtime,
     ) -> Result<HashMap<StreamParams, (Value, bool)>>;
 }
 
+#[async_trait]
 impl PipelinedExt for Pipeline {
-    fn register_functions(&self) -> HashMap<String, VRLResultResolver> {
+    async fn register_functions(&self) -> Result<HashMap<String, VRLResultResolver>> {
         let mut vrl_map = HashMap::new();
         for node in &self.nodes {
             if let pipeline::components::NodeData::Function(func_params) = &node.data {
-                if let Ok(vrl_runtime_config) =
-                    compile_vrl_function(&func_params.vrl_script, &self.org)
+                let transform = get_transforms(&self.org, &func_params.name).await?;
+                if let Ok(vrl_runtime_config) = compile_vrl_function(&transform.function, &self.org)
                 {
                     let registry = vrl_runtime_config
                         .config
@@ -75,7 +83,7 @@ impl PipelinedExt for Pipeline {
                 }
             }
         }
-        vrl_map
+        Ok(vrl_map)
     }
 
     fn execute(
@@ -83,10 +91,10 @@ impl PipelinedExt for Pipeline {
         input: Value,
         node_map: &HashMap<String, Node>,
         graph: &HashMap<String, Vec<String>>,
+        vrl_map: &HashMap<String, VRLResultResolver>,
+        runtime: &mut Runtime,
     ) -> Result<HashMap<StreamParams, (Value, bool)>> {
         let source_node_id = self.nodes[0].get_node_id();
-        let vrl_map = self.register_functions();
-        let mut runtime = crate::service::ingestion::init_functions_runtime();
         let mut results = HashMap::new();
 
         if let Err(e) = dfs(
@@ -96,8 +104,8 @@ impl PipelinedExt for Pipeline {
             &source_node_id,
             node_map,
             graph,
-            &vrl_map,
-            &mut runtime,
+            vrl_map,
+            runtime,
             &mut results,
         ) {
             return Err(anyhow::anyhow!(
@@ -264,4 +272,13 @@ fn process_next_nodes(
         }
         Ok(())
     }
+}
+
+async fn get_transforms(org_id: &str, fn_name: &str) -> Result<Transform> {
+    let func_key = format!("{org_id}/{fn_name}");
+    if let Some(trans) = QUERY_FUNCTIONS.get(&func_key) {
+        return Ok(trans.value().clone());
+    }
+    // get from database
+    crate::service::db::functions::get(org_id, fn_name).await
 }

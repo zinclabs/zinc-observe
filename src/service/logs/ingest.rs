@@ -73,6 +73,7 @@ pub async fn ingest(
     let mut stream_params = vec![StreamParams::new(org_id, &stream_name, StreamType::Logs)];
 
     // Start retrieve associated pipeline and construct pipeline components
+    let mut runtime = crate::service::ingestion::init_functions_runtime();
     let pipeline_params = crate::service::ingestion::get_stream_pipeline_params(
         org_id,
         &stream_name,
@@ -81,7 +82,7 @@ pub async fn ingest(
     .await;
     // End pipeline construction
 
-    if let Some((pl, node_map, graph)) = &pipeline_params {
+    if let Some((pl, node_map, graph, _)) = &pipeline_params {
         let pl_destinations = pl.get_all_destination_streams(node_map, graph);
         stream_params.extend(pl_destinations);
     }
@@ -160,8 +161,8 @@ pub async fn ingest(
             }
         }
 
-        if let Some((pipeline, pl_node_map, pl_graph)) = pipeline_params.as_ref() {
-            match pipeline.execute(item, pl_node_map, pl_graph) {
+        if let Some((pipeline, pl_node_map, pl_graph, vrl_map)) = pipeline_params.as_ref() {
+            match pipeline.execute(item, pl_node_map, pl_graph, vrl_map, &mut runtime) {
                 Err(e) => {
                     log::error!(
                         "[Pipeline] {}/{}/{}: Execution error: {}. Skip and ingest original",

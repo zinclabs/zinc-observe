@@ -22,17 +22,21 @@ use sqlx::{Decode, Error, FromRow, Row, Type};
 use utoipa::ToSchema;
 
 use crate::{
-    meta::stream::{StreamParams, StreamType},
+    meta::{
+        function::VRLResultResolver,
+        stream::{StreamParams, StreamType},
+    },
     utils::json,
 };
 
 pub mod components;
 
-// (pipeline, node_map, graph)
+// (pipeline, node_map, graph, vrl_map)
 pub type PipelineParams = (
     Pipeline,
     HashMap<String, Node>,
     HashMap<String, Vec<String>>,
+    HashMap<String, VRLResultResolver>,
 );
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema)]

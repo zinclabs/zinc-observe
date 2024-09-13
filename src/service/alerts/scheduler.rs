@@ -666,9 +666,14 @@ async fn handle_derived_stream_triggers(
             let mut ingestion_error_msg = None;
 
             let pl_node_map = pipeline.get_node_map();
-            if let Ok(pl_graph) = pipeline.build_adjacency_list(&pl_node_map) {
+            if let (Ok(pl_graph), Ok(vrl_map)) = (
+                pipeline.build_adjacency_list(&pl_node_map),
+                pipeline.register_functions().await,
+            ) {
+                let mut runtime = crate::service::ingestion::init_functions_runtime();
                 for record in local_val {
-                    match pipeline.execute(record, &pl_node_map, &pl_graph) {
+                    match pipeline.execute(record, &pl_node_map, &pl_graph, &vrl_map, &mut runtime)
+                    {
                         Err(e) => {
                             let err_msg = format!(
                                 "DerivedStream query results failed to pass through the associated pipeline: {}/{}. Caused by: {}",

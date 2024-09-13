@@ -103,11 +103,8 @@ pub enum NodeData {
 pub struct FunctionParams {
     #[serde(default)]
     pub name: String,
-    pub vrl_script: String,
     #[serde(default)]
     pub after_flatten: bool,
-    #[serde(default)]
-    pub params: String,
     #[serde(default)]
     pub num_args: u8,
 }
@@ -184,10 +181,10 @@ mod tests {
     #[test]
     fn test_function_node_serialization() {
         let func = FunctionParams {
-            vrl_script: "vrl_script".to_string(),
+            // vrl_script: "vrl_script".to_string(),
             name: "func".to_string(),
             after_flatten: false,
-            params: "row".to_string(),
+            // params: "row".to_string(),
             num_args: 0,
         };
         let func_node = NodeData::Function(func);
