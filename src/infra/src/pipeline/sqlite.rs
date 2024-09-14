@@ -56,19 +56,19 @@ impl super::PipelineTable for SqlitePipelineTable {
             r#"
 CREATE TABLE IF NOT EXISTS pipeline
 (
-    id              VARCHAR(256) NOT NULL PRIMARY KEY,
-    version         INT NOT NULL,
-    name            VARCHAR(256) NOT NULL,
+    id              VARCHAR(256) not null primary key,
+    version         INT not null,
+    name            VARCHAR(256) not null,
     description     TEXT,
-    org             VARCHAR(100) NOT NULL,
-    source_type     VARCHAR(50) NOT NULL,
+    org             VARCHAR(100) not null,
+    source_type     VARCHAR(50) not null,
     stream_org      VARCHAR(100),
     stream_name     VARCHAR(256),
     stream_type     VARCHAR(50),
     derived_stream  TEXT,
     nodes           TEXT,
     edges           TEXT,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at      TIMESTAMP default CURRENT_TIMESTAMP
 );
             "#,
         )
