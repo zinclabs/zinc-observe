@@ -34,7 +34,6 @@ pub mod metadata;
 pub mod metrics;
 pub mod organization;
 pub mod pipeline;
-// pub mod pipelines;
 pub mod promql;
 pub mod schema;
 pub mod search;

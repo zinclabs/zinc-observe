@@ -44,7 +44,7 @@ pub fn connect() -> Box<dyn PipelineTable> {
 pub trait PipelineTable: Sync + Send + 'static {
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
-    async fn put(&self, pipeline: Pipeline) -> Result<()>;
+    async fn put(&self, pipeline: &Pipeline) -> Result<()>;
     async fn update(&self, pipeline: Pipeline) -> Result<()>;
     async fn get_by_stream(&self, org: &str, stream_params: &StreamParams) -> Result<Pipeline>;
     async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline>;
@@ -65,7 +65,7 @@ pub async fn init() -> Result<()> {
 
 /// Creates a pipeline entry in the table
 #[inline]
-pub async fn put(pipeline: Pipeline) -> Result<()> {
+pub async fn put(pipeline: &Pipeline) -> Result<()> {
     CLIENT.put(pipeline).await
 }
 

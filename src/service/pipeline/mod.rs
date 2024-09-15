@@ -27,8 +27,8 @@ use config::meta::{
 
 use super::db;
 use crate::common::{
-    // infra::config::STREAM_FUNCTIONS,
-    meta::http::HttpResponse as MetaHttpResponse,
+    meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+    utils::auth::{remove_ownership, set_ownership},
 };
 
 pub mod execution;
@@ -61,17 +61,20 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error
         }
     }
 
-    match db::pipeline::set(pipeline).await {
+    match db::pipeline::set(&pipeline).await {
         Err(error) => Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
                 error.to_string(),
             )),
         ),
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Pipeline saved successfully".to_string(),
-        ))),
+        Ok(_) => {
+            set_ownership(&pipeline.org, "pipelines", Authz::new(&pipeline.id)).await;
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                "Pipeline saved successfully".to_string(),
+            )))
+        }
     }
 }
 
@@ -166,15 +169,14 @@ pub async fn list_pipelines(
         let mut result = Vec::new();
         for pipeline in pipelines {
             if permitted.is_none()
-                // QUESTION(taiming): what's this check for?
-                // || permitted
-                //     .as_ref()
-                //     .unwrap()
-                //     .contains(&format!("logs:{}", pipeline.stream_name))
                 || permitted
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("logs:_all_{}", org_id))
+                    .contains(&format!("pipelines:{}", pipeline.id))
+                || permitted
+                    .as_ref()
+                    .unwrap()
+                    .contains(&format!("pipelines:_all_{}", org_id))
             {
                 result.push(pipeline)
             }
@@ -228,10 +230,18 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<HttpResponse, Error> {
 
     let result = db::pipeline::delete(pipeline_id).await;
     match result {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Pipeline deleted".to_string(),
-        ))),
+        Ok(_) => {
+            remove_ownership(
+                &existing_pipeline.org,
+                "pipelines",
+                Authz::new(&existing_pipeline.id),
+            )
+            .await;
+            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                "Pipeline deleted".to_string(),
+            )))
+        }
         Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
             e.to_string(),

@@ -94,11 +94,11 @@ CREATE TABLE IF NOT EXISTS pipeline
         Ok(())
     }
 
-    async fn put(&self, pipeline: Pipeline) -> Result<()> {
+    async fn put(&self, pipeline: &Pipeline) -> Result<()> {
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
 
-        if let Err(e) = match pipeline.source {
+        if let Err(e) = match &pipeline.source {
             PipelineSource::Realtime(stream_params) => {
                 let (source_type, stream_org, stream_name, stream_type): (&str, &str, &str, &str) = (
                     "realtime",
@@ -113,11 +113,11 @@ INSERT INTO pipeline (id, version, name, description, org, source_type, stream_o
     ON CONFLICT DO NOTHING;
                     "#,
                 )
-                .bind(pipeline.id)
+                .bind(&pipeline.id)
                 .bind(pipeline.version)
-                .bind(pipeline.name)
-                .bind(pipeline.description)
-                .bind(pipeline.org)
+                .bind(&pipeline.name)
+                .bind(&pipeline.description)
+                .bind(&pipeline.org)
                 .bind(source_type)
                 .bind(stream_org)
                 .bind(stream_name)
@@ -141,11 +141,11 @@ INSERT INTO pipeline (id, version, name, description, org, source_type, derived_
     ON CONFLICT DO NOTHING;
                     "#,
                 )
-                .bind(pipeline.id)
+                .bind(&pipeline.id)
                 .bind(pipeline.version)
-                .bind(pipeline.name)
-                .bind(pipeline.description)
-                .bind(pipeline.org)
+                .bind(&pipeline.name)
+                .bind(&pipeline.description)
+                .bind(&pipeline.org)
                 .bind(source_type)
                 .bind(derived_stream_str)
                 .bind(json::to_string(&pipeline.nodes).expect("Serializing pipeline nodes error"))

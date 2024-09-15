@@ -24,7 +24,7 @@ use infra::pipeline::{self as infra_pipeline};
 /// Stores a new pipeline to database.
 ///
 /// Pipeline validation should be handled by the caller.
-pub async fn set(pipeline: Pipeline) -> Result<()> {
+pub async fn set(pipeline: &Pipeline) -> Result<()> {
     match infra_pipeline::put(pipeline).await {
         Ok(_) => {}
         Err(e) => {
