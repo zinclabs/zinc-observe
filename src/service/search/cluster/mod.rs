@@ -242,29 +242,26 @@ pub async fn search(
 
     // 3. process the search in the work group
     #[cfg(feature = "enterprise")]
-    if let Err(e) = work_group
-        .as_ref()
-        .unwrap()
-        .process(trace_id, user_id)
-        .await
-    {
-        metrics::QUERY_PENDING_NUMS
-            .with_label_values(&[&req.org_id])
-            .dec();
-        dist_lock::unlock(&locker).await?;
-        return Err(Error::Message(e.to_string()));
+    if let Some(wg) = &work_group {
+        if let Err(e) = wg.process(trace_id, user_id).await {
+            metrics::QUERY_PENDING_NUMS
+                .with_label_values(&[&req.org_id])
+                .dec();
+            dist_lock::unlock(&locker).await?;
+            return Err(Error::Message(e.to_string()));
+        }
     }
+
     #[cfg(feature = "enterprise")]
     if let Err(e) = dist_lock::unlock(&locker).await {
         metrics::QUERY_PENDING_NUMS
             .with_label_values(&[&req.org_id])
             .dec();
-        work_group
-            .as_ref()
-            .unwrap()
-            .done(trace_id, user_id)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
+        if let Some(wg) = &work_group {
+            wg.done(trace_id, user_id)
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
         return Err(e);
     }
     // done in the queue
@@ -403,12 +400,12 @@ pub async fn search(
             log::info!(
                 "[trace_id {trace_id}] search->grpc: search canceled before call search->grpc"
             );
-            work_group
-                .as_ref()
-                .unwrap()
-                .done(&trace_id, user_id)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
+            if let Some(wg) = &work_group {
+                wg.done(&trace_id, user_id)
+                    .await
+                    .map_err(|e| Error::Message(e.to_string()))?;
+            }
+
             return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
                 "[trace_id {trace_id}] search->grpc: search canceled before call search->grpc"
             ))));
@@ -540,12 +537,11 @@ pub async fn search(
                 dist_lock::unlock(&locker).await?;
                 #[cfg(feature = "enterprise")]
                 {
-                    work_group
-                        .as_ref()
-                        .unwrap()
-                        .done(trace_id, user_id)
-                        .await
-                        .map_err(|e| Error::Message(e.to_string()))?;
+                    if let Some(wg) = &work_group {
+                        wg.done(trace_id, user_id)
+                            .await
+                            .map_err(|e| Error::Message(e.to_string()))?;
+                    }
                 }
                 return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
                     e.to_string(),
@@ -559,12 +555,11 @@ pub async fn search(
             dist_lock::unlock(&locker).await?;
             #[cfg(feature = "enterprise")]
             {
-                work_group
-                    .as_ref()
-                    .unwrap()
-                    .done(trace_id, user_id)
-                    .await
-                    .map_err(|e| Error::Message(e.to_string()))?;
+                if let Some(wg) = &work_group {
+                    wg.done(trace_id, user_id)
+                        .await
+                        .map_err(|e| Error::Message(e.to_string()))?;
+                }
             }
             return Err(err);
         }
@@ -589,12 +584,11 @@ pub async fn search(
             dist_lock::unlock(&locker).await?;
             #[cfg(feature = "enterprise")]
             {
-                work_group
-                    .as_ref()
-                    .unwrap()
-                    .done(trace_id, user_id)
-                    .await
-                    .map_err(|e| Error::Message(e.to_string()))?;
+                if let Some(wg) = &work_group {
+                    wg.done(trace_id, user_id)
+                        .await
+                        .map_err(|e| Error::Message(e.to_string()))?;
+                }
             }
             return Err(e);
         }
@@ -606,12 +600,11 @@ pub async fn search(
     dist_lock::unlock(&locker).await?;
     #[cfg(feature = "enterprise")]
     {
-        work_group
-            .as_ref()
-            .unwrap()
-            .done(trace_id, user_id)
-            .await
-            .map_err(|e| Error::Message(e.to_string()))?;
+        if let Some(wg) = &work_group {
+            wg.done(trace_id, user_id)
+                .await
+                .map_err(|e| Error::Message(e.to_string()))?;
+        }
     }
 
     scan_stats.idx_scan_size = idx_scan_size as i64;
@@ -690,16 +683,20 @@ async fn work_group_need_wait(
                 "[trace_id {trace_id}] search: request timeout in queue"
             )));
         }
-        match work_group.as_ref().unwrap().need_wait(user_id).await {
-            Ok(true) => {
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        if let Some(wg) = work_group {
+            match wg.need_wait(user_id).await {
+                Ok(true) => {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                }
+                Ok(false) => {
+                    return Ok(());
+                }
+                Err(e) => {
+                    return Err(Error::Message(e.to_string()));
+                }
             }
-            Ok(false) => {
-                return Ok(());
-            }
-            Err(e) => {
-                return Err(Error::Message(e.to_string()));
-            }
+        } else {
+            return Ok(());
         }
     }
 }
