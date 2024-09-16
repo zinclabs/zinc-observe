@@ -29,7 +29,7 @@ use config::{
     utils::{base64, json},
     DISTINCT_FIELDS,
 };
-use infra::errors;
+use infra::{cache::stats, errors};
 use tracing::{Instrument, Span};
 
 use crate::{
@@ -810,18 +810,38 @@ async fn values_v1(
     let size = query
         .get("size")
         .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
-    let start_time = query
-        .get("start_time")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    // If this is a enrichment table, we need to get the start_time and end_time from the stats
+    let stats = if stream_type.eq(&StreamType::EnrichmentTables) {
+        Some(stats::get_stream_stats(org_id, stream_name, stream_type))
+    } else {
+        None
+    };
+    let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
+        stats.as_ref().unwrap().doc_time_min
+    } else {
+        query
+            .get("start_time")
+            .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
+    };
+
     if start_time == 0 {
         return Ok(MetaHttpResponse::bad_request("start_time is empty"));
     }
-    let end_time = query
-        .get("end_time")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    let end_time = if stream_type.eq(&StreamType::EnrichmentTables) {
+        stats.as_ref().unwrap().doc_time_max
+    } else {
+        query
+            .get("end_time")
+            .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
+    };
     if end_time == 0 {
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
+    let (start_time, end_time) = if start_time == end_time {
+        (start_time - 1, end_time + 1)
+    } else {
+        (start_time, end_time)
+    };
 
     let regions = query.get("regions").map_or(vec![], |regions| {
         regions
@@ -1074,18 +1094,38 @@ async fn values_v2(
     let size = query
         .get("size")
         .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
-    let start_time = query
-        .get("start_time")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    // If this is a enrichment table, we need to get the start_time and end_time from the stats
+    let stats = if stream_type.eq(&StreamType::EnrichmentTables) {
+        Some(stats::get_stream_stats(org_id, stream_name, stream_type))
+    } else {
+        None
+    };
+    let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
+        stats.as_ref().unwrap().doc_time_min
+    } else {
+        query
+            .get("start_time")
+            .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
+    };
+
     if start_time == 0 {
         return Ok(MetaHttpResponse::bad_request("start_time is empty"));
     }
-    let end_time = query
-        .get("end_time")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
+    let end_time = if stream_type.eq(&StreamType::EnrichmentTables) {
+        stats.as_ref().unwrap().doc_time_max
+    } else {
+        query
+            .get("end_time")
+            .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
+    };
     if end_time == 0 {
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
+    let (start_time, end_time) = if start_time == end_time {
+        (start_time - 1, end_time + 1)
+    } else {
+        (start_time, end_time)
+    };
     if no_count {
         query_sql = format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {size}")
     } else {

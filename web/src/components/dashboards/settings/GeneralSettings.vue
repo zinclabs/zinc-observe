@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"
+            :auto-apply-dashboard="true"
           />
         </div>
         <q-toggle
@@ -132,7 +133,7 @@ export default defineComponent({
       const data = await getDashboard(
         store,
         route.query.dashboard,
-        route.query.folder ?? "default"
+        route.query.folder ?? "default",
       );
 
       dashboardData.title = data.title;
@@ -159,9 +160,9 @@ export default defineComponent({
             await getDashboard(
               store,
               route.query.dashboard,
-              route.query.folder ?? "default"
-            )
-          )
+              route.query.folder ?? "default",
+            ),
+          ),
         );
 
         // update the values
@@ -190,7 +191,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           route.query.dashboard,
           data,
-          route?.query?.folder ?? "default"
+          route?.query?.folder ?? "default",
         );
 
         showPositiveNotification("Dashboard updated successfully.");
@@ -212,8 +213,8 @@ export default defineComponent({
         saveDashboardApi.execute().catch((err: any) => {
           showErrorNotification(
             JSON.stringify(
-              err.response.data["error"] || "Dashboard creation failed."
-            )
+              err.response.data["error"] || "Dashboard creation failed.",
+            ),
           );
         });
       });

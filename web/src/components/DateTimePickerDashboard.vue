@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <date-time
     ref="dateTimePicker"
-    :auto-apply="false"
+    :auto-apply="autoApplyDashboard"
     :default-type="modelValue.valueType"
     :default-absolute-time="{
       startTime: modelValue.startTime,
@@ -57,6 +57,10 @@ export default defineComponent({
       required: false,
       default: false,
     },
+    autoApplyDashboard: {
+      required: false,
+      default: false,
+    }
   },
   emits: ["update:modelValue"],
 

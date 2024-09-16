@@ -51,6 +51,14 @@
 
     <br />
 
+    <div class="header">Use current query</div>
+    <p>You can reference current query with the following format:</p>
+    <ul>
+      <li><span class="bg-highlight">${query}</span></li>
+      <li><span class="bg-highlight">${query_encoded}</span></li>
+    </ul>
+    <br />
+
     <div class="header">Use current selected time period</div>
     <p>
       You can reference current selected Time period with the following format:

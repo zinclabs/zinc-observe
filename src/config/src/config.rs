@@ -776,7 +776,7 @@ pub struct Common {
     pub use_multi_result_cache: bool,
     #[env_config(
         name = "ZO_RESULT_CACHE_SELECTION_STRATEGY",
-        default = "both",
+        default = "overlap",
         help = "Strategy to use for result cache, default is both , possible value - both,overlap , duration"
     )]
     pub result_cache_selection_strategy: String,
@@ -927,9 +927,15 @@ pub struct Limit {
     #[env_config(name = "ZO_QUICK_MODE_FILE_LIST_INTERVAL", default = 300)] // seconds
     pub quick_mode_file_list_interval: i64,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MIN_SIZE", default = 0)] // number of connections
-    pub sql_min_db_connections: u32,
+    pub sql_db_connections_min: u32,
     #[env_config(name = "ZO_META_CONNECTION_POOL_MAX_SIZE", default = 0)] // number of connections
-    pub sql_max_db_connections: u32,
+    pub sql_db_connections_max: u32,
+    #[env_config(
+        name = "ZO_META_CONNECTION_POOL_MAX_LIFETIME",
+        default = 0,
+        help = "Seconds, Maximum lifetime of individual connections."
+    )]
+    pub sql_db_connections_max_lifetime: u64,
     #[env_config(
         name = "ZO_META_TRANSACTION_RETRIES",
         default = 3,
@@ -1304,16 +1310,16 @@ pub fn init() -> Config {
         cfg.limit.file_push_limit = 10000;
     }
 
-    if cfg.limit.sql_min_db_connections == 0 {
-        cfg.limit.sql_min_db_connections = cpu_num as u32
+    if cfg.limit.sql_db_connections_min == 0 {
+        cfg.limit.sql_db_connections_min = cpu_num as u32
     }
 
-    if cfg.limit.sql_max_db_connections == 0 {
-        cfg.limit.sql_max_db_connections = cfg.limit.sql_min_db_connections * 2
+    if cfg.limit.sql_db_connections_max == 0 {
+        cfg.limit.sql_db_connections_max = cfg.limit.sql_db_connections_min * 2
     }
 
     if cfg.limit.consistent_hash_vnodes == 0 {
-        cfg.limit.consistent_hash_vnodes = 3;
+        cfg.limit.consistent_hash_vnodes = 100;
     }
 
     // check common config
