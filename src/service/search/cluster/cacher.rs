@@ -16,12 +16,15 @@
 use config::cluster::LOCAL_NODE;
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc::{self, DeleteResultCacheRequest, QueryCacheRequest};
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request};
+use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
 use tracing::{info_span, Instrument};
 
 use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse},
-    service::search::infra_cluster,
+    service::{
+        grpc::get_cached_channel,
+        search::{infra_cluster, server_internal_error},
+    },
 };
 
 #[tracing::instrument(name = "service:search:cluster:cacher:get_cached_results", skip_all)]
@@ -92,19 +95,14 @@ pub async fn get_cached_results(
                 let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "[trace_id {trace_id}] get_cached_results->grpc: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        super::super::server_internal_error("connect search node error")
-                    })?;
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "[trace_id {trace_id}] get_cached_results->grpc: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
                 let mut client =
                     cluster_rpc::query_cache_client::QueryCacheClient::with_interceptor(
                         channel,
@@ -309,19 +307,14 @@ pub async fn delete_cached_results(path: String) -> bool {
                 let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "[trace_id {trace_id}] delete_cached_results->grpc: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        super::super::server_internal_error("connect search node error")
-                    })?;
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "[trace_id {trace_id}] delete_cached_results->grpc: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
                 let mut client =
                     cluster_rpc::query_cache_client::QueryCacheClient::with_interceptor(
                         channel,

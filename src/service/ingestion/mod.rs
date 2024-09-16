@@ -21,8 +21,9 @@ use std::{
 use anyhow::{anyhow, Result};
 use chrono::{Duration, TimeZone, Utc};
 use config::{
-    cluster::LOCAL_NODE,
+    cluster::{LOCAL_NODE, LOCAL_NODE_ID},
     get_config,
+    ider::SnowflakeIdGenerator,
     meta::{
         stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
@@ -31,6 +32,7 @@ use config::{
     SIZE_IN_MB,
 };
 use futures::future::try_join_all;
+use infra::schema::STREAM_RECORD_ID_GENERATOR;
 use proto::cluster_rpc::IngestionType;
 use tokio::sync::Semaphore;
 use vector_enrichment::TableRegistry;
@@ -589,9 +591,10 @@ pub async fn get_stream_routing(
     }
 }
 
-pub async fn get_user_defined_schema(
+pub async fn get_uds_and_original_data_streams(
     streams: &[StreamParams],
     user_defined_schema_map: &mut HashMap<String, HashSet<String>>,
+    streams_need_original: &mut HashSet<String>,
 ) {
     let cfg = get_config();
     for stream in streams {
@@ -599,7 +602,10 @@ pub async fn get_user_defined_schema(
             infra::schema::get_settings(&stream.org_id, &stream.stream_name, stream.stream_type)
                 .await
                 .unwrap_or_default();
-        if let Some(fields) = stream_settings.defined_schema_fields {
+        if stream_settings.store_original_data {
+            streams_need_original.insert(stream.stream_name.to_string());
+        }
+        if let Some(fields) = &stream_settings.defined_schema_fields {
             if !fields.is_empty() {
                 let mut fields: HashSet<_> = fields.iter().cloned().collect();
                 if !fields.contains(&cfg.common.column_timestamp) {
@@ -609,6 +615,15 @@ pub async fn get_user_defined_schema(
             }
         }
     }
+}
+
+/// Calls the SnowflakeIdGenerator instance associated with this stream to generate a new i64 ID.
+pub fn generate_record_id(org_id: &str, stream_name: &str, stream_type: &StreamType) -> i64 {
+    let key = format!("{}/{}/{}", org_id, stream_type, stream_name);
+    STREAM_RECORD_ID_GENERATOR
+        .entry(key)
+        .or_insert_with(|| SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }))
+        .generate()
 }
 
 pub fn create_log_ingestion_req(

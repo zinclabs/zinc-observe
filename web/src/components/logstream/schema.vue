@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="markFormDirty"
               />
             </div>
+          
           </template>
 
           <template
@@ -168,7 +169,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <q-separator class="q-mt-lg q-mb-lg" />
 
-          <div class="title" data-test="schema-log-stream-mapping-title-text">
+          <div class="title flex tw-justify-between items-center" data-test="schema-log-stream-mapping-title-text">
+           <div>
             {{ t("logStream.mapping") }}
             <label
               v-show="indexData.defaultFts"
@@ -177,6 +179,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >- Using default fts keys, as no fts keys are set for
               stream.</label
             >
+           </div>
+            <q-toggle
+                data-test="log-stream-store-original-data-toggle-btn"
+                v-model="storeOriginalData"
+                :label="t('logStream.storeOriginalData')"
+                @click="formDirtyFlag = true"
+        />
           </div>
 
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
@@ -428,6 +437,7 @@ export default defineComponent({
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
     const dataRetentionDays = ref(0);
+    const storeOriginalData = ref(false);
     const maxQueryRange = ref(0);
     const confirmQueryModeChangeDialog = ref(false);
     const formDirtyFlag = ref(false);
@@ -478,6 +488,7 @@ export default defineComponent({
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
       maxQueryRange.value = 0;
+      storeOriginalData.value = false;
     });
 
     const isSchemaEvolutionEnabled = computed(() => {
@@ -632,6 +643,7 @@ export default defineComponent({
           store.state.zoConfig.data_retention_days;
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
+      storeOriginalData.value = streamResponse.settings.store_original_data;
 
       if (!streamResponse.schema) {
         loadingState.value = false;
@@ -676,6 +688,7 @@ export default defineComponent({
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
+
           setSchema(streamResponse);
           loadingState.value = false;
           dismiss();
@@ -713,6 +726,7 @@ export default defineComponent({
       if (showDataRetention.value) {
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
+      settings["store_original_data"] = storeOriginalData.value; 
 
       const newSchemaFieldsSet = new Set(
         newSchemaFields.value.map((field) =>
@@ -990,6 +1004,7 @@ export default defineComponent({
       showFullTextSearchColumn,
       getImageURL,
       dataRetentionDays,
+      storeOriginalData,
       maxQueryRange,
       showDataRetention,
       formatSizeFromMB,

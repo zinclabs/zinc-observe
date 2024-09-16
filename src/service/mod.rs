@@ -28,6 +28,7 @@ pub mod enrichment_table;
 pub mod exporter;
 pub mod file_list;
 pub mod functions;
+pub mod grpc;
 pub mod ingestion;
 pub mod kv;
 pub mod logs;

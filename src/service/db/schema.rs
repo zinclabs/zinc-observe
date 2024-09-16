@@ -18,7 +18,10 @@ use std::sync::Arc;
 use arrow_schema::{Field, Schema};
 use bytes::Bytes;
 use config::{
-    get_config, is_local_disk_storage,
+    cluster::LOCAL_NODE_ID,
+    get_config,
+    ider::SnowflakeIdGenerator,
+    is_local_disk_storage,
     meta::{cluster::RoleGroup, stream::StreamType},
     utils::json,
 };
@@ -26,8 +29,8 @@ use hashbrown::{HashMap, HashSet};
 use infra::{
     cache,
     schema::{
-        unwrap_stream_settings, SchemaCache, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED,
-        STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        unwrap_stream_settings, SchemaCache, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS,
+        STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
 };
 #[cfg(feature = "enterprise")]
@@ -326,6 +329,13 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 }
                 let latest_schema = latest_schema.pop().unwrap();
                 let settings = unwrap_stream_settings(&latest_schema).unwrap_or_default();
+                if settings.store_original_data {
+                    if let dashmap::Entry::Vacant(entry) =
+                        STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
+                    {
+                        entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
+                    }
+                }
                 let mut w = STREAM_SETTINGS.write().await;
                 w.insert(item_key.to_string(), settings);
                 drop(w);
@@ -428,6 +438,10 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 w.remove(item_key);
                 w.shrink_to_fit();
                 drop(w);
+                {
+                    STREAM_RECORD_ID_GENERATOR.remove(item_key);
+                    STREAM_RECORD_ID_GENERATOR.shrink_to_fit();
+                }
                 let mut w = STREAM_SETTINGS.write().await;
                 w.remove(item_key);
                 w.shrink_to_fit();
@@ -489,6 +503,13 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         }
         let latest_schema = latest_schema.last().unwrap();
         let settings = unwrap_stream_settings(latest_schema).unwrap_or_default();
+        if settings.store_original_data {
+            if let dashmap::Entry::Vacant(entry) =
+                STREAM_RECORD_ID_GENERATOR.entry(item_key.to_string())
+            {
+                entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
+            }
+        }
         let mut w = STREAM_SETTINGS.write().await;
         w.insert(item_key.to_string(), settings);
         drop(w);

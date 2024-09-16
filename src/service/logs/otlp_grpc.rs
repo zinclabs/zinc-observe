@@ -37,7 +37,7 @@ use prost::Message;
 use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
-        ingestion::{IngestionStatus, StreamStatus},
+        ingestion::{IngestionStatus, StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME},
         stream::StreamParams,
     },
     handler::http::request::CONTENT_TYPE_PROTO,
@@ -100,9 +100,11 @@ pub async fn handle_grpc_request(
 
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
-    crate::service::ingestion::get_user_defined_schema(
+    let mut streams_need_original_set: HashSet<String> = HashSet::new();
+    crate::service::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
+        &mut streams_need_original_set,
     )
     .await;
     // End get user defined schema
@@ -204,6 +206,23 @@ pub async fn handle_grpc_request(
                 };
                 let main_stream_key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
 
+                // store a copy of original data before it's being transformed and/or flattened,
+                // unless
+                // 1. original data is not an object -> won't be flattened.
+                // 2. no routing and current StreamName not in streams_need_original_set
+                let original_data = if rec.is_object() {
+                    if stream_routing_map.is_empty()
+                        && !streams_need_original_set.contains(&stream_name)
+                    {
+                        None
+                    } else {
+                        // otherwise, make a copy in case the routed stream needs original data
+                        Some(rec.to_string())
+                    }
+                } else {
+                    None // `item` won't be flattened, no need to store original
+                };
+
                 // Start row based transform before flattening the value
                 if let Some(transforms) = stream_before_functions_map.get(&main_stream_key) {
                     if !transforms.is_empty() {
@@ -269,6 +288,25 @@ pub async fn handle_grpc_request(
 
                 if let Some(fields) = user_defined_schema_map.get(&routed_stream_name) {
                     local_val = crate::service::logs::refactor_map(local_val, fields);
+                }
+
+                // add `_original` and '_record_id` if required by StreamSettings
+                if streams_need_original_set.contains(&routed_stream_name)
+                    && original_data.is_some()
+                {
+                    local_val.insert(
+                        ORIGINAL_DATA_COL_NAME.to_string(),
+                        original_data.unwrap().into(),
+                    );
+                    let record_id = crate::service::ingestion::generate_record_id(
+                        org_id,
+                        &routed_stream_name,
+                        &StreamType::Logs,
+                    );
+                    local_val.insert(
+                        ID_COL_NAME.to_string(),
+                        json::Value::String(record_id.to_string()),
+                    );
                 }
 
                 let function_no = stream_before_functions_map

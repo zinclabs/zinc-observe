@@ -452,6 +452,8 @@ const useLogs = () => {
           searchObj.data.stream.streamType || "logs",
           true,
         ).then((res) => {
+         
+
           searchObj.loadingStream = false;
           return res;
         });
@@ -3817,6 +3819,8 @@ const useLogs = () => {
         );
 
         if (streamData.schema != undefined) {
+
+          
           searchObj.data.stream.selectedStreamFields.push(streamData.schema);
         }
       }

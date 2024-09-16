@@ -21,7 +21,7 @@ use tonic::{
     Request,
 };
 
-use crate::{common::infra::cluster, router::grpc::ingest::get_ingester_channel};
+use crate::{common::infra::cluster, service::grpc::get_ingester_channel};
 
 pub async fn ingest(
     dest_org_id: &str,
@@ -36,7 +36,7 @@ pub async fn ingest(
     let token: MetadataValue<_> = cluster::get_internal_grpc_token()
         .parse()
         .map_err(|_| Error::msg("invalid token".to_string()))?;
-    let channel = get_ingester_channel().await?;
+    let (addr, channel) = get_ingester_channel().await?;
     let mut client = cluster_rpc::usage_client::UsageClient::with_interceptor(
         channel,
         move |mut req: Request<()>| {
@@ -54,11 +54,17 @@ pub async fn ingest(
     let res: cluster_rpc::UsageResponse = match client.report_usage(req).await {
         Ok(res) => res.into_inner(),
         Err(err) => {
-            log::error!("[UsageReport] export partial_success response: {:?}", err);
+            log::error!(
+                "[UsageReport] export partial_success node: {addr}, response: {:?}",
+                err
+            );
             if err.code() == tonic::Code::Internal {
                 return Err(err.into());
             }
-            return Err(Error::msg("ingest node error"));
+            return Err(Error::msg(format!(
+                "Ingest node {addr}, response error: {}",
+                err
+            )));
         }
     };
     Ok(res)

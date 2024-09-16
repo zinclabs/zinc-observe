@@ -193,7 +193,7 @@ export default defineComponent({
 
     const isSpanSelected = computed(() => {
       return searchObj.data.traceDetails.expandedSpans.includes(
-        props.span.spanId
+        props.span.spanId,
       );
     });
 
@@ -211,7 +211,7 @@ export default defineComponent({
         (
           (props.span?.durationMs / props.baseTracePosition?.durationMs) *
           100
-        ).toFixed(2)
+        ).toFixed(2),
       );
     };
 
@@ -220,24 +220,38 @@ export default defineComponent({
     });
 
     watch(
-      () => props.span.startTimeMs + props.baseTracePosition["startTimeMs"],
+      () => props.span.startTimeMs,
       () => {
         leftPosition.value = getLeftPosition();
-      }
+      },
+      {
+        immediate: true,
+      },
+    );
+
+    watch(
+      () => props.baseTracePosition,
+      () => {
+        leftPosition.value = getLeftPosition();
+      },
+      {
+        immediate: true,
+        deep: true,
+      },
     );
 
     watch(
       () => props.span?.durationMs + props.baseTracePosition?.durationMs,
       () => {
         spanWidth.value = getSpanWidth();
-      }
+      },
     );
 
     watch(
       () => spanBlockWidth.value + leftPosition.value + spanWidth.value,
       (val) => {
         durationStyle.value = getDurationStyle();
-      }
+      },
     );
 
     const getDurationStyle = () => {
@@ -283,7 +297,7 @@ export default defineComponent({
       } else {
         searchObj.data.traceDetails.expandedSpans =
           searchObj.data.traceDetails.expandedSpans.filter(
-            (val) => props.span.spanId !== val
+            (val) => props.span.spanId !== val,
           );
       }
     };
