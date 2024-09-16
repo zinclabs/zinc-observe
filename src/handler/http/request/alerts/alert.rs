@@ -526,18 +526,12 @@ async fn show_alert_history(
 )]
 #[get("/{org_id}/alerts/history")]
 async fn show_all_alert_history(
-    path: web::Path<(String, String, String)>,
+    path: web::Path<String>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name, name) = path.into_inner();
+    let org_id = path.into_inner();
     let user_id = req.headers().get("user_id").unwrap().to_str().unwrap();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or_default(),
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
 
     let mut _alert_list_from_rbac = None;
     // Get List of allowed objects

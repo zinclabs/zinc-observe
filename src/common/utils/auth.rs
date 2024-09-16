@@ -304,6 +304,17 @@ impl FromRequest for AuthExtractor {
                         path_columns[0]
                     )
                 }
+            } else if path_columns[2].eq("history") {
+                if method.eq("GET") {
+                    method = "LIST".to_string();
+                }
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(format!("{}_{}", path_columns[1], path_columns[2]).as_str())
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[0]
+                )
             } else if path_columns[2].starts_with("_values")
                 || path_columns[2].starts_with("_around")
             {
@@ -390,7 +401,7 @@ impl FromRequest for AuthExtractor {
             format!(
                 "{}:{}",
                 OFGA_MODELS
-                    .get(path_columns[2])
+                    .get(format!("{}_{}", path_columns[2], path_columns[4]).as_str())
                     .map_or(path_columns[2], |model| model.key),
                 path_columns[3]
             )
