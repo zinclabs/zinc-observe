@@ -1281,6 +1281,11 @@ const saveReport = async () => {
     scheduling.value.time = `${hours}:${minutes}`;
   }
 
+  // If the user has selected to schedule now, we set the timezone to the current timezone
+  if (selectedTimeTab.value === "scheduleNow") {
+    scheduling.value.timezone = timezone.value;
+  }
+
   const convertedDateTime = convertDateToTimestamp(
     scheduling.value.date,
     scheduling.value.time,
