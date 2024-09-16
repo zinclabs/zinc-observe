@@ -58,7 +58,6 @@ fn main() -> Result<()> {
             &[
                 "proto/cluster/common.proto",
                 "proto/cluster/event.proto",
-                "proto/cluster/filelist.proto",
                 "proto/cluster/metrics.proto",
                 "proto/cluster/search.proto",
                 "proto/cluster/ingest.proto",

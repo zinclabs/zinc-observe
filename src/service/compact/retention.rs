@@ -126,7 +126,6 @@ pub async fn delete_all(
             PartitionTimeLevel::Unset,
             start_time,
             end_time,
-            true,
         )
         .await?;
         if cfg.compact.data_retention_history {
@@ -232,7 +231,6 @@ pub async fn delete_by_date(
             PartitionTimeLevel::Unset,
             time_range.0,
             time_range.1,
-            true,
         )
         .await?;
         if cfg.compact.data_retention_history {
@@ -306,7 +304,6 @@ async fn delete_from_file_list(
         PartitionTimeLevel::Unset,
         time_range.0,
         time_range.1,
-        true,
     )
     .await?;
     if files.is_empty() {

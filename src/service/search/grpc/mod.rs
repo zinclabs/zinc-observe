@@ -22,7 +22,6 @@ use config::{
     get_config,
     meta::{
         bitvec::BitVec,
-        cluster::RoleGroup,
         search::{ScanStats, SearchType, StorageType},
         stream::{FileKey, StreamPartition, StreamType},
     },
@@ -35,16 +34,13 @@ use infra::{
 };
 use proto::cluster_rpc;
 
-use crate::{
-    common::infra::cluster as infra_cluster,
-    service::{
-        db,
-        file_list::query_by_ids,
-        search::{
-            datafusion::exec,
-            generate_search_schema, generate_select_start_search_schema,
-            sql::{Sql, RE_SELECT_WILDCARD},
-        },
+use crate::service::{
+    db,
+    file_list::query_by_ids,
+    search::{
+        datafusion::exec,
+        generate_search_schema, generate_select_start_search_schema,
+        sql::{Sql, RE_SELECT_WILDCARD},
     },
 };
 mod storage;
@@ -446,15 +442,7 @@ pub(crate) async fn get_file_list_by_ids(
     stream_type: StreamType,
     partition_keys: &[StreamPartition],
 ) -> Vec<FileKey> {
-    let is_local = get_config().common.meta_store_external
-        || infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-            .await
-            .unwrap_or_default()
-            .len()
-            <= 1;
-    let file_list = query_by_ids(ids, &sql.org_id, is_local)
-        .await
-        .unwrap_or_default();
+    let file_list = query_by_ids(ids).await.unwrap_or_default();
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {

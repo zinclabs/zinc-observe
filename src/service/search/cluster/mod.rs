@@ -842,12 +842,6 @@ pub(crate) async fn get_file_list(
     time_level: PartitionTimeLevel,
     partition_keys: &[StreamPartition],
 ) -> Vec<FileKey> {
-    let is_local = get_config().common.meta_store_external
-        || infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-            .await
-            .unwrap_or_default()
-            .len()
-            <= 1;
     let (time_min, time_max) = sql.meta.time_range.unwrap();
     let file_list = file_list::query(
         &sql.org_id,
@@ -856,7 +850,6 @@ pub(crate) async fn get_file_list(
         time_level,
         time_min,
         time_max,
-        is_local,
     )
     .await
     .unwrap_or_default();
@@ -883,12 +876,6 @@ pub(crate) async fn get_file_id_list(
     time_level: PartitionTimeLevel,
     partition_keys: &[StreamPartition],
 ) -> Vec<FileQueryData> {
-    let is_local = get_config().common.meta_store_external
-        || infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
-            .await
-            .unwrap_or_default()
-            .len()
-            <= 1;
     let (time_min, time_max) = sql.meta.time_range.unwrap();
     file_list::query_ids(
         &sql.org_id,
@@ -897,7 +884,6 @@ pub(crate) async fn get_file_id_list(
         time_level,
         time_min,
         time_max,
-        is_local,
     )
     .await
     .unwrap_or_default()
