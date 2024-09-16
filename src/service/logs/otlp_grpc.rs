@@ -337,7 +337,7 @@ pub async fn handle_grpc_request(
     let ep = if is_grpc {
         "/grpc/otlp/logs"
     } else {
-        "/api/oltp/v1/logs"
+        "/api/otlp/v1/logs"
     };
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();

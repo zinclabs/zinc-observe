@@ -521,10 +521,6 @@ pub struct Common {
     pub data_db_dir: String,
     #[env_config(name = "ZO_DATA_CACHE_DIR", default = "")] // ./data/openobserve/cache/
     pub data_cache_dir: String,
-    #[env_config(name = "ZO_WAL_MEMORY_MODE_ENABLED", default = false)]
-    pub wal_memory_mode_enabled: bool,
-    #[env_config(name = "ZO_WAL_LINE_MODE_ENABLED", default = true)]
-    pub wal_line_mode_enabled: bool,
     #[env_config(name = "ZO_COLUMN_TIMESTAMP", default = "_timestamp")]
     pub column_timestamp: String,
     // TODO: should rename to column_all
@@ -827,6 +823,8 @@ pub struct Limit {
     pub mem_table_bucket_num: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 5)] // seconds
     pub mem_persist_interval: u64,
+    #[env_config(name = "ZO_WAL_WRITE_BUFFER_SIZE", default = 16384)] // 16 KB
+    pub wal_write_buffer_size: usize,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files
@@ -1625,6 +1623,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.mem_table_bucket_num == 0 {
         cfg.limit.mem_table_bucket_num = 1;
+    }
+
+    // wal
+    if cfg.limit.wal_write_buffer_size < 4096 {
+        cfg.limit.wal_write_buffer_size = 4096;
     }
 
     // check query settings

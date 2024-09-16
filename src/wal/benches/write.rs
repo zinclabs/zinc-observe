@@ -21,12 +21,15 @@ pub fn write_benchmark(c: &mut Criterion) {
     let dir = tempdir().unwrap();
     let dir = dir.path();
     let mut group = c.benchmark_group("wal/write");
-    for entry_size in [256, 1024, 4096, 16384, 1024 * 1024] {
-        let mut writer = Writer::new(dir, "org", "stream", entry_size as u64, 1024_1024).unwrap();
-        let data = vec![42u8; entry_size];
-        group.bench_function(BenchmarkId::from_parameter(entry_size), |b| {
-            b.iter(|| writer.write(black_box(&data), true));
-        });
+    for buf_size in [4096, 8192, 16384, 32768] {
+        for entry_size in [4096, 16384, 32768, 65536] {
+            let mut writer =
+                Writer::new(dir, "org", "stream", entry_size as u64, 1024_1024, buf_size).unwrap();
+            let data = vec![42u8; entry_size];
+            group.bench_function(BenchmarkId::new(buf_size.to_string(), entry_size), |b| {
+                b.iter(|| writer.write(black_box(&data), true));
+            });
+        }
     }
     group.finish();
 }

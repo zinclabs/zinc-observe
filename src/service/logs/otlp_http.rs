@@ -455,7 +455,7 @@ pub async fn logs_json_handler(
     let took_time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/api/oltp/v1/logs",
+            "/api/otlp/v1/logs",
             metric_rpt_status_code,
             org_id,
             &stream_name,
@@ -464,7 +464,7 @@ pub async fn logs_json_handler(
         .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/api/oltp/v1/logs",
+            "/api/otlp/v1/logs",
             metric_rpt_status_code,
             org_id,
             &stream_name,

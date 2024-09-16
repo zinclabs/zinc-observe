@@ -208,6 +208,7 @@ impl Partition {
             f.write_all(&buf_parquet)
                 .await
                 .context(WriteFileSnafu { path: path.clone() })?;
+            drop(f);
 
             // set parquet metadata cache
             let mut file_key = path.clone();

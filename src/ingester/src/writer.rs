@@ -158,6 +158,7 @@ impl Writer {
                     &key.stream_type,
                     wal_id,
                     cfg.limit.max_file_size_on_disk as u64,
+                    cfg.limit.wal_write_buffer_size,
                 )
                 .expect("wal file create error"),
             )),
@@ -219,6 +220,7 @@ impl Writer {
                 &self.key.stream_type,
                 wal_id,
                 cfg.limit.max_file_size_on_disk as u64,
+                cfg.limit.wal_write_buffer_size,
             )
             .context(WalSnafu)?;
             let old_wal = std::mem::replace(&mut *wal, new_wal);
@@ -253,7 +255,7 @@ impl Writer {
 
     pub async fn close(&self) -> Result<()> {
         // rotation wal
-        let wal = self.wal.lock().await;
+        let mut wal = self.wal.lock().await;
         wal.sync().context(WalSnafu)?;
         let path = wal.path().clone();
         drop(wal);
@@ -270,7 +272,7 @@ impl Writer {
     }
 
     pub async fn sync(&self) -> Result<()> {
-        let wal = self.wal.lock().await;
+        let mut wal = self.wal.lock().await;
         wal.sync().context(WalSnafu)
     }
 
