@@ -207,8 +207,6 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
     } else {
         scan_stats.idx_took as usize
     });
-    // result.set_original_cond(id_timestamps);
-
 
     if query_type == "table" {
         result.response_type = "table".to_string();
@@ -216,7 +214,6 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
         result.response_type = "matrix".to_string();
     }
 
-    
     log::info!(
         "[trace_id {trace_id}] search->result: total: {}, took: {} ms, scan_size: {}",
         result.total,

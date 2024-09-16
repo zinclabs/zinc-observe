@@ -352,22 +352,16 @@ pub async fn query_by_ids(
     let token: MetadataValue<_> = cluster::get_internal_grpc_token()
         .parse()
         .map_err(|_| Error::Message("invalid token".to_string()))?;
-    let channel = Channel::from_shared(node.grpc_addr.clone())
-        .unwrap()
-        .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-        .connect()
-        .await
-        .map_err(|err| {
-            log::error!(
-                "file_list->grpc: node: {}, connect err: {:?}",
-                &node.grpc_addr,
-                err
-            );
-            Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
-                "connect to search node error: {}",
-                err
-            )))
-        })?;
+    let channel = get_cached_channel(&node.grpc_addr).await.map_err(|err| {
+        log::error!(
+            "file_list->grpc: node: {}, connect err: {:?}",
+            &node.grpc_addr,
+            err
+        );
+        Error::ErrorCode(ErrorCodes::ServerInternalError(
+            "connect querier error".to_string(),
+        ))
+    })?;
     let mut client = cluster_rpc::filelist_client::FilelistClient::with_interceptor(
         channel,
         move |mut req: Request<()>| {
@@ -513,22 +507,16 @@ pub async fn query_ids(
     let token: MetadataValue<_> = cluster::get_internal_grpc_token()
         .parse()
         .map_err(|_| Error::Message("invalid token".to_string()))?;
-    let channel = Channel::from_shared(node.grpc_addr.clone())
-        .unwrap()
-        .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-        .connect()
-        .await
-        .map_err(|err| {
-            log::error!(
-                "file_list->grpc: node: {}, connect err: {:?}",
-                &node.grpc_addr,
-                err
-            );
-            Error::ErrorCode(ErrorCodes::ServerInternalError(format!(
-                "connect to search node error: {}",
-                err
-            )))
-        })?;
+    let channel = get_cached_channel(&node.grpc_addr).await.map_err(|err| {
+        log::error!(
+            "file_list->grpc: node: {}, connect err: {:?}",
+            &node.grpc_addr,
+            err
+        );
+        Error::ErrorCode(ErrorCodes::ServerInternalError(
+            "connect querier error".to_string(),
+        ))
+    })?;
     let mut client = cluster_rpc::filelist_client::FilelistClient::with_interceptor(
         channel,
         move |mut req: Request<()>| {
