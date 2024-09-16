@@ -36,7 +36,7 @@ import {
   getUUID,
   generateTraceContext,
 } from "@/utils/zincutils";
-import { getConsumableRelativeTime } from "@/utils/date";
+import { convertDateToTimestamp, getConsumableRelativeTime } from "@/utils/date";
 import { byString } from "@/utils/json";
 import { logsErrorMessage } from "@/utils/common";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -167,6 +167,7 @@ const defaultObject = {
       colOrder: <any>{},
       colSizes: <any>{},
     },
+    histogramInterval : <any> 0,
     transforms: <any>[],
     queryResults: <any>[],
     sortedQueryResults: <any>[],
@@ -1814,7 +1815,7 @@ const useLogs = () => {
       if (!intervalMs) {
         throw new Error("Invalid interval");
       }
-
+      searchObj.data.histogramInterval = intervalMs;
       let date = new Date();
       const startTimeDate = new Date(
         searchObj.data.customDownloadQueryObj.query.start_time / 1000,
@@ -1842,17 +1843,17 @@ const useLogs = () => {
       }
 
       const startTime = startTimeDate.getTime() * 1000;
-      for (
-        let currentTime: any = startTime;
-        currentTime < searchObj.data.customDownloadQueryObj.query.end_time;
-        currentTime += intervalMs
-      ) {
-        date = new Date(currentTime / 1000); // Convert microseconds to milliseconds
-        histogramResults.push({
-          zo_sql_key: date.toISOString().slice(0, 19),
-          zo_sql_num: 0,
-        });
-      }
+      // for (
+      //   let currentTime: any = startTime;
+      //   currentTime < searchObj.data.customDownloadQueryObj.query.end_time;
+      //   currentTime += intervalMs
+      // ) {
+      //   date = new Date(currentTime / 1000); // Convert microseconds to milliseconds
+      //   histogramResults.push({
+      //     zo_sql_key: date.toISOString().slice(0, 19),
+      //     zo_sql_num: 0,
+      //   });
+      // }
     }
   }
 
@@ -2373,6 +2374,58 @@ const useLogs = () => {
             searchObj.loading = false;
             if (searchObj.data.queryResults.aggs == null) {
               searchObj.data.queryResults.aggs = [];
+            }
+            if(searchObj.data.queryResults.partitionDetail.partitions[0][0] == queryReq.query.start_time && searchObj.data.queryResults.partitionDetail.partitions[0][1] == queryReq.query.end_time){
+              histogramResults = [];
+              let date = new Date();
+              const startDateTime = searchObj.data.customDownloadQueryObj.query.start_time / 1000;
+      
+              const endDateTime = searchObj.data.customDownloadQueryObj.query.end_time / 1000 ;
+     
+              const nowString = res.data.hits[0].zo_sql_key;
+              const now = new Date(nowString);
+
+            const day = String(now.getDate()).padStart(2, "0");
+            const month = String(now.getMonth() + 1).padStart(2, "0");
+            const year = now.getFullYear();
+
+            const dateToBePassed = `${day}-${month}-${year}`;
+            const hours = String(now.getHours()).padStart(2, "0");
+            let minutes = String(now.getMinutes() ).padStart(2, "0");
+            if(searchObj.data.histogramInterval / 1000 <= 60000 ){
+              minutes = String(now.getMinutes() + 1).padStart(2, "0");
+            }
+            
+            const time = `${hours}:${minutes}`;
+
+            const currentTimeToBePassed = convertDateToTimestamp (
+              dateToBePassed,
+              time,
+              'UTC'
+            );
+                for (
+                  let currentTime: any = currentTimeToBePassed.timestamp / 1000;
+                  currentTime < endDateTime;
+                  currentTime += searchObj.data.histogramInterval / 1000
+                ) {
+                  date = new Date(currentTime);
+                  histogramResults.push({
+                    zo_sql_key: date.toISOString().slice(0, 19),
+                    zo_sql_num: 0,
+                  });
+                }
+                for (
+                  let currentTime: any = currentTimeToBePassed.timestamp / 1000;
+                  currentTime > startDateTime;
+                  currentTime -= searchObj.data.histogramInterval / 1000
+                ) {
+                  date = new Date(currentTime);
+                  histogramResults.push({
+                    zo_sql_key: date.toISOString().slice(0, 19),
+                    zo_sql_num: 0,
+                  });
+                }
+                
             }
             searchObj.data.queryResults.aggs.push(...res.data.hits);
             searchObj.data.queryResults.scan_size += res.data.scan_size;
@@ -3278,7 +3331,7 @@ const useLogs = () => {
         });
 
         const mergedData: any = Array.from(histogramMappedData.values());
-
+        console.log(mergedData,"res")
         mergedData.map(
           (bucket: {
             zo_sql_key: string | number | Date;
