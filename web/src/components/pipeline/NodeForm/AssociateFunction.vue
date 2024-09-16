@@ -180,7 +180,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import ConfirmDialog from "../ConfirmDialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 interface RouteCondition {
@@ -199,7 +199,7 @@ interface StreamRoute {
 }
 
 const AddFunction = defineAsyncComponent(
-  () => import("../functions/AddFunction.vue"),
+  () => import("@/components/functions/AddFunction.vue"),
 );
 
 const props = defineProps({

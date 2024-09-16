@@ -55,7 +55,6 @@ import { ref } from "vue";
 import { VueFlow } from "@vue-flow/core";
 // import vueFlowConfig from "./vueFlowConfig";
 import CustomNode from "./CustomNode.vue";
-import CustomQuery from "./CustomQuery.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
 
@@ -66,7 +65,7 @@ import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
 
 export default {
-  components: { VueFlow, CustomNode, DropzoneBackground, CustomQuery },
+  components: { VueFlow, CustomNode, DropzoneBackground },
   setup() {
     const {
       onDragOver,

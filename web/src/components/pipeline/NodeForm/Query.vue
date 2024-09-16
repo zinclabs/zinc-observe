@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
-      <q-form ref="routeFormRef" @submit="saveRouting">
+      <q-form ref="queryFormRef" @submit="saveQueryData">
         <div>
           <div
             data-test="stream-route-stream-type-select"
@@ -129,16 +129,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { computed, defineAsyncComponent, onMounted, ref, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
-import RealTimeAlert from "../alerts/RealTimeAlert.vue";
 import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
-import ConfirmDialog from "../ConfirmDialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useQuasar } from "quasar";
-import ScheduledPipeline from "@/components/pipeline/ScheduledPipeline.vue";
+import ScheduledPipeline from "@/components/pipeline/NodeForm/ScheduledPipeline.vue";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
+import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 const VariablesInput = defineAsyncComponent(
   () => import("@/components/alerts/VariablesInput.vue"),
@@ -160,7 +160,6 @@ interface StreamRoute {
     stream_name: string;
     stream_type: string;
   };
-  is_real_time: boolean;
   query_condition: {
     sql: string;
     type: string;
@@ -230,11 +229,11 @@ const indexOptions = ref([]);
 
 const originalStreamFields: Ref<any[]> = ref([]);
 
-const isValidName: Ref<boolean> = ref(true);
-
 const isAggregationEnabled = ref(false);
 
-const routeFormRef = ref<any>(null);
+const queryFormRef = ref<any>(null);
+
+const { addNode } = useDragAndDrop();
 
 const nodeLink = ref({
   from: "",
@@ -257,7 +256,6 @@ const getDefaultStreamRoute = () => {
       stream_name: "",
       stream_type: "logs",
     },
-    is_real_time: true,
     query_condition: {
       sql: "",
       type: "sql",
@@ -288,23 +286,6 @@ onMounted(() => {
     streamRoute.value = JSON.parse(
       JSON.stringify(props.editingRoute),
     ) as StreamRoute;
-
-    if (!streamRoute.value.is_real_time) {
-      // If aggregation was present enable aggregation toggle
-      isAggregationEnabled.value =
-        !!props.editingRoute.query_condition.aggregation;
-
-      // If context attributes are present, convert them to array
-      streamRoute.value.context_attributes = Object.keys(
-        streamRoute.value.context_attributes,
-      ).map((attr: string) => {
-        return {
-          key: attr,
-          value: streamRoute.value.context_attributes[attr],
-          id: getUUID(),
-        };
-      });
-    }
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -364,25 +345,6 @@ const updateStreamFields = async () => {
   filteredColumns.value = [...streamCols];
 };
 
-const addField = () => {
-  if (streamRoute.value.is_real_time) {
-    streamRoute.value.conditions.push({
-      column: "",
-      operator: "",
-      value: "",
-      id: getUUID(),
-    });
-  }
-};
-
-const removeField = (field: any) => {
-  if (streamRoute.value.is_real_time) {
-    streamRoute.value.conditions = streamRoute.value.conditions.filter(
-      (_field: any) => _field.id !== field.id,
-    );
-  }
-};
-
 const closeDialog = () => {
   emit("cancel:hideform");
 };
@@ -403,19 +365,9 @@ const openCancelDialog = () => {
 };
 
 // TODO OK : Add check for duplicate routing name
-const saveRouting = async () => {
-  isValidName.value = true;
-
-  if (!isUpdating.value) validateStreamName();
-
-  if (!isValidName.value) {
-    return;
-  }
-
-  if (!streamRoute.value.is_real_time) {
-    if (!scheduledAlertRef.value.validateInputs()) {
-      return false;
-    }
+const saveQueryData = async () => {
+  if (!scheduledAlertRef.value.validateInputs()) {
+    return false;
   }
 
   try {
@@ -424,21 +376,41 @@ const saveRouting = async () => {
     return false;
   }
 
-  routeFormRef.value.validate().then((valid: any) => {
+  queryFormRef.value.validate().then((valid: any) => {
     if (!valid) {
       return false;
     }
   });
-
-  // Save routing
-  emit("update:node", {
-    data: {
-      ...getRoutePayload(),
-      name: streamRoute.value.name,
+  console.log(queryFormRef.value);
+  console.log(getRoutePayload());
+  const formData = getRoutePayload();
+  let queryPayload = {
+    node_type: "query", // required
+    stream_type: formData.destination.stream_type, // required
+    query_condition: {
+      // same as before
+      type: formData.query_condition.type,
+      conditions: null,
+      sql: formData.query_condition.sql,
+      promql: null,
+      promql_condition: null,
+      aggregation: formData.query_condition.aggregation,
+      vrl_function: null,
+      search_event_type: "DerivedStream",
     },
-    link: nodeLink.value,
-  });
-
+    trigger_condition: {
+      // same as before
+      period: formData.trigger_condition.period,
+      operator: "=",
+      threshold: 0,
+      frequency: formData.trigger_condition.frequency,
+      cron: formData.trigger_condition.cron,
+      frequency_type: formData.trigger_condition.frequency_type,
+      silence: 0,
+    },
+    tz_offset: formData.trigger_condition?.timezone || "", // optional
+  };
+  addNode(queryPayload);
   emit("cancel:hideform");
 };
 
@@ -469,18 +441,6 @@ const deleteRoute = () => {
   emit("cancel:hideform");
 };
 
-const validateStreamName = () => {
-  isValidName.value = true;
-  Object.values(props.streamRoutes).forEach((route: any) => {
-    if (
-      route.name === streamRoute.value.name ||
-      route.name === props.streamName
-    ) {
-      isValidName.value = false;
-    }
-  });
-};
-
 const addVariable = () => {
   streamRoute.value.context_attributes.push({
     key: "",
@@ -500,55 +460,42 @@ const getRoutePayload = () => {
   let payload = JSON.parse(JSON.stringify(streamRoute.value));
 
   if (payload.uuid) delete payload.uuid;
+  // Deleting uuid from payload as it was added for reference of frontend
+  payload.destination.org_id = store.state.selectedOrganization.identifier;
 
-  if (payload.is_real_time) {
-    payload = {
-      name: payload.name,
-      conditions: payload.conditions,
-      is_real_time: payload.is_real_time,
-    };
-  } else {
-    // Deleting uuid from payload as it was added for reference of frontend
-    payload.destination.org_id = store.state.selectedOrganization.identifier;
+  payload.destination.stream_name = payload.name;
 
-    payload.destination.stream_name = payload.name;
+  payload.context_attributes = {};
 
-    payload.context_attributes = {};
+  streamRoute.value.context_attributes.forEach((attr: any) => {
+    if (attr.key?.trim() && attr.value?.trim())
+      payload.context_attributes[attr.key] = attr.value;
+  });
 
-    payload.query_condition.type = payload.is_real_time
-      ? "custom"
-      : streamRoute.value.query_condition.type;
+  payload.trigger_condition.period = Number(
+    streamRoute.value.trigger_condition.period,
+  );
 
-    streamRoute.value.context_attributes.forEach((attr: any) => {
-      if (attr.key?.trim() && attr.value?.trim())
-        payload.context_attributes[attr.key] = attr.value;
-    });
+  payload.trigger_condition.frequency = Number(
+    streamRoute.value.trigger_condition.frequency,
+  );
 
-    payload.trigger_condition.period = Number(
-      streamRoute.value.trigger_condition.period,
-    );
+  payload.description = streamRoute.value.description.trim();
 
-    payload.trigger_condition.frequency = Number(
-      streamRoute.value.trigger_condition.frequency,
-    );
-
-    payload.description = streamRoute.value.description.trim();
-
-    if (
-      !isAggregationEnabled.value ||
-      streamRoute.value.query_condition.type !== "custom"
-    ) {
-      payload.query_condition.aggregation = null;
-    }
-
-    if (payload.query_condition.aggregation?.having) {
-      delete payload.query_condition?.aggregation?.having;
-    }
-
-    delete payload?.conditions;
-
-    delete payload?.query_condition?.conditions;
+  if (
+    !isAggregationEnabled.value ||
+    streamRoute.value.query_condition.type !== "custom"
+  ) {
+    payload.query_condition.aggregation = null;
   }
+
+  if (payload.query_condition.aggregation?.having) {
+    delete payload.query_condition?.aggregation?.having;
+  }
+
+  delete payload?.conditions;
+
+  delete payload?.query_condition?.conditions;
 
   if (isUpdating.value) {
     payload.updatedAt = new Date().toISOString();

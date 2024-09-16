@@ -62,7 +62,6 @@ const ErrorsDashboard = () =>
   import("@/components/rum/performance/ErrorsDashboard.vue");
 const ApiDashboard = () =>
   import("@/components/rum/performance/ApiDashboard.vue");
-const StreamRouting = () => import("@/components/functions/StreamRouting.vue");
 const PipelineEditor = () => import("@/components/pipeline/PipelineEditor.vue");
 const PipelinesList = () => import("@/components/pipeline/PipelinesList.vue");
 

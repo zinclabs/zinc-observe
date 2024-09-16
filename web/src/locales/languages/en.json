@@ -417,7 +417,8 @@
     "derivedStream": "Derived Stream",
     "pipelineName": "Enter Pipeline Name",
     "flatteningLbl": "After Flattening",
-    "streamTitle": "Associate Stream"
+    "streamTitle": "Associate Stream",
+    "conditionTitle": "Associate Condition"
   },
   "function": {
     "header": "Functions",

@@ -101,8 +101,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     maximized
   >
     <div class="stream-routing-dialog-container full-height">
-      <StreamRouting
-        v-if="pipelineObj.dialog.name === 'streamRouting'"
+      <QueryForm
+        v-if="pipelineObj.dialog.name === 'query'"
+        :stream-name="pipeline.stream_name"
+        :stream-type="pipeline.stream_type"
+        :editing-route="streamRoutes[editingStreamRouteName]"
+        :stream-routes="streamRoutes"
+        @update:node="addStreamNode"
+        @cancel:hideform="resetDialog"
+        @delete:node="deleteNode"
+      />
+
+      <ConditionForm
+        v-if="pipelineObj.dialog.name === 'condition'"
         :stream-name="pipeline.stream_name"
         :stream-type="pipeline.stream_type"
         :editing-route="streamRoutes[editingStreamRouteName]"
@@ -148,8 +159,7 @@ import {
   type Ref,
 } from "vue";
 import { getImageURL } from "@/utils/zincutils";
-import StreamRouting from "./StreamRouting.vue";
-import AssociateFunction from "./AssociateFunction.vue";
+import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.vue";
 import functionsService from "@/services/jstransform";
 import { useStore } from "vuex";
 import pipelineService from "@/services/pipelines";
@@ -161,6 +171,8 @@ import jstransform from "@/services/jstransform";
 import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
+import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
+import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -928,8 +940,8 @@ const savePipeline = async () => {
   // await associateFunctions();
 
   pipelineService
-    .updatePipeline({
-      data: payload,
+    .createPipeline({
+      payload: pipelineObj.currentSelectedPipeline,
       org_identifier: store.state.selectedOrganization.identifier,
     })
     .then(() => {

@@ -149,6 +149,43 @@ size="1em" class="q-ma-sm" />
         </div>
       </div>
     </div>
+
+    <div
+      v-if="data.node_type == 'query'"
+      :class="`o2vf_node_${io_type}`"
+      class="custom-btn q-pa-none btn-fixed-width"
+      style="
+        width: 170px;
+        display: flex;
+        align-items: center;
+        border: none;
+        cursor: pointer;
+      "
+    >
+      <div class="icon-container" style="display: flex; align-items: center">
+        <!-- Icon -->
+        <q-icon :name="getIcon(data.node_type, io_type)"
+size="1em" class="q-ma-sm" />
+      </div>
+
+      <!-- Separator -->
+      <q-separator vertical class="q-mr-sm" />
+
+      <!-- Label -->
+      <div class="container">
+        <div
+          class="row"
+          style="
+            text-align: left;
+            text-wrap: wrap;
+            width: auto;
+            text-overflow: ellipsis;
+          "
+        >
+          {{ data.stream_type }} - {{ data.stream_name }}
+        </div>
+      </div>
+    </div>
     <Handle
       v-if="io_type === 'input' || io_type === 'default'"
       id="output"
