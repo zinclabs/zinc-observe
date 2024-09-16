@@ -162,7 +162,6 @@ pub async fn search(
 
     // If the query is of type inverted index and this is not an aggregations request,
     // then filter the file list based on the inverted index.
-    log::debug!("ids before inverted index at leader : {:?}", file_id_list);
     let mut idx_scan_size = 0;
     let mut idx_took = 0;
     let idx_file_list;
@@ -178,7 +177,6 @@ pub async fn search(
             idx_took,
         );
 
-        log::debug!("idx files : {:?}", idx_file_list);
         req.idx_files = idx_file_list.map(|v| IdxFileList {
             items: v
                 .into_iter()
@@ -194,7 +192,7 @@ pub async fn search(
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
 
-    // TODO YJDoc2 fix: as we are not querying the original size,
+    // TODO fix: as we are not querying the original size,
     // how to choose work_group
     // 1. get work group
     // #[cfg(feature = "enterprise")]

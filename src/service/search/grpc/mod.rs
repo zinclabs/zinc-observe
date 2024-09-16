@@ -150,7 +150,6 @@ pub async fn search(
         let file_id_data = &req.file_ids;
         let idx_file_list = &req.idx_files;
         let ids = file_id_data.iter().map(|f| f.id).collect::<Vec<_>>();
-        log::debug!("id list at grpc handler len {} {:?}", ids.len(), ids);
 
         let file_list_map: HashMap<String, _> = get_file_list_by_ids(
             &trace_id,
@@ -221,7 +220,6 @@ pub async fn search(
 
         file_list = files;
 
-        log::debug!("file list len at grpc handler {}", file_list.len());
         let (tbls, stats, partitions) =
             storage::search(&trace_id, sql.clone(), &file_list, stream_type, &work_group).await?;
         tables.extend(tbls);
@@ -401,7 +399,6 @@ pub async fn search(
     }
 
     scan_stats.format_to_mb();
-    log::debug!("hits total after merging in grpc handler {}", hits_total);
     let result = cluster_rpc::SearchResponse {
         job: req.job.clone(),
         took: start.elapsed().as_millis() as i32,
@@ -462,13 +459,8 @@ pub(crate) async fn get_file_list_by_ids(
             .len()
             <= 1;
     let file_list = query_by_ids(ids, &sql.org_id, is_local).await;
-    log::debug!("in grpc, file list : {:?}", file_list);
     let file_list = file_list.unwrap_or_default();
-    log::debug!(
-        "in grpc, file list before match source by id, query return length : {} , return {:?}",
-        file_list.len(),
-        file_list
-    );
+
     let mut files = Vec::with_capacity(file_list.len());
     for (id, file) in file_list {
         if sql
@@ -478,11 +470,7 @@ pub(crate) async fn get_file_list_by_ids(
             files.push((id, file.to_owned()));
         }
     }
-    log::debug!(
-        "in grpc, file list after match source by id, query return length : {} , return {:?}",
-        files.len(),
-        files
-    );
+
     files.sort_by(|a, b| a.1.key.cmp(&b.1.key));
     files.dedup_by(|a, b| a.1.key == b.1.key);
     files
