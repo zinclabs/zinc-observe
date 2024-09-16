@@ -147,11 +147,11 @@ pub async fn search(
     // search in object storage
     let req_stype = req.stype;
     if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
-        let file_id_data = &req.file_ids;
+        let file_ids = &req.file_ids;
         let idx_file_list = &req.idx_files;
-        let ids = file_id_data.iter().map(|f| f.id).collect::<Vec<_>>();
+        let ids = file_ids.iter().map(|f| f.id).collect::<Vec<_>>();
 
-        let file_list_map: HashMap<String, _> = get_file_list_by_ids(
+        let file_list_map: HashMap<_, _> = get_file_list_by_ids(
             &trace_id,
             &ids,
             &sql,
@@ -162,20 +162,22 @@ pub async fn search(
         .into_iter()
         .map(|f| (f.key.clone(), f))
         .collect();
+
         let mut file_list: Vec<FileKey>;
+
+        // if there are any files in idx_files_list,use them to
+        // filter the files we got from ids, otherwise use all the
+        // files we got from ids
         if let Some(idx_files) = idx_file_list {
             let mut file_map = HashMap::new();
+
             for idx_file in &idx_files.items {
                 let Some(file) = file_list_map.get(&idx_file.key) else {
+                    // ignore files not in the id list sent to us
                     continue;
                 };
                 let segment_ids = &idx_file.segment_ids;
-                let entry = file_map.entry(&idx_file.key).or_insert(FileKey {
-                    key: file.key.clone(),
-                    meta: file.meta.clone(),
-                    deleted: file.deleted,
-                    segment_ids: file.segment_ids.clone(),
-                });
+                let entry = file_map.entry(&file.key).or_insert(file.clone());
                 match (&entry.segment_ids, &segment_ids) {
                     (Some(_), None) => {}
                     (Some(bin_data), Some(segment_ids)) => {
@@ -196,15 +198,9 @@ pub async fn search(
         let mut files = Vec::with_capacity(file_list.len());
         // cannot use .iter().filter() as the function is async cannot be used in filter closure
         for file in file_list {
-            let source = FileKey {
-                key: file.key.clone(),
-                meta: file.meta.clone(),
-                deleted: false,
-                segment_ids: None,
-            };
             if sql
                 .match_source(
-                    &source,
+                    &file,
                     false,
                     false,
                     stream_type,
@@ -458,8 +454,9 @@ pub(crate) async fn get_file_list_by_ids(
             .unwrap_or_default()
             .len()
             <= 1;
-    let file_list = query_by_ids(ids, &sql.org_id, is_local).await;
-    let file_list = file_list.unwrap_or_default();
+    let file_list = query_by_ids(ids, &sql.org_id, is_local)
+        .await
+        .unwrap_or_default();
 
     let mut files = Vec::with_capacity(file_list.len());
     for file in file_list {
@@ -470,9 +467,6 @@ pub(crate) async fn get_file_list_by_ids(
             files.push(file.to_owned());
         }
     }
-
-    files.sort_by(|a, b| a.key.cmp(&b.key));
-    files.dedup_by(|a, b| a.key == b.key);
     files
 }
 
