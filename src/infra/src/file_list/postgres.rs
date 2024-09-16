@@ -565,7 +565,7 @@ SELECT stream, MIN(min_ts) AS min_ts, MAX(max_ts) AS max_ts, COUNT(*)::BIGINT AS
                     StreamStats::default()
                 }
             };
-            stats.add_stream_stats(item);
+            stats.format_by(item); // format stats
             update_streams.push((stream_key, stats));
         }
 
@@ -598,9 +598,9 @@ INSERT INTO stream_stats
         let mut tx = pool.begin().await?;
         for (stream_key, stats) in update_streams {
             if let Err(e) = sqlx::query(
-                r#"
+              r#"
 UPDATE stream_stats 
-    SET file_num = $1, min_ts = $2, max_ts = $3, records = $4, original_size = $5, compressed_size = $6
+    SET file_num = file_num + $1, min_ts = $2, max_ts = $3, records = records + $4, original_size = original_size + $5, compressed_size = compressed_size + $6
     WHERE stream = $7;
                 "#,
             )
@@ -647,6 +647,12 @@ UPDATE stream_stats
             .bind(stream)
             .execute(&pool)
             .await?;
+        sqlx::query(
+            r#"UPDATE stream_stats SET max_ts = min_ts WHERE stream = $1 AND max_ts < min_ts;"#,
+        )
+        .bind(stream)
+        .execute(&pool)
+        .await?;
         Ok(())
     }
 

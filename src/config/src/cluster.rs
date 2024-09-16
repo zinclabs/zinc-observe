@@ -27,12 +27,20 @@ pub static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
 pub static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
 pub static LOCAL_NODE: Lazy<Node> = Lazy::new(load_local_node);
 
-fn load_local_node() -> Node {
+pub fn load_local_node() -> Node {
+    let cfg = get_config();
     Node {
+        id: 1,
         uuid: load_local_node_uuid(),
         role: load_local_node_role(),
         role_group: load_role_group(),
-        ..Default::default()
+        name: cfg.common.instance_name.clone(),
+        http_addr: format!("http://127.0.0.1:{}", cfg.http.port),
+        grpc_addr: format!("http://127.0.0.1:{}", cfg.grpc.port),
+        cpu_num: cfg.limit.cpu_num as u64,
+        status: NodeStatus::Online,
+        scheduled: true,
+        broadcasted: false,
     }
 }
 

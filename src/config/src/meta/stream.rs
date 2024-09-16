@@ -310,21 +310,15 @@ impl StreamStats {
         }
     }
 
-    pub fn add_stream_stats(&mut self, stats: &StreamStats) {
-        self.file_num = max(0, self.file_num + stats.file_num);
-        self.doc_num = max(0, self.doc_num + stats.doc_num);
+    pub fn format_by(&mut self, stats: &StreamStats) {
+        self.file_num = stats.file_num;
+        self.doc_num = stats.doc_num;
+        self.storage_size = stats.storage_size;
+        self.compressed_size = stats.compressed_size;
         self.doc_time_min = self.doc_time_min.min(stats.doc_time_min);
         self.doc_time_max = self.doc_time_max.max(stats.doc_time_max);
-        self.storage_size += stats.storage_size;
-        self.compressed_size += stats.compressed_size;
         if self.doc_time_min == 0 {
             self.doc_time_min = stats.doc_time_min;
-        }
-        if self.storage_size < 0.0 {
-            self.storage_size = 0.0;
-        }
-        if self.compressed_size < 0.0 {
-            self.compressed_size = 0.0;
         }
     }
 }
