@@ -250,14 +250,14 @@ pub async fn query(
 }
 
 #[inline]
-#[tracing::instrument(name = "infra:file_list:query_db", skip_all)]
+#[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
 pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
     CLIENT.query_by_ids(ids).await
 }
 
 #[inline]
 #[tracing::instrument(
-    name = "infra:file_list:query_db",
+    name = "infra:file_list:query_db_ids",
     skip_all,
     fields(org_id = org_id, stream_name = stream_name)
 )]
