@@ -416,12 +416,11 @@ pub async fn query_by_ids(
         .items
         .into_iter()
         .map(|f| {
-            let res_fk = f.file_key.unwrap();
             let fk = FileKey {
-                key: res_fk.key,
-                meta: (&res_fk.meta.unwrap()).into(),
-                deleted: res_fk.deleted,
-                segment_ids: res_fk.segment_ids,
+                key: f.key,
+                meta: (&f.meta.unwrap()).into(),
+                deleted: f.deleted,
+                segment_ids: f.segment_ids,
             };
             fk
         })
@@ -576,9 +575,9 @@ pub async fn query_ids(
         }
     };
     let files = response
-        .items
+        .ids
         .into_iter()
-        .map(|f| FileQueryData { id: f.id })
+        .map(|id| FileQueryData { id })
         .collect::<Vec<_>>();
     log::info!(
         "file_list->grpc: node: {}, query list: {}, time: {}ms",

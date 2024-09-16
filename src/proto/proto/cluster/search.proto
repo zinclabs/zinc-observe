@@ -45,23 +45,20 @@ message SearchRequest {
     string                 index_type = 9;
     optional string           user_id = 10;
     optional string search_event_type = 11;
-    repeated FileId         file_ids  = 12;
+    repeated int64          file_ids  = 12;
     optional IdxFileList    idx_files = 13;
 
 }
 
+// proto3 does not allow 'optional repeated', so this
+// needs to be extracted as a separate message type
 message IdxFileList{
     repeated FileName items = 1;
 }
 
 message FileName{
-    string key =1;
-    optional bytes segment_ids = 2;
-}
-
-// TODO YJDoc2 maybe collapse this into the original req message
-message FileId{
-    int64          id          = 1;
+    string          key         = 1;
+    optional bytes  segment_ids = 2;
 }
 
 message SearchResponse {

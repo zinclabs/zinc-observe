@@ -23,8 +23,8 @@ use config::{
         cluster::{Node, Role, RoleGroup},
         search::{self, ScanStats, SearchEventType},
         stream::{
-            FileKey, FileQueryData, PartitionTimeLevel, QueryPartitionStrategy,
-            StreamPartition, StreamType,
+            FileKey, FileQueryData, PartitionTimeLevel, QueryPartitionStrategy, StreamPartition,
+            StreamType,
         },
     },
     metrics,
@@ -37,7 +37,7 @@ use infra::{
     errors::{Error, ErrorCodes, Result},
     schema::{unwrap_partition_time_level, unwrap_stream_settings},
 };
-use proto::cluster_rpc::{self, FileId, FileName, IdxFileList};
+use proto::cluster_rpc::{self, FileName, IdxFileList};
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
@@ -169,7 +169,7 @@ pub async fn search(
         (idx_file_list, idx_scan_size, idx_took) =
             get_file_list_by_inverted_index(meta.clone(), req.clone()).await?;
         log::info!(
-            "[trace_id {trace_id}] search: get file_list from inverted index time_range: {:?},
+            "[trace_id {trace_id}] search: get idx_file_list from inverted index time_range: {:?},
     num: {}, scan_size: {}, took: {} ms",
             meta.meta.time_range,
             file_id_list.len(),
@@ -356,7 +356,7 @@ pub async fn search(
                             [offset_start..min(offset_start + offset, file_num)]
                             .to_vec()
                             .iter()
-                            .map(|f| FileId { id: f.id })
+                            .map(|f| f.id)
                             .collect();
                         offset_start += offset;
                     }
@@ -365,7 +365,7 @@ pub async fn search(
                             .get(offset_start)
                             .unwrap()
                             .iter()
-                            .map(|f| FileId { id: f.id })
+                            .map(|f| f.id)
                             .collect();
                         offset_start += offset;
                         if req.file_ids.is_empty() {

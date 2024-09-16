@@ -149,11 +149,10 @@ pub async fn search(
     if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
         let file_ids = &req.file_ids;
         let idx_file_list = &req.idx_files;
-        let ids = file_ids.iter().map(|f| f.id).collect::<Vec<_>>();
 
         let file_list_map: HashMap<_, _> = get_file_list_by_ids(
             &trace_id,
-            &ids,
+            &file_ids,
             &sql,
             stream_type,
             &stream_settings.partition_keys,

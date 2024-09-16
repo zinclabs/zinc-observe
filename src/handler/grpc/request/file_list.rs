@@ -20,8 +20,8 @@ use config::{
 use infra::file_list as infra_file_list;
 use opentelemetry::global;
 use proto::cluster_rpc::{
-    filelist_server::Filelist, EmptyRequest, FileByIdQueryRequest, FileData, FileDataList, FileKey,
-    FileList, FileListQueryRequest, FileQueryData, IdList, MaxIdResponse,
+    filelist_server::Filelist, EmptyRequest, FileByIdQueryRequest, FileDataList, FileKey, FileList,
+    FileListQueryRequest, IdList, MaxIdResponse,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -117,7 +117,7 @@ impl Filelist for Filelister {
         let stream_name = &req.stream_name;
         let time_level = PartitionTimeLevel::from(req.time_level.as_str());
         let time_range = Some((req.start_time, req.end_time));
-        let files = infra_file_list::query_ids(
+        let file_ids = infra_file_list::query_ids(
             org_id,
             stream_type,
             stream_name,
@@ -128,7 +128,7 @@ impl Filelist for Filelister {
         .await
         .map_err(|e| Status::internal(e.to_string()))?
         .into_iter()
-        .map(|f| FileQueryData { id: f.id })
+        .map(|f| f.id)
         .collect();
 
         // metrics
@@ -140,7 +140,7 @@ impl Filelist for Filelister {
             .with_label_values(&["/file_list/query_ids", "200", "", "", ""])
             .inc();
 
-        Ok(Response::new(IdList { items: files }))
+        Ok(Response::new(IdList { ids: file_ids }))
     }
 
     async fn query_by_ids(
@@ -158,17 +158,15 @@ impl Filelist for Filelister {
         let files = infra_file_list::query_by_ids(ids)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
-        let items: Vec<FileData> = files
+        let items: Vec<FileKey> = files
             .into_iter()
-            .map(|( key, meta)| FileData {
-                file_key: Some(FileKey {
-                    key,
-                    meta: Some((&meta).into()),
-                    deleted: false,
-                    segment_ids: None,
-                }),
+            .map(|(key, meta)| FileKey {
+                key,
+                meta: Some((&meta).into()),
+                deleted: false,
+                segment_ids: None,
             })
-            .collect::<_>();
+            .collect();
 
         // metrics
         let time = start.elapsed().as_secs_f64();

@@ -470,14 +470,8 @@ pub struct MaxIdResponse {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IdList {
-    #[prost(message, repeated, tag = "1")]
-    pub items: ::prost::alloc::vec::Vec<FileQueryData>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FileQueryData {
-    #[prost(int64, tag = "1")]
-    pub id: i64,
+    #[prost(int64, repeated, tag = "1")]
+    pub ids: ::prost::alloc::vec::Vec<i64>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -489,14 +483,7 @@ pub struct FileByIdQueryRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileDataList {
     #[prost(message, repeated, tag = "1")]
-    pub items: ::prost::alloc::vec::Vec<FileData>,
-}
-/// TODO  YJDoc2 : collapse it into above?
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FileData {
-    #[prost(message, optional, tag = "1")]
-    pub file_key: ::core::option::Option<FileKey>,
+    pub items: ::prost::alloc::vec::Vec<FileKey>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1549,11 +1536,13 @@ pub struct SearchRequest {
     pub user_id: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "11")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(message, repeated, tag = "12")]
-    pub file_ids: ::prost::alloc::vec::Vec<FileId>,
+    #[prost(int64, repeated, tag = "12")]
+    pub file_ids: ::prost::alloc::vec::Vec<i64>,
     #[prost(message, optional, tag = "13")]
     pub idx_files: ::core::option::Option<IdxFileList>,
 }
+/// proto3 does not allow 'optional repeated', so this
+/// needs to be extracted as a separate message type
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1569,14 +1558,6 @@ pub struct FileName {
     pub key: ::prost::alloc::string::String,
     #[prost(bytes = "vec", optional, tag = "2")]
     pub segment_ids: ::core::option::Option<::prost::alloc::vec::Vec<u8>>,
-}
-/// TODO YJDoc2 maybe collapse this into the original req message
-#[derive(Eq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FileId {
-    #[prost(int64, tag = "1")]
-    pub id: i64,
 }
 #[derive(Eq)]
 #[derive(serde::Serialize)]
