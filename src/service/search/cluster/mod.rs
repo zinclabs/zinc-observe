@@ -191,7 +191,8 @@ pub async fn search(
 
     #[cfg(not(feature = "enterprise"))]
     let work_group: Option<String> = None;
-
+    #[cfg(feature = "enterprise")]
+    let work_group: Option<o2_enterprise::enterprise::search::WorkGroup> = None;
     // TODO fix: as we are not querying the original size,
     // how to choose work_group
     // 1. get work group

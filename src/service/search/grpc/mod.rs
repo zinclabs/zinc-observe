@@ -147,12 +147,11 @@ pub async fn search(
     // search in object storage
     let req_stype = req.stype;
     if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
-        let file_ids = &req.file_ids;
         let idx_file_list = &req.idx_files;
 
         let file_list_map: HashMap<_, _> = get_file_list_by_ids(
             &trace_id,
-            &file_ids,
+            &req.file_ids,
             &sql,
             stream_type,
             &stream_settings.partition_keys,

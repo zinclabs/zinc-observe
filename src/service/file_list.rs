@@ -415,14 +415,11 @@ pub async fn query_by_ids(
     let files = response
         .items
         .into_iter()
-        .map(|f| {
-            let fk = FileKey {
-                key: f.key,
-                meta: (&f.meta.unwrap()).into(),
-                deleted: f.deleted,
-                segment_ids: f.segment_ids,
-            };
-            fk
+        .map(|f| FileKey {
+            key: f.key,
+            meta: (&f.meta.unwrap()).into(),
+            deleted: f.deleted,
+            segment_ids: f.segment_ids,
         })
         .collect::<Vec<_>>();
     log::info!(
