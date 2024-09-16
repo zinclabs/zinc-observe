@@ -36,9 +36,9 @@ message FileDataList{
     repeated FileData items = 1;
 }
 
+// TODO  YJDoc2 : collapse it into above?
 message FileData{
-    int64          id           = 1;
-    FileKey        file_key     = 2;
+    FileKey        file_key     = 1;
 }
 
 message FileListQueryRequest {

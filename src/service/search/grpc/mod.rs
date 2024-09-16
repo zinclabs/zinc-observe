@@ -160,7 +160,7 @@ pub async fn search(
         )
         .await
         .into_iter()
-        .map(|(_, f)| (f.key.clone(), f))
+        .map(|f| (f.key.clone(), f))
         .collect();
         let mut file_list: Vec<FileKey>;
         if let Some(idx_files) = idx_file_list {
@@ -451,7 +451,7 @@ pub(crate) async fn get_file_list_by_ids(
     sql: &super::sql::Sql,
     stream_type: StreamType,
     partition_keys: &[StreamPartition],
-) -> Vec<(i64, FileKey)> {
+) -> Vec<FileKey> {
     let is_local = get_config().common.meta_store_external
         || infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
             .await
@@ -462,17 +462,17 @@ pub(crate) async fn get_file_list_by_ids(
     let file_list = file_list.unwrap_or_default();
 
     let mut files = Vec::with_capacity(file_list.len());
-    for (id, file) in file_list {
+    for file in file_list {
         if sql
             .match_source(&file, false, false, stream_type, partition_keys)
             .await
         {
-            files.push((id, file.to_owned()));
+            files.push(file.to_owned());
         }
     }
 
-    files.sort_by(|a, b| a.1.key.cmp(&b.1.key));
-    files.dedup_by(|a, b| a.1.key == b.1.key);
+    files.sort_by(|a, b| a.key.cmp(&b.key));
+    files.dedup_by(|a, b| a.key == b.key);
     files
 }
 

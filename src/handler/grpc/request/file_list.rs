@@ -160,8 +160,7 @@ impl Filelist for Filelister {
             .map_err(|e| Status::internal(e.to_string()))?;
         let items: Vec<FileData> = files
             .into_iter()
-            .map(|(id, key, meta)| FileData {
-                id,
+            .map(|( key, meta)| FileData {
                 file_key: Some(FileKey {
                     key,
                     meta: Some((&meta).into()),

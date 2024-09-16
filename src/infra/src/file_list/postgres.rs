@@ -222,7 +222,7 @@ impl super::FileList for PostgresFileList {
             parse_file_key_columns(file).map_err(|e| Error::Message(e.to_string()))?;
         let ret = sqlx::query_as::<_, super::FileRecord>(
             r#"
-SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+    SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list WHERE stream = $1 AND date = $2 AND file = $3;
             "#,
         )
@@ -293,7 +293,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
         let ret = if flattened.is_some() {
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+    SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     WHERE stream = $1 AND flattened = $2 LIMIT 1000;
                 "#,
@@ -306,7 +306,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
             let (time_start, time_end) = time_range.unwrap_or((0, 0));
             sqlx::query_as::<_, super::FileRecord>(
                 r#"
-SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
+    SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened
     FROM file_list 
     WHERE stream = $1 AND max_ts >= $2 AND min_ts <= $3;
                 "#,
@@ -328,7 +328,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
             .collect())
     }
 
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(i64, String, FileMeta)>> {
+    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<(String, FileMeta)>> {
         if ids.is_empty() {
             return Ok(Vec::default());
         }
@@ -341,7 +341,7 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
             // is recommended instead of using ? ,
             // see https://github.com/launchbadge/sqlx/blob/main/FAQ.md#how-can-i-do-a-select--where-foo-in--query
             let query = sqlx::query_as::<_, super::FileRecord>(
-                r#"SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
+                r#"SELECT stream, date, file, deleted, min_ts, max_ts, records, original_size, compressed_size, flattened FROM file_list 
                 WHERE id = ANY($1)"#
             )
                 .bind(chunk);
@@ -353,7 +353,6 @@ SELECT id, stream, date, file, deleted, min_ts, max_ts, records, original_size, 
             .into_iter()
             .map(|r| {
                 (
-                    r.id,
                     format!("files/{}/{}/{}", r.stream, r.date, r.file),
                     FileMeta::from(&r),
                 )

@@ -313,7 +313,7 @@ pub async fn query_by_ids(
     ids: &[i64],
     org_id: &str,
     is_local: bool,
-) -> Result<Vec<(i64, FileKey)>, anyhow::Error> {
+) -> Result<Vec<FileKey>, anyhow::Error> {
     let cfg = get_config();
     if is_local || cfg.common.local_mode {
         return query_by_ids_inner(ids).await;
@@ -482,7 +482,7 @@ pub async fn query_by_ids(
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    // TODO new query here
+
     let response: cluster_rpc::FileDataList = match client.query_by_ids(request).await {
         Ok(res) => res.into_inner(),
         Err(err) => {
@@ -510,7 +510,7 @@ pub async fn query_by_ids(
                 deleted: res_fk.deleted,
                 segment_ids: res_fk.segment_ids,
             };
-            (f.id, fk)
+            fk
         })
         .collect::<Vec<_>>();
     log::info!(
@@ -522,19 +522,16 @@ pub async fn query_by_ids(
     Ok(files)
 }
 
-async fn query_by_ids_inner(ids: &[i64]) -> Result<Vec<(i64, FileKey)>, anyhow::Error> {
+async fn query_by_ids_inner(ids: &[i64]) -> Result<Vec<FileKey>, anyhow::Error> {
     let files = file_list::query_by_ids(ids).await?;
     let mut file_keys = Vec::with_capacity(files.len());
-    for (id, key, meta) in files {
-        file_keys.push((
-            id,
-            FileKey {
-                key,
-                meta,
-                deleted: false,
-                segment_ids: None,
-            },
-        ));
+    for (key, meta) in files {
+        file_keys.push(FileKey {
+            key,
+            meta,
+            deleted: false,
+            segment_ids: None,
+        });
     }
     Ok(file_keys)
 }

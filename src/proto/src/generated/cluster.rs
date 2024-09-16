@@ -491,12 +491,11 @@ pub struct FileDataList {
     #[prost(message, repeated, tag = "1")]
     pub items: ::prost::alloc::vec::Vec<FileData>,
 }
+/// TODO  YJDoc2 : collapse it into above?
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileData {
-    #[prost(int64, tag = "1")]
-    pub id: i64,
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag = "1")]
     pub file_key: ::core::option::Option<FileKey>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
