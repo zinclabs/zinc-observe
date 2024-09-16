@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-if="disableMoreErrorDetails">
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-error-message"
-                        :htmlContent="searchObj.data.errorMsg"
+                        :htmlContent="searchObj.data.errorMsg + '<br>' +  searchObj.data.errorDetail"
                       />
                     </span>
                   </h5>

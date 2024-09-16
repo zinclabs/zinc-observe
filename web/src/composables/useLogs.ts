@@ -136,6 +136,7 @@ const defaultObject = {
     parsedQuery: {},
     countErrorMsg: "",
     errorMsg: "",
+    errorDetail: "",
     errorCode: 0,
     filterErrMsg: "",
     missingStreamMessage: "",
@@ -386,6 +387,7 @@ const useLogs = () => {
     searchObj.data.resultGrid.currentPage = 1;
     searchObj.runQuery = false;
     searchObj.data.errorMsg = "";
+    searchObj.data.errorDetail = "";
     searchObj.data.countErrorMsg = "";
   }
 
@@ -1248,6 +1250,9 @@ const useLogs = () => {
                 "Error while processing partition request.";
               if (err.response != undefined) {
                 searchObj.data.errorMsg = err.response.data.error;
+                if(err.response.data.hasOwnProperty("error_detail")){
+                  searchObj.data.errorDetail = err.response.data.error_detail;
+                }
                 if (err.response.data.hasOwnProperty("trace_id")) {
                   trace_id = err.response.data?.trace_id;
                 }
@@ -1263,6 +1268,7 @@ const useLogs = () => {
               if (err?.request?.status >= 429) {
                 notificationMsg.value = err?.response?.data?.message;
                 searchObj.data.errorMsg = err?.response?.data?.message;
+                searchObj.data.errorDetail = err?.response?.data?.error_detail;
               }
 
               if (trace_id) {
@@ -2264,6 +2270,9 @@ const useLogs = () => {
               : "Error while processing histogram request.";
           if (err.response != undefined) {
             searchObj.data.errorMsg = err.response.data.error;
+            if(err.response.data.hasOwnProperty("error_detail")){
+              searchObj.data.errorDetail = err.response.data.error_detail;
+            }
             if (err.response.data.hasOwnProperty("trace_id")) {
               trace_id = err.response.data?.trace_id;
             }
@@ -2286,6 +2295,7 @@ const useLogs = () => {
           if (err?.request?.status >= 429) {
             notificationMsg.value = err?.response?.data?.message;
             searchObj.data.errorMsg = err?.response?.data?.message;
+            searchObj.data.errorDetail = err?.response?.data?.error_detail;
           }
 
           if (trace_id) {
@@ -2506,6 +2516,7 @@ const useLogs = () => {
       searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
       searchObj.data.errorMsg = "";
+      searchObj.data.errorDetail = "";
       searchObj.data.countErrorMsg = "";
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.interestingFieldList = [];
@@ -3481,6 +3492,7 @@ const useLogs = () => {
           searchObj.data.errorMsg = "Error while processing search request.";
           if (err.response != undefined) {
             searchObj.data.errorMsg = err.response.data.error;
+            searchObj.data.errorDetail = err.response.data.error_detail;
             if (err.response.data.hasOwnProperty("trace_id")) {
               trace_id = err.response.data?.trace_id;
             }

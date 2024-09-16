@@ -89,8 +89,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <SanitizedHtmlRenderer
                   data-test="logs-search-error-message"
-                  :html-content="searchObj.data.errorMsg"
-                />
+                  :htmlContent="searchObj.data.errorMsg + '<br>' +  searchObj.data.errorDetail"
+                  />
 
                 <div
                   data-test="logs-search-error-20003"
