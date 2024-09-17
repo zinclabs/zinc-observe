@@ -1475,6 +1475,7 @@ pub async fn search_history(
         .unwrap_or("")
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    // stream_type must be specified
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
@@ -1494,6 +1495,7 @@ pub async fn search_history(
 
     // Search
     let stream_name = USAGE_STREAM;
+    let usage_stream_type = StreamType::Logs;
     let search_query_req = match req.to_query_req(stream_name, &cfg.common.column_timestamp) {
         Ok(r) => r,
         Err(e) => {
@@ -1515,8 +1517,12 @@ pub async fn search_history(
             let user: meta::user::User =
                 USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
             let stream_type_str = stream_type.to_string();
+            let mut method = "LIST";
             let stream_name = match req.stream_name {
-                Some(ref name) => name,
+                Some(ref name) => {
+                    method = "GET";
+                    name
+                }
                 None => &org_id,
             };
 
@@ -1525,8 +1531,7 @@ pub async fn search_history(
                     &user_id,
                     AuthExtractor {
                         auth: "".to_string(),
-                        // TODO: Fix here
-                        method: "GET".to_string(),
+                        method: method.to_string(),
                         o2_type: format!(
                             "{}_history:{}",
                             OFGA_MODELS
@@ -1581,7 +1586,7 @@ pub async fn search_history(
     let search_res = SearchService::search(
         &trace_id,
         &cfg.common.usage_org,
-        stream_type,
+        usage_stream_type,
         Some(user_id.clone()),
         &search_query_req,
     )
@@ -1594,7 +1599,7 @@ pub async fn search_history(
             http_report_metrics(
                 start,
                 &org_id,
-                stream_type,
+                usage_stream_type,
                 stream_name,
                 "500",
                 "_search_history",
@@ -1636,7 +1641,7 @@ pub async fn search_history(
     http_report_metrics(
         start,
         &org_id,
-        stream_type,
+        usage_stream_type,
         stream_name,
         "200",
         "_search_history",
@@ -1669,7 +1674,7 @@ pub async fn search_history(
         req_stats,
         history_org_id,
         stream_name,
-        stream_type,
+        usage_stream_type,
         UsageType::SearchHistory,
         num_fn,
         started_at,

@@ -459,7 +459,7 @@ pub async fn all_history(
     org_id: &str,
     user_id: &str,
     filters: AlertHistoryFilter,
-    permitted: Option<Vec<String>>,
+    _permitted: Option<Vec<String>>,
 ) -> Result<config::meta::search::Response, (http::StatusCode, anyhow::Error)> {
     let now = Utc::now().timestamp_micros();
     let config = get_config();
@@ -483,7 +483,7 @@ pub async fn all_history(
     } else {
         filters.from
     };
-    let mut sql = format!(
+    let sql = format!(
         "SELECT * FROM \"{}\" WHERE org = '{}' AND module = 'alert'",
         TRIGGERS_USAGE_STREAM, org_id
     );
