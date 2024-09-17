@@ -976,7 +976,13 @@ export default defineComponent({
     };
 
     const prefetch = () => {
-      const href = "/web/assets/editor.api.v1.js";
+      let href = "";
+      if(config.isCloud == "true") {
+        href = "/assets/editor.api.v1.js";
+      }
+      else{
+        href = "/web/assets/editor.api.v1.js"
+      }
       const existingLink = document.querySelector(
         `link[rel="prefetch"][href="${href}"]`,
       );
