@@ -195,8 +195,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 }
             } else {
                 for org_name in orgs {
-                    get_index_creation_tuples(org_name, &mut tuples).await;
-                    get_history_creation_tuples(org_id, &mut tuples).await;
+                    if need_migrate_index_streams {
+                        get_index_creation_tuples(org_name, &mut tuples).await;
+                    }
+                    if need_migrate_history_tuples {
+                        get_history_creation_tuples(org_id, &mut tuples).await;
+                    }
                 }
             }
 
