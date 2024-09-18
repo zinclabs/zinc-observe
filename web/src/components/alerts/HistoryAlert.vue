@@ -138,11 +138,11 @@ export default defineComponent({
     NoData,
   },
   props: {
-    alertName: String,
+  modelValue: {
+    type: Boolean,
+    required: true
   },
-
-
-
+},
   emits: ['closeDialog'],
   methods: {
 
