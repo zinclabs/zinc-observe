@@ -145,6 +145,7 @@ pub async fn search(
     if req_stype != cluster_rpc::SearchType::WalOnly as i32 {
         let idx_file_list = &req.idx_files;
 
+        let start = std::time::Instant::now();
         let file_list_map: HashMap<_, _> = get_file_list_by_ids(
             &trace_id,
             &req.file_ids,
@@ -156,6 +157,12 @@ pub async fn search(
         .into_iter()
         .map(|f| (f.key.clone(), f))
         .collect();
+        let file_list_took = start.elapsed().as_millis() as usize;
+        log::info!(
+            "search: get file data in worker num: {}, took: {} ms",
+            file_list_map.len(),
+            file_list_took,
+        );
 
         let mut file_list: Vec<FileKey>;
 
@@ -191,6 +198,7 @@ pub async fn search(
         }
         let mut files = Vec::with_capacity(file_list.len());
         // cannot use .iter().filter() as the function is async cannot be used in filter closure
+        let start = std::time::Instant::now();
         for file in file_list {
             if sql
                 .match_source(
@@ -205,8 +213,18 @@ pub async fn search(
                 files.push(file);
             }
         }
+        let match_source_took = start.elapsed().as_millis() as usize;
+        log::info!(
+            "search: match_source in worker took: {} ms",
+            match_source_took
+        );
         files.sort_by(|a, b| a.meta.min_ts.cmp(&b.meta.min_ts));
         files.dedup_by(|a, b| a.key == b.key);
+        let file_data_sort_took = start.elapsed().as_millis() as usize;
+        log::info!(
+            "search: file sorting in worker took: {} ms",
+            file_data_sort_took
+        );
 
         file_list = files;
 
