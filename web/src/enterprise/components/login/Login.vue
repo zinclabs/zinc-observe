@@ -111,7 +111,7 @@ export default defineComponent({
                 store.dispatch("setSelectedOrganization", selectedOrg.value);
               }
               return optiondata;
-            }
+            },
           );
 
           const redirectURI = window.sessionStorage.getItem("redirectURI");
@@ -153,7 +153,7 @@ export default defineComponent({
       userInfo: {},
     };
   },
-  created() {
+  async created() {
     /**
      * Get the user info from the url hash
      * if user info is not null and user email is not null
@@ -194,6 +194,9 @@ export default defineComponent({
 
       //analytics
       const userId = this.userInfo.email;
+
+      await importMoment();
+
       segment.identify(
         "Log In",
         {
@@ -202,7 +205,7 @@ export default defineComponent({
           firstName: this.userInfo.given_name,
           lastName: this.userInfo.family_name,
         },
-        { originalTimestamp: moment.utc().format() }
+        { originalTimestamp: moment.utc().format() },
       );
 
       openobserveRum.setUser({
@@ -250,7 +253,7 @@ export default defineComponent({
                 firstName: this.userInfo.given_name,
                 lastName: this.userInfo.family_name,
               },
-              { originalTimestamp: moment.utc().format() }
+              { originalTimestamp: moment.utc().format() },
             );
 
             openobserveRum.setUser({
@@ -276,7 +279,7 @@ export default defineComponent({
               firstName: this.userInfo.given_name,
               lastName: this.userInfo.family_name,
             },
-            { originalTimestamp: moment.utc().format() }
+            { originalTimestamp: moment.utc().format() },
           );
 
           openobserveRum.setUser({
