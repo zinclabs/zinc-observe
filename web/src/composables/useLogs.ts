@@ -1715,6 +1715,18 @@ const useLogs = () => {
               for (const partition of partitions) {
                 searchObj.data.histogramQuery.query.start_time = partition[0];
                 searchObj.data.histogramQuery.query.end_time = partition[1];
+                 //to improve the cancel query UI experience we add additional check here and further we need to remove it 
+                 if (searchObj.data.isOperationCancelled) {
+                  searchObj.loadingHistogram = false;
+                  searchObj.data.isOperationCancelled = false;
+          
+                  if (!searchObj.data.histogram?.xData?.length) {
+                    notificationMsg.value = "Search query was cancelled";
+                    searchObj.data.histogram.errorMsg = "Search query was cancelled";
+                    searchObj.data.histogram.errorDetail = "Search query was cancelled";
+                  }
+                  break;
+                }
                 await getHistogramQueryData(searchObj.data.histogramQuery);
                 if (partitions.length > 1) {
                   setTimeout(async () => {
