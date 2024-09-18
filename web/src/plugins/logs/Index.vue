@@ -233,7 +233,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-if="disableMoreErrorDetails">
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-error-message"
-                        :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
+                        :htmlContent="searchObj.data.errorMsg + '<br><h6>' + searchObj.data.errorDetail + '</h6>'"
+                        />
                     </span>
                   </h5>
                 </div>
@@ -1071,6 +1072,23 @@ export default defineComponent({
       errorList.splice(0);
       errorList.push(errorMessage);
     };
+
+    // [START] cancel running queries
+
+    //reactive object for loading state of variablesData and panels
+    const variablesAndPanelsDataLoadingState = reactive({
+      variablesData: {},
+      panels: {},
+      searchRequestTraceIds: {},
+    });
+
+    // provide variablesAndPanelsDataLoadingState to share data between components
+    provide(
+      "variablesAndPanelsDataLoadingState",
+      variablesAndPanelsDataLoadingState,
+    );
+
+    // [END] cancel running queries
 
     return {
       t,
