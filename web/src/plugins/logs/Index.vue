@@ -1359,7 +1359,7 @@ $navbarHeight: 64px;
 
   .thirdlevel {
     .field-list-collapse-btn {
-      z-index: 99;
+      z-index: 11;
       position: absolute;
       top: 5px;
       font-size: 12px !important;

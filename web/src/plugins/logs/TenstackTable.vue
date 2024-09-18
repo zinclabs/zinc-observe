@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <thead
-        class="tw-sticky tw-top-0 tw-z-50"
+        class="tw-sticky tw-top-0 tw-z-10"
         style="max-height: 44px; height: 22px"
       >
         <vue-draggable
