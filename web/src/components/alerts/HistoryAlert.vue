@@ -139,8 +139,6 @@ export default defineComponent({
   },
   props: {
     alertName: String,
-    alertTitle: String,
-    additionalInfo: String,
   },
 
 
