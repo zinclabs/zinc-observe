@@ -976,25 +976,25 @@ export default defineComponent({
     };
 
     const prefetch = () => {
-      let href = "";
-      if(config.isCloud == "true") {
-        href = "/assets/editor.api.v1.js";
-      }
-      else{
-        href = "/web/assets/editor.api.v1.js"
-      }
-      const existingLink = document.querySelector(
-        `link[rel="prefetch"][href="${href}"]`,
-      );
+      // let href = "";
+      // if(config.isCloud == "true") {
+      //   href = "/assets/editor.api.v1.js";
+      // }
+      // else{
+      //   href = "/web/assets/editor.api.v1.js"
+      // }
+      // const existingLink = document.querySelector(
+      //   `link[rel="prefetch"][href="${href}"]`,
+      // );
 
-      if (!existingLink) {
-        // Create a new link element
-        isMonacoEditorLoaded.value = true;
-        const link = document.createElement("link");
-        link.rel = "prefetch";
-        link.href = href;
-        document.head.appendChild(link);
-      }
+      // if (!existingLink) {
+      //   // Create a new link element
+      //   isMonacoEditorLoaded.value = true;
+      //   const link = document.createElement("link");
+      //   link.rel = "prefetch";
+      //   link.href = href;
+      //   document.head.appendChild(link);
+      // }
     };
 
     const expandMenu = () => {
