@@ -181,6 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
            </div>
             <q-toggle
+                v-if="isCloud !== 'true'"
                 data-test="log-stream-store-original-data-toggle-btn"
                 v-model="storeOriginalData"
                 :label="t('logStream.storeOriginalData')"
