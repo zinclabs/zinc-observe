@@ -26,8 +26,8 @@ use datafusion::arrow::datatypes::Schema;
 use infra::{
     cache::stats,
     schema::{
-        unwrap_partition_time_level, unwrap_stream_settings, STREAM_SCHEMAS,
-        STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        unwrap_partition_time_level, unwrap_stream_settings, STREAM_RECORD_ID_GENERATOR,
+        STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
 };
 
@@ -296,7 +296,9 @@ pub async fn update_stream_settings(
             if let Some(max_query_range) = update_settings.max_query_range {
                 settings.max_query_range = max_query_range;
             }
-
+            if let Some(store_original_data) = update_settings.store_original_data {
+                settings.store_original_data = store_original_data;
+            }
             if let Some(flatten_level) = update_settings.flatten_level {
                 settings.flatten_level = Some(flatten_level);
             }
@@ -438,6 +440,11 @@ pub async fn delete_stream(
     let mut w = STREAM_SETTINGS.write().await;
     w.remove(&key);
     drop(w);
+
+    // delete stream record id generator cache
+    {
+        STREAM_RECORD_ID_GENERATOR.remove(&key);
+    }
 
     // delete stream stats cache
     stats::remove_stream_stats(org_id, stream_name, stream_type);

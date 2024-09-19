@@ -21,7 +21,10 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{common::infra::cluster, service::search::MetadataMap};
+use crate::{
+    common::infra::cluster,
+    service::{grpc::get_ingester_channel, search::MetadataMap},
+};
 
 #[derive(Default)]
 pub struct MetricsServer;
@@ -55,7 +58,7 @@ impl MetricsService for MetricsServer {
         let token: MetadataValue<_> = cluster::get_internal_grpc_token()
             .parse()
             .map_err(|_| Status::internal("invalid token".to_string()))?;
-        let channel = super::get_ingester_channel().await?;
+        let (addr, channel) = get_ingester_channel().await?;
         let client = MetricsServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
             req.metadata_mut().insert("authorization", token.clone());
             Ok(req)
@@ -71,7 +74,7 @@ impl MetricsService for MetricsServer {
             Ok(res) => {
                 if res.get_ref().partial_success.is_some() {
                     log::error!(
-                        "[Router:METRICS] export partial_success response: {:?}",
+                        "[Router:METRICS] export partial_success node: {addr}, response: {:?}",
                         res.get_ref()
                     );
                 }
@@ -79,7 +82,7 @@ impl MetricsService for MetricsServer {
             }
             Err(e) => {
                 let time = start.elapsed().as_millis() as usize;
-                log::error!("[Router:METRICS] export status: {e}, took: {time} ms");
+                log::error!("[Router:METRICS] export node: {addr}, status: {e}, took: {time} ms");
                 Err(e)
             }
         }

@@ -912,3 +912,13 @@ export const splitQuotedString = (input: any) => {
 
   return result;
 };
+
+export const getTimezonesByOffset = async (offsetMinutes: number) => {
+  await importMoment();
+  const offsetHours = offsetMinutes / 60;
+  const timezones = moment.tz.names();
+  return timezones.filter((zone: string) => {
+    const zoneOffset = moment.tz(zone).utcOffset() / 60;
+    return zoneOffset === offsetHours;
+  });
+};

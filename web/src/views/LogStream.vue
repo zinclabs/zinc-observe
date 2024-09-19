@@ -352,6 +352,9 @@ export default defineComponent({
         label: t("logStream.docNum"),
         align: "left",
         sortable: true,
+        sort: (a, b, rowA, rowB) => {
+          return parseInt(rowA.doc_num) - parseInt(rowB.doc_num);
+        },
       },
       {
         name: "storage_size",

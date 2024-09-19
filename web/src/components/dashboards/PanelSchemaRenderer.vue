@@ -164,6 +164,7 @@ import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { onUnmounted } from "vue";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -329,8 +330,7 @@ export default defineComponent({
           [panelSchema?.value?.id]: false,
         };
       }
-    }),
-    
+    });
     watch(
       [data, store?.state],
       async () => {
@@ -651,6 +651,31 @@ export default defineComponent({
         // if pie, donut or heatmap then series name will come in name field
         // also, if value is an array, then last value will be taken
         const drilldownVariables: any = {};
+
+        // selected start time and end time
+        if (
+          selectedTimeObj?.value?.start_time &&
+          selectedTimeObj?.value?.start_time != "Invalid Date"
+        ) {
+          drilldownVariables.start_time = new Date(
+            selectedTimeObj?.value?.start_time?.toISOString(),
+          ).getTime();
+        }
+
+        if (
+          selectedTimeObj?.value?.end_time &&
+          selectedTimeObj?.value?.end_time != "Invalid Date"
+        ) {
+          drilldownVariables.end_time = new Date(
+            selectedTimeObj?.value?.end_time?.toISOString(),
+          ).getTime();
+        }
+
+        // param to pass current query
+        drilldownVariables.query = panelSchema.value.queries[0].query ?? "";
+        drilldownVariables.query_encoded = b64EncodeUnicode(
+          panelSchema.value.queries[0].query ?? "",
+        );
 
         // if chart type is 'table' then we need to pass the table name
         if (panelSchema.value.type == "table") {

@@ -82,6 +82,11 @@ impl SearchingFileLocker {
     pub fn exist(&self, file: &str) -> bool {
         self.inner.get(file).is_some()
     }
+
+    pub fn clean(&mut self) {
+        self.inner.clear();
+        self.inner.shrink_to_fit();
+    }
 }
 
 struct Manager {
@@ -394,6 +399,11 @@ pub fn release_files(files: &[String]) {
 
 pub fn lock_files_exists(file: &str) -> bool {
     SEARCHING_FILES.read().exist(file)
+}
+
+pub fn clean_lock_files() {
+    let mut locker = SEARCHING_FILES.write();
+    locker.clean();
 }
 
 pub fn lock_request(trace_id: &str, files: &[String]) {

@@ -164,14 +164,14 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page.getByText("Chart configuration has been").click();
     await expect(page.getByText("Chart configuration has been")).toBeVisible();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await expect(page.getByText("There are some errors, please")).toBeVisible();
     await page
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_hash"] [data-test="dashboard-add-x-data"]'
       )
       .click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page
       .locator('[data-test="dashboard-y-item-_timestamp-remove"]')
       .click();
@@ -180,7 +180,7 @@ test.describe(" visualize UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_image"] [data-test="dashboard-add-y-data"]'
       )
       .click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
         x: 470,
@@ -198,7 +198,7 @@ test.describe(" visualize UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.locator(".q-list > div:nth-child(5)").click();
     await expect(
       page.locator('[data-test="chart-renderer"] canvas')
@@ -212,7 +212,7 @@ test.describe(" visualize UI testcases", () => {
       },
     });
     await page.locator(".q-pa-none > .q-list > div").first().click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
         x: 590,
@@ -220,7 +220,7 @@ test.describe(" visualize UI testcases", () => {
       },
     });
     await page.locator(".q-list > div:nth-child(2)").click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
         x: 475,
@@ -228,7 +228,7 @@ test.describe(" visualize UI testcases", () => {
       },
     });
     await page.locator('[data-test="selected-chart-h-bar-item"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
         x: 722,
@@ -291,7 +291,7 @@ test.describe(" visualize UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_annotations_kubernetes_io_psp"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await page.locator('[data-test="confirm-button"]').click();
   });
@@ -353,10 +353,10 @@ test.describe(" visualize UI testcases", () => {
     await page.waitForTimeout(1000);
 
     // await page.getByText('e2e_automate').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.locator('[data-test="date-time-btn"]').click();
     await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
   });
 
   test("should not update the query on the logs page when switching between logs and visualization, even if changes are made in any field in the visualization", async ({
@@ -375,7 +375,7 @@ test.describe(" visualize UI testcases", () => {
       .click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
 
     let exceptionBefore = null;
     let exceptionAfter = null;
@@ -393,7 +393,7 @@ test.describe(" visualize UI testcases", () => {
     }
 
     await page.locator('[data-test="dashboard-add-condition-remove"]').click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await page.locator('[data-test="confirm-button"]').click();
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
@@ -412,7 +412,7 @@ test.describe(" visualize UI testcases", () => {
     expect(exceptionBefore).toBe(exceptionAfter);
 
     // Perform an additional refresh to ensure consistency
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
   });
 
   test("should make the data disappear on the visualization page after a page refresh and navigate to the logs page", async ({
@@ -434,7 +434,7 @@ test.describe(" visualize UI testcases", () => {
         '[data-test="field-list-item-logs-e2e_automate-kubernetes_container_name"] [data-test="dashboard-add-b-data"]'
       )
       .click();
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
 
     // Reload the page
     await page.reload();

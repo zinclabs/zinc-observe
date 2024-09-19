@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="column full-height no-wrap searchdetaildialog"
     data-test="dialog-box"
   >
+ 
     <q-card-section class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap">
         <div class="col">
@@ -75,7 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tab-panels-container"
       v-model="tab"
       animated
-    >
+    >   
+
       <q-tab-panel name="json" class="q-pa-none">
         <q-card-section
           data-test="log-detail-json-content"
@@ -383,6 +385,7 @@ export default defineComponent({
     },
   },
   methods: {
+
     toggleIncludeSearchTerm(term: string) {
       // if (flag == false) {
       this.$emit("add:searchterm", term);

@@ -397,7 +397,8 @@
     "indexType": "Index Type",
     "addField": "Add Field",
     "addSchemaField": "Add to Defined Schema Fields",
-    "removeSchemaField": "Remove Defined Schema Fields"
+    "removeSchemaField": "Remove Defined Schema Fields",
+    "storeOriginalData" : "Store Original Data"
   },
   "pipeline": {
     "header": "Pipelines",

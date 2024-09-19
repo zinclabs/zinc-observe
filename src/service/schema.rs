@@ -17,7 +17,9 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::Result;
 use config::{
+    cluster::LOCAL_NODE_ID,
     get_config,
+    ider::SnowflakeIdGenerator,
     meta::stream::StreamType,
     utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
     SQL_FULL_TEXT_SEARCH_FIELDS,
@@ -25,7 +27,8 @@ use config::{
 use datafusion::arrow::datatypes::{Field, Schema};
 use hashbrown::HashSet;
 use infra::schema::{
-    get_settings, unwrap_stream_settings, SchemaCache, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+    get_settings, unwrap_stream_settings, SchemaCache, STREAM_RECORD_ID_GENERATOR,
+    STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
 };
 use serde_json::{Map, Value};
 
@@ -348,6 +351,11 @@ async fn handle_diff_schema(
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
     w.insert(cache_key.clone(), final_schema.clone());
     drop(w);
+    if stream_setting.store_original_data {
+        if let dashmap::Entry::Vacant(entry) = STREAM_RECORD_ID_GENERATOR.entry(cache_key.clone()) {
+            entry.insert(SnowflakeIdGenerator::new(unsafe { LOCAL_NODE_ID }));
+        }
+    }
     let mut w = STREAM_SETTINGS.write().await;
     w.insert(cache_key.clone(), stream_setting);
     drop(w);

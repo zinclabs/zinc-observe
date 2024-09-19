@@ -15,7 +15,7 @@
 
 use std::{
     fs::{create_dir_all, remove_file, File, OpenOptions},
-    io::{self, Seek, SeekFrom, Write},
+    io::{BufWriter, Seek, SeekFrom, Write},
     path::PathBuf,
 };
 
@@ -27,7 +27,7 @@ use crate::errors::*;
 
 pub struct Writer {
     path: PathBuf,
-    f: File,
+    f: BufWriter<File>,
     bytes_written: usize,
     uncompressed_bytes_written: usize,
     buffer: Vec<u8>,
@@ -40,6 +40,7 @@ impl Writer {
         stream_type: &str,
         id: u64,
         init_size: u64,
+        buffer_size: usize,
     ) -> Result<Self> {
         let path = super::build_file_path(root_dir, org_id, stream_type, id);
         create_dir_all(path.parent().unwrap()).context(FileOpenSnafu { path: path.clone() })?;
@@ -70,7 +71,7 @@ impl Writer {
 
         Ok(Self {
             path,
-            f,
+            f: BufWriter::with_capacity(buffer_size, f),
             bytes_written,
             uncompressed_bytes_written: bytes_written,
             buffer: Vec::with_capacity(8 * 1204),
@@ -124,7 +125,7 @@ impl Writer {
         })?;
 
         // Go back and write the chunk header values
-        let mut buf = io::Cursor::new(buf);
+        let mut buf = std::io::Cursor::new(buf);
         buf.set_position(0);
 
         buf.write_u32::<BigEndian>(checksum)
@@ -149,14 +150,17 @@ impl Writer {
         Ok(())
     }
 
-    pub fn sync(&self) -> Result<()> {
-        self.f.sync_all().context(FileSyncSnafu {
+    pub fn sync(&mut self) -> Result<()> {
+        self.f.flush().context(FileSyncSnafu {
+            path: self.path.clone(),
+        })?;
+        self.f.get_ref().sync_data().context(FileSyncSnafu {
             path: self.path.clone(),
         })?;
         Ok(())
     }
 
-    pub fn close(&self) -> Result<()> {
+    pub fn close(&mut self) -> Result<()> {
         self.sync()
     }
 }
@@ -185,12 +189,12 @@ impl<W> Write for HasherWrapper<W>
 where
     W: Write,
 {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.hasher.update(buf);
         self.inner.write(buf)
     }
 
-    fn flush(&mut self) -> io::Result<()> {
+    fn flush(&mut self) -> std::io::Result<()> {
         self.inner.flush()
     }
 }

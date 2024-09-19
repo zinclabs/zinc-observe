@@ -36,6 +36,7 @@
           v-model="selectedDate"
           ref="dateTimePickerRef"
           data-test="dashboard-viewpanel-date-time-picker"
+          :disable="disable"
         />
         <AutoRefreshInterval
           v-model="refreshInterval"
@@ -44,6 +45,22 @@
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <q-btn
+          v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length && disable"
+          class="q-ml-sm"
+          outline
+          padding="xs"
+          no-caps
+          icon="cancel"
+          @click="cancelViewPanelQuery"
+          data-test="dashboard-viewpanel-cancel-btn"
+          color="negative"
+        >
+          <q-tooltip>
+            {{ t("panel.cancel") }}
+          </q-tooltip>
+        </q-btn>
+        <q-btn
+          v-else
           class="q-ml-sm"
           outline
           padding="xs"
@@ -51,6 +68,7 @@
           icon="refresh"
           @click="refreshData"
           data-test="dashboard-viewpanel-refresh-data-btn"
+          :disable="disable"
         />
         <q-btn
           no-caps
@@ -145,9 +163,10 @@ import RelativeTime from "@/components/common/RelativeTime.vue";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { onActivated } from "vue";
 import { parseDuration } from "@/utils/date";
-
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
-import { inject } from "vue";
+import { inject, provide, computed } from "vue";
+import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "ViewPanel",
@@ -471,6 +490,46 @@ export default defineComponent({
       emit("update:initialVariableValues", ...args);
     };
 
+    // [START] cancel running queries
+
+    //reactive object for loading state of variablesData and panels
+    const variablesAndPanelsDataLoadingState = reactive({
+      variablesData: {},
+      panels: {},
+      searchRequestTraceIds: {},
+    });
+
+    // provide variablesAndPanelsDataLoadingState to share data between components
+    provide(
+      "variablesAndPanelsDataLoadingState",
+      variablesAndPanelsDataLoadingState,
+    );
+
+    const searchRequestTraceIds = computed(() => {
+      const searchIds = Object.values(
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
+      ).filter((item: any) => item.length > 0);
+      return searchIds.flat() as string[];
+    });
+
+    const { traceIdRef, cancelQuery } = useCancelQuery();
+
+    const cancelViewPanelQuery = () => {
+      traceIdRef.value = searchRequestTraceIds.value;
+      cancelQuery();
+    };
+
+    const disable = ref(false);
+    
+    watch(variablesAndPanelsDataLoadingState, () => {
+      const panelsValues = Object.values(
+        variablesAndPanelsDataLoadingState.panels,
+      );
+      disable.value = panelsValues.some((item: any) => item === true);
+    });
+
+    // [END] cancel running queries
+
     return {
       t,
       updateDateTime,
@@ -495,6 +554,10 @@ export default defineComponent({
       onUpdateInitialVariableValues,
       lastTriggeredAt,
       handleLastTriggeredAtUpdate,
+      searchRequestTraceIds,
+      cancelViewPanelQuery,
+      disable,
+      config,
     };
   },
 });

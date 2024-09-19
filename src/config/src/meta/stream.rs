@@ -305,21 +305,15 @@ impl StreamStats {
         }
     }
 
-    pub fn add_stream_stats(&mut self, stats: &StreamStats) {
-        self.file_num = max(0, self.file_num + stats.file_num);
-        self.doc_num = max(0, self.doc_num + stats.doc_num);
+    pub fn format_by(&mut self, stats: &StreamStats) {
+        self.file_num = stats.file_num;
+        self.doc_num = stats.doc_num;
+        self.storage_size = stats.storage_size;
+        self.compressed_size = stats.compressed_size;
         self.doc_time_min = self.doc_time_min.min(stats.doc_time_min);
         self.doc_time_max = self.doc_time_max.max(stats.doc_time_max);
-        self.storage_size += stats.storage_size;
-        self.compressed_size += stats.compressed_size;
         if self.doc_time_min == 0 {
             self.doc_time_min = stats.doc_time_min;
-        }
-        if self.storage_size < 0.0 {
-            self.storage_size = 0.0;
-        }
-        if self.compressed_size < 0.0 {
-            self.compressed_size = 0.0;
         }
     }
 }
@@ -498,6 +492,8 @@ pub struct UpdateStreamSettings {
     pub defined_schema_fields: UpdateStringSettingsArray,
     #[serde(default)]
     pub max_query_range: Option<i64>,
+    #[serde(default)]
+    pub store_original_data: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -523,6 +519,8 @@ pub struct StreamSettings {
     pub defined_schema_fields: Option<Vec<String>>,
     #[serde(default)]
     pub max_query_range: i64,
+    #[serde(default)]
+    pub store_original_data: bool,
 }
 
 impl Serialize for StreamSettings {
@@ -545,6 +543,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("bloom_filter_fields", &self.bloom_filter_fields)?;
         state.serialize_field("data_retention", &self.data_retention)?;
         state.serialize_field("max_query_range", &self.max_query_range)?;
+        state.serialize_field("store_original_data", &self.store_original_data)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
@@ -650,6 +649,11 @@ impl From<&str> for StreamSettings {
 
         let flatten_level = settings.get("flatten_level").map(|v| v.as_i64().unwrap());
 
+        let store_original_data = settings
+            .get("store_original_data")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
         Self {
             partition_time_level,
             partition_keys,
@@ -660,6 +664,7 @@ impl From<&str> for StreamSettings {
             max_query_range,
             flatten_level,
             defined_schema_fields,
+            store_original_data,
         }
     }
 }

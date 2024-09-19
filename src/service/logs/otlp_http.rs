@@ -38,7 +38,7 @@ use crate::{
     common::meta::{
         functions::{StreamTransform, VRLResultResolver},
         http::HttpResponse as MetaHttpResponse,
-        ingestion::{IngestionStatus, StreamStatus},
+        ingestion::{IngestionStatus, StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME},
         stream::StreamParams,
     },
     handler::http::request::CONTENT_TYPE_JSON,
@@ -125,9 +125,11 @@ pub async fn logs_json_handler(
 
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
-    crate::service::ingestion::get_user_defined_schema(
+    let mut streams_need_original_set: HashSet<String> = HashSet::new();
+    crate::service::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
+        &mut streams_need_original_set,
     )
     .await;
     // End get user defined schema
@@ -317,6 +319,23 @@ pub async fn logs_json_handler(
 
                 value = json::to_value(local_val)?;
 
+                // store a copy of original data before it's being transformed and/or flattened,
+                // unless
+                // 1. original data is not an object -> won't be flattened.
+                // 2. no routing and current StreamName not in streams_need_original_set
+                let original_data = if value.is_object() {
+                    if stream_routing_map.is_empty()
+                        && !streams_need_original_set.contains(&stream_name)
+                    {
+                        None
+                    } else {
+                        // otherwise, make a copy in case the routed stream needs original data
+                        Some(value.to_string())
+                    }
+                } else {
+                    None // `item` won't be flattened, no need to store original
+                };
+
                 let main_stream_key = format!("{org_id}/{}/{stream_name}", StreamType::Logs);
 
                 // Start row based transform before flattening the value
@@ -388,6 +407,25 @@ pub async fn logs_json_handler(
                     local_val = crate::service::logs::refactor_map(local_val, fields);
                 }
 
+                // add `_original` and '_record_id` if required by StreamSettings
+                if streams_need_original_set.contains(&routed_stream_name)
+                    && original_data.is_some()
+                {
+                    local_val.insert(
+                        ORIGINAL_DATA_COL_NAME.to_string(),
+                        original_data.unwrap().into(),
+                    );
+                    let record_id = crate::service::ingestion::generate_record_id(
+                        org_id,
+                        &routed_stream_name,
+                        &StreamType::Logs,
+                    );
+                    local_val.insert(
+                        ID_COL_NAME.to_string(),
+                        json::Value::String(record_id.to_string()),
+                    );
+                }
+
                 let function_no = stream_before_functions_map
                     .get(&main_stream_key)
                     .map(|v| v.len())
@@ -455,7 +493,7 @@ pub async fn logs_json_handler(
     let took_time = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
-            "/api/oltp/v1/logs",
+            "/api/otlp/v1/logs",
             metric_rpt_status_code,
             org_id,
             &stream_name,
@@ -464,7 +502,7 @@ pub async fn logs_json_handler(
         .observe(took_time);
     metrics::HTTP_INCOMING_REQUESTS
         .with_label_values(&[
-            "/api/oltp/v1/logs",
+            "/api/otlp/v1/logs",
             metric_rpt_status_code,
             org_id,
             &stream_name,

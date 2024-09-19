@@ -146,6 +146,8 @@ pub async fn search_parquet(
     {
         Ok(versions) => versions,
         Err(err) => {
+            // release all files
+            wal::release_files(&lock_files);
             log::error!("[trace_id {trace_id}] get schema error: {}", err);
             return Err(Error::ErrorCode(ErrorCodes::SearchStreamNotFound(
                 sql.stream_name.clone(),
@@ -153,6 +155,8 @@ pub async fn search_parquet(
         }
     };
     if schema_versions.is_empty() {
+        // release all files
+        wal::release_files(&lock_files);
         return Ok((vec![], ScanStats::new(), 0));
     }
     let schema_latest_id = schema_versions.len() - 1;
@@ -251,7 +255,20 @@ pub async fn search_parquet(
             work_group: Some(work_group.to_string()),
             target_partitions: 0,
         };
-        let diff_fields = generate_search_schema_diff(&schema, &schema_latest_map)?;
+        let diff_fields = match generate_search_schema_diff(&schema, &schema_latest_map) {
+            Ok(diff_fields) => diff_fields,
+            Err(err) => {
+                // release all files
+                wal::release_files(&lock_files);
+                log::error!(
+                    "[trace_id {trace_id}] generate search schema diff error: {}",
+                    err
+                );
+                return Err(Error::ErrorCode(ErrorCodes::ServerInternalError(
+                    "generate search schema diff error".to_string(),
+                )));
+            }
+        };
         let table = match exec::create_parquet_table(
             &session,
             schema_latest.clone(),

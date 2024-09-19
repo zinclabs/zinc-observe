@@ -36,8 +36,8 @@ use futures::{StreamExt, TryStreamExt};
 use infra::{
     cache::stats,
     schema::{
-        SchemaCache, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST,
-        STREAM_SETTINGS,
+        SchemaCache, STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED,
+        STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
 };
 
@@ -268,6 +268,11 @@ async fn delete_enrichment_table(org_id: &str, stream_name: &str, stream_type: S
     let mut w = STREAM_SETTINGS.write().await;
     w.remove(&key);
     drop(w);
+
+    // delete record_id generator if present
+    {
+        STREAM_RECORD_ID_GENERATOR.remove(&key);
+    }
 
     // delete stream key
     let _ = enrichment_table::delete(org_id, stream_name).await;

@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   placeholder="Select column"
                   fill-input
                   :input-debounce="400"
-                  @filter="filterColumns"
+                  @filter="filterFields"
                   :rules="[(val: any) => !!val || 'Field is required!']"
                   style="width: 200px"
                   @update:model-value="updateTrigger"
@@ -524,10 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-icon>
         </div>
         <div style="min-height: 58px">
-          <div
-            class="flex items-center q-mr-sm"
-            style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
-          >
+          <div class="flex items-center q-mr-sm" style="width: fit-content">
             <div
               data-test="scheduled-alert-cron-input"
               style="width: 87px; margin-left: 0 !important"
@@ -586,18 +583,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </q-tooltip>
           </q-icon>
-        </div>
-        <div style="min-height: 58px">
-          <div
-            class="flex items-center q-mr-sm"
-            style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
+          <template
+            v-if="triggerData.frequency_type == 'cron' && showTimezoneWarning"
           >
+            <q-icon
+              :name="outlinedWarning"
+              size="18px"
+              class="cursor-pointer tw-ml-[8px]"
+              :class="
+                store.state.theme === 'dark'
+                  ? 'tw-text-orange-500'
+                  : 'tw-text-orange-500'
+              "
+            >
+              <q-tooltip
+                anchor="center right"
+                self="center left"
+                max-width="auto"
+                class="tw-text-[14px]"
+              >
+                Warning: The displayed timezone is approximate. Verify and
+                select the correct timezone manually.
+              </q-tooltip>
+            </q-icon>
+          </template>
+        </div>
+        <div style="min-height: 84px">
+          <div class="flex items-center q-mr-sm" style="width: fit-content">
             <div
               data-test="scheduled-alert-frequency-input"
               :style="
                 triggerData.frequency_type == 'minutes'
                   ? 'width: 87px; margin-left: 0 !important'
-                  : 'width: 180px !important'
+                  : 'width: fit-content !important'
               "
               class="silence-notification-input"
             >
@@ -612,15 +630,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="background: none"
                 @update:model-value="updateFrequency"
               />
-              <q-input
-                data-test="scheduled-alert-cron-input-field"
-                v-else
-                v-model="triggerData.cron"
-                dense
-                filled
-                style="background: none"
-                @update:model-value="updateCron"
-              />
+              <div v-else class="tw-flex tw-items-center o2-input">
+                <q-input
+                  data-test="scheduled-alert-cron-input-field"
+                  v-model="triggerData.cron"
+                  dense
+                  filled
+                  :label="t('reports.cron') + ' *'"
+                  style="background: none; width: 180px"
+                  class="showLabelOnTop"
+                  stack-label
+                  outlined
+                  @update:model-value="updateCron"
+                />
+                <q-select
+                  data-test="add-report-schedule-start-timezone-select"
+                  v-model="triggerData.timezone"
+                  :options="filteredTimezone"
+                  @blur="
+                    browserTimezone =
+                      browserTimezone == ''
+                        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                        : browserTimezone
+                  "
+                  use-input
+                  @filter="timezoneFilterFn"
+                  input-debounce="0"
+                  dense
+                  filled
+                  emit-value
+                  fill-input
+                  hide-selected
+                  :title="triggerData.timezone"
+                  :label="t('logStream.timezone') + ' *'"
+                  :display-value="`Timezone: ${browserTimezone}`"
+                  class="timezone-select showLabelOnTop q-ml-sm"
+                  stack-label
+                  outlined
+                  style="width: 220px"
+                />
+              </div>
             </div>
             <div
               v-if="triggerData.frequency_type == 'minutes'"
@@ -656,7 +705,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-alert-period-title"
-          class="text-bold flex items-center"
+          class="text-bold flex items-center q-pb-sm"
           style="width: 190px"
         >
           {{ t("alerts.period") + " *" }}
@@ -726,6 +775,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             Field is required!
           </div>
+          <div
+            data-test="scheduled-alert-period-warning-text"
+            v-else
+            class="text-primary q-pt-xs"
+            style="font-size: 12px; line-height: 12px"
+          >
+            Note: The period should be the same as the cron expression.
+          </div>
         </div>
       </div>
     </div>
@@ -746,9 +803,10 @@ import { useI18n } from "vue-i18n";
 import {
   outlinedDelete,
   outlinedInfo,
+  outlinedWarning,
 } from "@quasar/extras/material-icons-outlined";
 import { useStore } from "vuex";
-import { getImageURL } from "@/utils/zincutils";
+import { getImageURL, useLocalTimezone } from "@/utils/zincutils";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { useQuasar } from "quasar";
@@ -775,6 +833,7 @@ const props = defineProps([
   "disableThreshold",
   "disableVrlFunction",
   "disableQueryTypeSelection",
+  "showTimezoneWarning",
 ]);
 
 const emits = defineEmits([
@@ -812,6 +871,8 @@ const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
 
+const filteredTimezone: any = ref([]);
+
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
 const regularFunctions = ["avg", "max", "min", "sum", "count"];
 
@@ -847,6 +908,29 @@ const getNumericColumns = computed(() => {
 const cronJobError = ref("");
 
 const filteredNumericColumns = ref(getNumericColumns.value);
+
+const currentTimezone =
+  useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+const browserTimezone = ref(currentTimezone);
+
+// @ts-ignore
+let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
+  return tz;
+});
+
+filteredTimezone.value = [...timezoneOptions];
+
+const browserTime =
+  "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+
+// Add the UTC option
+timezoneOptions.unshift("UTC");
+timezoneOptions.unshift(browserTime);
+
+const timezoneFilterFn = (val: string, update: Function) => {
+  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
+};
 
 const addField = () => {
   emits("field:add");
@@ -1027,18 +1111,34 @@ const updateAggregation = () => {
   emits("input:update", "aggregation", aggregationData.value);
 };
 
-const filterColumns = (val: string, update: Function) => {
+const filterFields = (val: string, update: Function) => {
+  filteredFields.value = filterColumns(props.columns, val, update);
+};
+
+const filterColumns = (options: string[], val: string, update: Function) => {
+  let filteredOptions: any[] = [];
+
   if (val === "") {
     update(() => {
-      filteredFields.value = [...props.columns];
+      filteredOptions = [...options];
     });
   }
+
   update(() => {
     const value = val.toLowerCase();
-    filteredFields.value = props.columns.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
-    );
+    filteredOptions = options.filter((column: any) => {
+      // Check if type of column is object or string and then filter
+      if (typeof column === "object") {
+        return column.value.toLowerCase().indexOf(value) > -1;
+      }
+
+      if (typeof column === "string") {
+        return column.toLowerCase().indexOf(value) > -1;
+      }
+    });
   });
+
+  return filteredOptions;
 };
 
 const filterNumericColumns = (val: string, update: Function) => {

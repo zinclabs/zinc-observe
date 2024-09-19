@@ -198,8 +198,8 @@ const useStreams = () => {
                 store.state.selectedOrganization.identifier,
                 streamName,
                 streamType,
-              );
-              streams[streamType].list[streamIndex] = _stream.data;
+              ); 
+              streams[streamType].list[streamIndex] = removeSchemaFields(_stream.data);
             } catch (err) {
               return reject("Error while fetching schema");
             }
@@ -260,7 +260,7 @@ const useStreams = () => {
                 streamType,
               );
 
-              streams[streamType].list[streamIndex] = fetchedStream.data;
+              streams[streamType].list[streamIndex] = removeSchemaFields(fetchedStream.data);
             }
           }
 
@@ -275,6 +275,15 @@ const useStreams = () => {
       }),
     );
   };
+
+  function removeSchemaFields (streamData: any) {
+    if(streamData.schema){
+      streamData.schema = streamData.schema.filter((field: any) => {
+        return field.name != '_original' && field.name != '_o2_id';
+      });
+    }
+    return streamData
+  }
 
   const isStreamFetched = (streamType: string) => {
     let isStreamFetched = false;

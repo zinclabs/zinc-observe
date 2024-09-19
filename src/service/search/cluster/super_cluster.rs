@@ -158,7 +158,7 @@ pub async fn search(
                                         program: program.program.clone(),
                                         fields: program.fields.clone(),
                                     },
-                                    &json::Value::Object(hit.clone()),
+                                    &json::Value::Object(hit),
                                     &sql.org_id,
                                     &sql.stream_name,
                                 );

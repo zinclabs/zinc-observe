@@ -139,7 +139,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
                                         program: program.program.clone(),
                                         fields: program.fields.clone(),
                                     },
-                                    &json::Value::Object(hit.clone()),
+                                    &json::Value::Object(hit),
                                     &sql.org_id,
                                     &sql.stream_name,
                                 );
@@ -201,6 +201,7 @@ pub async fn search(mut req: cluster_rpc::SearchRequest) -> Result<search::Respo
             / scan_stats.querier_files as f64) as usize,
     );
     result.set_idx_scan_size(scan_stats.idx_scan_size as usize);
+
     result.set_idx_took(if idx_took > 0 {
         idx_took
     } else {

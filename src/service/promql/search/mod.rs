@@ -34,7 +34,6 @@ use proto::cluster_rpc;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
-    transport::Channel,
     Request,
 };
 use tracing::{info_span, Instrument};
@@ -43,6 +42,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::{
     common::infra::cluster,
     service::{
+        grpc::get_cached_channel,
         promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
         search::{server_internal_error, MetadataMap},
         usage::report_request_usage_stats,
@@ -178,23 +178,17 @@ async fn search_in_cluster(
                 let token: MetadataValue<_> = cluster::get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "promql->search->grpc: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        server_internal_error("connect search node error")
-                    })?;
-
-                    let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
-                        channel,
-                        move |mut req: Request<()>| {
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "promql->search->grpc: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
+                let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
+                    channel,
+                    move |mut req: Request<()>| {
                         req.metadata_mut().insert("authorization", token.clone());
                         req.metadata_mut()
                             .insert(org_header_key.clone(), org_id.clone());

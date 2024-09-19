@@ -614,7 +614,7 @@ export default defineComponent({
     const addVariableForm: Ref<any> = ref(null);
     const data: any = reactive({
       schemaResponse: [],
-      streamType: ["logs", "metrics", "traces"],
+      streamType: ["logs", "metrics", "traces", "enrichment_tables"],
       streams: [],
       currentFieldsList: [],
 
@@ -1092,6 +1092,7 @@ export default defineComponent({
       () => variableData?.multiSelect,
       (newVal) => {
         if (!newVal) {
+          variableData.selectAllValueForMultiSelect = 'first';
           if (Array.isArray(variableData?.options)) {
             variableData.options.forEach((option: any, index: any) => {
               if (variableData.options[index]) {

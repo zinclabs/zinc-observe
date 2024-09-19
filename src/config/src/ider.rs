@@ -191,7 +191,7 @@ impl SnowflakeIdBucket {
 pub fn get_time_millis(epoch: SystemTime) -> i64 {
     SystemTime::now()
         .duration_since(epoch)
-        .expect("Time went mackward")
+        .expect("Time went backward")
         .as_millis() as i64
 }
 

@@ -417,6 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
+            :disable="disable"
           />
         </div>
         <div class="search-time float-left q-mr-xs">
@@ -470,37 +471,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </q-btn-dropdown>
             </q-btn-group>
-
-            <q-btn
-              v-if="
-                config.isEnterprise == 'true' &&
-                !!searchObj.data.searchRequestTraceIds.length &&
-                (searchObj.loading == true ||
-                  searchObj.loadingHistogram == true)
-              "
-              data-test="logs-search-bar-refresh-btn"
-              data-cy="search-bar-refresh-button"
-              dense
-              flat
-              :title="t('search.cancel')"
-              class="q-pa-none search-button cancel-search-button"
-              @click="cancelQuery"
-              >{{ t("search.cancel") }}</q-btn
-            >
-            <q-btn
-              v-else
-              data-test="logs-search-bar-refresh-btn"
-              data-cy="search-bar-refresh-button"
-              dense
-              flat
-              :title="t('search.runQuery')"
-              class="q-pa-none search-button"
-              @click="handleRunQueryFn"
-              :disable="
-                searchObj.loading == true || searchObj.loadingHistogram == true
-              "
-              >{{ t("search.runQuery") }}</q-btn
-            >
+            <div v-if="searchObj.meta.logsVisualizeToggle === 'visualize'">
+              <q-btn
+                v-if="
+                  config.isEnterprise == 'true' &&
+                  visualizeSearchRequestTraceIds.length
+                "
+                data-test="logs-search-bar-visualize-cancel-btn"
+                dense
+                flat
+                :title="t('search.cancel')"
+                class="q-pa-none search-button cancel-search-button"
+                @click="cancelVisualizeQueries"
+                >{{ t("search.cancel") }}</q-btn
+              >
+              <q-btn
+                v-else
+                data-test="logs-search-bar-visualize-refresh-btn"
+                dense
+                flat
+                :title="t('search.runQuery')"
+                class="q-pa-none search-button"
+                @click="handleRunQueryFn"
+                :disable="disable"
+                >{{ t("search.runQuery") }}</q-btn
+              >
+            </div>
+            <div v-else>
+              <q-btn
+                v-if="
+                  config.isEnterprise == 'true' &&
+                  !!searchObj.data.searchRequestTraceIds.length &&
+                  (searchObj.loading == true ||
+                    searchObj.loadingHistogram == true)
+                "
+                data-test="logs-search-bar-refresh-btn"
+                data-cy="search-bar-refresh-button"
+                dense
+                flat
+                :title="t('search.cancel')"
+                class="q-pa-none search-button cancel-search-button"
+                @click="cancelQuery"
+                >{{ t("search.cancel") }}</q-btn
+              >
+              <q-btn
+                v-else
+                data-test="logs-search-bar-refresh-btn"
+                data-cy="search-bar-refresh-button"
+                dense
+                flat
+                :title="t('search.runQuery')"
+                class="q-pa-none search-button"
+                @click="handleRunQueryFn"
+                :disable="
+                  searchObj.loading == true ||
+                  searchObj.loadingHistogram == true
+                "
+                >{{ t("search.runQuery") }}</q-btn
+              >
+            </div>
           </div>
         </div>
       </div>
@@ -921,6 +950,8 @@ import { cloneDeep } from "lodash-es";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
 import { inject } from "vue";
 import QueryEditor from "@/components/QueryEditor.vue";
+import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import { computed } from "vue";
 
 const defaultValue: any = () => {
   return {
@@ -2515,6 +2546,38 @@ export default defineComponent({
       dashboardPanelData.meta = dashboardPanelDataMetaObj;
     };
 
+    // [START] cancel running queries
+
+    const variablesAndPanelsDataLoadingState = inject(
+      "variablesAndPanelsDataLoadingState",
+      {},
+    );
+
+    const visualizeSearchRequestTraceIds = computed(() => {
+      const searchIds = Object.values(
+        variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+      ).filter((item: any) => item.length > 0);
+
+      return searchIds.flat() as string[];
+    });
+    const { traceIdRef, cancelQuery: cancelVisualizeQuery } = useCancelQuery();
+
+    const cancelVisualizeQueries = () => {
+      traceIdRef.value = visualizeSearchRequestTraceIds.value;
+      cancelVisualizeQuery();
+    };
+
+    const disable = ref(false);
+
+    watch(variablesAndPanelsDataLoadingState, () => {
+      const panelsValues = Object.values(
+        variablesAndPanelsDataLoadingState.panels,
+      );
+      disable.value = panelsValues.some((item: any) => item === true);
+    });
+
+    // [END] cancel running queries
+
     return {
       t,
       store,
@@ -2592,6 +2655,9 @@ export default defineComponent({
       confirmLogsVisualizeModeChangeDialog,
       changeLogsVisualizeToggle,
       onLogsVisualizeToggleUpdate,
+      visualizeSearchRequestTraceIds,
+      disable,
+      cancelVisualizeQueries,
     };
   },
   computed: {

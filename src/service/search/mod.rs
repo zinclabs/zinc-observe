@@ -44,14 +44,18 @@ use tokio::sync::Mutex;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
+    crate::service::grpc::get_cached_channel,
     o2_enterprise::enterprise::{common::infra::config::O2_CONFIG, search::TaskStatus},
-    tonic::{codec::CompressionEncoding, metadata::MetadataValue, transport::Channel, Request},
+    tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request},
     tracing::{info_span, Instrument},
 };
 
 use super::usage::report_request_usage_stats;
 use crate::{
-    common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
+    common::{
+        infra::cluster as infra_cluster,
+        meta::{ingestion::ORIGINAL_DATA_COL_NAME, stream::StreamParams},
+    },
     handler::grpc::request::search::Searcher,
     service::format_partition_key,
 };
@@ -233,7 +237,9 @@ pub async fn search_partition(
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
+    let start = std::time::Instant::now();
     let cfg = get_config();
+
     let query = cluster_rpc::SearchQuery {
         start_time: req.start_time,
         end_time: req.end_time,
@@ -259,6 +265,14 @@ pub async fn search_partition(
         &stream_settings.partition_keys,
     )
     .await;
+
+    let file_list_took = start.elapsed().as_millis() as usize;
+    log::info!(
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
+        meta.meta.time_range,
+        files.len(),
+        file_list_took,
+    );
 
     let nodes = infra_cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
@@ -329,7 +343,12 @@ pub async fn search_partition(
     }
     let mut step = (req.end_time - req.start_time) / part_num as i64;
     // step must be times of min_step
-    step = step - step % min_step;
+    if step < min_step {
+        step = min_step;
+    }
+    if step % min_step > 0 {
+        step = step - step % min_step;
+    }
 
     // generate partitions
     let mut partitions = Vec::with_capacity(part_num);
@@ -392,19 +411,14 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
                 let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "search->grpc: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        server_internal_error("connect search node error")
-                    })?;
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "search->grpc: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -555,19 +569,14 @@ pub async fn cancel_query(
                 let token: MetadataValue<_> = infra_cluster::get_internal_grpc_token()
                     .parse()
                     .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = Channel::from_shared(node_addr)
-                    .unwrap()
-                    .connect_timeout(std::time::Duration::from_secs(cfg.grpc.connect_timeout))
-                    .connect()
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "grpc_cancel_query: node: {}, connect err: {:?}",
-                            &node.grpc_addr,
-                            err
-                        );
-                        server_internal_error("connect search node error")
-                    })?;
+                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
+                    log::error!(
+                        "search->cancel_query: node: {}, connect err: {:?}",
+                        &node.grpc_addr,
+                        err
+                    );
+                    server_internal_error("connect search node error")
+                })?;
                 let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
                     channel,
                     move |mut req: Request<()>| {
@@ -857,7 +866,7 @@ fn generate_select_start_search_schema(
         }
     }
     let cfg = get_config();
-    let schema = if !defined_schema_fields.is_empty() {
+    let mut new_schema_fields = if !defined_schema_fields.is_empty() {
         let mut fields: HashSet<String> = defined_schema_fields.iter().cloned().collect();
         if !fields.contains(&cfg.common.column_timestamp) {
             fields.insert(cfg.common.column_timestamp.to_string());
@@ -872,14 +881,20 @@ fn generate_select_start_search_schema(
                 None => schema_latest_map.get(f).map(|f| (*f).clone()),
             })
             .collect::<Vec<_>>();
-        Arc::new(Schema::new(new_fields))
+        new_fields
     } else if !new_fields.is_empty() {
-        let new_schema = Schema::new(new_fields);
-        Arc::new(Schema::try_merge(vec![schema.to_owned(), new_schema])?)
+        let mut merged_fields = schema.fields().to_vec();
+        // can extend directly b/c none of the `new_fields` is present in schema, checked above
+        merged_fields.extend(new_fields);
+        merged_fields
     } else {
-        Arc::new(schema.clone())
+        schema.fields().to_vec()
     };
-    Ok((schema, diff_fields))
+
+    // skip selecting "_original" column if `SELECT * ...`
+    new_schema_fields.retain(|field| field.name() != ORIGINAL_DATA_COL_NAME);
+
+    Ok((Arc::new(Schema::new(new_schema_fields)), diff_fields))
 }
 
 fn generate_used_fields_in_query(sql: &Arc<sql::Sql>) -> Vec<String> {

@@ -71,7 +71,7 @@ export const usePanelDataLoader = (
    */
   const getCacheKey = () => ({
     panelSchema: toRaw(panelSchema.value),
-    variablesData: toRaw(variablesData.value),
+    variablesData: JSON.parse(JSON.stringify([...(getDependentVariablesData() || []), ...(getDynamicVariablesData() || [])])),
     forceLoad: toRaw(forceLoad.value),
     // searchType: toRaw(searchType.value),
     dashboardId: toRaw(dashboardId?.value),
@@ -1352,6 +1352,10 @@ export const usePanelDataLoader = (
       "panelSchema.htmlContent",
       "panelSchema.markdownContent",
     ];
+
+    log("usePanelDataLoader: panelcache: tempPanelCacheKey", tempPanelCacheKey)
+    log("usePanelDataLoader: panelcache: omit(getCacheKey())", omit(getCacheKey(), keysToIgnore))
+    log("usePanelDataLoader: panelcache: omit(tempPanelCacheKey))", omit(tempPanelCacheKey, keysToIgnore))
 
     // check if it is stale or not
     if (

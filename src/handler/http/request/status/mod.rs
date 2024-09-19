@@ -687,6 +687,10 @@ async fn enable_node(req: HttpRequest) -> Result<HttpResponse, Error> {
         None => false,
     };
     node.scheduled = enable;
+    if !node.scheduled {
+        // release all the searching files
+        crate::common::infra::wal::clean_lock_files();
+    }
     match cluster::update_local_node(&node).await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
@@ -698,6 +702,9 @@ async fn flush_node() -> Result<HttpResponse, Error> {
     if !LOCAL_NODE.is_ingester() {
         return Ok(MetaHttpResponse::not_found("local node is not an ingester"));
     };
+
+    // release all the searching files
+    crate::common::infra::wal::clean_lock_files();
 
     match ingester::flush_all().await {
         Ok(_) => Ok(MetaHttpResponse::json(true)),

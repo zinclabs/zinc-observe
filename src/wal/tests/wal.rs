@@ -21,7 +21,7 @@ fn wal() {
     let entry_num = 100;
     let dir = tempdir().unwrap();
     let dir = dir.path();
-    let mut writer = Writer::new(dir, "org", "stream", 1, 1024_1024).unwrap();
+    let mut writer = Writer::new(dir, "org", "stream", 1, 1024_1024, 8 * 1024).unwrap();
     for i in 0..entry_num {
         let data = format!("hello world {}", i);
         writer.write(data.as_bytes(), true).unwrap();

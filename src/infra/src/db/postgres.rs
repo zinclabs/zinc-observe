@@ -36,9 +36,17 @@ fn connect() -> Pool<Postgres> {
         .expect("postgres connect options create failed")
         .disable_statement_logging();
 
+    let max_lifetime = if cfg.limit.sql_db_connections_max_lifetime > 0 {
+        Some(std::time::Duration::from_secs(
+            cfg.limit.sql_db_connections_max_lifetime,
+        ))
+    } else {
+        None
+    };
     PgPoolOptions::new()
-        .min_connections(cfg.limit.sql_min_db_connections)
-        .max_connections(cfg.limit.sql_max_db_connections)
+        .min_connections(cfg.limit.sql_db_connections_min)
+        .max_connections(cfg.limit.sql_db_connections_max)
+        .max_lifetime(max_lifetime)
         .connect_lazy_with(db_opts)
 }
 
