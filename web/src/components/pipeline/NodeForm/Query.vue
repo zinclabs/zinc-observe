@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">
-      {{ t("pipeline.routing") }}
+      {{ t("pipeline.query") }}
     </div>
     <q-separator />
 
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="padding-top: 0"
           >
             <q-select
-              v-model="streamRoute.destination.stream_type"
+              v-model="streamRoute.stream_type"
               :options="streamTypes"
               :label="t('alerts.streamType') + ' *'"
               :popup-content-style="{ textTransform: 'lowercase' }"
@@ -65,8 +65,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:query_type="streamRoute.query_condition.type"
             v-model:aggregation="streamRoute.query_condition.aggregation"
             v-model:isAggregationEnabled="isAggregationEnabled"
-            @field:add="addField"
-            @field:remove="removeField"
             @validate-sql="validateSqlQuery"
             class="q-mt-sm"
           />
@@ -127,7 +125,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import { computed, defineAsyncComponent, onMounted, ref, type Ref } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  onMounted,
+  ref,
+  type Ref,
+  onActivated,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -153,13 +158,8 @@ interface RouteCondition {
 
 interface StreamRoute {
   name: string;
+  stream_type: string;
   conditions: RouteCondition[];
-  destination: {
-    // should be part of payload
-    org_id: string;
-    stream_name: string;
-    stream_type: string;
-  };
   query_condition: {
     sql: string;
     type: string;
@@ -233,7 +233,7 @@ const isAggregationEnabled = ref(false);
 
 const queryFormRef = ref<any>(null);
 
-const { addNode } = useDragAndDrop();
+const { addNode, pipelineObj } = useDragAndDrop();
 
 const nodeLink = ref({
   from: "",
@@ -248,14 +248,13 @@ const dialog = ref({
 });
 
 const getDefaultStreamRoute = () => {
+  if (pipelineObj.isEditNode) {
+    return pipelineObj.currentSelectedNodeData.data;
+  }
   return {
     name: "",
     conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
-    destination: {
-      org_id: "",
-      stream_name: "",
-      stream_type: "logs",
-    },
+    stream_type: "logs",
     query_condition: {
       sql: "",
       type: "sql",
@@ -280,12 +279,9 @@ const getDefaultStreamRoute = () => {
 };
 
 onMounted(() => {
-  if (props.editingRoute) {
-    isUpdating.value = true;
-
-    streamRoute.value = JSON.parse(
-      JSON.stringify(props.editingRoute),
-    ) as StreamRoute;
+  
+  if (pipelineObj.isEditNode) {
+    streamRoute.value = pipelineObj.currentSelectedNodeData?.data;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -293,10 +289,19 @@ onMounted(() => {
   updateStreamFields();
 });
 
+onActivated(() => {
+  if (pipelineObj.isEditNode) {
+    streamRoute.value = pipelineObj.currentSelectedNodeData.data;
+  }
+
+  originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
+});
+
 const streamTypes = ["logs", "enrichment_tables"];
 
 const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
+console.log(streamRoute.value, "streamRoute.value");
 const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
 
 const filterColumns = (options: any[], val: String, update: Function) => {
@@ -381,12 +386,11 @@ const saveQueryData = async () => {
       return false;
     }
   });
-  console.log(queryFormRef.value);
-  console.log(getRoutePayload());
-  const formData = getRoutePayload();
+
+  const formData = streamRoute.value;
   let queryPayload = {
     node_type: "query", // required
-    stream_type: formData.destination.stream_type, // required
+    stream_type: formData.stream_type, // required
     query_condition: {
       // same as before
       type: formData.query_condition.type,
@@ -407,8 +411,9 @@ const saveQueryData = async () => {
       cron: formData.trigger_condition.cron,
       frequency_type: formData.trigger_condition.frequency_type,
       silence: 0,
+      timezone: formData.trigger_condition?.timezone || 0, // optional
     },
-    tz_offset: formData.trigger_condition?.timezone || "", // optional
+    tz_offset: formData.trigger_condition?.timezone || 0, // optional
   };
   addNode(queryPayload);
   emit("cancel:hideform");
@@ -454,61 +459,6 @@ const removeVariable = (variable: any) => {
     streamRoute.value.context_attributes.filter(
       (_variable: any) => _variable.id !== variable.id,
     );
-};
-
-const getRoutePayload = () => {
-  let payload = JSON.parse(JSON.stringify(streamRoute.value));
-
-  if (payload.uuid) delete payload.uuid;
-  // Deleting uuid from payload as it was added for reference of frontend
-  payload.destination.org_id = store.state.selectedOrganization.identifier;
-
-  payload.destination.stream_name = payload.name;
-
-  payload.context_attributes = {};
-
-  streamRoute.value.context_attributes.forEach((attr: any) => {
-    if (attr.key?.trim() && attr.value?.trim())
-      payload.context_attributes[attr.key] = attr.value;
-  });
-
-  payload.trigger_condition.period = Number(
-    streamRoute.value.trigger_condition.period,
-  );
-
-  payload.trigger_condition.frequency = Number(
-    streamRoute.value.trigger_condition.frequency,
-  );
-
-  payload.description = streamRoute.value.description.trim();
-
-  if (
-    !isAggregationEnabled.value ||
-    streamRoute.value.query_condition.type !== "custom"
-  ) {
-    payload.query_condition.aggregation = null;
-  }
-
-  if (payload.query_condition.aggregation?.having) {
-    delete payload.query_condition?.aggregation?.having;
-  }
-
-  delete payload?.conditions;
-
-  delete payload?.query_condition?.conditions;
-
-  if (isUpdating.value) {
-    payload.updatedAt = new Date().toISOString();
-    payload.lastEditedBy = store.state.userInfo.email;
-  } else {
-    payload.createdAt = new Date().toISOString();
-    payload.owner = store.state.userInfo.email;
-    payload.lastTriggeredAt = new Date().getTime();
-    payload.lastEditedBy = store.state.userInfo.email;
-    payload.updatedAt = new Date().toISOString();
-  }
-
-  return payload;
 };
 
 const validateSqlQuery = () => {

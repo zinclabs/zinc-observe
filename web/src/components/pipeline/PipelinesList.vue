@@ -144,13 +144,8 @@ import NoData from "../shared/grid/NoData.vue";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
-interface Pipeline {
-  name: string;
-  description: string;
-  stream_type: string;
-  stream_name: string;
-}
 
 const { t } = useI18n();
 const router = useRouter();
@@ -166,6 +161,8 @@ const showCreatePipeline = ref(false);
 const pipelines = ref([]);
 
 const store = useStore();
+
+const { pipelineObj } = useDragAndDrop();
 
 const confirmDialogMeta: any = ref({
   show: false,
@@ -199,7 +196,7 @@ const currentRouteName = computed(() => {
   return router.currentRoute.value.name;
 });
 
-const editingPipeline = ref<Pipeline | null>(null);
+const editingPipeline = ref<any | null>(null);
 
 const columns: any = ref<QTableProps["columns"]>([
   {
@@ -271,10 +268,16 @@ const getPipelines = () => {
     });
 };
 
-const editPipeline = (pipeline: Pipeline) => {
+const editPipeline = (pipeline: any) => {
+  pipeline.nodes.forEach(node => {
+    node.type = node.io_type;
+  });
+
+  pipelineObj.currentSelectedPipeline = pipeline;
   router.push({
     name: "pipelineEditor",
     query: {
+      id: pipeline.pipeline_id,
       name: pipeline.name,
       stream: pipeline.stream_name,
       stream_type: pipeline.stream_type,
@@ -283,7 +286,7 @@ const editPipeline = (pipeline: Pipeline) => {
   });
 };
 
-const openDeleteDialog = (pipeline: Pipeline) => {
+const openDeleteDialog = (pipeline: any) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
   confirmDialogMeta.value.message =
@@ -292,7 +295,7 @@ const openDeleteDialog = (pipeline: Pipeline) => {
   confirmDialogMeta.value.data = pipeline;
 };
 
-const savePipeline = (data: Pipeline) => {
+const savePipeline = (data: any) => {
   const dismiss = q.notify({
     message: "saving pipeline...",
     position: "bottom",

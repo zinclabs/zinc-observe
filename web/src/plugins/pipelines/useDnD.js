@@ -30,19 +30,26 @@ const defaultPipelineObj = {
   name: "",
   description: "",
   source: {
-    source_type: "realtime"
+    source_type: "realtime",
   },
   nodes: [],
   edges: [],
 };
 
 const defaultObject = {
-  isEditMode: false,
+  pipelineDirectionTopBottom: false,
+  dirtyFlag: false,
+  isEditPipeline: false,
+  isEditNode: false,
   draggedNode: null,
   isDragOver: false,
   isDragging: false,
   hasInputNode: false,
-  currentSelectedNode: null,
+  currentSelectedNodeID: "",
+  currentSelectedNodeData: {
+    stream_type: "logs",
+    stream_name: "",
+  },
   dialog: dialogObj,
   nodeTypes: null,
   currentSelectedPipeline: defaultPipelineObj,
@@ -72,7 +79,7 @@ export default function useDragAndDrop() {
 
     pipelineObj.draggedNode = node;
     pipelineObj.isDragging = true;
-    pipelineObj.currentSelectedNode = null;
+    pipelineObj.currentSelectedNodeData = null;
 
     document.addEventListener("drop", onDragEnd);
   }
@@ -142,9 +149,10 @@ export default function useDragAndDrop() {
       off();
     });
 
-    pipelineObj.currentSelectedNode = newNode;
+    pipelineObj.currentSelectedNodeData = newNode;
     pipelineObj.dialog.name = newNode.data.node_type;
     pipelineObj.dialog.show = true;
+    pipelineObj.isEditNode = false;
   }
 
   function onNodeChange(changes) {
@@ -167,13 +175,20 @@ export default function useDragAndDrop() {
       source: connection.source,
       target: connection.target,
     };
-    pipelineObj.currentSelectedPipeline.edges = [...pipelineObj.currentSelectedPipeline.edges, newEdge]; // Update edges state
+    pipelineObj.currentSelectedPipeline.edges = [
+      ...pipelineObj.currentSelectedPipeline.edges,
+      newEdge,
+    ]; // Update edges state
   }
 
   function validateConnection({ source, target, sourceHandle, targetHandle }) {
     // Example validation rules
-    const sourceNode = pipelineObj.currentSelectedPipeline.nodes.find((node) => node.id === source);
-    const targetNode = pipelineObj.currentSelectedPipeline.nodes.find((node) => node.id === target);
+    const sourceNode = pipelineObj.currentSelectedPipeline.nodes.find(
+      (node) => node.id === source,
+    );
+    const targetNode = pipelineObj.currentSelectedPipeline.nodes.find(
+      (node) => node.id === target,
+    );
 
     // Input-only node (cannot be the source of a connection)
     if (sourceNode.type === "input") {
@@ -189,13 +204,29 @@ export default function useDragAndDrop() {
   }
 
   function addNode(newNode) {
-    let currentSelectedNode = pipelineObj.currentSelectedNode;
-    if (currentSelectedNode) {
-      currentSelectedNode.data = { ...currentSelectedNode.data, ...newNode };
-      pipelineObj.currentSelectedPipeline.nodes = [...pipelineObj.currentSelectedPipeline.nodes, currentSelectedNode];
-    }
+    let currentSelectedNode = pipelineObj.currentSelectedNodeData;
+    if (pipelineObj.isEditNode == true && currentSelectedNode.id != "") {
+      if (currentSelectedNode) {
+        currentSelectedNode.data = { ...currentSelectedNode.data, ...newNode };
 
-    pipelineObj.currentSelectedNode = dialogObj;
+        //find the index from pipelineObj.currentSelectedPipeline.nodes based on id
+        const index = pipelineObj.currentSelectedPipeline.nodes.findIndex(
+          (node) => node.id === currentSelectedNode.id,
+        );
+
+        pipelineObj.currentSelectedPipeline.nodes[index] = currentSelectedNode;
+      }
+    } else {
+      if (currentSelectedNode) {
+        currentSelectedNode.data = { ...currentSelectedNode.data, ...newNode };
+        pipelineObj.currentSelectedPipeline.nodes = [
+          ...pipelineObj.currentSelectedPipeline.nodes,
+          currentSelectedNode,
+        ];
+      }
+    }
+    pipelineObj.isEditNode = false;
+    pipelineObj.currentSelectedNodeData = dialogObj;
   }
 
   function editNode(updatedNode) {
@@ -208,6 +239,30 @@ export default function useDragAndDrop() {
         ...updatedNode,
       };
     }
+  }
+
+  // delete the node from pipelineObj.currentSelectedPipeline.nodes and pipelineObj.currentSelectedPipeline.edges all reference associated with target and source
+  // also empty pipelineObj.currentSelectedNodeData
+  function deletePipelineNode(nodeId) {
+    pipelineObj.dirtyFlag = true;
+    pipelineObj.currentSelectedPipeline.nodes =
+      pipelineObj.currentSelectedPipeline.nodes.filter(
+        (node) => node.id !== nodeId,
+      );
+    pipelineObj.currentSelectedPipeline.edges =
+      pipelineObj.currentSelectedPipeline.edges.filter(
+        (edge) => edge.source !== nodeId && edge.target !== nodeId,
+      );
+    pipelineObj.currentSelectedNodeData = null;
+    hasInputNodeFn();
+  }
+
+  const resetPipelineData = () => {
+    pipelineObj.currentSelectedPipeline = defaultPipelineObj;
+    pipelineObj.currentSelectedNodeData = dialogObj;
+    pipelineObj.isEditPipeline = false;
+    pipelineObj.isEditNode = false;
+    pipelineObj.dirtyFlag = false;
   }
 
   return {
@@ -223,5 +278,7 @@ export default function useDragAndDrop() {
     validateConnection,
     addNode,
     editNode,
+    deletePipelineNode,
+    resetPipelineData,
   };
 }

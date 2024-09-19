@@ -77,29 +77,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :error="functionExists"
             />
           </div>
-
-          <div
-            data-test="associate-function-order-input"
-            class="o2-input full-width"
-            style="padding-top: 12px"
-          >
-            <q-input
-              v-model="functionOrder"
-              :label="t('function.order') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              stack-label
-              outlined
-              filled
-              dense
-              type="number"
-              :rules="[
-                (val: any) => (!!val && val > -1) || 'Field is required!',
-              ]"
-              tabindex="0"
-              style="min-width: 220px"
-            />
-          </div>
         </div>
 
         <div v-if="createNewFunction" class="pipeline-add-function">
@@ -203,23 +180,6 @@ const AddFunction = defineAsyncComponent(
 );
 
 const props = defineProps({
-  defaultOrder: {
-    type: Number,
-    required: false,
-    default: 1,
-  },
-  functionData: {
-    type: Object,
-    required: false,
-    default: () => {
-      return null;
-    },
-  },
-  loading: {
-    type: Boolean,
-    required: false,
-    default: false,
-  },
   functions: {
     type: Array,
     required: true,
@@ -234,11 +194,6 @@ const props = defineProps({
       return [];
     },
   },
-  afterFlattening: {
-    type: Boolean,
-    required: false,
-    default: false,
-  },
 });
 
 const emit = defineEmits([
@@ -250,15 +205,17 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 
+const { addNode, pipelineObj } = useDragAndDrop();
+
 const addFunctionRef: any = ref(null);
 
 const isUpdating = ref(false);
 
-const selectedFunction = ref("");
+const selectedFunction = ref(pipelineObj.currentSelectedNodeData?.data.name || "");
 
 const functionOrder = ref(props.defaultOrder);
 
-const afterFlattening = ref(props.afterFlattening || false);
+const afterFlattening = ref(pipelineObj.currentSelectedNodeData?.data.after_flatten || false);
 
 const filteredFunctions: Ref<any[]> = ref([]);
 
@@ -267,8 +224,6 @@ const createNewFunction = ref(false);
 const store = useStore();
 
 const functionExists = ref(false);
-
-const { addNode } = useDragAndDrop();
 
 const nodeLink = ref({
   from: "",
@@ -294,19 +249,12 @@ watch(
 );
 
 onBeforeMount(() => {
-  filteredFunctions.value = [...props.functions];
-
-  if (props.functionData) {
-    isUpdating.value = true;
-    selectedFunction.value = props.functionData.name;
-    functionOrder.value = props.functionData.order;
-  }
+  
 });
 
 const openCancelDialog = () => {
   if (
-    selectedFunction.value === (props.functionData?.name || "") &&
-    functionOrder.value === (props.functionData?.order || 1)
+    selectedFunction.value === (props.functionData?.name || "")
   ) {
     emit("cancel:hideform");
     return;
@@ -345,8 +293,7 @@ const saveFunction = () => {
 
   const functionNode = {
     name: selectedFunction.value,
-    order: functionOrder.value,
-    afterFlattening: afterFlattening.value,
+    after_flatten: afterFlattening.value,
   };
   addNode(functionNode);
   // emit("update:node", {
@@ -373,7 +320,7 @@ const saveUpdatedLink = (link: { from: string; to: string }) => {
 };
 
 const deleteFunction = () => {
-  emit("delete:node", { data: props.functionData, type: "function" });
+  
   emit("cancel:hideform");
 };
 </script>

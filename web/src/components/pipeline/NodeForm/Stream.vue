@@ -24,20 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("pipeline.streamTitle") }}
     </div>
     <q-separator />
-    <div v-if="loading">
-      <q-spinner
-        v-if="loading"
-        color="primary"
-        size="40px"
-        style="
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-        "
-      />
-    </div>
-    <div v-else class="stream-routing-container full-width q-pa-md">
+    <div class="stream-routing-container full-width q-pa-md">
       <q-form @submit="saveStream">
         <div class="flex justify-start items-center" style="padding-top: 0px">
           <div
@@ -114,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
           />
           <q-btn
-            v-if="isUpdating"
+            v-if="pipelineObj.isEditNode"
             data-test="associate-stream-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
@@ -136,71 +123,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import {
-  ref,
-  type Ref,
-  defineEmits,
-  onBeforeMount,
-  onMounted,
-  watch,
-  nextTick,
-  defineAsyncComponent,
-} from "vue";
+import { ref, type Ref, defineEmits, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 
-const props = defineProps({
-  streamType: {
-    type: String,
-    required: true,
-    default: "logs",
-  },
-  streamName: {
-    type: String,
-    required: false,
-    default: "",
-  },
-  loading: {
-    type: Boolean,
-    required: false,
-    default: false,
-  },
-});
-
 const emit = defineEmits(["cancel:hideform"]);
 
 const { t } = useI18n();
 
-const isUpdating = ref(false);
-
 const store = useStore();
 
-const { addNode } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
-const { getStream, getStreams } = useStreams();
+const { getStreams } = useStreams();
 
-const stream_type = ref(props.streamType);
-const stream_name = ref(props.streamName);
-const filteredColumns: any = ref([]);
 const filteredStreams: Ref<string[]> = ref([]);
 const isFetchingStreams = ref(false);
 const indexOptions = ref([]);
 const schemaList = ref([]);
 const streams: any = ref({});
 const streamTypes = ["logs", "metrics", "traces"];
+const stream_name = ref(pipelineObj.currentSelectedNodeData?.data.stream_name);
+const stream_type = ref(pipelineObj.currentSelectedNodeData?.data.stream_type);
 
 onMounted(async () => {
-  updateStreams(true);
+  await getStreamList();
 });
 
 async function getStreamList() {
-  await getStreams(stream_type.value, false)
+  const streamType = pipelineObj.currentSelectedNodeData.hasOwnProperty("stream_type")
+    ? pipelineObj.currentSelectedNodeData.stream_type
+    : "logs";
+  await getStreams(streamType, false)
     .then((res: any) => {
       isFetchingStreams.value = true;
-      streams.value[stream_type.value] = res.list;
+      streams.value[streamType] = res.list;
       schemaList.value = res.list;
       indexOptions.value = res.list.map((data: any) => {
         return data.name;
@@ -227,19 +187,19 @@ const openDeleteDialog = () => {
   dialog.value.show = true;
   dialog.value.title = "Delete Node";
   dialog.value.message =
-    "Are you sure you want to delete function association?";
-  dialog.value.okCallback = deleteStream;
+    "Are you sure you want to delete stream association?";
+  dialog.value.okCallback = deleteNode;
 };
 
-const deleteStream = () => {
-  // deleteNode();
+const deleteNode = () => {
+  deletePipelineNode(pipelineObj.currentSelectedNodeID);
   emit("cancel:hideform");
 };
 
 const saveStream = () => {
   const streamNodeData = {
-    stream_type: stream_type.value,
-    stream_name: stream_name.value,
+    stream_type: stream_type,
+    stream_name: stream_name,
     org_id: store.state.selectedOrganization.identifier,
     node_type: "stream",
   };
@@ -267,30 +227,6 @@ const filterColumns = (options: any[], val: String, update: Function) => {
     );
   });
   return filteredOptions;
-};
-
-const updateStreams = (resetStream = true) => {
-  if (resetStream) stream_name.value = "";
-  if (streams.value[stream_type.value]) {
-    schemaList.value = streams.value[stream_type.value];
-    indexOptions.value = streams.value[stream_type.value].map((data: any) => {
-      return data.name;
-    });
-    return;
-  }
-
-  if (!stream_type.value) return Promise.resolve();
-
-  isFetchingStreams.value = true;
-  return getStreams(stream_type.value, false)
-    .then((res: any) => {
-      streams.value[stream_type.value] = res.list;
-      schemaList.value = res.list;
-      indexOptions.value = res.list.map((data: any) => {
-        return data.name;
-      });
-    })
-    .finally(() => (isFetchingStreams.value = false));
 };
 </script>
 

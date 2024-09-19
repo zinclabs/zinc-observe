@@ -122,55 +122,8 @@ interface RouteCondition {
 }
 
 interface StreamRoute {
-  name: string;
   conditions: RouteCondition[];
-  destination: {
-    // should be part of payload
-    org_id: string;
-    stream_name: string;
-    stream_type: string;
-  };
-  is_real_time: boolean;
-  query_condition: {
-    sql: string;
-    type: string;
-    aggregation: {
-      group_by: string[];
-    } | null;
-  };
-  trigger_condition: {
-    period: number;
-    frequency_type: string;
-    frequency: number;
-    cron: string;
-    timezone: string;
-  };
-  context_attributes: any;
-  description: string;
-  enabled: boolean;
-  tz_offset?: number;
 }
-
-const props = defineProps({
-  streamName: {
-    type: String,
-    required: true,
-  },
-  streamType: {
-    type: String,
-    required: true,
-  },
-  editingRoute: {
-    type: Object,
-    required: false,
-    default: () => null,
-  },
-  streamRoutes: {
-    type: Object,
-    required: true,
-    default: () => ({}),
-  },
-});
 
 const { t } = useI18n();
 
@@ -227,6 +180,9 @@ const dialog = ref({
 });
 
 const getDefaultStreamRoute = () => {
+  if (pipelineObj.isEditNode) {
+    return pipelineObj.currentSelectedNodeData.data;
+  }
   return {
     name: "",
     conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
@@ -359,22 +315,18 @@ const getFields = async () => {
 };
 
 const addField = () => {
-  if (streamRoute.value.is_real_time) {
     streamRoute.value.conditions.push({
       column: "",
       operator: "",
       value: "",
       id: getUUID(),
     });
-  }
 };
 
 const removeField = (field: any) => {
-  if (streamRoute.value.is_real_time) {
     streamRoute.value.conditions = streamRoute.value.conditions.filter(
       (_field: any) => _field.id !== field.id,
     );
-  }
 };
 
 const closeDialog = () => {
@@ -399,8 +351,11 @@ const openCancelDialog = () => {
 // TODO OK : Add check for duplicate routing name
 const saveCondition = async () => {
   let payload = getConditionPayload();
-  console.log(payload);
-  // addNode(payload);
+  let conditionData = {
+    node_type: "condition",
+    conditions: payload.conditions,
+  };
+  addNode(conditionData);
 
   emit("cancel:hideform");
 };

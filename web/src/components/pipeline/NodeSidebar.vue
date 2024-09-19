@@ -46,15 +46,22 @@ export default {
         class="q-pa-none btn-fixed-width"
         align="left"
         style="width: 170px"
+        v-if="node.isSectionHeader==false"
       >
         <q-tooltip>
           <div style="text-transform: capitalize">{{ node.tooltip }}</div>
         </q-tooltip>
-        <q-icon left size="1em"
+        <q-icon left size="1.3em"
 :name="node.icon" class="q-ma-sm" />
         <q-separator vertical class="q-mr-sm" />
         <div>{{ node.label }}</div>
       </q-btn>
+      <div v-else>
+        <div class="q-mb-xs q-mt-md text-subtitle1">
+          <div>{{ node.label }}</div>
+          <q-separator />
+        </div>
+      </div>
     </div>
   </div>
 </template>

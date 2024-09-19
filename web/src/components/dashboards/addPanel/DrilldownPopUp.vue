@@ -290,7 +290,7 @@
         style="min-width: 60px"
         data-test="confirm-button"
         :disable="isFormValid"
-        :label="isEditMode ? 'Update' : 'Add'"
+        :label="isEditPipeline ? 'Update' : 'Add'"
       />
     </q-card-actions>
   </div>

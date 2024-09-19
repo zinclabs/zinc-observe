@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div id="graph-container"
 class="dnd-flow" @drop="onDrop">
+    <div v-if="pipelineObj.dirtyFlag" class="bg-warning bold q-pa-sm">Note: Changes not yet saved. Press "Save" button to save your changes.</div>
     <VueFlow
       v-model:nodes="pipelineObj.currentSelectedPipeline.nodes"
       v-model:edges="pipelineObj.currentSelectedPipeline.edges"
@@ -36,13 +37,13 @@ class="dnd-flow" @drop="onDrop">
       >
         <p v-if="isDragOver">Drop here</p>
       </DropzoneBackground>
-      <template #node-input="{ id, io_type, data }">
+      <template #node-input="{ id, data }">
         <CustomNode :id="id" :data="data" io_type="input" />
       </template>
-      <template #node-output="{ id, io_type, data }">
+      <template #node-output="{ id, data }">
         <CustomNode :id="id" :data="data" io_type="output" />
       </template>
-      <template #node-default="{ id, io_type, data }">
+      <template #node-default="{ id, data }">
         <CustomNode :id="id" :data="data" io_type="default" />
       </template>
     </VueFlow>

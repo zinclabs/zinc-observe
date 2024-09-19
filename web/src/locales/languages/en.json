@@ -418,7 +418,8 @@
     "pipelineName": "Enter Pipeline Name",
     "flatteningLbl": "After Flattening",
     "streamTitle": "Associate Stream",
-    "conditionTitle": "Associate Condition"
+    "conditionTitle": "Associate Condition",
+    "query": "Associate Query"
   },
   "function": {
     "header": "Functions",

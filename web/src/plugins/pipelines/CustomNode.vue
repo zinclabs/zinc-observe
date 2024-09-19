@@ -15,14 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup>
-import {
-  Handle,
-  Position,
-  useHandleConnections,
-  useNodesData,
-} from "@vue-flow/core";
-
+import { Handle } from "@vue-flow/core";
 import useDragAndDrop from "./useDnD";
+import { defineEmits, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const props = defineProps({
   id: {
@@ -36,25 +33,60 @@ const props = defineProps({
   },
 });
 
-function getIcon(searchTerm, ioType) {
-  const node = this.pipelineObj.nodeTypes.find(
-    (node) => node.subtype === searchTerm && node.io_type === ioType
-  );
-  return node ? node.icon : undefined;
-}
-function getTooltip(searchTerm) {
-  const node = this.pipelineObj.nodeTypes.find(
-    (node) => node.subtype === searchTerm,
-  );
-  return node ? node.tooltip : "";
-}
-const { onDragStart, pipelineObj } = useDragAndDrop();
+const emit = defineEmits(["delete:node"]);
 
-const connections = useHandleConnections({
-  useHandleConnections: true,
+const { t } = useI18n();
+
+const { pipelineObj, deletePipelineNode } = useDragAndDrop();
+
+const editNode = (id) => {
+  //from id find the node from pipelineObj.currentSelectedPipelineData.nodes
+  const fullNode = pipelineObj.currentSelectedPipeline.nodes.find(
+    (node) => node.id === id
+  );
+  pipelineObj.isEditNode = true;
+  pipelineObj.currentSelectedNodeData = fullNode;
+  pipelineObj.currentSelectedNodeID = id;
+  pipelineObj.dialog.name = fullNode.data.node_type;
+  pipelineObj.dialog.show = true;
+};
+
+const deleteNode = (id) => {
+  openCancelDialog(id);
+};
+
+const confirmDialogMeta = ref({
+  show: false,
+  title: "",
+  message: "",
+  data: null,
+  onConfirm: () => {},
 });
 
-const nodesData = useNodesData(() => connections.value[0]?.source);
+const openCancelDialog = (id) => {
+  confirmDialogMeta.value.show = true;
+  confirmDialogMeta.value.title = t("common.delete");
+  confirmDialogMeta.value.message = "Are you sure you want to delete node?";
+  confirmDialogMeta.value.onConfirm = () => {
+    deletePipelineNode(id);
+  };
+};
+
+const resetConfirmDialog = () => {
+  confirmDialogMeta.value.show = false;
+  confirmDialogMeta.value.title = "";
+  confirmDialogMeta.value.message = "";
+  confirmDialogMeta.value.onConfirm = () => {};
+};
+
+function getIcon(searchTerm, ioType) {
+  const node = this.pipelineObj.nodeTypes.find(
+    (node) => node.subtype === searchTerm && node.io_type === ioType,
+  );
+
+  console.log(this.pipelineObj.nodeTypes, searchTerm, ioType)
+  return node ? node.icon : undefined;
+}
 </script>
 
 <template>
@@ -64,7 +96,7 @@ const nodesData = useNodesData(() => connections.value[0]?.source);
       v-if="io_type == 'output' || io_type === 'default'"
       id="input"
       type="target"
-      position="top"
+      :position="pipelineObj.pipelineDirectionTopBottom == true ? 'top' : 'left'"
       :style="{ filter: 'invert(100%)' }"
     />
     <div
@@ -81,8 +113,11 @@ const nodesData = useNodesData(() => connections.value[0]?.source);
     >
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon :name="getIcon(data.node_type, io_type)"
-size="1em" class="q-ma-sm" />
+        <q-icon
+          :name="getIcon(data.node_type, io_type)"
+          size="1em"
+          class="q-ma-sm"
+        />
       </div>
 
       <!-- Separator -->
@@ -106,10 +141,29 @@ size="1em" class="q-ma-sm" />
           <div style="text-transform: capitalize">
             Run
             {{
-              data.afterFlattening ? "After Flattening" : "Before Flattening"
+              data.after_flatten ? "After Flattening" : "Before Flattening"
             }}
           </div>
         </div>
+      </div>
+      <div class="float-right">
+        <q-btn
+          flat
+          round
+          dense
+          icon="edit"
+          size="0.8em"
+          @click="editNode(id)"
+          style="margin-right: 5px"
+        />
+        <q-btn
+          flat
+          round
+          dense
+          icon="delete"
+          size="0.8em"
+          @click="deleteNode(id)"
+        />
       </div>
     </div>
 
@@ -127,8 +181,11 @@ size="1em" class="q-ma-sm" />
     >
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon :name="getIcon(data.node_type, io_type)"
-size="1em" class="q-ma-sm" />
+        <q-icon
+          :name="getIcon(data.node_type, io_type)"
+          size="1em"
+          class="q-ma-sm"
+        />
       </div>
 
       <!-- Separator -->
@@ -147,6 +204,25 @@ size="1em" class="q-ma-sm" />
         >
           {{ data.stream_type }} - {{ data.stream_name }}
         </div>
+      </div>
+      <div class="float-right">
+        <q-btn
+          flat
+          round
+          dense
+          icon="edit"
+          size="0.8em"
+          @click="editNode(id)"
+          style="margin-right: 5px"
+        />
+        <q-btn
+          flat
+          round
+          dense
+          icon="delete"
+          size="0.8em"
+          @click="deleteNode(id)"
+        />
       </div>
     </div>
 
@@ -164,8 +240,11 @@ size="1em" class="q-ma-sm" />
     >
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
-        <q-icon :name="getIcon(data.node_type, io_type)"
-size="1em" class="q-ma-sm" />
+        <q-icon
+          :name="getIcon(data.node_type, io_type)"
+          size="1em"
+          class="q-ma-sm"
+        />
       </div>
 
       <!-- Separator -->
@@ -185,15 +264,103 @@ size="1em" class="q-ma-sm" />
           {{ data.stream_type }} - {{ data.stream_name }}
         </div>
       </div>
+
+      <div class="float-right">
+        <q-btn
+          flat
+          round
+          dense
+          icon="edit"
+          size="0.8em"
+          @click="editNode(id)"
+          style="margin-right: 5px"
+        />
+        <q-btn
+          flat
+          round
+          dense
+          icon="delete"
+          size="0.8em"
+          @click="deleteNode(id)"
+        />
+      </div>
+    </div>
+
+    <div
+      v-if="data.node_type == 'condition'"
+      :class="`o2vf_node_${io_type}`"
+      class="custom-btn q-pa-none btn-fixed-width"
+      style="
+        width: 170px;
+        display: flex;
+        align-items: center;
+        border: none;
+        cursor: pointer;
+      "
+    >
+      <div class="icon-container" style="display: flex; align-items: center">
+        <!-- Icon -->
+        <q-icon
+          :name="getIcon(data.node_type, io_type)"
+          size="1em"
+          class="q-ma-sm"
+        />
+      </div>
+
+      <!-- Separator -->
+      <q-separator vertical class="q-mr-sm" />
+
+      <!-- Label -->
+      <div class="container">
+        <div
+          class="row"
+          style="
+            text-align: left;
+            text-wrap: wrap;
+            width: auto;
+            text-overflow: ellipsis;
+          "
+        >
+          Condition - {{ data.condition }}
+        </div>
+      </div>
+
+      <div class="float-right">
+        <q-btn
+          flat
+          round
+          dense
+          icon="edit"
+          size="0.8em"
+          @click="editNode(id)"
+          style="margin-right: 5px"
+        />
+        <q-btn
+          flat
+          round
+          dense
+          icon="delete"
+          size="0.8em"
+          @click="deleteNode(id)"
+        />
+      </div>
     </div>
     <Handle
       v-if="io_type === 'input' || io_type === 'default'"
       id="output"
       type="source"
-      position="bottom"
+      :position="pipelineObj.pipelineDirectionTopBottom == true ? 'bottom' : 'right'"
       :style="{ filter: 'invert(100%)' }"
     />
   </div>
+
+  <confirm-dialog
+    :title="confirmDialogMeta.title"
+    :message="confirmDialogMeta.message"
+    @update:ok="confirmDialogMeta.onConfirm()"
+    @update:cancel="resetConfirmDialog"
+    v-model="confirmDialogMeta.show"
+  />
 </template>
 
 <style lang="scss">
