@@ -33,6 +33,7 @@ import organizationsService from "@/services/organizations";
 import { useLocalCurrentUser, useLocalOrganization } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import { openobserveRum } from "@openobserve/browser-rum";
+import moment from "moment";
 
 export default defineComponent({
   name: "PageLoginCallback",
@@ -42,7 +43,7 @@ export default defineComponent({
     const router = useRouter();
     const selectedOrg = ref("");
     let orgOptions = ref([{ label: Number, value: String }]);
-    let moment: any;
+    // let moment: any;
 
     const importMoment = async () => {
       const momentModule: any = await import("moment");
@@ -50,7 +51,7 @@ export default defineComponent({
     };
 
     onBeforeMount(async () => {
-      await importMoment();
+      // await importMoment();
     });
 
     /**
@@ -195,7 +196,7 @@ export default defineComponent({
       //analytics
       const userId = this.userInfo.email;
 
-      await importMoment();
+      // await importMoment();
 
       segment.identify(
         "Log In",
