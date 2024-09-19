@@ -150,7 +150,6 @@ export default defineConfig({
             "@openobserve/browser-rum",
           ],
           "o2cs-date-fns": ["date-fns", "date-fns-tz"],
-          "editor.api": ["monaco-editor"],
         },
         chunkFileNames: ({ name }) => {
           if (name.startsWith("o2cs-")) {
