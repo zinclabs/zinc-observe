@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <SanitizedHtmlRenderer
                   data-test="logs-search-error-message"
-                  :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
+                  :htmlContent="searchObj.data.errorMsg"/>
                 <div
                   data-test="logs-search-error-20003"
                   v-if="parseInt(searchObj.data.errorCode) == 20003"
