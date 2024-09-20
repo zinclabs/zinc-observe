@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</q-tooltip></q-btn
             >
             <q-btn
-              v-if="!isFullscreen"
+              v-if="!isFullscreen && config.isCloud == 'false'"
               outline
               class="dashboard-icons q-px-sm q-ml-sm hideOnPrintMode"
               size="sm"
