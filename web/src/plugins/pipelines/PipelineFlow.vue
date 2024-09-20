@@ -19,33 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div id="graph-container"
   
 class="dnd-flow" @drop="onDrop">
-<div class="container">
-   
-    <div class="button-group">
-      <q-btn
-        flat
-        round
-        @click="zoomIn"
-        :class="buttonClass"
-      >
-        <q-icon name="add" />
-      </q-btn>
-      <div class="separator"></div>
-      <q-btn
-        flat
-        round
-        @click="zoomOut"
-        :class="buttonClass"
-      >
-        <q-icon name="remove" />
-        
-      </q-btn>
-      <div v-show="pipelineObj.dirtyFlag" class="warning-text">
-      Unsaved changes detected. Click "Save" to preserve your updates.
-    </div>
-    </div>
-    
-  </div>
 
     <VueFlow
     ref="vueFlowRef"
@@ -56,9 +29,9 @@ class="dnd-flow" @drop="onDrop">
       @edges-change="onEdgesChange"
       @connect="onConnect"
       @dragover="onDragOver"
-       :zoom-on-scroll="false"
-      :zoom-on-pinch="false"
-
+      :default-viewport="{ zoom: 1.5 }"
+    :min-zoom="0.2"
+    :max-zoom="4"
       @dragleave="onDragLeave"
       :edge-types="edgeTypes"
 
@@ -80,6 +53,12 @@ class="dnd-flow" @drop="onDrop">
       <template #node-default="{ id, data }">
         <CustomNode :id="id" :data="data" io_type="default" />
       </template>
+      <Controls position="top-left">
+      <ControlButton title="Reset Transform" @click="resetTransform">
+        <Icon name="reset" />
+      </ControlButton>
+    </Controls>
+
     </VueFlow>
     <!-- Add UI elements or buttons to interact with the methods -->
   </div>
@@ -88,6 +67,7 @@ class="dnd-flow" @drop="onDrop">
 <script>
 import { ref, onMounted } from "vue";
 import { VueFlow } from "@vue-flow/core";
+import { ControlButton, Controls } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
 import CustomNode from "./CustomNode.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
@@ -121,9 +101,13 @@ const  buttonClass = () => {
     };
     onMounted(() => {
       if (vueFlowRef.value) {
-        vueFlowRef.value.fitView({ padding: 0.1, includeHiddenNodes: true });
+        vueFlowRef.value.fitView({ padding: 10, includeHiddenNodes: true });
       }
     });
+    
+function resetTransform() {
+  setViewport({ x: 0, y: 0, zoom: 1 })
+}
     const vueFlowRef = ref(null);
     const zoomIn = () => {
       vueFlowRef.value.zoomIn();
