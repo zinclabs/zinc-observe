@@ -54,6 +54,12 @@ const editNode = (id) => {
 const deleteNode = (id) => {
   openCancelDialog(id);
 };
+const  functionInfo = (data) =>  {
+  console.log(data,"data i am ")
+  console.log(pipelineObj.functions[data.name],"fun to be displayed")
+
+      return pipelineObj.functions[data.name] || null;
+  }
 
 const confirmDialogMeta = ref({
   show: false,
@@ -79,12 +85,13 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.onConfirm = () => {};
 };
 
-function getIcon(searchTerm, ioType) {
+function getIcon(data, ioType) {
+  console.log(data,"data in getIcon")
+  const searchTerm = data.node_type;
+
   const node = this.pipelineObj.nodeTypes.find(
     (node) => node.subtype === searchTerm && node.io_type === ioType,
   );
-
-  console.log(this.pipelineObj.nodeTypes, searchTerm, ioType)
   return node ? node.icon : undefined;
 }
 </script>
@@ -104,17 +111,28 @@ function getIcon(searchTerm, ioType) {
       :class="`o2vf_node_${type}`"
       class="custom-btn q-pa-none btn-fixed-width"
       style="
-        width: 170px;
+      padding: 5px 2px;
+        width: fit-content;
         display: flex;
         align-items: center;
         border: none;
         cursor: pointer;
       "
     >
-      <div class="icon-container" style="display: flex; align-items: center">
+    <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
+  <div>
+    <strong>Name:</strong> {{ functionInfo(data).name }}<br />
+    <strong>Definition:</strong><br />
+    <div style="border: 1px solid lightgray; padding: 4px; border-radius: 1px ;">
+      {{ functionInfo(data).function }}
+    </div>
+  </div>
+</q-tooltip>
+
+      <div class="icon-container " style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
-          :name="getIcon(data.node_type, io_type)"
+          :name="getIcon(data, io_type)"
           size="1em"
           class="q-ma-sm"
         />
@@ -146,7 +164,7 @@ function getIcon(searchTerm, ioType) {
           </div>
         </div>
       </div>
-      <div class="float-right">
+      <div class="float-right tw-pl-2">
         <q-btn
           flat
           round
@@ -154,7 +172,6 @@ function getIcon(searchTerm, ioType) {
           icon="edit"
           size="0.8em"
           @click="editNode(id)"
-          style="margin-right: 5px"
         />
         <q-btn
           flat
@@ -172,17 +189,19 @@ function getIcon(searchTerm, ioType) {
       :class="`o2vf_node_${io_type}`"
       class="custom-btn q-pa-none btn-fixed-width"
       style="
-        width: 170px;
+        width: fit-content;
         display: flex;
         align-items: center;
         border: none;
         cursor: pointer;
+        padding: 5px 2px;
+
       "
     >
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
-          :name="getIcon(data.node_type, io_type)"
+          :name="getIcon(data, io_type)"
           size="1em"
           class="q-ma-sm"
         />
@@ -202,10 +221,10 @@ function getIcon(searchTerm, ioType) {
             text-overflow: ellipsis;
           "
         >
-          {{ data.stream_type }} - {{ data.stream_name }}
+          {{ data.stream_type }} - {{ data.stream_name.label }}
         </div>
       </div>
-      <div class="float-right">
+      <div class="float-right tw-pl-2">
         <q-btn
           flat
           round
@@ -213,7 +232,6 @@ function getIcon(searchTerm, ioType) {
           icon="edit"
           size="0.8em"
           @click="editNode(id)"
-          style="margin-right: 5px"
         />
         <q-btn
           flat
@@ -231,17 +249,30 @@ function getIcon(searchTerm, ioType) {
       :class="`o2vf_node_${io_type}`"
       class="custom-btn q-pa-none btn-fixed-width"
       style="
-        width: 170px;
+        width: fit-content;
         display: flex;
         align-items: center;
         border: none;
         cursor: pointer;
+        padding: 5px 2px;
+
       "
     >
+    <q-tooltip :style="{ maxWidth: '300px', whiteSpace: 'pre-wrap' }">
+  <div>
+    <strong>SQL:</strong> <pre style="max-width: 200px ; text-wrap: wrap;">{{ data.query_condition.sql }}</pre><br />
+    <strong>Period:</strong> {{ data.trigger_condition.period }}<br />
+    <strong>Frequency:</strong> {{ data.trigger_condition.frequency }} {{ data.trigger_condition.frequency_type }}<br />
+    <strong>Operator:</strong> {{ data.trigger_condition.operator }}<br />
+    <strong>Threshold:</strong> {{ data.trigger_condition.threshold }}<br />
+    <strong>Cron:</strong> {{ data.trigger_condition.cron || 'None' }}<br />
+    <strong>Silence:</strong> {{ data.trigger_condition.silence }}
+  </div>
+</q-tooltip>
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
-          :name="getIcon(data.node_type, io_type)"
+          :name="getIcon(data, io_type)"
           size="1em"
           class="q-ma-sm"
         />
@@ -291,17 +322,31 @@ function getIcon(searchTerm, ioType) {
       :class="`o2vf_node_${io_type}`"
       class="custom-btn q-pa-none btn-fixed-width"
       style="
-        width: 170px;
+        width: fit-content;
         display: flex;
         align-items: center;
         border: none;
         cursor: pointer;
       "
     >
+    <q-tooltip>
+      <div v-for="(condition, index) in data.conditions" :key="index">
+        <div>
+          <strong>Column:</strong> {{ condition.column }}
+        </div>
+        <div>
+          <strong>Operator:</strong> {{ condition.operator }}
+        </div>
+        <div>
+          <strong>Value:</strong> {{ condition.value }}
+        </div>
+        <q-separator v-if="index < data.conditions.length - 1" />
+      </div>
+    </q-tooltip>
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
-          :name="getIcon(data.node_type, io_type)"
+          :name="getIcon(data, io_type)"
           size="1em"
           class="q-ma-sm"
         />

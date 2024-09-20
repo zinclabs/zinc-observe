@@ -161,6 +161,7 @@ export default function useDragAndDrop() {
 
   function onNodesChange(changes) {
     hasInputNodeFn();
+
     console.log("Nodes change", changes);
   }
 
@@ -174,10 +175,15 @@ export default function useDragAndDrop() {
       id: `e${connection.source}-${connection.target}`,
       source: connection.source,
       target: connection.target,
+      markerEnd: { type: 'arrowclosed' }, // Add arrow marker
+
+
     };
+
     pipelineObj.currentSelectedPipeline.edges = [
       ...pipelineObj.currentSelectedPipeline.edges,
       newEdge,
+      console.log(pipelineObj.currentSelectedPipeline.edges,"edges new"),
     ]; // Update edges state
   }
 

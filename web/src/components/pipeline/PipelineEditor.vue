@@ -162,6 +162,7 @@ import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
+const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
@@ -226,7 +227,7 @@ const plotChart: any = ref({
           position: "bottom",
         },
         draggable: true,
-        edgeSymbol: ["circle", "arrow"],
+        edgeSymbol: [ "arrow"],
         edgeSymbolSize: [10, 10],
         edgeLabel: {
           fontSize: 20,
@@ -317,14 +318,17 @@ const nodeTypes: any = [
     label: "Stream",
     subtype: "stream",
     io_type: "output",
-    icon: "img:" + streamImage,
+    icon: "img:" + streamOutputImage,
     tooltip: "Destination: Stream Node",
     isSectionHeader: false,
   },
 ];
+const functions = ref<{ [key: string]: Function }>({});
+
 
 const { pipelineObj, resetPipelineData } = useDragAndDrop();
 pipelineObj.nodeTypes = nodeTypes;
+pipelineObj.functions = functions;
 
 const nodes: Ref<Node[]> = ref([]);
 
@@ -336,7 +340,6 @@ const hasInputType = computed(() => {
 
 const nodeLinks = ref<{ [key: string]: NodeLink }>({});
 
-const functions = ref<{ [key: string]: Function }>({});
 
 const functionOptions = ref<string[]>([]);
 
@@ -428,6 +431,7 @@ const getFunctions = () => {
       functions.value = {};
       functionOptions.value = [];
       res.data.list.forEach((func: Function) => {
+        console.log(func,"func");
         functions.value[func.name] = func;
         functionOptions.value.push(func.name);
       });
@@ -445,7 +449,7 @@ const resetDialog = () => {
 };
 
 const savePipeline = async () => {
-  if (pipelineObj.currentSelectedPipeline.name == "") {
+  if (pipelineObj.currentSelectedPipeline.name === "") {
     q.notify({
       message: "Pipeline name is required",
       color: "negative",
@@ -455,13 +459,14 @@ const savePipeline = async () => {
     return;
   }
 
-  const node = pipelineObj.currentSelectedPipeline.nodes.find(
+  // Find the input node
+  const inputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
     (node) =>
       node.io_type === "input" &&
-      (node.data.node_type === "stream" || node.data.node_type === "query"),
+      (node.data.node_type === "stream" || node.data.node_type === "query")
   );
 
-  if (node == undefined) {
+  if (inputNodeIndex === -1) {
     q.notify({
       message: "Source node is required",
       color: "negative",
@@ -470,76 +475,71 @@ const savePipeline = async () => {
     });
     return;
   } else {
-    if (node.data.node_type == "stream") {
+    pipelineObj.currentSelectedPipeline.nodes.map((node) => {
+      if (node.data.node_type === "stream") {
+        node.data.stream_name = node.data.stream_name.value;
+      }
+    });
+    const inputNode = pipelineObj.currentSelectedPipeline.nodes.splice(inputNodeIndex, 1)[0];
+  
+    pipelineObj.currentSelectedPipeline.nodes.unshift(inputNode);
+
+    if (inputNode.data.node_type === "stream") {
       pipelineObj.currentSelectedPipeline.source.source_type = "realtime";
     } else {
       pipelineObj.currentSelectedPipeline.source.source_type = "scheduled";
     }
   }
+
   pipelineObj.currentSelectedPipeline.org =
     store.state.selectedOrganization.identifier;
+
   const dismiss = q.notify({
     message: "Saving pipeline...",
     position: "bottom",
     spinner: true,
   });
 
-  if (pipelineObj.isEditPipeline == true) {
-    pipelineService
-      .updatePipeline({
+  const saveOperation = pipelineObj.isEditPipeline
+    ? pipelineService.updatePipeline({
         data: pipelineObj.currentSelectedPipeline,
         org_identifier: store.state.selectedOrganization.identifier,
       })
-      .then(() => {
-        q.notify({
-          message: "Pipeline saved successfully",
-          color: "positive",
-          position: "bottom",
-          timeout: 3000,
-        });
-      })
-      .catch((error) => {
-        q.notify({
-          message:
-            error.response?.data?.message || "Error while saving pipeline",
-          color: "negative",
-          position: "bottom",
-          timeout: 3000,
-        });
-      })
-      .finally(() => {
-        pipelineObj.isEditPipeline = false;
-        dismiss();
-      });
-  } else {
-    pipelineService
-      .createPipeline({
+    : pipelineService.createPipeline({
         data: pipelineObj.currentSelectedPipeline,
         org_identifier: store.state.selectedOrganization.identifier,
-      })
-      .then(() => {
-        q.notify({
-          message: "Pipeline saved successfully",
-          color: "positive",
-          position: "bottom",
-          timeout: 3000,
-        });
-      })
-      .catch((error) => {
-        q.notify({
-          message:
-            error.response?.data?.message || "Error while saving pipeline",
-          color: "negative",
-          position: "bottom",
-          timeout: 3000,
-        });
-      })
-      .finally(() => {
-        pipelineObj.isEditPipeline = false;
-        dismiss();
       });
-  }
+
+  saveOperation
+    .then(() => {
+      q.notify({
+        message: "Pipeline saved successfully",
+        color: "positive",
+        position: "bottom",
+        timeout: 3000,
+      });
+      router.push({
+        name: "pipelines",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    })
+    .catch((error) => {
+      q.notify({
+        message:
+          error.response?.data?.message || "Error while saving pipeline",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      });
+    })
+    .finally(() => {
+      pipelineObj.isEditPipeline = false;
+      dismiss();
+    });
 };
+
 
 const openCancelDialog = () => {
   confirmDialogMeta.value.show = true;
@@ -631,18 +631,21 @@ const updateNewFunction = (_function: Function) => {
   .vue-flow__node-input {
     background-color: #c8d6f5;
     border-color: 1px solid #2c6b2f;
+    color: black;
   }
 
   .o2vf_node_output,
   .vue-flow__node-output {
     background-color: #8fd4b8;
     border-color: 1px solid #3b6f3f;
+    color: black;
   }
 
   .o2vf_node_default,
   .vue-flow__node-default {
     background-color: #efefef;
     border-color: 1px solid #171e25;
+    color: black;
   }
 }
 </style>

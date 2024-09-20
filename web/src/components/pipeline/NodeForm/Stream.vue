@@ -26,12 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
     <div class="stream-routing-container full-width q-pa-md">
       <q-form @submit="saveStream">
+
         <div class="flex justify-start items-center" style="padding-top: 0px">
           <div
             data-test="add-alert-stream-type-select"
             class="alert-stream-type o2-input q-mr-sm full-width"
             style="padding-top: 0"
           >
+
             <q-select
               v-model="stream_type"
               :options="streamTypes"
@@ -44,8 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               outlined
               filled
               dense
-              v-bind:readonly="beingUpdated"
-              v-bind:disable="beingUpdated"
+
               @update:model-value="updateStreams()"
               :rules="[(val: any) => !!val || 'Field is required!']"
             />
@@ -55,25 +56,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="o2-input full-width"
             style="padding-top: 0"
           >
-            <q-select
-              v-model="stream_name"
-              :options="filteredStreams"
-              :label="t('alerts.stream_name') + ' *'"
-              :loading="isFetchingStreams"
-              :popup-content-style="{ textTransform: 'lowercase' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-sm showLabelOnTop no-case full-width"
-              filled
-              stack-label
-              dense
-              use-input
-              hide-selected
-              fill-input
-              :input-debounce="400"
-              @filter="filterStreams"
-              behavior="menu"
-              :rules="[(val: any) => !!val || 'Field is required!']"
+          <q-select
+            v-model="stream_name"
+            :options="filteredStreams"
+             option-label="label"
+              option-value="value"
+            :label="t('alerts.stream_name') + ' *'"
+            :loading="isFetchingStreams"
+            :popup-content-style="{ textTransform: 'lowercase' }"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-py-sm showLabelOnTop no-case full-width"
+            filled
+            stack-label
+            dense
+            use-input
+            hide-selected
+            fill-input
+            :input-debounce="400"
+            @filter="filterStreams"
+            behavior="menu"
+            :rules="[(val: any) => !!val || 'Field is required!']"
+            :option-disable="option => option.isDisable"
             />
           </div>
         </div>
@@ -123,13 +127,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import { ref, type Ref, defineEmits, onMounted } from "vue";
+import { ref, type Ref, defineEmits, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
-
+import pipelineService from "@/services/pipelines";
 const emit = defineEmits(["cancel:hideform"]);
 
 const { t } = useI18n();
@@ -145,29 +149,64 @@ const isFetchingStreams = ref(false);
 const indexOptions = ref([]);
 const schemaList = ref([]);
 const streams: any = ref({});
+const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
 const stream_name = ref(pipelineObj.currentSelectedNodeData?.data.stream_name);
-const stream_type = ref(pipelineObj.currentSelectedNodeData?.data.stream_type);
-
+const stream_type = ref("logs");
+watch(stream_name, async (newVal) => {
+  console.log(stream_name.value, "stream_name");
+});
 onMounted(async () => {
+  await getUsedStreamsList();
   await getStreamList();
 });
-
+async function getUsedStreamsList() {
+    const org_identifier = store.state.selectedOrganization.identifier;
+  await pipelineService.getPipelineStreams(org_identifier)
+    .then((res: any) => {
+      usedStreams.value[stream_type.value] = res.data.list;
+    })
+}
 async function getStreamList() {
   const streamType = pipelineObj.currentSelectedNodeData.hasOwnProperty("stream_type")
     ? pipelineObj.currentSelectedNodeData.stream_type
     : "logs";
-  await getStreams(streamType, false)
-    .then((res: any) => {
-      isFetchingStreams.value = true;
-      streams.value[streamType] = res.list;
-      schemaList.value = res.list;
-      indexOptions.value = res.list.map((data: any) => {
-        return data.name;
+  
+  
+  isFetchingStreams.value = true;
+  
+  try {
+    console.log(stream_type.value,"in  fun")
+    const res : any = await getStreams(stream_type.value, false);
+    
+    if (res.list.length > 0 && pipelineObj.currentSelectedNodeData.type === "input") {
+      res.list.forEach((stream) => {
+        stream.isDisable = usedStreams.value[streamType].some(
+          (usedStream) => usedStream.stream_name === stream.name
+        );
       });
-    })
-    .finally(() => (isFetchingStreams.value = false));
+    }
+    
+    streams.value[streamType] = res.list;
+    schemaList.value = res.list;
+    indexOptions.value = res.list.map((data) => data.name);
+    console.log(streams.value, "streams");
+  } finally {
+    isFetchingStreams.value = false;
+  }
 }
+
+// watch(stream_type.value || pipelineObj.currentSelectedNodeData.type, async (newVal) => {
+//   await getStreamList();
+// });
+const updateStreams = () => {
+  getStreamList();
+  console.log(stream_type.value,"stream_type")
+  // pipelineObj.currentSelectedNodeData.data.stream_type = stream_type.value;
+  
+};
+
+
 
 const dialog = ref({
   show: false,
@@ -209,8 +248,33 @@ const saveStream = () => {
 };
 
 const filterStreams = (val: string, update: any) => {
-  filteredStreams.value = filterColumns(indexOptions.value, val, update);
+  const streamType = pipelineObj.currentSelectedNodeData.stream_type || 'logs';
+  if(pipelineObj.currentSelectedNodeData.type === 'input') {
+    const filtered = streams.value[streamType].filter((stream) => {
+    return stream.name.toLowerCase().includes(val.toLowerCase());
+  }).map((stream) => ({
+    label: stream.name,
+    value: stream.name,  // Use a unique identifier if needed
+    isDisable: stream.isDisable
+  }));
+  filteredStreams.value = filtered;
+  }
+  else{
+    const filtered = streams.value[streamType].filter((stream) => {
+    return stream.name.toLowerCase().includes(val.toLowerCase());
+  }).map((stream) => ({
+    label: stream.name,
+    value: stream.name,  // Use a unique identifier if needed
+    isDisable: false
+  }));
+  filteredStreams.value = filtered;
+
+  }
+
+  
+  update();
 };
+
 
 const filterColumns = (options: any[], val: String, update: Function) => {
   let filteredOptions: any[] = [];

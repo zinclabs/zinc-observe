@@ -19,17 +19,13 @@ const pipelines = {
   },
 
   deletePipeline: ({
-    stream_name,
-    stream_type,
-    name,
-    org_identifier,
+    pipeline_id,
+    org_id,
   }: {
-    stream_name: string;
-    name: string;
-    stream_type: string;
-    org_identifier: string;
+    pipeline_id : string;
+    org_id: string;
   }) => {
-    const url = `/api/${org_identifier}/streams/${stream_name}/pipelines/${name}?type=${stream_type}`;
+    const url = `/api/${org_id}/pipelines/${pipeline_id}`;
     return http().delete(url);
   },
 
@@ -53,6 +49,11 @@ const pipelines = {
   }) => {
     const url = `/api/${org_identifier}/pipelines`;
     return http().put(url, data);
+  },
+  getPipelineStreams: (org_identifier:string) => {
+    console.log(org_identifier,"org_identifier")
+    const url = `/api/${org_identifier}/pipelines/streams`;
+    return http().get(url);
   },
 };
 

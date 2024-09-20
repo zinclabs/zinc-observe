@@ -84,10 +84,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
+        <q-btn
+            data-test="stream-routing-cancel-btn"
+            :label="t('alerts.delete')"
+            padding="sm md"
+            class="text-bold no-border q-mx-md "
+            color="negative"
+            no-caps
+            @click="openCancelDialog"
+          />
+      
           <q-btn
             data-test="stream-routing-cancel-btn"
             class="text-bold"
-            :label="t('alerts.delete')"
+            :label="t('alerts.cancel')"
             text-color="light-text"
             padding="sm md"
             no-caps
@@ -404,16 +414,14 @@ const saveQueryData = async () => {
     },
     trigger_condition: {
       // same as before
-      period: formData.trigger_condition.period,
+      period: formData.trigger_condition.period || 1,
       operator: "=",
       threshold: 0,
       frequency: formData.trigger_condition.frequency,
       cron: formData.trigger_condition.cron,
       frequency_type: formData.trigger_condition.frequency_type,
       silence: 0,
-      timezone: formData.trigger_condition?.timezone || 0, // optional
     },
-    tz_offset: formData.trigger_condition?.timezone || 0, // optional
   };
   addNode(queryPayload);
   emit("cancel:hideform");

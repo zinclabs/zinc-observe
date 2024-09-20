@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script setup lang="ts">
-import { ref, onBeforeMount, computed } from "vue";
+import { ref, onBeforeMount, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
@@ -163,6 +163,13 @@ const pipelines = ref([]);
 const store = useStore();
 
 const { pipelineObj } = useDragAndDrop();
+
+watch(
+  () => router.currentRoute.value,
+  () => {
+    getPipelines();
+  },
+);
 
 const confirmDialogMeta: any = ref({
   show: false,
@@ -254,6 +261,7 @@ const getPipelines = () => {
   pipelineService
     .getPipelines(store.state.selectedOrganization.identifier)
     .then((response) => {
+      resultTotal.value = response.data.list.length;
       pipelines.value = response.data.list.map(
         (pipeline: any, index: number) => {
           return {
@@ -331,16 +339,18 @@ const savePipeline = (data: any) => {
 };
 
 const deletePipeline = () => {
+  console.log(confirmDialogMeta.value.data,"data");
   const dismiss = q.notify({
     message: "deleting pipeline...",
     position: "bottom",
     spinner: true,
   });
-
+  const { pipeline_id} = confirmDialogMeta.value.data;
+  const org_id = store.state.selectedOrganization.identifier;
   pipelineService
     .deletePipeline({
-      ...confirmDialogMeta.value.data,
-      org_identifier: store.state.selectedOrganization.identifier,
+      pipeline_id,
+      org_id
     })
     .then(() => {
       getPipelines();

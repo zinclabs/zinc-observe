@@ -17,9 +17,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- src/components/PipelineFlow.vue -->
 <template>
   <div id="graph-container"
+  
 class="dnd-flow" @drop="onDrop">
-    <div v-if="pipelineObj.dirtyFlag" class="bg-warning bold q-pa-sm">Note: Changes not yet saved. Press "Save" button to save your changes.</div>
+<div class="container">
+   
+    <div class="button-group">
+      <q-btn
+        flat
+        round
+        @click="zoomIn"
+        :class="buttonClass"
+      >
+        <q-icon name="add" />
+      </q-btn>
+      <div class="separator"></div>
+      <q-btn
+        flat
+        round
+        @click="zoomOut"
+        :class="buttonClass"
+      >
+        <q-icon name="remove" />
+        
+      </q-btn>
+      <div v-show="pipelineObj.dirtyFlag" class="warning-text">
+      Unsaved changes detected. Click "Save" to preserve your updates.
+    </div>
+    </div>
+    
+  </div>
+
     <VueFlow
+    ref="vueFlowRef"
       v-model:nodes="pipelineObj.currentSelectedPipeline.nodes"
       v-model:edges="pipelineObj.currentSelectedPipeline.edges"
       @node-change="onNodeChange"
@@ -27,7 +56,12 @@ class="dnd-flow" @drop="onDrop">
       @edges-change="onEdgesChange"
       @connect="onConnect"
       @dragover="onDragOver"
+       :zoom-on-scroll="false"
+      :zoom-on-pinch="false"
+
       @dragleave="onDragLeave"
+      :edge-types="edgeTypes"
+
     >
       <DropzoneBackground
         :style="{
@@ -52,7 +86,7 @@ class="dnd-flow" @drop="onDrop">
 </template>
 
 <script>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { VueFlow } from "@vue-flow/core";
 // import vueFlowConfig from "./vueFlowConfig";
 import CustomNode from "./CustomNode.vue";
@@ -64,6 +98,7 @@ import "@vue-flow/core/dist/style.css";
 
 /* import the default theme (optional) */
 import "@vue-flow/core/dist/theme-default.css";
+import { useStore } from "vuex";
 
 export default {
   components: { VueFlow, CustomNode, DropzoneBackground },
@@ -80,6 +115,23 @@ export default {
       validateConnection,
       pipelineObj,
     } = useDragAndDrop();
+    const store = useStore();
+const  buttonClass = () => {
+      return this.theme === 'dark' ? 'dark-theme' : 'light-theme';
+    };
+    onMounted(() => {
+      if (vueFlowRef.value) {
+        vueFlowRef.value.fitView({ padding: 0.1, includeHiddenNodes: true });
+      }
+    });
+    const vueFlowRef = ref(null);
+    const zoomIn = () => {
+      vueFlowRef.value.zoomIn();
+    };
+
+    const zoomOut = () => {
+      vueFlowRef.value.zoomOut();
+    };
 
     return {
       pipelineObj,
@@ -92,6 +144,10 @@ export default {
       onEdgesChange,
       onConnect,
       validateConnection,
+      zoomIn,
+      zoomOut,
+      vueFlowRef,
+      buttonClass
     };
   },
 };
@@ -100,6 +156,46 @@ export default {
 <style scoped>
 #graph-container {
   width: 1150px;
-  height: 1000px;
+  height: 100vh;
+}
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.warning-text {
+  background-color: #ffc107;
+  font-weight: bold;
+  padding: 8px;
+}
+
+.button-group {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+}
+
+.dark-theme {
+  background-color: #333;
+  color: #fff;
+}
+
+.light-theme {
+  background-color: #fff;
+  color: #000;
+}
+
+.separator {
+  width: 1px;
+  height: 24px;
+  background-color: #ccc;
+  margin: 0 8px;
+}
+
+q-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

@@ -212,10 +212,11 @@ const isValidName = computed(() => {
 
 const updateStreams = (resetStream = true) => {
   if (resetStream) formData.value.stream_name = "";
-
+console.log(formData.value.stream_type,"type in res");
   if (!formData.value.stream_type) return Promise.resolve();
 
   isFetchingStreams.value = true;
+  
   return getStreams(formData.value.stream_type, false)
     .then((res: any) => {
       indexOptions.value = res.list.map((data: any) => {

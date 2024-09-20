@@ -37,17 +37,20 @@ const useStreams = () => {
     schema: boolean,
     notify: boolean = true,
   ) => {
+    console.log(_streamName,"in this working fine 3")
     return new Promise(async (resolve, reject) => {
+      console.log(_streamName,"in this working fine 2")
       const streamName = _streamName || "all";
 
       // We don't fetch schema while fetching all streams or specific type all streams
       // So keeping it false, don't change this
       schema = false;
-
       if (getStreamsPromise.value) {
         await getStreamsPromise.value;
       }
+      console.log(streamName,"in this working fine 1")
       try {
+        console.log(streamName,"in this working fine")
         if (!isStreamFetched(streamName || "all")) {
           // Added adddtional check to fetch all streamstype separately if streamName is all
           const dismiss = notify
@@ -107,6 +110,8 @@ const useStreams = () => {
                 reject(new Error(e.message));
               });
           } else {
+
+            console.log(streamName,"in this working")
             getStreamsPromise.value = StreamService.nameList(
               store.state.selectedOrganization.identifier,
               _streamName,
