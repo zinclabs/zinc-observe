@@ -217,6 +217,11 @@ pub async fn search(
                     response_time: time,
                     size: res.scan_size as f64,
                     request_body: Some(req_query.sql.clone()),
+                    function: if req_query.query_fn.is_empty() {
+                        None
+                    } else {
+                        Some(req_query.query_fn.clone())
+                    },
                     user_email: user_id,
                     min_ts: Some(req_query.start_time),
                     max_ts: Some(req_query.end_time),

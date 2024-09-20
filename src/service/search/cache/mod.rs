@@ -279,11 +279,13 @@ pub async fn search(
         res.histogram_interval = Some(c_resp.histogram_interval);
     }
 
+    let num_fn = req.query.query_fn.is_some() as u16;
     let req_stats = RequestStats {
         records: res.hits.len() as i64,
         response_time: time,
         size: res.scan_size as f64,
         request_body: Some(req.query.sql),
+        function: req.query.query_fn,
         user_email: user_id,
         min_ts: Some(req.query.start_time),
         max_ts: Some(req.query.end_time),
@@ -300,7 +302,6 @@ pub async fn search(
         result_cache_ratio: Some(res.result_cache_ratio),
         ..Default::default()
     };
-    let num_fn = req.query.query_fn.is_some() as u16;
     report_request_usage_stats(
         req_stats,
         org_id,

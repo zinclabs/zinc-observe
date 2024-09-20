@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use chrono::{Datelike, Timelike, Utc};
+use chrono::{DateTime, Datelike, Timelike};
 use config::{
     get_config,
     meta::{
@@ -61,6 +61,7 @@ pub async fn report_request_usage_stats(
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
         .inc_by((stats.size * SIZE_IN_MB) as u64);
     let event: UsageEvent = usage_type.into();
+    let now = DateTime::from_timestamp_micros(timestamp).unwrap();
 
     if !get_config().common.usage_enabled {
         return;
@@ -68,7 +69,6 @@ pub async fn report_request_usage_stats(
 
     let request_body = stats.request_body.unwrap_or(usage_type.to_string());
     let user_email = stats.user_email.unwrap_or("".to_owned());
-    let now = Utc::now();
 
     let mut usage = vec![];
 
@@ -89,6 +89,7 @@ pub async fn report_request_usage_stats(
             ),
             org_id: org_id.to_owned(),
             request_body: request_body.to_owned(),
+            function: None,
             size: stats.size,
             unit: "MB".to_owned(),
             user_email: user_email.to_owned(),
@@ -127,6 +128,7 @@ pub async fn report_request_usage_stats(
         unit: "MB".to_owned(),
         user_email,
         response_time: stats.response_time,
+        function: stats.function,
         num_records: stats.records,
         stream_type,
         stream_name: stream_name.to_owned(),
