@@ -199,7 +199,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         get_index_creation_tuples(org_name, &mut tuples).await;
                     }
                     if need_migrate_history_tuples {
-                        get_history_creation_tuples(org_id, &mut tuples).await;
+                        get_history_creation_tuples(org_name, &mut tuples).await;
                     }
                 }
             }
