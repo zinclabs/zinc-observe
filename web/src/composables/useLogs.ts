@@ -2389,7 +2389,19 @@ const useLogs = () => {
             if (searchObj.data.queryResults.aggs == null) {
               searchObj.data.queryResults.aggs = [];
             }
-            if(searchObj.data.queryResults.partitionDetail.partitions[0][0] == queryReq.query.start_time && searchObj.data.queryResults.partitionDetail.partitions[0][1] == queryReq.query.end_time){
+
+            const parsedSQL: any = fnParsedSQL();
+            const partitions = JSON.parse(
+              JSON.stringify(
+                searchObj.data.queryResults.partitionDetail.partitions,
+              ),
+            );
+
+            // is _timestamp orderby ASC then reverse the partition array
+            if (isTimestampASC(parsedSQL?.orderby) && partitions.length > 1) {
+              partitions.reverse();
+            }
+            if(partitions[0][0] == queryReq.query.start_time && partitions[0][1] == queryReq.query.end_time){
               histogramResults = [];
               let date = new Date();
               const startDateTime = searchObj.data.customDownloadQueryObj.query.start_time / 1000;
