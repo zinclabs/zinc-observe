@@ -16,11 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- src/components/PipelineFlow.vue -->
 <template>
-  <div id="graph-container"
-  
-class="dnd-flow" @drop="onDrop">
 
     <VueFlow
+    @drop="onDrop"
     ref="vueFlowRef"
       v-model:nodes="pipelineObj.currentSelectedPipeline.nodes"
       v-model:edges="pipelineObj.currentSelectedPipeline.edges"
@@ -30,12 +28,13 @@ class="dnd-flow" @drop="onDrop">
       @connect="onConnect"
       @dragover="onDragOver"
       :default-viewport="{ zoom: 1.5 }"
-    :min-zoom="0.2"
-    :max-zoom="4"
+      :min-zoom="0.2"
+      :max-zoom="4"
       @dragleave="onDragLeave"
-      :edge-types="edgeTypes"
+      class="basic-flow"
 
     >
+
       <DropzoneBackground
         :style="{
           backgroundColor: isDragOver ? '#e7f3ff' : 'transparent',
@@ -53,20 +52,17 @@ class="dnd-flow" @drop="onDrop">
       <template #node-default="{ id, data }">
         <CustomNode :id="id" :data="data" io_type="default" />
       </template>
-      <Controls position="top-left">
-      <ControlButton title="Reset Transform" @click="resetTransform">
-        <Icon name="reset" />
-      </ControlButton>
+      <Controls 
+      class="controls-grp"
+        position="top-left">
     </Controls>
-
     </VueFlow>
     <!-- Add UI elements or buttons to interact with the methods -->
-  </div>
 </template>
 
 <script>
 import { ref, onMounted } from "vue";
-import { VueFlow } from "@vue-flow/core";
+import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { ControlButton, Controls } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
 import CustomNode from "./CustomNode.vue";
@@ -75,13 +71,14 @@ import useDragAndDrop from "./useDnD";
 
 /* import the required styles */
 import "@vue-flow/core/dist/style.css";
-
 /* import the default theme (optional) */
 import "@vue-flow/core/dist/theme-default.css";
-import { useStore } from "vuex";
+import '@vue-flow/controls/dist/style.css'
 
+import { useStore } from "vuex";
 export default {
-  components: { VueFlow, CustomNode, DropzoneBackground },
+  components: { VueFlow, CustomNode, DropzoneBackground, Controls,ControlButton
+   },
   setup() {
     const {
       onDragOver,
@@ -99,6 +96,7 @@ export default {
 const  buttonClass = () => {
       return this.theme === 'dark' ? 'dark-theme' : 'light-theme';
     };
+    const { setViewport } = useVueFlow()
     onMounted(() => {
       if (vueFlowRef.value) {
         vueFlowRef.value.fitView({ padding: 10, includeHiddenNodes: true });
@@ -131,7 +129,8 @@ function resetTransform() {
       zoomIn,
       zoomOut,
       vueFlowRef,
-      buttonClass
+      buttonClass,
+      resetTransform,
     };
   },
 };
@@ -182,4 +181,7 @@ q-btn {
   align-items: center;
   justify-content: center;
 }
+
+
+
 </style>

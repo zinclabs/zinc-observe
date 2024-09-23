@@ -169,6 +169,7 @@ const queryImage = getImageURL("images/pipeline/query.svg");
 
 const PipelineFlow = defineAsyncComponent(
   () => import("@/plugins/pipelines/PipelineFlow.vue"),
+
 );
 
 interface Routing {
@@ -381,6 +382,9 @@ onBeforeMount(() => {
   getFunctions();
 });
 
+
+
+
 const getPipeline = () => {
   const route = router.currentRoute.value;
 
@@ -442,6 +446,7 @@ const getFunctions = () => {
 };
 
 const resetDialog = () => {
+
   pipelineObj.dialog.show = false;
   pipelineObj.dialog.name = "";
   editingFunctionName.value = "";
@@ -597,6 +602,7 @@ const updateNewFunction = (_function: Function) => {
 }
 
 .pipeline-chart-container {
+height: 80vh;
   border-radius: 12px;
   width: calc(100% - 200px);
 }
