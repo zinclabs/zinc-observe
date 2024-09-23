@@ -119,6 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :functions="functionOptions"
         :associated-functions="associatedFunctions"
         @cancel:hideform="resetDialog"
+       @add:function = "refreshFunctionList"
+        
       />
 
       <StreamNode
@@ -341,7 +343,9 @@ const hasInputType = computed(() => {
 
 const nodeLinks = ref<{ [key: string]: NodeLink }>({});
 
-
+const refreshFunctionList = () =>{
+  getFunctions();
+}
 const functionOptions = ref<string[]>([]);
 
 const streamRoutes = ref<{ [key: string]: any }>({});
@@ -420,7 +424,7 @@ const getPipeline = () => {
 };
 
 const getFunctions = () => {
-  if (Object.keys(functions.value).length) return;
+  // if (Object.keys(functions.value).length) return;
   isFetchingFunctions.value = true;
   return functionsService
     .list(

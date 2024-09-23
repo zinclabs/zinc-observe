@@ -24,9 +24,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("pipeline.streamTitle") }}
     </div>
     <q-separator />
-    <div class="stream-routing-container full-width q-pa-md">
-      <q-form @submit="saveStream">
 
+    <div   class="stream-routing-container full-width q-pa-md">
+      <q-toggle
+      v-if="selectedNodeType == 'output'"
+        data-test="create-stream-toggle"
+        class="q-mb-sm"
+        :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
+        v-model="createNewStream"
+      />
+      <q-form   @submit="saveStream">
+
+      <div v-if="!createNewStream">
         <div class="flex justify-start items-center" style="padding-top: 0px">
           <div
             data-test="add-alert-stream-type-select"
@@ -115,8 +124,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openDeleteDialog"
           />
         </div>
+      </div>
+      <div v-else class="pipeline-add-stream">
+        <AddStream
+        ref="addStreamRef"
+        @streamAdded="getLogStream"
+         />
+      </div>
       </q-form>
     </div>
+
+    
   </div>
   <confirm-dialog
     v-model="dialog.show"
@@ -127,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import { ref, type Ref, defineEmits, onMounted, watch } from "vue";
+import { ref, type Ref, defineEmits, onMounted, watch, defineAsyncComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
@@ -143,8 +161,14 @@ const store = useStore();
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
 const { getStreams } = useStreams();
+const AddStream = defineAsyncComponent (
+  () => import("@/components/logstream/AddStream.vue"),
+);
 
 const filteredStreams: Ref<string[]> = ref([]);
+const addStreamRef = ref(null);
+const createNewStream = ref(false);
+const isUpdating = ref(false);
 const isFetchingStreams = ref(false);
 const indexOptions = ref([]);
 const schemaList = ref([]);
@@ -153,6 +177,7 @@ const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
 const stream_name = ref(pipelineObj.currentSelectedNodeData?.data.stream_name);
 const stream_type = ref("logs");
+const selectedNodeType = ref(pipelineObj.currentSelectedNodeData.io_type)
 watch(stream_name, async (newVal) => {
   console.log(stream_name.value, "stream_name");
 });
@@ -205,6 +230,9 @@ const updateStreams = () => {
   // pipelineObj.currentSelectedNodeData.data.stream_type = stream_type.value;
   
 };
+const getLogStream = () =>{
+  console.log("this is done")
+}
 
 
 
@@ -294,9 +322,18 @@ const filterColumns = (options: any[], val: String, update: Function) => {
 };
 </script>
 
-<style scoped>
+<style  >
 .stream-routing-title {
   font-size: 20px;
   padding-top: 16px;
+}
+.pipeline-add-stream {
+  .add-stream-header.row {
+    display: none ;
+  }
+
+  .q-separator {
+    display: none !important;
+  }
 }
 </style>
