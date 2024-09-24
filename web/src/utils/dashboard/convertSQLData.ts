@@ -422,9 +422,8 @@ export const convertSQLData = async (
           filledData.push(currentFilledData);
         }
       }
-
-      return filledData;
     }
+    return filledData;
   };
 
   const missingValueData: any = missingValue();
