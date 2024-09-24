@@ -43,6 +43,8 @@ export const convertSQLData = async (
   resultMetaData: any,
   metadata: any,
 ) => {
+  console.log(metadata, "metadata");
+
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -56,30 +58,38 @@ export const convertSQLData = async (
   }
 
   // get the x axis key
-  const getXAxisKeys = () => {
-    return panelSchema?.queries[0]?.fields?.x?.length
-      ? panelSchema?.queries[0]?.fields?.x.map((it: any) => it.alias)
+  const getXAxisKeys = (currentQueryIndex: any = 0) => {
+    return panelSchema?.queries[currentQueryIndex]?.fields?.x?.length
+      ? panelSchema?.queries[currentQueryIndex]?.fields?.x.map(
+          (it: any) => it.alias,
+        )
       : [];
   };
 
   // get the y axis key
-  const getYAxisKeys = () => {
-    return panelSchema?.queries[0]?.fields?.y?.length
-      ? panelSchema?.queries[0]?.fields?.y.map((it: any) => it.alias)
+  const getYAxisKeys = (currentQueryIndex: any = 0) => {
+    return panelSchema?.queries[currentQueryIndex]?.fields?.y?.length
+      ? panelSchema?.queries[currentQueryIndex]?.fields?.y.map(
+          (it: any) => it.alias,
+        )
       : [];
   };
 
   // get the z axis key
-  const getZAxisKeys = () => {
-    return panelSchema?.queries[0]?.fields?.z?.length
-      ? panelSchema?.queries[0]?.fields?.z.map((it: any) => it.alias)
+  const getZAxisKeys = (currentQueryIndex: any = 0) => {
+    return panelSchema?.queries[currentQueryIndex]?.fields?.z?.length
+      ? panelSchema?.queries[currentQueryIndex]?.fields?.z.map(
+          (it: any) => it.alias,
+        )
       : [];
   };
 
   // get the breakdown key
-  const getBreakDownKeys = () => {
-    return panelSchema?.queries[0]?.fields?.breakdown?.length
-      ? panelSchema?.queries[0]?.fields?.breakdown.map((it: any) => it.alias)
+  const getBreakDownKeys = (currentQueryIndex: any = 0) => {
+    return panelSchema?.queries[currentQueryIndex]?.fields?.breakdown?.length
+      ? panelSchema?.queries[currentQueryIndex]?.fields?.breakdown.map(
+          (it: any) => it.alias,
+        )
       : [];
   };
 
@@ -139,61 +149,81 @@ export const convertSQLData = async (
    * @returns {any[]} - The processed data array.
    */
   const processData = (data: any[], panelSchema: any): any[] => {
-    if (!data.length || !Array.isArray(data[0])) {
+    console.log(
+      JSON.parse(JSON.stringify(data)),
+      JSON.parse(JSON.stringify(panelSchema)),
+      "data",
+    );
+
+    if (!data || !Array.isArray(data)) {
       return [];
     }
 
-    const { top_results, top_results_others } = panelSchema.config;
-    const innerDataArray = data[0];
-    if (!top_results || !breakDownKeys.length) {
-      return innerDataArray;
-    }
-
-    const breakdownKey = breakDownKeys[0];
-    const yAxisKey = yAxisKeys[0];
-    const xAxisKey = xAxisKeys[0];
-
-    // Step 1: Aggregate y_axis values by breakdown, ignoring items without a breakdown key
-    const breakdown = innerDataArray.reduce((acc, item) => {
-      const breakdownValue = item[breakdownKey];
-      const yAxisValue = item[yAxisKey];
-      if (breakdownValue) {
-        acc[breakdownValue] = (acc[breakdownValue] || 0) + (+yAxisValue || 0);
-      }
-      return acc;
-    }, {});
-
-    // Step 2: Sort and extract the top keys based on the configured number of top results
-    const topKeys = Object.entries(breakdown)
-      .sort(([, a]: any, [, b]: any) => b - a)
-      .slice(0, top_results)
-      .map(([key]) => key);
-
-    // Step 3: Initialize result array and others object for aggregation
     const resultArray: any[] = [];
-    const othersObj: any = {};
 
-    innerDataArray.forEach((item) => {
-      const breakdownValue = item[breakdownKey];
-      if (topKeys.includes(breakdownValue)) {
-        resultArray.push(item);
-      } else if (top_results_others) {
-        const xAxisValue = String(item[xAxisKey]);
-        othersObj[xAxisValue] =
-          (othersObj[xAxisValue] || 0) + (+item[yAxisKey] || 0);
-      }
-    });
+    for (let i = 0; i < data.length; i++) {
+      let currentDataResult: any = [];
+      if (!data[i] || !Array.isArray(data[i])) {
+        resultArray.push([]);
+      } else {
+        const { top_results, top_results_others } = panelSchema.config;
+        const innerDataArray = data[i];
+        if (!top_results || !breakDownKeys.length) {
+          currentDataResult = innerDataArray;
+        }
 
-    // Step 4: Add 'others' aggregation to the result array if enabled
-    if (top_results_others) {
-      Object.entries(othersObj).forEach(([xAxisValue, yAxisValue]) => {
-        resultArray.push({
-          [breakdownKey]: "others",
-          [xAxisKey]: xAxisValue,
-          [yAxisKey]: yAxisValue,
+        const breakdownKey = breakDownKeys[0];
+        const yAxisKey = yAxisKeys[0];
+        const xAxisKey = xAxisKeys[0];
+
+        // Step 1: Aggregate y_axis values by breakdown, ignoring items without a breakdown key
+        const breakdown = innerDataArray.reduce((acc: any, item: any) => {
+          const breakdownValue = item[breakdownKey];
+          const yAxisValue = item[yAxisKey];
+          if (breakdownValue) {
+            acc[breakdownValue] =
+              (acc[breakdownValue] || 0) + (+yAxisValue || 0);
+          }
+          return acc;
+        }, {});
+
+        // Step 2: Sort and extract the top keys based on the configured number of top results
+        const topKeys = Object.entries(breakdown)
+          .sort(([, a]: any, [, b]: any) => b - a)
+          .slice(0, top_results)
+          .map(([key]) => key);
+
+        // Step 3: Initialize result array and others object for aggregation
+
+        const othersObj: any = {};
+
+        innerDataArray.forEach((item: any) => {
+          const breakdownValue = item[breakdownKey];
+          if (topKeys.includes(breakdownValue)) {
+            currentDataResult.push(item);
+          } else if (top_results_others) {
+            const xAxisValue = String(item[xAxisKey]);
+            othersObj[xAxisValue] =
+              (othersObj[xAxisValue] || 0) + (+item[yAxisKey] || 0);
+          }
         });
-      });
+
+        // Step 4: Add 'others' aggregation to the result array if enabled
+        if (top_results_others) {
+          Object.entries(othersObj).forEach(([xAxisValue, yAxisValue]) => {
+            currentDataResult.push({
+              [breakdownKey]: "others",
+              [xAxisKey]: xAxisValue,
+              [yAxisKey]: yAxisValue,
+            });
+          });
+        }
+      }
+
+      resultArray.push(currentDataResult);
     }
+
+    console.log(resultArray, "resultArray");
 
     return resultArray;
   };
@@ -220,145 +250,194 @@ export const convertSQLData = async (
   const processedData = processData(searchQueryData, panelSchema);
 
   const missingValue = () => {
+    const filledData: any[] = [];
     // Get the interval in minutes
-    const interval = resultMetaData?.value?.map(
-      (it: any) => it.histogram_interval,
-    )[0];
+    // const perQueryIntervals = resultMetaData?.value?.map(
+    //   (it: any) => it.histogram_interval,
+    // );
 
-    if (
-      !interval ||
-      !metadata.queries ||
-      !["area-stacked", "line", "area", "bar", "stacked"].includes(
-        panelSchema.type,
-      )
+    for (
+      let processedDataIndex = 0;
+      processedDataIndex < processedData.length;
+      processedDataIndex++
     ) {
-      return JSON.parse(JSON.stringify(processedData));
-    }
+      const interval =
+        resultMetaData?.value[processedDataIndex]?.histogram_interval;
 
-    // Extract and process metaDataStartTime
-    const metaDataStartTime = metadata?.queries[0]?.startTime?.toString() ?? 0;
-    const startTime = new Date(parseInt(metaDataStartTime) / 1000);
-
-    // Calculate the binnedDate
-    const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
-    const binnedDate = dateBin(interval, startTime, origin);
-
-    // Convert interval to milliseconds
-    const intervalMillis = interval * 1000;
-
-    // Identify the time-based key
-    const searchQueryDataFirstEntry = processedData[0];
-
-    const keys = [
-      ...getXAxisKeys(),
-      ...getYAxisKeys(),
-      ...getZAxisKeys(),
-      ...getBreakDownKeys(),
-    ];
-    const timeBasedKey = keys?.find((key) =>
-      isTimeSeries([searchQueryDataFirstEntry?.[key]]),
-    );
-
-    if (!timeBasedKey) {
-      return JSON.parse(JSON.stringify(processedData));
-    }
-
-    // Extract and process metaDataEndTime
-    const metaDataEndTime = metadata?.queries[0]?.endTime?.toString() ?? 0;
-    const endTime = new Date(parseInt(metaDataEndTime) / 1000);
-
-    const xAxisKeysWithoutTimeStamp = getXAxisKeys().filter(
-      (key: any) => key !== timeBasedKey,
-    );
-    const breakdownAxisKeysWithoutTimeStamp = getBreakDownKeys().filter(
-      (key: any) => key !== timeBasedKey,
-    );
-
-    const timeKey = timeBasedKey;
-    const uniqueKey =
-      xAxisKeysWithoutTimeStamp[0] !== undefined
-        ? xAxisKeysWithoutTimeStamp[0]
-        : breakdownAxisKeysWithoutTimeStamp[0];
-
-    // Create a set of unique xAxis values
-    const uniqueXAxisValues = new Set(
-      processedData.map((d: any) => d[uniqueKey]),
-    );
-
-    const filledData: any = [];
-    let currentTime = binnedDate;
-    // Create a map of existing data
-    const searchDataMap = new Map();
-    processedData?.forEach((d: any) => {
-      const key =
-        xAxisKeysWithoutTimeStamp.length > 0 ||
-        breakdownAxisKeysWithoutTimeStamp.length > 0
-          ? `${d[timeKey]}-${d[uniqueKey]}`
-          : `${d[timeKey]}`;
-
-      searchDataMap.set(key, d);
-    });
-
-    while (currentTime <= endTime) {
-      const currentFormattedTime = format(
-        toZonedTime(currentTime, "UTC"),
-        "yyyy-MM-dd'T'HH:mm:ss",
-      );
+      console.log(interval, "interval");
 
       if (
-        xAxisKeysWithoutTimeStamp.length === 0 &&
-        breakdownAxisKeysWithoutTimeStamp.length === 0
+        !interval ||
+        !metadata.queries ||
+        !["area-stacked", "line", "area", "bar", "stacked"].includes(
+          panelSchema.type,
+        )
       ) {
-        const key = `${currentFormattedTime}`;
-        const currentData = searchDataMap.get(key);
-        const nullEntry = {
-          [timeKey]: currentFormattedTime,
-          ...currentData,
-        };
-        if (!currentData) {
-          keys.forEach((key) => {
-            if (key !== timeKey) nullEntry[key] = noValueConfigOption;
-          });
-        }
-
-        filledData.push(nullEntry);
+        // return JSON.parse(JSON.stringify(processedData));
+        filledData.push(
+          JSON.parse(JSON.stringify(processedData[processedDataIndex])),
+        );
       } else {
-        uniqueXAxisValues.forEach((uniqueValue: any) => {
-          const key = `${currentFormattedTime}-${uniqueValue}`;
-          const currentData = searchDataMap.get(key);
-          if (currentData) {
-            filledData.push(currentData);
-          } else {
-            const nullEntry = {
-              [timeKey]: currentFormattedTime,
-              [uniqueKey]: uniqueValue,
-            };
+        console.log(
+          metadata?.queries[processedDataIndex].startTime,
+          "startTime",
+        );
 
-            keys.forEach((key) => {
-              if (key !== timeKey && key !== uniqueKey) {
-                nullEntry[key] = noValueConfigOption;
+        // Extract and process metaDataStartTime
+        const metaDataStartTime =
+          metadata?.queries[processedDataIndex]?.startTime?.toString() ?? 0;
+        const startTime = new Date(parseInt(metaDataStartTime));
+
+        // Calculate the binnedDate
+        const origin = new Date(Date.UTC(2001, 0, 1, 0, 0, 0, 0));
+        const binnedDate = dateBin(
+          interval,
+          startTime.getTime() / 1000,
+          origin,
+        );
+
+        // Convert interval to milliseconds
+        const intervalMillis = interval * 1000;
+
+        // Identify the time-based key
+        const searchQueryDataFirstEntry = processedData[processedDataIndex][0];
+
+        const keys = [
+          ...getXAxisKeys(processedDataIndex),
+          ...getYAxisKeys(processedDataIndex),
+          ...getZAxisKeys(processedDataIndex),
+          ...getBreakDownKeys(processedDataIndex),
+        ];
+
+        const timeBasedKey = keys?.find((key) =>
+          isTimeSeries([searchQueryDataFirstEntry?.[key]]),
+        );
+
+        if (!timeBasedKey) {
+          filledData.push(
+            JSON.parse(JSON.stringify(processedData[processedDataIndex])),
+          );
+        } else {
+          // Extract and process metaDataEndTime
+          const metaDataEndTime =
+            metadata?.queries[processedDataIndex]?.endTime?.toString() ?? 0;
+          const endTime = new Date(parseInt(metaDataEndTime) / 1000);
+
+          const xAxisKeysWithoutTimeStamp = getXAxisKeys()?.filter(
+            (key: any) => key !== timeBasedKey,
+          );
+          const breakdownAxisKeysWithoutTimeStamp = getBreakDownKeys()?.filter(
+            (key: any) => key !== timeBasedKey,
+          );
+
+          const timeKey = timeBasedKey;
+          const uniqueKey =
+            xAxisKeysWithoutTimeStamp[0] !== undefined
+              ? xAxisKeysWithoutTimeStamp[0]
+              : breakdownAxisKeysWithoutTimeStamp[0];
+
+          // Create a set of unique xAxis values
+          const uniqueXAxisValues = new Set(
+            processedData[processedDataIndex].map((d: any) => d[uniqueKey]),
+          );
+
+          console.log(
+            uniqueXAxisValues,
+            uniqueKey,
+            timeKey,
+            xAxisKeysWithoutTimeStamp,
+            "uniqueXAxisValues",
+          );
+
+          const currentFilledData: any = [];
+          let currentTime = binnedDate;
+          // Create a map of existing data
+          const searchDataMap = new Map();
+          processedData[processedDataIndex]?.forEach((d: any) => {
+            const key =
+              xAxisKeysWithoutTimeStamp.length > 0 ||
+              breakdownAxisKeysWithoutTimeStamp.length > 0
+                ? `${d[timeKey]}-${d[uniqueKey]}`
+                : `${d[timeKey]}`;
+
+            searchDataMap.set(key, d);
+          });
+
+          console.log(searchDataMap, "searchDataMap");
+
+          console.log(currentTime, endTime, "currentTime");
+
+          while (currentTime <= endTime) {
+            const currentFormattedTime = format(
+              toZonedTime(currentTime, "UTC"),
+              "yyyy-MM-dd'T'HH:mm:ss",
+            );
+
+            if (
+              xAxisKeysWithoutTimeStamp.length === 0 &&
+              breakdownAxisKeysWithoutTimeStamp.length === 0
+            ) {
+              const key = `${currentFormattedTime}`;
+              const currentData = searchDataMap.get(key);
+
+              // console.log(searchDataMap, key, searchDataMap.get(key), "currentData");
+
+              const nullEntry = {
+                [timeKey]: currentFormattedTime,
+                ...currentData,
+              };
+              if (!currentData) {
+                keys.forEach((key) => {
+                  if (key !== timeKey) nullEntry[key] = noValueConfigOption;
+                });
               }
-            });
 
-            filledData.push(nullEntry);
+              currentFilledData.push(nullEntry);
+            } else {
+              uniqueXAxisValues.forEach((uniqueValue: any) => {
+                const key = `${currentFormattedTime}-${uniqueValue}`;
+                const currentData = searchDataMap.get(key);
+                if (currentData) {
+                  currentFilledData.push(currentData);
+                } else {
+                  const nullEntry = {
+                    [timeKey]: currentFormattedTime,
+                    [uniqueKey]: uniqueValue,
+                  };
+
+                  keys.forEach((key) => {
+                    if (key !== timeKey && key !== uniqueKey) {
+                      nullEntry[key] = noValueConfigOption;
+                    }
+                  });
+
+                  currentFilledData.push(nullEntry);
+                }
+              });
+            }
+
+            currentTime = new Date(currentTime.getTime() + intervalMillis);
           }
-        });
+
+          filledData.push(currentFilledData);
+        }
       }
 
-      currentTime = new Date(currentTime.getTime() + intervalMillis);
+      return filledData;
     }
-
-    return filledData;
   };
 
-  const missingValueData = missingValue();
+  const missingValueData: any = missingValue();
+
+  console.log("missingValueData", missingValueData);
+
   // flag to check if the data is time series
   let isTimeSeriesFlag = false;
 
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
     const data =
-      missingValueData?.filter((item: any) => {
+      missingValueData[0]?.filter((item: any) => {
         return (
           xAxisKeys.every((key: any) => item[key] != null) &&
           yAxisKeys.every((key: any) => item[key] != null) &&
@@ -760,7 +839,7 @@ export const convertSQLData = async (
         const key1 = breakDownKeys[0];
         // get the unique value of the second xAxis's key
         const stackedXAxisUniqueValue = [
-          ...new Set(missingValueData.map((obj: any) => obj[key1])),
+          ...new Set(missingValueData[0].map((obj: any) => obj[key1])),
         ].filter((it) => it);
 
         options.series = yAxisKeys
@@ -770,7 +849,7 @@ export const convertSQLData = async (
             ).label;
             return stackedXAxisUniqueValue?.map((key: any) => {
               // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-              const data = missingValueData.filter(
+              const data = missingValueData[0].filter(
                 (it: any) => it[key1] == key,
               );
               const seriesObj = {
@@ -1122,12 +1201,12 @@ export const convertSQLData = async (
       const key1 = breakDownKeys[0];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(missingValueData.map((obj: any) => obj[key1])),
+        ...new Set(missingValueData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
         // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-        const data = missingValueData.filter((it: any) => it[key1] == key);
+        const data = missingValueData[0].filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,
@@ -1332,12 +1411,12 @@ export const convertSQLData = async (
       const key1 = breakDownKeys[0];
       // get the unique value of the second xAxis's key
       const stackedXAxisUniqueValue = [
-        ...new Set(processedData.map((obj: any) => obj[key1])),
+        ...new Set(processedData[0].map((obj: any) => obj[key1])),
       ].filter((it) => it);
 
       options.series = stackedXAxisUniqueValue?.map((key: any) => {
         // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
-        const data = processedData.filter((it: any) => it[key1] == key);
+        const data = processedData[0].filter((it: any) => it[key1] == key);
         const seriesObj = {
           name: key,
           ...defaultSeriesProps,

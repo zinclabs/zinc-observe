@@ -71,7 +71,12 @@ export const usePanelDataLoader = (
    */
   const getCacheKey = () => ({
     panelSchema: toRaw(panelSchema.value),
-    variablesData: JSON.parse(JSON.stringify([...(getDependentVariablesData() || []), ...(getDynamicVariablesData() || [])])),
+    variablesData: JSON.parse(
+      JSON.stringify([
+        ...(getDependentVariablesData() || []),
+        ...(getDynamicVariablesData() || []),
+      ]),
+    ),
     forceLoad: toRaw(forceLoad.value),
     // searchType: toRaw(searchType.value),
     dashboardId: toRaw(dashboardId?.value),
@@ -417,255 +422,373 @@ export const usePanelDataLoader = (
         // which is used to check whether the current query has been aborted
         const abortControllerRef = abortController;
 
-        // reset old state data
-        state.data = [];
-        state.metadata = {
-          queries: [],
-        };
-        state.resultMetaData = [];
-
-        // Call search API
-
-        // Get the page type from the first query in the panel schema
-        const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
-
-        // Handle each query sequentially
-        for (const [
-          panelQueryIndex,
-          it,
-        ] of panelSchema.value.queries.entries()) {
-          const { query: query1, metadata: metadata1 } = replaceQueryValue(
-            it.query,
-            startISOTimestamp,
-            endISOTimestamp,
-            panelSchema.value.queryType,
-          );
-
-          const { query: query2, metadata: metadata2 } =
-            await applyDynamicVariables(query1, panelSchema.value.queryType);
-
-          const query = query2;
-
-          const metadata: any = {
-            originalQuery: it.query,
-            query: query,
-            startTime: startISOTimestamp,
-            endTime: endISOTimestamp,
-            queryType: panelSchema.value.queryType,
-            variables: [...(metadata1 || []), ...(metadata2 || [])],
+        try {
+          // reset old state data
+          state.data = [];
+          state.metadata = {
+            queries: [],
           };
-          const { traceparent, traceId } = generateTraceContext();
-          addTraceId(traceId);
-          try {
-            // partition api call
-            const res = await callWithAbortController(
-              async () =>
-                queryService.partition({
-                  org_identifier: store.state.selectedOrganization.identifier,
-                  query: {
-                    sql: query,
-                    query_fn: it.vrlFunctionQuery
-                      ? b64EncodeUnicode(it.vrlFunctionQuery)
-                      : null,
-                    sql_mode: "full",
-                    start_time: startISOTimestamp,
-                    end_time: endISOTimestamp,
-                    size: -1,
+          state.resultMetaData = [];
+
+          // Call search API
+
+          // Get the page type from the first query in the panel schema
+          const pageType = panelSchema.value.queries[0]?.fields?.stream_type;
+
+          panelSchema.value.queries = [
+            {
+              query:
+                'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "default"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+              vrlFunctionQuery: "",
+              customQuery: false,
+              fields: {
+                stream: "default",
+                stream_type: "logs",
+                x: [
+                  {
+                    label: "Timestamp",
+                    alias: "x_axis_1",
+                    column: "_timestamp",
+                    color: null,
+                    aggregationFunction: "histogram",
+                    sortBy: "ASC",
+                    isDerived: false,
                   },
-                  page_type: pageType,
-                  traceparent,
-                }),
-              abortControllerRef.signal,
+                ],
+                y: [
+                  {
+                    label: "Timestamp",
+                    alias: "y_axis_1",
+                    column: "_timestamp",
+                    color: "#5960b2",
+                    aggregationFunction: "count",
+                    isDerived: false,
+                  },
+                ],
+                z: [],
+                breakdown: [],
+                filter: {
+                  filterType: "group",
+                  logicalOperator: "AND",
+                  conditions: [],
+                },
+              },
+              config: {
+                promql_legend: "",
+                layer_type: "scatter",
+                weight_fixed: 1,
+                limit: 0,
+                min: 0,
+                max: 100,
+              },
+            },
+            {
+              query:
+                'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"  FROM "default"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC',
+              vrlFunctionQuery: "",
+              customQuery: false,
+              fields: {
+                stream: "default",
+                stream_type: "logs",
+                x: [
+                  {
+                    label: "Timestamp",
+                    alias: "x_axis_1",
+                    column: "_timestamp",
+                    color: null,
+                    aggregationFunction: "histogram",
+                    sortBy: "ASC",
+                    isDerived: false,
+                  },
+                ],
+                y: [
+                  {
+                    label: "Timestamp",
+                    alias: "y_axis_1",
+                    column: "_timestamp",
+                    color: "#5960b2",
+                    aggregationFunction: "count",
+                    isDerived: false,
+                  },
+                ],
+                z: [],
+                breakdown: [],
+                filter: {
+                  filterType: "group",
+                  logicalOperator: "AND",
+                  conditions: [],
+                },
+              },
+              config: {
+                promql_legend: "",
+                layer_type: "scatter",
+                weight_fixed: 1,
+                limit: 0,
+                min: 0,
+                max: 100,
+              },
+            },
+          ];
+
+          // Handle each query sequentially
+          for (const [
+            panelQueryIndex,
+            it,
+          ] of panelSchema.value.queries.entries()) {
+            const { query: query1, metadata: metadata1 } = replaceQueryValue(
+              it.query,
+              startISOTimestamp,
+              endISOTimestamp,
+              panelSchema.value.queryType,
             );
 
-            // if aborted, return
-            if (abortControllerRef?.signal?.aborted) {
-              return;
-            }
+            const { query: query2, metadata: metadata2 } =
+              await applyDynamicVariables(query1, panelSchema.value.queryType);
 
-            // partition array from api response
-            const partitionArr = res?.data?.partitions ?? [];
+            const query = query2;
 
-            // always sort partitions in descending order
-            partitionArr.sort((a: any, b: any) => a[0] - b[0]);
+            const metadata: any = {
+              originalQuery: it.query,
+              query: query,
+              startTime:
+                panelQueryIndex != 0
+                  ? startISOTimestamp - 1 * 24 * 60 * 60 * 1000000
+                  : startISOTimestamp,
+              endTime:
+                panelQueryIndex != 0
+                  ? endISOTimestamp - 1 * 24 * 60 * 60 * 1000000
+                  : endISOTimestamp,
+              queryType: panelSchema.value.queryType,
+              variables: [...(metadata1 || []), ...(metadata2 || [])],
+            };
+            const { traceparent, traceId } = generateTraceContext();
+            addTraceId(traceId);
+            try {
+              // partition api call
+              const res = await callWithAbortController(
+                async () =>
+                  queryService.partition({
+                    org_identifier: store.state.selectedOrganization.identifier,
+                    query: {
+                      sql: query,
+                      query_fn: it.vrlFunctionQuery
+                        ? b64EncodeUnicode(it.vrlFunctionQuery)
+                        : null,
+                      sql_mode: "full",
+                      start_time: startISOTimestamp,
+                      end_time: endISOTimestamp,
+                      size: -1,
+                    },
+                    page_type: pageType,
+                    traceparent,
+                  }),
+                abortControllerRef.signal,
+              );
 
-            // max_query_range for current query stream
-            const max_query_range = res?.data?.max_query_range ?? 0;
-
-            // histogram_interval from partition api response
-            const histogramInterval = res?.data?.histogram_interval
-              ? `${res?.data?.histogram_interval} seconds`
-              : null;
-
-            // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
-            state.data.push([]);
-            state.metadata.queries.push({});
-            state.resultMetaData.push({});
-
-            const currentQueryIndex = state.data.length - 1;
-
-            // Update the metadata for the current query
-            Object.assign(state.metadata.queries[currentQueryIndex], metadata);
-
-            // remaining query range
-            let remainingQueryRange = max_query_range;
-
-            // loop on all partitions and call search api for each partition
-            for (let i = partitionArr.length - 1; i >= 0; i--) {
-              state.loading = true;
-
-              const partition = partitionArr[i];
-
+              // if aborted, return
               if (abortControllerRef?.signal?.aborted) {
-                break;
+                return;
               }
-              const { traceparent, traceId } = generateTraceContext();
-              addTraceId(traceId);
 
-              try {
-                const searchRes = await callWithAbortController(
-                  async () =>
-                    queryService.search(
-                      {
-                        org_identifier:
-                          store.state.selectedOrganization.identifier,
-                        query: {
-                          query: {
-                            sql: await changeHistogramInterval(
-                              query,
-                              histogramInterval,
-                            ),
-                            query_fn: it.vrlFunctionQuery
-                              ? b64EncodeUnicode(it.vrlFunctionQuery)
-                              : null,
-                            sql_mode: "full",
-                            start_time: partition[0],
-                            end_time: partition[1],
-                            size: -1,
-                          },
-                        },
-                        page_type: pageType,
-                        traceparent,
-                      },
-                      searchType.value ?? "Dashboards",
-                    ),
-                  abortControllerRef.signal,
-                );
-                // remove past error detail
-                state.errorDetail = "";
+              // partition array from api response
+              const partitionArr = res?.data?.partitions ?? [];
 
-                // if there is an function error and which not related to stream range, throw error
-                if (
-                  searchRes.data.function_error &&
-                  searchRes.data.is_partial != true
-                ) {
-                  // abort on unmount
-                  if (abortControllerRef) {
-                    // this will stop partition api call
-                    abortControllerRef?.abort();
-                  }
+              // always sort partitions in descending order
+              partitionArr.sort((a: any, b: any) => a[0] - b[0]);
 
-                  // throw error
-                  throw new Error(
-                    `Function error: ${searchRes.data.function_error}`,
-                  );
-                }
+              // max_query_range for current query stream
+              const max_query_range = res?.data?.max_query_range ?? 0;
 
-                // if the query is aborted or the response is partial, break the loop
+              // histogram_interval from partition api response
+              const histogramInterval = res?.data?.histogram_interval
+                ? `${res?.data?.histogram_interval} seconds`
+                : null;
+
+              // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
+              state.data.push([]);
+              state.metadata.queries.push({});
+              state.resultMetaData.push({});
+
+              const currentQueryIndex = state.data.length - 1;
+
+              // Update the metadata for the current query
+              Object.assign(
+                state.metadata.queries[currentQueryIndex],
+                metadata,
+              );
+
+              // remaining query range
+              let remainingQueryRange = max_query_range;
+
+              // loop on all partitions and call search api for each partition
+              for (let i = partitionArr.length - 1; i >= 0; i--) {
+                state.loading = true;
+
+                const partition = partitionArr[i];
+
                 if (abortControllerRef?.signal?.aborted) {
                   break;
                 }
+                const { traceparent, traceId } = generateTraceContext();
+                addTraceId(traceId);
 
-                state.data[currentQueryIndex] = [
-                  ...searchRes.data.hits,
-                  ...(state.data[currentQueryIndex] ?? []),
-                ];
+                try {
+                  const searchRes = await callWithAbortController(
+                    async () =>
+                      await queryService.search(
+                        {
+                          org_identifier:
+                            store.state.selectedOrganization.identifier,
+                          query: {
+                            query: {
+                              sql: await changeHistogramInterval(
+                                query,
+                                histogramInterval,
+                              ),
+                              query_fn: it.vrlFunctionQuery
+                                ? b64EncodeUnicode(it.vrlFunctionQuery)
+                                : null,
+                              sql_mode: "full",
+                              // if i == 0 ? then do gap of 7 days
+                              start_time:
+                                currentQueryIndex != 0
+                                  ? partition[0] - 1 * 24 * 60 * 60 * 1000000
+                                  : partition[0],
+                              end_time:
+                                currentQueryIndex != 0
+                                  ? partition[1] - 1 * 24 * 60 * 60 * 1000000
+                                  : partition[1],
+                              size: -1,
+                            },
+                          },
+                          page_type: pageType,
+                          traceparent,
+                        },
+                        searchType.value ?? "Dashboards",
+                      ),
+                    abortControllerRef.signal,
+                  );
+                  // remove past error detail
+                  state.errorDetail = "";
 
-                // update result metadata
-                state.resultMetaData[currentQueryIndex] = searchRes.data ?? {};
+                  // if there is an function error and which not related to stream range, throw error
+                  if (
+                    searchRes.data.function_error &&
+                    searchRes.data.is_partial != true
+                  ) {
+                    // abort on unmount
+                    if (abortControllerRef) {
+                      // this will stop partition api call
+                      abortControllerRef?.abort();
+                    }
 
-                if (searchRes.data.is_partial == true) {
-                  // set the new start time as the start time of query
-                  state.resultMetaData[currentQueryIndex].new_end_time =
-                    endISOTimestamp;
+                    // throw error
+                    throw new Error(
+                      `Function error: ${searchRes.data.function_error}`,
+                    );
+                  }
 
-                  // need to break the loop, save the cache
-                  saveCurrentStateToCache();
+                  // if the query is aborted or the response is partial, break the loop
+                  if (abortControllerRef?.signal?.aborted) {
+                    break;
+                  }
 
-                  break;
-                }
+                  state.data[currentQueryIndex] = [
+                    ...searchRes.data.hits,
+                    ...(state.data[currentQueryIndex] ?? []),
+                  ];
 
-                if (max_query_range != 0) {
-                  // calculate the current partition time range
-                  // convert timerange from milliseconds to hours
-                  const timeRange = (partition[1] - partition[0]) / 3600000000;
+                  // update result metadata
+                  state.resultMetaData[currentQueryIndex] =
+                    searchRes.data ?? {};
 
-                  // get result cache ratio(it will be from 0 to 100)
-                  const resultCacheRatio =
-                    searchRes.data.result_cache_ratio ?? 0;
+                  if (searchRes.data.is_partial == true) {
+                    // set the new start time as the start time of query
+                    state.resultMetaData[currentQueryIndex].new_end_time =
+                      endISOTimestamp;
 
-                  // calculate the remaining query range
-                  // remaining query range = remaining query range - queried time range for the current partition
-                  // queried time range = time range * ((100 - result cache ratio) / 100)
+                    // need to break the loop, save the cache
+                    saveCurrentStateToCache();
 
-                  const queriedTimeRange =
-                    timeRange * ((100 - resultCacheRatio) / 100);
+                    break;
+                  }
 
-                  remainingQueryRange = remainingQueryRange - queriedTimeRange;
+                  if (max_query_range != 0) {
+                    // calculate the current partition time range
+                    // convert timerange from milliseconds to hours
+                    const timeRange =
+                      (partition[1] - partition[0]) / 3600000000;
 
-                  // if the remaining query range is less than 0, break the loop
-                  // we exceeded the max query range
-                  if (remainingQueryRange < 0) {
-                    // set that is_partial to true if it is not last partition which we need to call
-                    if (i != 0) {
-                      // set that is_partial to true
-                      state.resultMetaData[currentQueryIndex].is_partial = true;
-                      // set function error
-                      state.resultMetaData[currentQueryIndex].function_error =
-                        `Query duration is modified due to query range restriction of ${max_query_range} hours`;
-                      // set the new start time and end time
-                      state.resultMetaData[currentQueryIndex].new_end_time =
-                        endISOTimestamp;
+                    // get result cache ratio(it will be from 0 to 100)
+                    const resultCacheRatio =
+                      searchRes.data.result_cache_ratio ?? 0;
 
-                      // set the new start time as the start time of query
-                      state.resultMetaData[currentQueryIndex].new_start_time =
-                        partition[0];
+                    // calculate the remaining query range
+                    // remaining query range = remaining query range - queried time range for the current partition
+                    // queried time range = time range * ((100 - result cache ratio) / 100)
 
-                      // need to break the loop, save the cache
-                      saveCurrentStateToCache();
+                    const queriedTimeRange =
+                      timeRange * ((100 - resultCacheRatio) / 100);
 
-                      break;
+                    remainingQueryRange =
+                      remainingQueryRange - queriedTimeRange;
+
+                    // if the remaining query range is less than 0, break the loop
+                    // we exceeded the max query range
+                    if (remainingQueryRange < 0) {
+                      // set that is_partial to true if it is not last partition which we need to call
+                      if (i != 0) {
+                        // set that is_partial to true
+                        state.resultMetaData[currentQueryIndex].is_partial =
+                          true;
+                        // set function error
+                        state.resultMetaData[currentQueryIndex].function_error =
+                          `Query duration is modified due to query range restriction of ${max_query_range} hours`;
+                        // set the new start time and end time
+                        state.resultMetaData[currentQueryIndex].new_end_time =
+                          endISOTimestamp;
+
+                        // set the new start time as the start time of query
+                        state.resultMetaData[currentQueryIndex].new_start_time =
+                          partition[0];
+
+                        // need to break the loop, save the cache
+                        saveCurrentStateToCache();
+
+                        break;
+                      }
                     }
                   }
+                } finally {
+                  removeTraceId(traceId);
                 }
-              } finally {
-                removeTraceId(traceId);
-              }
 
-              if (i == 0) {
-                // if it is last partition, cache the result
-                saveCurrentStateToCache();
+                if (i == 0) {
+                  // if it is last partition, cache the result
+                  saveCurrentStateToCache();
+                }
               }
-            }
-          } catch (error) {
-            // Process API error for "sql"
-            processApiError(error, "sql");
-            return { result: null, metadata: metadata };
-          } finally {
-            // set loading to false
-            state.loading = false;
-            removeTraceId(traceId);
-            // abort on done
-            if (abortControllerRef) {
-              abortControllerRef?.abort();
+            } catch (error) {
+              // Process API error for "sql"
+              processApiError(error, "sql");
+              return { result: null, metadata: metadata };
+            } finally {
+              // set loading to false
+              state.loading = false;
+              removeTraceId(traceId);
             }
           }
+
+          state.loading = false;
+
+          log("logaData: state.data", state.data);
+          log("logaData: state.metadata", state.metadata);
+        } finally {
+          // abort on done
+          if (abortControllerRef) {
+            abortControllerRef?.abort();
+          }
         }
-
-        state.loading = false;
-
-        log("logaData: state.data", state.data);
-        log("logaData: state.metadata", state.metadata);
       }
     } catch (error: any) {
       if (
@@ -1356,9 +1479,15 @@ export const usePanelDataLoader = (
       "panelSchema.markdownContent",
     ];
 
-    log("usePanelDataLoader: panelcache: tempPanelCacheKey", tempPanelCacheKey)
-    log("usePanelDataLoader: panelcache: omit(getCacheKey())", omit(getCacheKey(), keysToIgnore))
-    log("usePanelDataLoader: panelcache: omit(tempPanelCacheKey))", omit(tempPanelCacheKey, keysToIgnore))
+    log("usePanelDataLoader: panelcache: tempPanelCacheKey", tempPanelCacheKey);
+    log(
+      "usePanelDataLoader: panelcache: omit(getCacheKey())",
+      omit(getCacheKey(), keysToIgnore),
+    );
+    log(
+      "usePanelDataLoader: panelcache: omit(tempPanelCacheKey))",
+      omit(tempPanelCacheKey, keysToIgnore),
+    );
 
     // check if it is stale or not
     if (
