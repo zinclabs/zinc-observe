@@ -920,43 +920,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       />
     </div>
-
-    <div>
-      <div class="flex items-center q-mr-sm">
-        <div
-          data-test="scheduled-dashboard-period-title"
-          class="text-bold q-py-md flex items-center"
-          style="width: 190px"
-        >
-          Comparison Against
-          <q-btn
-            no-caps
-            padding="xs"
-            class=""
-            size="sm"
-            flat
-            icon="info_outline"
-            data-test="dashboard-addpanel-config-time-shift-info"
-          >
-            <q-tooltip
-              anchor="bottom middle"
-              self="top middle"
-              style="font-size: 10px"
-              max-width="250px"
-            >
-              <span
-                >This feature allows you to compare data points from multiple
-                queries over a selected time range. By adjusting the date or
-                time, the system will retrieve corresponding data from different
-                queries, enabling you to observe changes or differences
-                between the selected time periods
-              </span>
-            </q-tooltip>
-          </q-btn>
-        </div>
-      </div>
-      <CustomDateTimePicker @update:dateTime="handleDateTimeUpdate" />
-    </div>
   </div>
 </template>
 
@@ -968,13 +931,11 @@ import Drilldown from "./Drilldown.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
-import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 export default defineComponent({
   components: {
     Drilldown,
     CommonAutoComplete,
     MarkLineConfig,
-    CustomDateTimePicker,
   },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
@@ -1207,12 +1168,6 @@ export default defineComponent({
         field[value] = key;
       }
     };
-    const handleDateTimeUpdate = (data: any) => {
-      //here we get the data from the CustomDateTimePicker component
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].config.time_shift = data;
-    };
 
     const selectPromQlNameOption = (option: any) => {
       const inputValue =
@@ -1262,7 +1217,6 @@ export default defineComponent({
       legendWidthValue,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
-      handleDateTimeUpdate,
     };
   },
 });
