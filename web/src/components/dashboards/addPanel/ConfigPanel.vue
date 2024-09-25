@@ -922,7 +922,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
             <div >
-              <CustomDateTimePicker :alertPage=false @update:dateTime="handleDateTimeUpdate" />
+              <CustomDateTimePicker  :alertPage=false @update:dateTime="handleDateTimeUpdate" />
             </div>
   </div>
 </template>

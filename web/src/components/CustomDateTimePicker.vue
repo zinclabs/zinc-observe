@@ -1,31 +1,5 @@
 <template>
-    <div v-if="props.alertPage" class="flex items-center q-mr-sm">
-        <div 
-          data-test="scheduled-alert-period-title"
-          class="text-bold q-py-md flex items-center"
-          style="width: 190px"
-        >
-        Multi Window Selection
-          <q-btn
-          no-caps
-          padding="xs"
-          class=""
-          size="sm"
-          flat
-          icon="info_outline"
-          data-test="dashboard-addpanel-config-drilldown-info">
-           <q-tooltip
-              :class="{ 'alert-page-font': alertPage }" anchor="bottom middle" self="top middle" 
-              :style="props.alertPage ? 'font-size: 14px': 'font-size: 10px'"
-              
-              :max-width="props.alertPage ? '300px' : '250px'" >
-             <span>Additional timeframe for query execution: <br />
-                For example, selecting "past 10 hours" means that each time the query runs, it will retrieve data from 10 hours prior, using the last 10 minutes of that period. <br /> If the query is scheduled from 4:00 PM to 4:10 PM, additionally it will pull data from 6:00 AM to 6:10 AM.
-                </span> 
-            </q-tooltip>
-          </q-btn>
-        </div>
-      </div>
+   
     <div  v-for="(picker, index) in dateTimePickers" :key="index" class="q-mb-md">
       <q-btn
      style="width: 180px;"
@@ -116,10 +90,8 @@
           </q-tab-panel>
         </q-tab-panels>
       </q-menu>
-
-      <q-btn
-
-      v-if="props.alertPage"
+          <q-btn
+          v-if="props.deleteIcon == 'outlinedDelete'"
                 data-test="custom-date-picker-delete-btn"
                 :icon="outlinedDelete"
                 class=" q-mb-sm q-ml-xs q-mr-sm"
@@ -132,15 +104,23 @@
                 @click="removeDateTimePicker(index)"
                 style="min-width: auto;"
               />
-    </div>
 
+          <q-icon
+          v-else
+            class="q-mr-xs q-ml-sm"
+            size="15px"
+            name="close"
+            style="cursor: pointer"
+            @click="removeDateTimePicker(index)"
+            :data-test="`dashboard-addpanel-config-markline-remove-${index}`"
+          />
+    </div>
     <q-btn
-    v-if="props.alertPage"
-      data-test="alert-conditions-add-condition-btn"
-      icon="add"
-      label="Add"
-      class="q-mt-sm"
       @click="addDateTimePicker"
+      :class="!props.alertsPage ? 'dashboard-add-btn' : 'alert-add-btn'"
+      label="+ Add"
+      no-caps
+      data-test="date-time-picker-add-btn"
     />
 </template>
 
@@ -156,7 +136,16 @@ const relativePeriod = ref("m");
 const relativeValue = ref(15);
 const selectedType = ref("relative");
 
-
+const props = defineProps({
+  deleteIcon: {
+    type: String,
+    default: "",
+  },
+  alertsPage: {
+    type: Boolean,
+    default: false,
+  },
+});
 
 
 function createPicker() {
@@ -173,17 +162,6 @@ function createPicker() {
     },
   });
 }
-const props = defineProps({
-  alertPage: {
-    type: Boolean,
-    default: false,
-  },
-});
-const tooltipClass = computed(() => ({
-  'bg-grey-8': true,
-  'alert-page-font': props.alertPage,
-}));
-
 
 let relativePeriods = [
       { label: "Minutes", value: "m" },
@@ -525,6 +503,16 @@ onBeforeMount(()=>{
     .q-item:nth-child(2) {
       border-bottom: 1px solid #dcdcdc;
     }
+  }
+  .dashboard-add-btn{
+    cursor: pointer; 
+    padding: 0px 5px;
+  }
+  .alert-add-btn{
+    border-radius: 4px;
+          text-transform: capitalize;
+          background: #f2f2f2 !important;
+          color: #000 !important;
   }
   </style>
   
