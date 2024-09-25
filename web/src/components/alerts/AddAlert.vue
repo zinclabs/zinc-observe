@@ -191,6 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :sqlQueryErrorMsg="sqlQueryErrorMsg"
                 :vrlFunctionError="vrlFunctionError"
                 :showTimezoneWarning="showTimezoneWarning"
+                v-model:multipleTimeRangeData = "dateTimeData"
                 v-model:trigger="formData.trigger_condition"
                 v-model:sql="formData.query_condition.sql"
                 v-model:promql="formData.query_condition.promql"
@@ -198,8 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:aggregation="formData.query_condition.aggregation"
                 v-model:promql_condition="
                   formData.query_condition.promql_condition
-                "
-                v-model:vrl_function="formData.query_condition.vrl_function"
+                "                v-model:vrl_function="formData.query_condition.vrl_function"
                 v-model:isAggregationEnabled="isAggregationEnabled"
                 v-model:showVrlFunction="showVrlFunction"
                 @field:add="addField"
@@ -207,6 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @input:update="onInputUpdate"
                 @validate-sql="validateSqlQuery"
                 @update:showVrlFunction="updateFunctionVisibility"
+                @update:multipleTimeRangeData="handleMultiTimeRangeData"
                 class="q-mt-sm"
               />
             </div>
@@ -283,6 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
+
                 <div
                   data-test="add-alert-delay-error"
                   v-if="formData.trigger_condition.silence < 0"
@@ -293,6 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
             </div>
+
 
             <div class="o2-input flex justify-start items-center">
               <div
@@ -468,6 +471,7 @@ import useFunctions from "@/composables/useFunctions";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { convertDateToTimestamp } from "@/utils/date";
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue"
 
 const defaultValue: any = () => {
   return {
@@ -509,6 +513,7 @@ const defaultValue: any = () => {
       silence: 10,
       frequency_type: "minutes",
       timezone: "UTC",
+      multiTimeRange:[],
     },
     destinations: [],
     context_attributes: {},
@@ -544,6 +549,7 @@ export default defineComponent({
     RealTimeAlert: defineAsyncComponent(() => import("./RealTimeAlert.vue")),
     VariablesInput: defineAsyncComponent(() => import("./VariablesInput.vue")),
     PreviewAlert: defineAsyncComponent(() => import("./PreviewAlert.vue")),
+    CustomDateTimePicker,
   },
   setup(props) {
     const store: any = useStore();
@@ -597,6 +603,7 @@ export default defineComponent({
     const validateSqlQueryPromise = ref<Promise<unknown>>();
 
     const addAlertFormRef = ref(null);
+    const  dateTimeData = ref(null);
 
     const router = useRouter();
     const scheduledAlertRef: any = ref(null);
@@ -633,6 +640,9 @@ export default defineComponent({
     const showPreview = computed(() => {
       return formData.value.stream_type && formData.value.stream_name;
     });
+    function handleMultiTimeRangeData(updatedData) {
+      formData.value.trigger_condition.multiTimeRange = updatedData
+    };
 
     const updateConditions = (e: any) => {
       try {
@@ -1184,6 +1194,16 @@ export default defineComponent({
       }
     };
 
+
+    const validateMultiTimeRange = (multiTimeRange: any) => {
+      for (const range of multiTimeRange) {
+        if (range.offSet.startsWith('0')) {
+          return false;
+        }
+      }
+      return true;
+    };
+
     return {
       t,
       q,
@@ -1244,9 +1264,12 @@ export default defineComponent({
       sqlQueryErrorMsg,
       vrlFunctionError,
       updateFunctionVisibility,
+      validateMultiTimeRange,
       convertDateToTimestamp,
       getTimezonesByOffset,
       showTimezoneWarning,
+      handleMultiTimeRangeData,
+      dateTimeData,
     };
   },
 
@@ -1341,6 +1364,17 @@ export default defineComponent({
         });
         return false;
       }
+      const isValid = this.validateMultiTimeRange(this.formData.trigger_condition.multiTimeRange);
+      if (!isValid) {
+
+         this.q.notify({
+          type: "negative",
+          message: "Selecting 0 in multi window selection is not allowed.",
+          timeout: 1500,
+        });
+        return false;
+      }
+
 
       if (this.formData.stream_name == "") {
         this.q.notify({

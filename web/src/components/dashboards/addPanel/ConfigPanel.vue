@@ -920,6 +920,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       />
     </div>
+
+            <div >
+              <CustomDateTimePicker :alertPage=false @update:dateTime="handleDateTimeUpdate" />
+            </div>
   </div>
 </template>
 
@@ -931,8 +935,9 @@ import Drilldown from "./Drilldown.vue";
 import MarkLineConfig from "./MarkLineConfig.vue";
 import CommonAutoComplete from "@/components/dashboards/addPanel/CommonAutoComplete.vue";
 
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue"
 export default defineComponent({
-  components: { Drilldown, CommonAutoComplete, MarkLineConfig },
+  components: { Drilldown, CommonAutoComplete, MarkLineConfig, CustomDateTimePicker },
   props: ["dashboardPanelData", "variablesData"],
   setup(props) {
     const dashboardPanelDataPageKey = inject(
@@ -1164,6 +1169,10 @@ export default defineComponent({
         field[value] = key;
       }
     };
+    const handleDateTimeUpdate = (data) =>{
+      //here we get the data from the CustomDateTimePicker component
+      //[ {offSet: 2d}, {offSet:15m}] --> this is the data format
+}
 
     const selectPromQlNameOption = (option: any) => {
       const inputValue =
@@ -1213,6 +1222,7 @@ export default defineComponent({
       legendWidthValue,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
+      handleDateTimeUpdate,
     };
   },
 });

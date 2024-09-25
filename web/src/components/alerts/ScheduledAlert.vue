@@ -613,6 +613,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+        <CustomDateTimePicker :alertPage=true @update:dateTime="handleDateTimeUpdate"  v-if="tab == 'sql'"/>
+
+     
+
       <div class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-alert-cron-toggle-title"
@@ -833,6 +837,7 @@ import {
 import { useStore } from "vuex";
 import { getImageURL, useLocalTimezone } from "@/utils/zincutils";
 import { useQuasar } from "quasar";
+import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue"
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -857,6 +862,7 @@ const props = defineProps([
   "disableQueryTypeSelection",
   "vrlFunctionError",
   "showTimezoneWarning",
+  "multipleTimeRangeData"
 ]);
 
 const emits = defineEmits([
@@ -873,6 +879,7 @@ const emits = defineEmits([
   "update:vrl_function",
   "update:showVrlFunction",
   "validate-sql",
+  "update:multipleTimeRangeData"
 ]);
 
 const { t } = useI18n();
@@ -936,6 +943,9 @@ const filteredNumericColumns = ref(getNumericColumns.value);
 const addField = () => {
   emits("field:add");
 };
+const handleDateTimeUpdate = (data) =>{
+  emits("update:multipleTimeRangeData",data)
+}
 
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
 
@@ -1186,6 +1196,7 @@ const validateInputs = (notify: boolean = true) => {
     return true;
   }
 
+
   if (
     !props.disableThreshold &&
     (isNaN(triggerData.value.threshold) ||
@@ -1200,6 +1211,7 @@ const validateInputs = (notify: boolean = true) => {
       });
     return false;
   }
+  
 
   return true;
 };
