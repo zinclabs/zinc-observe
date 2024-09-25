@@ -640,7 +640,7 @@ export default defineComponent({
     const showPreview = computed(() => {
       return formData.value.stream_type && formData.value.stream_name;
     });
-    function handleMultiTimeRangeData(updatedData) {
+    function handleMultiTimeRangeData(updatedData : any) {
       formData.value.trigger_condition.multiTimeRange = updatedData
     };
 

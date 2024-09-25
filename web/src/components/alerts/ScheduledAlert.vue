@@ -629,10 +629,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="info_outline"
           data-test="dashboard-addpanel-config-drilldown-info">
            <q-tooltip
-              :class="{ 'alert-page-font': alertPage }" anchor="bottom middle" self="top middle" 
-              :style="props.alertPage ? 'font-size: 14px': 'font-size: 10px'"
+           class="tool-tip-multi-window-selection"
+               anchor="bottom middle" self="top middle" 
+              style="font-size: 14px;"
               
-              :max-width="props.alertPage ? '300px' : '250px'" >
+              max-width="300px" >
              <span>Additional timeframe for query execution: <br />
                 For example, selecting "past 10 hours" means that each time the query runs, it will retrieve data from 10 hours prior, using the last 10 minutes of that period. <br /> If the query is scheduled from 4:00 PM to 4:10 PM, additionally it will pull data from 6:00 AM to 6:10 AM.
                 </span> 
@@ -970,7 +971,7 @@ const filteredNumericColumns = ref(getNumericColumns.value);
 const addField = () => {
   emits("field:add");
 };
-const handleDateTimeUpdate = (data) =>{
+const handleDateTimeUpdate = (data: any) =>{
   emits("update:multipleTimeRangeData",data)
 }
 
