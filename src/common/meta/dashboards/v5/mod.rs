@@ -289,6 +289,15 @@ pub struct QueryConfig {
     min: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     max: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    time_shift: Option<Vec<TimeShift>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TimeShift {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    off_set: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
