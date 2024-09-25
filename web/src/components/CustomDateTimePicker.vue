@@ -1,6 +1,6 @@
 <template>
-    <div class="flex items-center q-mr-sm">
-        <div
+    <div v-if="props.alertPage" class="flex items-center q-mr-sm">
+        <div 
           data-test="scheduled-alert-period-title"
           class="text-bold q-py-md flex items-center"
           style="width: 190px"
@@ -118,6 +118,8 @@
       </q-menu>
 
       <q-btn
+
+      v-if="props.alertPage"
                 data-test="custom-date-picker-delete-btn"
                 :icon="outlinedDelete"
                 class=" q-mb-sm q-ml-xs q-mr-sm"
@@ -133,6 +135,7 @@
     </div>
 
     <q-btn
+    v-if="props.alertPage"
       data-test="alert-conditions-add-condition-btn"
       icon="add"
       label="Add"
