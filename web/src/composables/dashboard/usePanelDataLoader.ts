@@ -773,7 +773,7 @@ export const usePanelDataLoader = (
         let variableValue = "";
         if (Array.isArray(variable.value)) {
           const value = variable.value
-            .map((value: any) => `'${escapeSingleQuotes(value)}'`)
+            .map((value: any) => `'${value}'`)
             .join(",");
           const possibleVariablesPlaceHolderTypes = [
             {
@@ -816,9 +816,7 @@ export const usePanelDataLoader = (
             );
           });
         } else {
-          variableValue = escapeSingleQuotes(
-            variable.value === null ? "" : variable.value,
-          );
+          variableValue = variable.value === null ? "" : variable.value;
           if (query.includes(variableName)) {
             metadata.push({
               type: "variable",
