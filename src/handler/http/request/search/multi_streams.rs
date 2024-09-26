@@ -145,7 +145,7 @@ pub async fn search_multi(
     };
 
     // handle encoding for query and aggs
-    let mut multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
+    let multi_req: search::MultiStreamRequest = match json::from_slice(&body) {
         Ok(v) => v,
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));

@@ -358,7 +358,6 @@ impl Alert {
                 .evaluate_scheduled(
                     &self.get_stream_params(),
                     &self.trigger_condition,
-                    &self.query_condition,
                     start_time,
                 )
                 .await

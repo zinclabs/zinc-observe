@@ -812,7 +812,7 @@ where
 }
 
 impl MultiStreamRequest {
-    pub fn to_query_req(&mut self) -> Vec<Request> {
+    pub fn to_query_req(&self) -> Vec<Request> {
         let mut res = vec![];
         for query in &self.sql {
             let query_fn = if query.is_old_format {

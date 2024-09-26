@@ -41,6 +41,54 @@ pub struct TriggerCondition {
     pub timezone: Option<String>,
 }
 
+#[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+pub struct CompareHistoricData {
+    #[serde(rename = "offSet")]
+    pub offset: String,
+    // pub unit: TimeRange,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+pub enum TimeRange {
+    #[default]
+    #[serde(rename = "m")]
+    Minutes,
+    #[serde(rename = "h")]
+    Hours,
+    #[serde(rename = "d")]
+    Days,
+    #[serde(rename = "w")]
+    Weeks,
+    #[serde(rename = "M")]
+    Months,
+}
+
+impl std::fmt::Display for TimeRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TimeRange::Minutes => write!(f, "m"),
+            TimeRange::Hours => write!(f, "h"),
+            TimeRange::Days => write!(f, "d"),
+            TimeRange::Weeks => write!(f, "w"),
+            TimeRange::Months => write!(f, "M"),
+        }
+    }
+}
+
+impl TryFrom<&str> for TimeRange {
+    type Error = &'static str;
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        Ok(match s.to_lowercase().as_str() {
+            "m" => TimeRange::Minutes,
+            "h" => TimeRange::Hours,
+            "d" => TimeRange::Days,
+            "w" => TimeRange::Weeks,
+            "M" => TimeRange::Months,
+            _ => return Err("invalid timerange unit"),
+        })
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub enum FrequencyType {
     #[serde(rename = "cron")]
@@ -64,6 +112,8 @@ pub struct QueryCondition {
     pub vrl_function: Option<String>,
     #[serde(default)]
     pub search_event_type: Option<SearchEventType>,
+    #[serde(default)]
+    pub multi_time_range: Option<Vec<CompareHistoricData>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]

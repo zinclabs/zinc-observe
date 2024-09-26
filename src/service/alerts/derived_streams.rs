@@ -187,12 +187,7 @@ impl DerivedStreamMeta {
             self.query_condition.evaluate_realtime(row).await
         } else {
             self.query_condition
-                .evaluate_scheduled(
-                    &self.source,
-                    &self.trigger_condition,
-                    &self.query_condition,
-                    start_time,
-                )
+                .evaluate_scheduled(&self.source, &self.trigger_condition, start_time)
                 .await
         }
     }

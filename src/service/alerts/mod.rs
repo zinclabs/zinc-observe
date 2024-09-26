@@ -18,7 +18,7 @@ use arrow_schema::DataType;
 use chrono::{Duration, Utc};
 use config::{
     get_config, ider,
-    meta::search::SearchEventType,
+    meta::search::{SearchEventType, SqlQuery},
     utils::{
         base64,
         json::{Map, Value},
@@ -71,7 +71,6 @@ impl QueryCondition {
         &self,
         stream_param: &StreamParams,
         trigger_condition: &TriggerCondition,
-        query_condition: &QueryCondition,
         start_time: Option<i64>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
         let now = Utc::now().timestamp_micros();
@@ -176,63 +175,163 @@ impl QueryCondition {
             }
         };
 
-        // fire the query
-        let req = config::meta::search::Request {
-            query: config::meta::search::Query {
-                sql: sql.clone(),
-                from: 0,
-                size: if self.search_event_type.is_some() {
-                    -1
-                } else {
-                    std::cmp::max(100, trigger_condition.threshold)
-                },
-                start_time: if let Some(start_time) = start_time {
-                    start_time
-                } else {
-                    now - Duration::try_minutes(trigger_condition.period)
-                        .unwrap()
-                        .num_microseconds()
-                        .unwrap()
-                },
-                end_time: now,
-                sort_by: None,
-                quick_mode: false,
-                query_type: "".to_string(),
-                track_total_hits: false,
-                uses_zo_fn: false,
-                query_fn: if query_condition.vrl_function.is_some() {
-                    match base64::decode_url(query_condition.vrl_function.as_ref().unwrap()) {
-                        Ok(query_fn) => Some(query_fn),
-                        Err(e) => {
-                            return Err(anyhow::anyhow!(
-                                "Error decoding alert vrl query function: {e}" /* TODO: update
-                                                                                * error msg */
-                            ));
-                        }
-                    }
-                } else {
-                    None
-                },
-                skip_wal: false,
-            },
-            encoding: config::meta::search::RequestEncoding::Empty,
-            regions: vec![],
-            clusters: vec![],
-            timeout: 0,
-            search_type: Some(SearchEventType::Alerts), /* TODO(taiming): change the name to
-                                                         * scheduled & inform FE */
-            index_type: "".to_string(),
+        let mut time_diff = Duration::try_minutes(trigger_condition.period)
+            .unwrap()
+            .num_microseconds()
+            .unwrap();
+        let start_time = if let Some(start_time) = start_time {
+            time_diff = now - start_time;
+            Some(start_time)
+        } else {
+            Some(now - time_diff)
+        };
+        let size = if self.search_event_type.is_some() {
+            -1
+        } else {
+            std::cmp::max(100, trigger_condition.threshold)
         };
         let trace_id = ider::uuid();
-        let resp = match SearchService::search(
-            &trace_id,
-            &stream_param.org_id,
-            stream_param.stream_type,
-            None,
-            &req,
-        )
-        .await
+
+        let resp = if self.multi_time_range.is_some()
+            && !self.multi_time_range.as_ref().unwrap().is_empty()
         {
+            let req = config::meta::search::MultiStreamRequest {
+                sql: {
+                    let mut sqls =
+                        Vec::with_capacity(self.multi_time_range.as_ref().unwrap().len() + 1);
+                    sqls.push(SqlQuery {
+                        sql: sql.clone(),
+                        start_time,
+                        end_time: Some(now),
+                        query_fn: None,
+                        is_old_format: false,
+                    });
+                    for timerange in self.multi_time_range.as_ref().unwrap() {
+                        let (offset, unit) = timerange.offset.split_at(timerange.offset.len() - 1);
+                        // Default is 1 if parsing fails
+                        let offset = offset.parse::<i64>().unwrap_or(1);
+                        let end_time = match unit {
+                            "h" => {
+                                now - Duration::try_hours(offset)
+                                    .unwrap()
+                                    .num_microseconds()
+                                    .unwrap()
+                            }
+                            "d" => {
+                                now - Duration::try_days(offset)
+                                    .unwrap()
+                                    .num_microseconds()
+                                    .unwrap()
+                            }
+                            "w" => {
+                                now - Duration::try_weeks(offset)
+                                    .unwrap()
+                                    .num_microseconds()
+                                    .unwrap()
+                            }
+                            "M" => {
+                                now - Duration::try_days(offset * 30)
+                                    .unwrap()
+                                    .num_microseconds()
+                                    .unwrap()
+                            }
+                            // Default to minutes
+                            _ => {
+                                now - Duration::try_minutes(offset)
+                                    .unwrap()
+                                    .num_microseconds()
+                                    .unwrap()
+                            }
+                        };
+                        sqls.push(SqlQuery {
+                            sql: sql.clone(),
+                            start_time: Some(end_time - time_diff),
+                            end_time: Some(end_time),
+                            query_fn: None,
+                            is_old_format: false,
+                        });
+                    }
+                    sqls
+                },
+                encoding: config::meta::search::RequestEncoding::Empty,
+                regions: vec![],
+                clusters: vec![],
+                timeout: 0,
+                search_type: Some(SearchEventType::Alerts),
+                from: 0,
+                size,
+                start_time: 0, // ignored
+                end_time: 0,   // ignored
+                sort_by: None,
+                quick_mode: false,
+                track_total_hits: false,
+                query_type: "".to_string(),
+                uses_zo_fn: false,
+                query_fn: self.vrl_function.clone(),
+                skip_wal: false,
+                index_type: "".to_string(),
+                per_query_response: false, // Will return results in single array
+            };
+
+            SearchService::search_multi(
+                &trace_id,
+                &stream_param.org_id,
+                stream_param.stream_type,
+                None,
+                &req,
+            )
+            .await
+        } else {
+            // fire the query
+            let req = config::meta::search::Request {
+                query: config::meta::search::Query {
+                    sql: sql.clone(),
+                    from: 0,
+                    size,
+                    start_time: start_time.unwrap(),
+                    end_time: now,
+                    sort_by: None,
+                    quick_mode: false,
+                    query_type: "".to_string(),
+                    track_total_hits: false,
+                    uses_zo_fn: false,
+                    query_fn: if self.vrl_function.is_some() {
+                        match base64::decode_url(self.vrl_function.as_ref().unwrap()) {
+                            Ok(query_fn) => Some(query_fn),
+                            Err(e) => {
+                                return Err(anyhow::anyhow!(
+                                    "Error decoding alert vrl query function: {e}" /* TODO: update
+                                                                                    * error msg */
+                                ));
+                            }
+                        }
+                    } else {
+                        None
+                    },
+                    skip_wal: false,
+                },
+                encoding: config::meta::search::RequestEncoding::Empty,
+                regions: vec![],
+                clusters: vec![],
+                timeout: 0,
+                search_type: Some(SearchEventType::Alerts), /* TODO(taiming): change the name to
+                                                             * scheduled & inform FE */
+                index_type: "".to_string(),
+            };
+            SearchService::search(
+                &trace_id,
+                &stream_param.org_id,
+                stream_param.stream_type,
+                None,
+                &req,
+            )
+            .await
+        };
+
+        // Resp hits can be of two types -
+        // 1. Vec<Map<String, Value>> - for normal alert
+        // 2. Vec<Vec<Map<String, Value>>> - for multi_time_range alert
+        let resp = match resp {
             Ok(v) => {
                 if v.is_partial {
                     return Err(anyhow::anyhow!("{}", v.function_error));
@@ -251,7 +350,11 @@ impl QueryCondition {
         let records: Option<Vec<Map<String, Value>>> = Some(
             resp.hits
                 .iter()
-                .map(|hit| hit.as_object().unwrap().clone())
+                .map(|hit| match hit {
+                    Value::Object(hit) => hit.clone(),
+                    // TODO: Handle nested array for multirange alert
+                    _ => Map::new(),
+                })
                 .collect(),
         );
         if self.search_event_type.is_none() {
