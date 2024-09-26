@@ -16,6 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- src/components/PipelineFlow.vue -->
 <template>
+  <div class="container">
+     <div v-show="pipelineObj.dirtyFlag" class="warning-text">
+     Unsaved changes detected. Click "Save" to preserve your updates.
+   </div>
+   
+ </div>
 
     <VueFlow
     @drop="onDrop"
@@ -53,6 +59,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CustomNode :id="id" :data="data" io_type="default" />
       </template>
       <Controls 
+      :showInteractive=false
+
       class="controls-grp"
         position="top-left">
     </Controls>
@@ -61,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onActivated, watch } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { ControlButton, Controls } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
@@ -76,6 +84,8 @@ import "@vue-flow/core/dist/theme-default.css";
 import '@vue-flow/controls/dist/style.css'
 
 import { useStore } from "vuex";
+const { onInit } = useVueFlow();
+
 export default {
   components: { VueFlow, CustomNode, DropzoneBackground, Controls,ControlButton
    },
@@ -93,15 +103,23 @@ export default {
       pipelineObj,
     } = useDragAndDrop();
     const store = useStore();
+
 const  buttonClass = () => {
       return this.theme === 'dark' ? 'dark-theme' : 'light-theme';
     };
     const { setViewport } = useVueFlow()
-    onMounted(() => {
+
+
+
+watch(() => pipelineObj.currentSelectedPipeline, (newVal, oldVal) => {
       if (vueFlowRef.value) {
-        vueFlowRef.value.fitView({ padding: 10, includeHiddenNodes: true });
+       vueFlowRef.value.fitView({ padding: 1});
+      }
+      if(pipelineObj.dirtyFlag){
+        pipelineObj.dirtyFlag = false;
       }
     });
+
     
 function resetTransform() {
   setViewport({ x: 0, y: 0, zoom: 1 })

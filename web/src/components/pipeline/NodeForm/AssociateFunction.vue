@@ -124,8 +124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
           />
           <q-btn
-            v-if="isUpdating"
-            data-test="associate-function-delete-btn"
+          v-if="pipelineObj.isEditNode"
+          data-test="associate-function-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
             color="negative"
@@ -205,7 +205,7 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 
-const { addNode, pipelineObj } = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode } = useDragAndDrop();
 
 const addFunctionRef: any = ref(null);
 
@@ -253,6 +253,10 @@ onBeforeMount(() => {
 });
 
 const openCancelDialog = () => {
+  if(createNewFunction.value == true || !selectedFunction.value === (props.functionData?.name || "")) {
+    createNewFunction.value = false;
+    return;
+  }
   if (
     selectedFunction.value === (props.functionData?.name || "")
   ) {
@@ -320,7 +324,8 @@ const saveUpdatedLink = (link: { from: string; to: string }) => {
 };
 
 const deleteFunction = () => {
-  
+  deletePipelineNode (pipelineObj.currentSelectedNodeID);
+
   emit("cancel:hideform");
 };
 </script>

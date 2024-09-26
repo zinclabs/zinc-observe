@@ -68,31 +68,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @validate-sql="validateSqlQuery"
             class="q-mt-sm"
           />
-
-          <div class="q-mt-md">
-            <div class="text-bold">{{ t("alerts.additionalVariables") }}</div>
-            <variables-input
-              class="o2-input"
-              :variables="streamRoute.context_attributes"
-              @add:variable="addVariable"
-              @remove:variable="removeVariable"
-            />
-          </div>
         </div>
 
         <div
           class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
-        <q-btn
-            data-test="stream-routing-cancel-btn"
-            :label="t('alerts.delete')"
-            padding="sm md"
-            class="text-bold no-border q-mx-md "
-            color="negative"
-            no-caps
-            @click="openCancelDialog"
-          />
       
           <q-btn
             data-test="stream-routing-cancel-btn"
@@ -113,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
           />
           <q-btn
-            v-if="isUpdating"
+          v-if="pipelineObj.isEditNode"
             data-test="stream-routing-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
@@ -243,7 +224,7 @@ const isAggregationEnabled = ref(false);
 
 const queryFormRef = ref<any>(null);
 
-const { addNode, pipelineObj } = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
 
 const nodeLink = ref({
   from: "",
@@ -386,7 +367,9 @@ const saveQueryData = async () => {
   }
 
   try {
+    await validateSqlQuery();
     await validateSqlQueryPromise.value;
+
   } catch (e) {
     return false;
   }
@@ -435,21 +418,23 @@ const openDeleteDialog = () => {
 };
 
 const deleteRoute = () => {
-  emit("delete:node", {
-    data: {
-      ...props.editingRoute,
-      name: props.editingRoute.name,
-    },
-    type: "streamRoute",
-  });
+  // emit("delete:node", {
+  //   data: {
+  //     ...props.editingRoute,
+  //     name: props.editingRoute.name,
+  //   },
+  //   type: "streamRoute",
+  // });
 
-  emit("delete:node", {
-    data: {
-      ...props.editingRoute,
-      name: props.editingRoute.name + ":" + "condition",
-    },
-    type: "condition",
-  });
+  // emit("delete:node", {
+  //   data: {
+  //     ...props.editingRoute,
+  //     name: props.editingRoute.name + ":" + "condition",
+  //   },
+  //   type: "condition",
+  // });
+  deletePipelineNode (pipelineObj.currentSelectedNodeID);
+
 
   emit("cancel:hideform");
 };
@@ -470,6 +455,7 @@ const removeVariable = (variable: any) => {
 };
 
 const validateSqlQuery = () => {
+
   const query = buildQueryPayload({
     sqlMode: true,
     streamName: streamRoute.value.name as string,
@@ -478,6 +464,7 @@ const validateSqlQuery = () => {
   delete query.aggs;
 
   query.query.sql = streamRoute.value.query_condition.sql;
+
 
   validateSqlQueryPromise.value = new Promise((resolve, reject) => {
     searchService
@@ -504,6 +491,7 @@ const validateSqlQuery = () => {
         resolve("");
       });
   });
+
 };
 </script>
 

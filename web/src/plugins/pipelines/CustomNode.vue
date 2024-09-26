@@ -221,7 +221,7 @@ function getIcon(data, ioType) {
             text-overflow: ellipsis;
           "
         >
-          {{ data.stream_type }} - {{ data.stream_name.label }}
+          {{ data.stream_type }} -{{   data.stream_name.label }}
         </div>
       </div>
       <div class="float-right tw-pl-2">

@@ -780,7 +780,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="scheduled-alert-period-warning-text"
             v-else
             class="text-primary q-pt-xs"
-            style="font-size: 12px; line-height: 12px"
+            style="font-size: 12px; line-height: 12px ;padding: 8px 0px;"
           >
             Note: The period should be the same as the cron expression.
           </div>
@@ -948,6 +948,7 @@ const removeField = (field: any) => {
 
 const updateQueryValue = (value: string) => {
   query.value = value;
+  console.log(value,"value in editor")
 
   if (tab.value === "sql") emits("update:sql", value);
   if (tab.value === "promql") emits("update:promql", value);
@@ -1172,7 +1173,8 @@ const filterFunctionOptions = (val: string, update: any) => {
 
 const onBlurQueryEditor = () => {
   queryEditorPlaceholderFlag.value = true;
-  emits("validate-sql");
+
+  // emits("validate-sql");
 };
 
 const validateInputs = (notify: boolean = true) => {

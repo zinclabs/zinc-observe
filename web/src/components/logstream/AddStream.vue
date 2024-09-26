@@ -142,7 +142,7 @@ const streamTypes = [
   { label: "Traces", value: "traces" },
 ];
 
-const emits = defineEmits(["streamAdded", "close"]);
+const emits = defineEmits(["streamAdded", "close","added:stream-aded"]);
 
 const { addStream, getStream, getUpdatedSettings } = useStreams();
 
@@ -231,6 +231,8 @@ const saveStream = async () => {
         timeout: 4000,
       });
     });
+
+    emits("added:stream-aded", streamInputs.value);
 };
 
 const getStreamPayload = () => {

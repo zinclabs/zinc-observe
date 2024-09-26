@@ -128,7 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else class="pipeline-add-stream">
         <AddStream
         ref="addStreamRef"
-        @streamAdded="getLogStream"
+        @added:stream-aded="getLogStream"
+
          />
       </div>
       </q-form>
@@ -176,7 +177,7 @@ const streams: any = ref({});
 const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
 const stream_name = ref(pipelineObj.currentSelectedNodeData?.data.stream_name);
-const stream_type = ref("logs");
+const stream_type = ref(pipelineObj.currentSelectedNodeData?.data.stream_type || "logs"); ;
 const selectedNodeType = ref(pipelineObj.currentSelectedNodeData.io_type)
 watch(stream_name, async (newVal) => {
   console.log(stream_name.value, "stream_name");
@@ -230,8 +231,19 @@ const updateStreams = () => {
   // pipelineObj.currentSelectedNodeData.data.stream_type = stream_type.value;
   
 };
-const getLogStream = () =>{
-  console.log("this is done")
+const getLogStream = (data) =>{
+  // pipelineObj.currentSelectedNodeData.data.stream_name = data.name;
+  // pipelineObj.currentSelectedNodeData.data.stream_type = data.stream_type;
+  stream_name.value = {label: data.name, value: data.name, isDisable: false};
+  stream_type.value = data.stream_type;
+  // stream_name.value = data.name;
+  // stream_type.value = data.stream_type;
+
+
+  if(createNewStream.value){
+    createNewStream.value = false;
+    return;
+  }
 }
 
 

@@ -267,7 +267,8 @@ const isValidStreamName = computed(() => {
 
 const updateStreamFields = async (streamName, streamType) => {
   let streamCols: any = [];
-  const streams: any = await getStream(streamName.value, streamType, true);
+  const streams: any = await getStream(streamName, streamType, true);
+  console.log(streamName, "updateStreamFields");
 
   if (streams && Array.isArray(streams.schema)) {
     streamCols = streams.schema.map((column: any) => ({

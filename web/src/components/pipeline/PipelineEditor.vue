@@ -143,12 +143,15 @@ import {
   computed,
   defineAsyncComponent,
   onBeforeMount,
+  onMounted,
   ref,
   type Ref,
 } from "vue";
 import { getImageURL } from "@/utils/zincutils";
 import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.vue";
 import functionsService from "@/services/jstransform";
+import { VueFlow, useVueFlow } from "@vue-flow/core";
+
 import { useStore } from "vuex";
 import pipelineService from "@/services/pipelines";
 import { useRouter } from "vue-router";
@@ -168,11 +171,18 @@ const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
+const { onInit } = useVueFlow();
 
 const PipelineFlow = defineAsyncComponent(
   () => import("@/plugins/pipelines/PipelineFlow.vue"),
 
 );
+
+onInit((vueFlowInstance) => {
+  console.log("this is triggered every tme")
+  // instance is the same as the return of `useVueFlow`
+  vueFlowInstance.fitView({ padding: 1})
+})
 
 interface Routing {
   [key: string]: RouteCondition[];
@@ -258,7 +268,6 @@ const pipeline = ref<Pipeline>({
 });
 
 const router = useRouter();
-
 const store = useStore();
 
 const confirmDialogMeta: any = ref({
@@ -268,6 +277,7 @@ const confirmDialogMeta: any = ref({
   data: null,
   onConfirm: () => {},
 });
+
 
 const nodeTypes: any = [
   {
