@@ -147,13 +147,14 @@ import { useRouter } from "vue-router";
 import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import { useRoute } from "vue-router";
-import { updateDashboard } from "../../utils/commons";
+import { updateDashboard, getDashboard } from "../../utils/commons";
 import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
+import { onMounted } from "vue";
 
 const ViewPanel = defineAsyncComponent(() => {
   return import("@/components/dashboards/viewPanel/ViewPanel.vue");
@@ -369,6 +370,11 @@ export default defineComponent({
 
     // save the dashboard value
     const saveDashboard = async () => {
+      if (isDataChanged.value) {
+        showErrorNotification("Data has changed, cannot save.");
+        return;
+      }
+
       try {
         await updateDashboard(
           store,
@@ -379,15 +385,58 @@ export default defineComponent({
         );
 
         showPositiveNotification("Dashboard updated successfully");
+
+        initialDashboardData.value = JSON.parse(
+          JSON.stringify(props.dashboardData),
+        );
+        isDataChanged.value = false;
       } catch (error: any) {
         showErrorNotification(error?.message ?? "Dashboard update failed", {
           timeout: 2000,
         });
-
-        // refresh dashboard
         refreshDashboard();
       }
     };
+
+    const initialDashboardData = ref(null);
+
+    const isDataChanged = ref(false);
+
+    const fetchDashboardData = async () => {
+      try {
+        initialDashboardData.value = await getDashboard(
+          store,
+          route.query.dashboard,
+          route.query.folder ?? "default",
+        );
+        console.log(
+          "Fetched initial dashboard data:",
+          initialDashboardData.value,
+        );
+      } catch (error) {
+        showErrorNotification("Failed to load dashboard data", {
+          timeout: 2000,
+        });
+      }
+    };
+
+    const checkIfDataChanged = () => {
+      isDataChanged.value =
+        JSON.stringify(initialDashboardData.value) !==
+        JSON.stringify(props.dashboardData);
+    };
+
+    watch(
+      () => props.dashboardData,
+      () => {
+        checkIfDataChanged();
+      },
+      { deep: true },
+    );
+
+    onMounted(() => {
+      fetchDashboardData();
+    });
 
     //add panel
     const addPanelData = () => {
@@ -401,13 +450,28 @@ export default defineComponent({
       });
     };
 
-    const movedEvent = async (i, newX, newY) => {
-      await saveDashboard();
-    };
-
+    // Handle the resize event and save the dashboard if needed
     const resizedEvent = async (i, newX, newY, newHPx, newWPx) => {
       window.dispatchEvent(new Event("resize"));
-      await saveDashboard();
+
+      // Prevent save if data has changed
+      if (isDataChanged.value) {
+        console.log("Data has changed, skipping save");
+        showErrorNotification("Cannot save because data has changed.");
+        return false; // Stop further execution if data has changed
+      } else {
+        console.log("No changes, proceeding with save");
+        await saveDashboard();
+      }
+    };
+
+    // Handle the move event and save the dashboard if needed
+    const movedEvent = async (i, newX, newY) => {
+      if (isDataChanged.value) {
+        return; // Don't save if there are no changes
+      } else {
+        await saveDashboard();
+      }
     };
 
     const getDashboardLayout: any = (panels: any) => {
