@@ -256,7 +256,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-show="showSearchHistory">
       <search-history
+      ref="searchHistoryRef"
         @closeSearchHistory="closeSearchHistoryfn"
+        :isClicked="showSearchHistory"
+
         />
     </div>
   </q-page>
@@ -436,6 +439,7 @@ export default defineComponent({
     const router = useRouter();
     const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
+    const searchHistoryRef = ref(null);
     let {
       searchObj,
       getQueryData,
@@ -842,6 +846,7 @@ export default defineComponent({
       }
     };
     const showSearchHistoryfn = () => {
+
       router.push({
           name: "logs",
           query: {
@@ -850,6 +855,8 @@ export default defineComponent({
           },
         });
       showSearchHistory.value = true;
+
+
     }
 
     function removeFieldByName(data, fieldName) {

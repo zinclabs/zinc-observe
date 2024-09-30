@@ -142,6 +142,10 @@
       NoData,
     },
     props: {
+      isClicked: {
+        type: Boolean,
+        default: false,
+      },
     },
     emits: ['closeSearchHistory'],
     methods: {
@@ -413,9 +417,13 @@
         },
       });
     };
-      onMounted(() => {
-        fetchSearchHistory(); 
-      })
+
+
+      watch(() => props.isClicked, (value) => {
+        if(value == true){
+          fetchSearchHistory();
+        }
+      });
       return {
         searchObj,
         store,
