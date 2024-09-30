@@ -632,17 +632,6 @@ export default defineComponent({
         }
       },
     );
-
-    watch(
-      () => router.currentRoute.value.query,
-      
-      (type, prev) => {
-        if(prev.hasOwnProperty("action") && prev.action == "history"){
-          searchObj.meta.refreshHistogram = true;
-          refreshHistogramChart();
-        }
-      },
-    );
     watch(
       ()=> router.currentRoute.value.query,
       ()=>{
@@ -1083,7 +1072,7 @@ export default defineComponent({
     const closeSearchHistoryfn = () => {
       router.back();
       showSearchHistory.value = false;
-      searchObj.meta.refreshHistogram = true;
+      refreshHistogramChart();
     };
 
     // watch for changes in the visualize toggle
