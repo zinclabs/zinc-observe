@@ -3688,7 +3688,6 @@ const useLogs = () => {
       if(router.currentRoute.value.query.hasOwnProperty("type") &&  router.currentRoute.value.query.type == "search_history_re_apply"){
        delete router.currentRoute.value.query.type;
         }   
-        console.log(router.currentRoute.value.query,"query")   // searchObj.data.histogram.chartParams.title = ""
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
@@ -3806,7 +3805,6 @@ const useLogs = () => {
     }
 
     searchObj.shouldIgnoreWatcher = false;
-    console.log(queryParams, "queryParams");
     if(queryParams.hasOwnProperty("type") &&  queryParams.type == "search_history_re_apply"){
       delete queryParams.type;
     }
