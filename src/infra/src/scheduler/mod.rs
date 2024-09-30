@@ -116,6 +116,7 @@ pub struct Trigger {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_time: Option<i64>,
     pub retries: i32,
+    #[serde(default)]
     pub data: String,
 }
 
