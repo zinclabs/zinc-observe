@@ -617,7 +617,9 @@ export default defineComponent({
 
     watch(
       () => router.currentRoute.value.query.type,
+      
       (type, prev) => {
+
         if (
 
           searchObj.shouldIgnoreWatcher == false &&
@@ -654,6 +656,8 @@ export default defineComponent({
           searchObj.data.stream.selectedStream.value = router.currentRoute.value.query.stream;
           searchObj.data.stream.streamType = router.currentRoute.value.query.stream_type;
           resetSearchObj();
+          searchObj.data.queryResults.hits = [];
+          searchObj.meta.searchApplied = false;
           resetStreamData();
           restoreUrlQueryParams();
           // loadLogsData();
