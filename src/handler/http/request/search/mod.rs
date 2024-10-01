@@ -1558,23 +1558,6 @@ pub async fn search_history(
         }
     };
 
-    search_res.hits = search_res
-        .hits
-        .into_iter()
-        .filter_map(|hit| match SearchHistoryHitResponse::try_from(hit) {
-            Ok(response) => match serde_json::to_value(response) {
-                Ok(json_value) => Some(json_value),
-                Err(e) => {
-                    log::error!("[trace_id {}] Serialization error: {:?}", trace_id, e);
-                    None
-                }
-            },
-            Err(e) => {
-                log::error!("[trace_id {}] Deserialization error: {:?}", trace_id, e);
-                None
-            }
-        })
-        .collect::<Vec<_>>();
     search_res.trace_id = trace_id.clone();
 
     // report http metrics
