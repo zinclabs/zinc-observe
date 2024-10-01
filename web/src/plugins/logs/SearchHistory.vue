@@ -383,7 +383,7 @@
 
 
       watch(() => props.isClicked, (value) => {
-        if(value == true){
+        if(value == true && !isLoading.value){
           fetchSearchHistory();
         }
       });
