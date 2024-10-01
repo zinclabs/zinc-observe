@@ -24,7 +24,7 @@ use config::{
         search::SearchEventType,
         sql::resolve_stream_names,
         stream::StreamType,
-        usage::{RequestStats, UsageType},
+        usage::{RequestStats, UsageType, USAGE_STREAM},
     },
     metrics,
     utils::{base64, json},
@@ -1486,7 +1486,7 @@ pub async fn search_history(
     req.user_email = user_id.clone();
 
     // Search
-    let stream_name = "usage";
+    let stream_name = USAGE_STREAM;
     let search_query_req = match req.to_query_req(stream_name, &cfg.common.column_timestamp) {
         Ok(r) => r,
         Err(e) => {
@@ -1522,7 +1522,7 @@ pub async fn search_history(
         .with_label_values(&[&org_id])
         .dec();
 
-    let history_org_id = "_meta";
+    let history_org_id = &cfg.common.usage_org;
     let stream_type = StreamType::Logs;
     let search_res = SearchService::search(
         &trace_id,
@@ -1595,7 +1595,7 @@ pub async fn search_history(
     let num_fn = search_query_req.query.query_fn.is_some() as u16;
     report_request_usage_stats(
         req_stats,
-        &org_id,
+        history_org_id,
         stream_name,
         StreamType::Logs,
         UsageType::SearchHistory,
