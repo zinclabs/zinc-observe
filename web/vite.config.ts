@@ -134,7 +134,6 @@ export default defineConfig({
     target: "es2020",
     chunkSizeWarningLimit: 3000,
     rollupOptions: {
-      external: ["@openobserve/node-sql-parser/build/DatafusionSQL"],
       plugins: [
         nodePolyfills(),
         visualizer({
