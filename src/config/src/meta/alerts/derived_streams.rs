@@ -17,7 +17,7 @@ use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::meta::{
+use crate::meta::{
     alerts::{QueryCondition, TriggerCondition},
     stream::StreamParams,
 };

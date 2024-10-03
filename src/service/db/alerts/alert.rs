@@ -15,12 +15,12 @@
 
 use std::sync::Arc;
 
-use config::{meta::stream::StreamType, utils::json};
-
-use crate::{
-    common::{infra::config::STREAM_ALERTS, meta::alerts::alert::Alert},
-    service::db,
+use config::{
+    meta::{alerts::alert::Alert, stream::StreamType},
+    utils::json,
 };
+
+use crate::{common::infra::config::STREAM_ALERTS, service::db};
 
 pub async fn get(
     org_id: &str,

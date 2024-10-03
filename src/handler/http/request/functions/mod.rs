@@ -16,12 +16,9 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use config::meta::function::{StreamOrder, Transform};
 
-use crate::common::{
-    meta,
-    meta::functions::{StreamOrder, Transform},
-    utils::http::get_stream_type_from_request,
-};
+use crate::common::{meta, utils::http::get_stream_type_from_request};
 
 /// CreateFunction
 #[utoipa::path(

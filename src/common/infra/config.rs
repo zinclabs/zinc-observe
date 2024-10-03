@@ -15,7 +15,13 @@
 
 use std::sync::Arc;
 
-use config::{RwAHashMap, RwHashMap};
+use config::{
+    meta::{
+        alerts::{alert::Alert, destinations::Destination, templates::Template},
+        function::{StreamFunctionsList, Transform},
+    },
+    RwAHashMap, RwHashMap,
+};
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
@@ -24,15 +30,8 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
-        alerts::{alert::Alert, destinations::Destination, templates::Template},
-        dashboards::reports,
-        functions::{StreamFunctionsList, Transform},
-        maxmind::MaxmindClient,
-        organization::OrganizationSetting,
-        pipelines::PipeLine,
-        prom::ClusterLeader,
-        syslog::SyslogRoute,
-        user::User,
+        dashboards::reports, maxmind::MaxmindClient, organization::OrganizationSetting,
+        pipelines::PipeLine, prom::ClusterLeader, syslog::SyslogRoute, user::User,
     },
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,

@@ -16,15 +16,15 @@
 use std::collections::HashMap;
 
 use config::{
-    meta::stream::{RoutingCondition, StreamType},
+    meta::{
+        alerts::derived_streams::DerivedStreamMeta,
+        function::StreamFunctionsList,
+        stream::{RoutingCondition, StreamType},
+    },
     utils::json::Value,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use crate::common::meta::{
-    alerts::derived_streams::DerivedStreamMeta, functions::StreamFunctionsList,
-};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct PipeLine {

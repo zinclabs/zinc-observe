@@ -25,7 +25,13 @@ use config::{
     get_config,
     ider::SnowflakeIdGenerator,
     meta::{
-        stream::{PartitionTimeLevel, PartitioningDetails, Routing, StreamPartition, StreamType},
+        alerts::alert::Alert,
+        function::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
+        pipeline::PipelineParams,
+        stream::{
+            PartitionTimeLevel, PartitioningDetails, Routing, StreamParams, StreamPartition,
+            StreamType,
+        },
         usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
     },
     utils::{flatten, json::*},
@@ -41,21 +47,16 @@ use vrl::{
     prelude::state,
 };
 
-use super::usage::publish_triggers_usage;
+use super::{pipeline::execution::PipelinedExt, usage::publish_triggers_usage};
 use crate::{
     common::{
         infra::config::{
             REALTIME_ALERT_TRIGGERS, STREAM_ALERTS, STREAM_FUNCTIONS, STREAM_PIPELINES,
         },
-        meta::{
-            alerts::alert::Alert,
-            functions::{StreamTransform, VRLResultResolver, VRLRuntimeConfig},
-            ingestion::IngestionRequest,
-            stream::{SchemaRecords, StreamParams},
-        },
+        meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::functions::get_vrl_compiler_config,
     },
-    service::{db, format_partition_key},
+    service::{alerts::alert::AlertExt, db, format_partition_key},
 };
 
 pub mod grpc;
@@ -182,6 +183,38 @@ pub async fn get_stream_partition_keys(
     PartitioningDetails {
         partition_keys: stream_settings.partition_keys,
         partition_time_level: stream_settings.partition_time_level,
+    }
+}
+
+pub async fn get_stream_pipeline_params(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: &StreamType,
+) -> Option<PipelineParams> {
+    let stream_params = StreamParams::new(org_id, stream_name, *stream_type);
+    let pipeline = infra::pipeline::get_by_stream(org_id, &stream_params)
+        .await
+        .ok();
+    match pipeline {
+        Some(pl) => {
+            let node_map = pl.get_node_map();
+            match (
+                pl.build_adjacency_list(&node_map),
+                pl.register_functions().await,
+            ) {
+                (Ok(graph), Ok(vrl_map)) => Some((pl, node_map, graph, vrl_map)),
+                _ => {
+                    log::error!(
+                        "[Pipeline] {}/{}/{}: Error prep pipeline execution parameters. Skip pipeline execution",
+                        pl.org,
+                        pl.name,
+                        pl.id,
+                    );
+                    None
+                }
+            }
+        }
+        None => None,
     }
 }
 

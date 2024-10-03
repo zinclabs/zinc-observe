@@ -63,6 +63,18 @@ impl StreamType {
             StreamType::Logs | StreamType::Metrics | StreamType::Traces
         )
     }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            StreamType::Logs => "logs",
+            StreamType::Metrics => "metrics",
+            StreamType::Traces => "traces",
+            StreamType::EnrichmentTables => "enrichment_tables",
+            StreamType::Filelist => "file_list",
+            StreamType::Metadata => "metadata",
+            StreamType::Index => "index",
+        }
+    }
 }
 
 impl From<&str> for StreamType {
@@ -106,6 +118,53 @@ impl std::fmt::Display for StreamType {
             StreamType::Index => write!(f, "index"),
         }
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(default)]
+pub struct StreamParams {
+    pub org_id: faststr::FastStr,
+    pub stream_name: faststr::FastStr,
+    pub stream_type: StreamType,
+}
+
+impl Default for StreamParams {
+    fn default() -> Self {
+        Self {
+            org_id: String::default().into(),
+            stream_name: String::default().into(),
+            stream_type: StreamType::default(),
+        }
+    }
+}
+
+impl std::fmt::Display for StreamParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}/{}/{}",
+            self.org_id, self.stream_name, self.stream_type
+        )
+    }
+}
+
+impl StreamParams {
+    pub fn new(org_id: &str, stream_name: &str, stream_type: StreamType) -> Self {
+        Self {
+            org_id: org_id.to_string().into(),
+            stream_name: stream_name.to_string().into(),
+            stream_type,
+        }
+    }
+
+    pub fn is_valid(&self) -> bool {
+        !(self.org_id.is_empty() || self.stream_name.is_empty())
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct ListStreamParams {
+    pub list: Vec<StreamParams>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
@@ -752,7 +811,7 @@ pub struct RoutingCondition {
 }
 // Code Duplicated from alerts
 impl RoutingCondition {
-    pub async fn evaluate(&self, row: &Map<String, Value>) -> bool {
+    pub fn evaluate(&self, row: &Map<String, Value>) -> bool {
         let val = match row.get(&self.column) {
             Some(val) => val,
             None => {
@@ -932,5 +991,20 @@ mod tests {
         assert_eq!(part.get_partition_key("test1"), "field=25");
         assert_eq!(part.get_partition_key("test2"), "field=4");
         assert_eq!(part.get_partition_key("test3"), "field=2");
+    }
+
+    #[test]
+    fn test_stream_params() {
+        let params = StreamParams::new("org_id", "stream_name", StreamType::Logs);
+        let param2 = StreamParams::new("org_id", "stream_name", StreamType::Logs);
+        let param3 = StreamParams::new("org_id", "stream_name", StreamType::Index);
+        assert_eq!(params.org_id, "org_id");
+        assert_eq!(params.stream_name, "stream_name");
+        assert_eq!(params.stream_type, StreamType::Logs);
+        let mut map = HashMap::new();
+        map.insert(params, 1);
+        map.insert(param2, 2);
+        map.insert(param3, 2);
+        assert_eq!(map.len(), 2);
     }
 }

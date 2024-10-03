@@ -114,9 +114,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::organization::watch().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::ofga::watch().await });
-    if LOCAL_NODE.is_ingester() {
-        tokio::task::spawn(async move { db::pipelines::watch().await });
-    }
 
     #[cfg(feature = "enterprise")]
     if !LOCAL_NODE.is_compactor() || LOCAL_NODE.is_single_node() {
@@ -160,9 +157,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     db::syslog::cache_syslog_settings()
         .await
         .expect("syslog settings cache failed");
-    if LOCAL_NODE.is_ingester() {
-        db::pipelines::cache().await.expect("syslog cache failed");
-    }
 
     // cache file list
     if !cfg.common.meta_store_external {

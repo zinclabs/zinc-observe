@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::json;
-
-use crate::common::meta::functions::ZoFunction;
+use config::{meta::function::ZoFunction, utils::json};
 
 pub(crate) mod arr_descending_udf;
 pub(crate) mod arrcount_udf;

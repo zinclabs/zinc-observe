@@ -31,7 +31,8 @@ pub mod metrics;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
 pub mod organization;
-pub mod pipelines;
+pub mod pipeline;
+pub mod pipelines_v1; // left for migration purposes. To be deprecated
 pub mod saved_view;
 pub mod scheduler;
 pub mod schema;

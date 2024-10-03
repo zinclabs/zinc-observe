@@ -13,11 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::stream::StreamParams;
 use infra::errors::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
-
-use crate::common::meta::stream::StreamParams;
 
 pub mod alerts;
 pub mod compact;
@@ -35,7 +34,7 @@ pub mod logs;
 pub mod metadata;
 pub mod metrics;
 pub mod organization;
-pub mod pipelines;
+pub mod pipeline;
 pub mod promql;
 pub mod schema;
 pub mod search;

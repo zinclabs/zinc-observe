@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::Utc;
-use config::{meta::stream::StreamType, utils::json};
+use config::{
+    meta::{
+        alerts::{alert::Alert, destinations::Destination, templates::Template},
+        stream::StreamType,
+    },
+    utils::json,
+};
 use datafusion::arrow::datatypes::Schema;
 use infra::{
     db::{self as infra_db, NO_NEED_WATCH},
@@ -32,10 +38,7 @@ use o2_enterprise::enterprise::openfga::authorizer::authz::get_ownership_tuple;
 use crate::{
     common::{
         infra::config::VERSION,
-        meta::{
-            alerts::{alert::Alert, destinations::Destination, templates::Template},
-            dashboards::reports::Report,
-        },
+        meta::dashboards::reports::Report,
         utils::auth::{into_ofga_supported_format, is_ofga_unsupported},
     },
     service::db,

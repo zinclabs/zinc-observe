@@ -15,13 +15,10 @@
 
 use std::sync::Arc;
 
-use config::utils::json;
+use config::{meta::alerts::destinations::Destination, utils::json};
 use itertools::Itertools;
 
-use crate::{
-    common::{infra::config::ALERTS_DESTINATIONS, meta::alerts::destinations::Destination},
-    service::db,
-};
+use crate::{common::infra::config::ALERTS_DESTINATIONS, service::db};
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error> {
     let map_key = format!("{org_id}/{name}");

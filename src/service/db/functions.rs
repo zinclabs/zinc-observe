@@ -15,13 +15,13 @@
 
 use std::sync::Arc;
 
-use config::utils::json;
+use config::{
+    meta::function::{StreamFunctionsList, Transform},
+    utils::json,
+};
 
 use crate::{
-    common::{
-        infra::config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS},
-        meta::functions::{StreamFunctionsList, Transform},
-    },
+    common::infra::config::{QUERY_FUNCTIONS, STREAM_FUNCTIONS},
     service::db,
 };
 

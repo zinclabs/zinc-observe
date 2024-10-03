@@ -22,7 +22,8 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
-        stream::{PartitioningDetails, StreamType},
+        alerts::alert::Alert,
+        stream::{PartitioningDetails, StreamParams, StreamType},
         usage::UsageType,
     },
     metrics,
@@ -40,13 +41,13 @@ use prost::Message;
 use crate::{
     common::meta::{
         self,
-        alerts::alert::Alert,
         http::HttpResponse as MetaHttpResponse,
         prom::{self, MetricType, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-        stream::{SchemaRecords, StreamParams},
+        stream::SchemaRecords,
     },
     handler::http::request::CONTENT_TYPE_JSON,
     service::{
+        alerts::alert::AlertExt,
         db, format_stream_name,
         ingestion::{evaluate_trigger, get_val_for_attr, write_file, TriggerAlertData},
         metrics::{format_label_name, get_exclude_labels, otlp_grpc::handle_grpc_request},

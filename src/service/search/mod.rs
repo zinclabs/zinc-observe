@@ -23,7 +23,7 @@ use config::{
         cluster::RoleGroup,
         search,
         sql::OrderBy,
-        stream::{FileKey, StreamPartition, StreamType},
+        stream::{FileKey, StreamPartition, StreamParams, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,
@@ -62,8 +62,7 @@ use {
 
 use super::usage::report_request_usage_stats;
 use crate::{
-    common::{infra::cluster as infra_cluster, meta::stream::StreamParams},
-    handler::grpc::request::search::Searcher,
+    common::infra::cluster as infra_cluster, handler::grpc::request::search::Searcher,
     service::format_partition_key,
 };
 

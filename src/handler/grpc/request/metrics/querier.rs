@@ -16,7 +16,7 @@
 use arrow::ipc::writer::StreamWriter;
 use config::{
     ider,
-    meta::stream::{FileKey, FileMeta, StreamType},
+    meta::stream::{FileKey, FileMeta, StreamParams, StreamType},
     metrics,
     utils::{
         file::{get_file_contents, scan_files},
@@ -30,7 +30,7 @@ use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{
-    common::{infra::wal, meta::stream::StreamParams},
+    common::infra::wal,
     handler::grpc::{
         cluster_rpc::{
             metrics_server::Metrics, MetricsQueryRequest, MetricsQueryResponse, MetricsWalFile,

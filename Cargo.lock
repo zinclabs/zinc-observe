@@ -2122,6 +2122,7 @@ dependencies = [
  "datafusion",
  "dotenv_config",
  "dotenvy",
+ "faststr",
  "fst",
  "futures",
  "get_if_addrs",
@@ -2147,6 +2148,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sqlparser",
+ "sqlx",
  "svix-ksuid",
  "sysinfo",
  "tokio",
@@ -2154,6 +2156,7 @@ dependencies = [
  "tracing-log",
  "tracing-subscriber",
  "utoipa",
+ "vrl",
  "zstd",
 ]
 

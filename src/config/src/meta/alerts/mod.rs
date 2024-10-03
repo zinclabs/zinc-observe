@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::search::SearchEventType, utils::json::Value};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use crate::{meta::search::SearchEventType, utils::json::Value};
 
 pub mod alert;
 pub mod derived_streams;

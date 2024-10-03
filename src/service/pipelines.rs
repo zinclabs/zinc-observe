@@ -19,16 +19,21 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use config::meta::{search::SearchEventType, stream::StreamType};
+use config::meta::{
+    search::SearchEventType,
+    stream::{StreamParams, StreamType},
+};
 
 use super::db;
-use crate::common::{
-    infra::config::STREAM_FUNCTIONS,
-    meta::{
-        http::HttpResponse as MetaHttpResponse,
-        pipelines::{PipeLine, PipeLineList},
-        stream::StreamParams,
+use crate::{
+    common::{
+        infra::config::STREAM_FUNCTIONS,
+        meta::{
+            http::HttpResponse as MetaHttpResponse,
+            pipelines::{PipeLine, PipeLineList},
+        },
     },
+    service::alerts::derived_streams::DerivedStreamMetaExt,
 };
 
 #[tracing::instrument(skip(pipeline))]

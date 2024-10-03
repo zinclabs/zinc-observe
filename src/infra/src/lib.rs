@@ -18,6 +18,7 @@ pub mod db;
 pub mod dist_lock;
 pub mod errors;
 pub mod file_list;
+pub mod pipeline;
 pub mod queue;
 pub mod scheduler;
 pub mod schema;
@@ -29,6 +30,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     file_list::create_table().await?;
     file_list::LOCAL_CACHE.create_table().await?;
     file_list::local_cache_gc().await?;
+    pipeline::init().await?;
     queue::init().await?;
     scheduler::init().await?;
     schema::init().await?;

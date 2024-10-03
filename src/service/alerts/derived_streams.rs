@@ -15,46 +15,27 @@
 
 use std::str::FromStr;
 
+use async_trait::async_trait;
 use chrono::Utc;
 use config::{
     get_config,
+    meta::{
+        alerts::{FrequencyType, QueryType},
+        pipeline::components::DerivedStream,
+    },
     utils::json::{Map, Value},
 };
 use cron::Schedule;
-use hashbrown::HashMap;
 
-use crate::{
-    common::{
-        meta::{
-            // authz::Authz,
-            alerts::{derived_streams::DerivedStreamMeta, FrequencyType, QueryType},
-        },
-        // utils::auth::{remove_ownership, set_ownership},
-    },
-    service::db,
-};
+use crate::service::{alerts::QueryConditionExt, db};
 
 pub async fn save(
-    mut derived_stream: DerivedStreamMeta,
+    mut derived_stream: DerivedStream,
     pipeline_name: &str,
+    pipeline_id: &str,
 ) -> Result<(), anyhow::Error> {
-    derived_stream.name = derived_stream.name.trim().to_string();
     // 1. Start validate DerivedStream
-    if !derived_stream.is_valid() {
-        return Err(anyhow::anyhow!(
-            "DerivedStream Name, destination, and Trigger period required"
-        ));
-    }
-
-    // query_type for realtime
-    if derived_stream.is_real_time && derived_stream.query_condition.query_type != QueryType::Custom
-    {
-        return Err(anyhow::anyhow!(
-            "Realtime DerivedStream should use Custom query type"
-        ));
-    }
-
-    // other checks for query type
+    // checks for query type
     match derived_stream.query_condition.query_type {
         QueryType::SQL => {
             if derived_stream
@@ -82,22 +63,7 @@ pub async fn save(
             }
         }
         _ => {}
-    }
-
-    // check source stream schema
-    let schema = infra::schema::get(
-        &derived_stream.source.org_id,
-        &derived_stream.source.stream_name,
-        derived_stream.source.stream_type,
-    )
-    .await?;
-    if schema.fields().is_empty() {
-        return Err(anyhow::anyhow!(
-            "Source Stream {}/{} schema is empty.",
-            derived_stream.source.org_id,
-            derived_stream.source.stream_name,
-        ));
-    }
+    };
     // End input validation
 
     // 2. update the frequency
@@ -110,17 +76,8 @@ pub async fn save(
             std::cmp::max(1, get_config().limit.derived_stream_schedule_interval / 60);
     }
 
-    // 3. clean up DerivedStream context attributes
-    if let Some(attrs) = &derived_stream.context_attributes {
-        let mut new_attrs = HashMap::with_capacity(attrs.len());
-        for (key, val) in attrs.iter() {
-            new_attrs.insert(key.trim().to_string(), val.to_string());
-        }
-        derived_stream.context_attributes = Some(new_attrs);
-    }
-
     // test derived_stream
-    if let Err(e) = &derived_stream.evaluate(None, None).await {
+    if let Err(e) = &derived_stream.evaluate(None).await {
         return Err(anyhow::anyhow!(
             "DerivedStream not saved due to failed test run caused by {}",
             e.to_string()
@@ -130,11 +87,11 @@ pub async fn save(
     // Save the trigger to db
     let next_run_at = Utc::now().timestamp_micros();
     let trigger = db::scheduler::Trigger {
-        org: derived_stream.source.org_id.to_string(),
+        org: derived_stream.org_id.to_string(),
         module: db::scheduler::TriggerModule::DerivedStream,
-        module_key: derived_stream.get_scheduler_module_key(pipeline_name),
+        module_key: derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id),
         next_run_at,
-        is_realtime: derived_stream.is_real_time,
+        is_realtime: false,
         is_silenced: false,
         ..Default::default()
     };
@@ -150,50 +107,50 @@ pub async fn save(
 }
 
 pub async fn delete(
-    derived_stream: DerivedStreamMeta,
+    derived_stream: DerivedStream,
     pipeline_name: &str,
+    pipeline_id: &str,
 ) -> Result<(), anyhow::Error> {
     db::scheduler::delete(
-        &derived_stream.source.org_id,
+        &derived_stream.org_id,
         db::scheduler::TriggerModule::DerivedStream,
-        &derived_stream.get_scheduler_module_key(pipeline_name),
+        &derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id),
     )
     .await
     .map_err(|e| anyhow::anyhow!("Error deleting derived stream trigger: {e}"))
 }
 
-impl DerivedStreamMeta {
-    pub fn is_valid(&self) -> bool {
-        !self.name.is_empty()
-            && !self.is_real_time // TODO(taiming): support realtime DerivedStream
-            && self.source.is_valid()
-            && self.destination.is_valid()
-            && self.trigger_condition.period != 0
-    }
+#[async_trait]
+pub trait DerivedStreamExt: Sync + Send + 'static {
+    fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String;
+    async fn evaluate(
+        &self,
+        start_time: Option<i64>,
+    ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
+}
 
-    pub fn get_scheduler_module_key(&self, pipeline_name: &str) -> String {
+#[async_trait]
+impl DerivedStreamExt for DerivedStream {
+    fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String {
         format!(
             "{}/{}/{}/{}",
-            self.source.stream_type, self.source.stream_name, pipeline_name, self.name
+            self.stream_type, self.org_id, pipeline_name, pipeline_id
         )
     }
 
-    pub async fn evaluate(
+    async fn evaluate(
         &self,
-        row: Option<&Map<String, Value>>,
         start_time: Option<i64>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error> {
-        if self.is_real_time {
-            self.query_condition.evaluate_realtime(row).await
-        } else {
-            self.query_condition
-                .evaluate_scheduled(
-                    &self.source,
-                    &self.trigger_condition,
-                    &self.query_condition,
-                    start_time,
-                )
-                .await
-        }
+        self.query_condition
+            .evaluate_scheduled(
+                &self.org_id,
+                None,
+                self.stream_type,
+                &self.trigger_condition,
+                &self.query_condition,
+                start_time,
+            )
+            .await
     }
 }
