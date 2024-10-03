@@ -392,10 +392,10 @@
             hit.end_time = timestampToTimezoneDate(hit.end_time / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
             hit.rawTook = hit.took;
             hit.took  = formatTime(hit.took);
-            hit.scan_records = hit.scan_records;
             hit.rawScanRecords = hit.scan_records;
-            hit.scan_size = hit.scan_size + hit.unit;
+            hit.scan_records = hit.scan_records;
             hit.rawScanSize = hit.scan_size;
+            hit.scan_size = hit.scan_size + hit.unit;
             hit.cached_ratio = hit.cached_ratio;
             hit.rawCachedRatio = hit.cached_ratio;
             hit.sql = hit.sql;
@@ -420,7 +420,7 @@
         
 
       };
-
+    //this method needs to revamped / can be made shorter
       const   sortMethod = (rows, sortBy, descending) => {
         const data = [...rows];
         if(sortBy === 'duration'){
@@ -442,13 +442,6 @@
           }
           // console.log(data.sort((a, b) => a.rawScanRecords - b.rawScanRecords), "data")
           return data.sort((a, b) => a.rawScanRecords - b.rawScanRecords);
-        }
-        if(sortBy === "scan_size"){
-          if (descending) {
-            return data.sort((a, b) => b.rawScanSize - a.rawScanSize);
-          }
-          // console.log(data.sort((a, b) => a.rawScanRecords - b.rawScanRecords), "data")
-          return data.sort((a, b) => a.rawScanSize - b.rawScanSize);
         }
         if(sortBy === "scan_size"){
           if (descending) {
