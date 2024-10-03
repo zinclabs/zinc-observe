@@ -813,7 +813,7 @@ const useLogs = () => {
         //   return false;
         // }
 
-        if (parsedSQL.limit != null) {
+        if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
           req.query.size = parsedSQL.limit.value[0].value;
 
           if (parsedSQL.limit.seperator == "offset") {
@@ -1053,7 +1053,7 @@ const useLogs = () => {
   }
 
   const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !parsedSQL?.limit;
+    return !parsedSQL?.limit || parsedSQL?.limit.value.length == 0;
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -2078,7 +2078,7 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
-        if (parsedSQL.limit != null) {
+        if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
           //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
