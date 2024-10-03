@@ -147,7 +147,7 @@
       </div>
       <div v-if="props.row?.function" class="text-left q-mb-sm tw-px-2 expanded-content">
         <div class="tw-flex tw-items-center q-py-sm ">
-        <strong >Function Defination : <span>  <q-btn
+        <strong >Function Definition : <span>  <q-btn
             @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
             size="xs"
             dense
@@ -674,7 +674,7 @@
  <style lang="scss" scoped >
 .expanded-content {
   padding: 0  3rem;
-  min-width: 100vh;
+  min-width: 100vw;
   max-height: 100vh; /* Set a fixed height for the container */
   overflow: hidden; /* Hide overflow by default */
 }
