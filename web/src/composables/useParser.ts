@@ -1,8 +1,6 @@
-import DatafusionSQL from "@openobserve/node-sql-parser/build/DatafusionSQL";
 const useParser = () => {
   const sqlParser = async () => {
-    console.log(DatafusionSQL, "DatafusionSQL");
-    const Parser: any = DatafusionSQL.Parser;
+    const Parser: any = await import("@openobserve/node-sql-parser/build/datafusionsql");
 
     if (Parser) {
       return new Parser.default.Parser();
