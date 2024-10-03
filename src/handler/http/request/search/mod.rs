@@ -21,7 +21,7 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        search::SearchEventType,
+        search::{SearchEventType, SearchHistoryHitResponse},
         sql::resolve_stream_names,
         stream::StreamType,
         usage::{RequestStats, UsageType, USAGE_STREAM},
@@ -1435,7 +1435,7 @@ pub async fn search_partition(
                 "stream_type": "logs",
                 "took": 0.056222333,
                 "trace_id": "7f7898fd19424c47ba830a6fa9b25e1f",
-                "user_email": "root@example.com"
+                "function": ".",
                 },
             ],
             "total": 3,
@@ -1557,6 +1557,24 @@ pub async fn search_history(
             });
         }
     };
+
+    search_res.hits = search_res
+        .hits
+        .into_iter()
+        .filter_map(|hit| match SearchHistoryHitResponse::try_from(hit) {
+            Ok(response) => match serde_json::to_value(response) {
+                Ok(json_value) => Some(json_value),
+                Err(e) => {
+                    log::error!("[trace_id {}] Serialization error: {:?}", trace_id, e);
+                    None
+                }
+            },
+            Err(e) => {
+                log::error!("[trace_id {}] Deserialization error: {:?}", trace_id, e);
+                None
+            }
+        })
+        .collect::<Vec<_>>();
 
     search_res.trace_id = trace_id.clone();
 

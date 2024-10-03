@@ -446,6 +446,14 @@ pub struct SearchHistoryHitResponse {
     pub response_time: f64,
     pub cached_ratio: i64,
     pub trace_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub function: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub _timestamp: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event: Option<String>,
 }
 
 impl TryFrom<json::Value> for SearchHistoryHitResponse {
@@ -502,6 +510,19 @@ impl TryFrom<json::Value> for SearchHistoryHitResponse {
                 .and_then(|v| v.as_str())
                 .ok_or("trace_id missing".to_string())?
                 .to_string(),
+            function: value
+                .get("function")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string()),
+            _timestamp: value.get("_timestamp").and_then(|v| v.as_i64()),
+            unit: value
+                .get("unit")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string()),
+            event: value
+                .get("event")
+                .and_then(|v| v.as_str())
+                .map(|v| v.to_string()),
         })
     }
 }
@@ -993,7 +1014,7 @@ mod search_history_utils {
 
         // Method to build the SQL query
         pub fn build(self, search_stream_name: &str) -> String {
-            let mut query = format!("SELECT * FROM {} WHERE 1=1", search_stream_name);
+            let mut query = format!("SELECT * FROM {} WHERE event='Search'", search_stream_name);
 
             if let Some(org_id) = self.org_id {
                 if !org_id.is_empty() {

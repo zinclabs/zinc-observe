@@ -147,7 +147,7 @@
       </div>
       <div v-if="props.row?.function" class="text-left q-mb-sm tw-px-2 expanded-content">
         <div class="tw-flex tw-items-center q-py-sm ">
-        <strong >Function Defination : <span>  <q-btn
+        <strong >Function Definition : <span>  <q-btn
             @click.stop="copyToClipboard(props.row.function, 'Function Defination')"
             size="xs"
             dense
@@ -383,22 +383,22 @@
            columnsToBeRendered.value = generateColumns(filteredHits);
            filteredHits.forEach((hit:any)=>{
 
-            const {formatted, raw} = calculateDuration(hit.min_ts, hit.max_ts);
+            const {formatted, raw} = calculateDuration(hit.start_time, hit.end_time);
             hit.duration = formatted;
             hit.rawDuration = raw;
-            hit.toBeStoredStartTime = hit.min_ts;
-            hit.toBeStoredEndTime = hit.max_ts;
-            hit.start_time = timestampToTimezoneDate(hit.min_ts / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
-            hit.end_time = timestampToTimezoneDate(hit.max_ts / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
-            hit.rawTook = hit.response_time;
-            hit.took  = formatTime(hit.response_time);
-            hit.scan_records = hit.num_records;
-            hit.rawScanRecords = hit.num_records;
-            hit.scan_size = hit.size + hit.unit;
-            hit.rawScanSize = hit.size;
+            hit.toBeStoredStartTime = hit.start_time;
+            hit.toBeStoredEndTime = hit.end_time;
+            hit.start_time = timestampToTimezoneDate(hit.start_time / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
+            hit.end_time = timestampToTimezoneDate(hit.end_time / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
+            hit.rawTook = hit.took;
+            hit.took  = formatTime(hit.took);
+            hit.rawScanRecords = hit.scan_records;
+            hit.scan_records = hit.scan_records;
+            hit.rawScanSize = hit.scan_size;
+            hit.scan_size = hit.scan_size + hit.unit;
             hit.cached_ratio = hit.cached_ratio;
             hit.rawCachedRatio = hit.cached_ratio;
-            hit.sql = hit.request_body;
+            hit.sql = hit.sql;
             hit.function = hit.function;
             hit.rawExecutedTime = hit._timestamp;
             hit.executed_time =  timestampToTimezoneDate(hit._timestamp / 1000, store.state.timezone, "yyyy-MM-dd HH:mm:ss.SSS");
@@ -420,7 +420,7 @@
         
 
       };
-
+    //this method needs to revamped / can be made shorter
       const   sortMethod = (rows, sortBy, descending) => {
         const data = [...rows];
         if(sortBy === 'duration'){
@@ -442,13 +442,6 @@
           }
           // console.log(data.sort((a, b) => a.rawScanRecords - b.rawScanRecords), "data")
           return data.sort((a, b) => a.rawScanRecords - b.rawScanRecords);
-        }
-        if(sortBy === "scan_size"){
-          if (descending) {
-            return data.sort((a, b) => b.rawScanSize - a.rawScanSize);
-          }
-          // console.log(data.sort((a, b) => a.rawScanRecords - b.rawScanRecords), "data")
-          return data.sort((a, b) => a.rawScanSize - b.rawScanSize);
         }
         if(sortBy === "scan_size"){
           if (descending) {
@@ -681,7 +674,7 @@
  <style lang="scss" scoped >
 .expanded-content {
   padding: 0  3rem;
-  min-width: 100vh;
+  min-width: 100vw;
   max-height: 100vh; /* Set a fixed height for the container */
   overflow: hidden; /* Hide overflow by default */
 }
