@@ -196,7 +196,7 @@ pub async fn get_stream_pipeline_params(
         .await
         .ok();
     match pipeline {
-        Some(pl) => {
+        Some(pl) if pl.enabled => {
             let node_map = pl.get_node_map();
             match (
                 pl.build_adjacency_list(&node_map),
@@ -214,7 +214,7 @@ pub async fn get_stream_pipeline_params(
                 }
             }
         }
-        None => None,
+        _ => None,
     }
 }
 

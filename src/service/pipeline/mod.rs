@@ -199,6 +199,37 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<HttpResponse, Error
 }
 
 #[tracing::instrument]
+pub async fn enable_pipeline(
+    org_id: &str,
+    pipeline_id: &str,
+    value: bool,
+) -> Result<HttpResponse, Error> {
+    let mut pipeline = match db::pipeline::get_by_id(pipeline_id).await {
+        Ok(pipeline) => pipeline,
+        Err(_) => {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                StatusCode::NOT_FOUND.into(),
+                format!("Pipeline with ID {pipeline_id} not found"),
+            )));
+        }
+    };
+
+    pipeline.enabled = value;
+    match db::pipeline::update(pipeline).await {
+        Err(error) => Ok(
+            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                error.to_string(),
+            )),
+        ),
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            format!("Pipeline enabled: {value}"),
+        ))),
+    }
+}
+
+#[tracing::instrument]
 pub async fn delete_pipeline(pipeline_id: &str) -> Result<HttpResponse, Error> {
     let existing_pipeline = match db::pipeline::get_by_id(pipeline_id).await {
         Ok(pipeline) => pipeline,

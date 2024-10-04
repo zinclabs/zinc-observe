@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS pipeline
 (
     id              VARCHAR(256) not null primary key,
     version         INT not null,
+    enabled         BOOLEAN default true not null,
     name            VARCHAR(256) not null,
     description     TEXT,
     org             VARCHAR(100) not null,
@@ -110,12 +111,13 @@ CREATE TABLE IF NOT EXISTS pipeline
                 );
                 sqlx::query(
                     r#"
-INSERT IGNORE INTO pipeline (id, version, name, description, org, source_type, stream_org, stream_name, stream_type, nodes, edges)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT IGNORE INTO pipeline (id, version, enabled, name, description, org, source_type, stream_org, stream_name, stream_type, nodes, edges)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                     "#,
                 )
                 .bind(&pipeline.id)
                 .bind(pipeline.version)
+                .bind(pipeline.enabled)
                 .bind(&pipeline.name)
                 .bind(&pipeline.description)
                 .bind(&pipeline.org)
@@ -136,12 +138,13 @@ INSERT IGNORE INTO pipeline (id, version, name, description, org, source_type, s
                 );
                 sqlx::query(
                     r#"
-INSERT IGNORE INTO pipeline (id, version, name, description, org, source_type, derived_stream, nodes, edges)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT IGNORE INTO pipeline (id, version, enabled, name, description, org, source_type, derived_stream, nodes, edges)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                     "#,
                 )
                 .bind(&pipeline.id)
                 .bind(pipeline.version)
+                .bind(pipeline.enabled)
                 .bind(&pipeline.name)
                 .bind(&pipeline.description)
                 .bind(&pipeline.org)
@@ -182,11 +185,12 @@ INSERT IGNORE INTO pipeline (id, version, name, description, org, source_type, d
                 sqlx::query(
                     r#"
 UPDATE pipeline
-    SET version = ?, name = ?, description = ?, org = ?, source_type = ?, stream_org = ?, stream_name = ?, stream_type = ?, nodes = ?, edges = ?
+    SET version = ?, enabled = ?, name = ?, description = ?, org = ?, source_type = ?, stream_org = ?, stream_name = ?, stream_type = ?, nodes = ?, edges = ?
     WHERE id =?;
                     "#,
                 )
                 .bind(pipeline.version)
+                .bind(pipeline.enabled)
                 .bind(pipeline.name)
                 .bind(pipeline.description)
                 .bind(pipeline.org)
@@ -209,11 +213,12 @@ UPDATE pipeline
                 sqlx::query(
                     r#"
 UPDATE pipeline
-    SET version = ?, name = ?, description = ?, org = ?, source_type = ?, derived_stream = ?, nodes = ?, edges = ?
+    SET version = ?, enabled = ?, name = ?, description = ?, org = ?, source_type = ?, derived_stream = ?, nodes = ?, edges = ?
     WHERE id = ?;
                     "#,
                 )
                 .bind(pipeline.version)
+                .bind(pipeline.enabled)
                 .bind(pipeline.name)
                 .bind(pipeline.description)
                 .bind(pipeline.org)

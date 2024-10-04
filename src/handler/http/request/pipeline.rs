@@ -16,6 +16,7 @@
 use std::io::Error;
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
 
 /// CreatePipeline
@@ -171,4 +172,37 @@ pub async fn update_pipeline(
 ) -> Result<HttpResponse, Error> {
     let pipeline = pipeline.into_inner();
     crate::service::pipeline::update_pipeline(pipeline).await
+}
+
+/// EnablePipeline
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Pipelines",
+    operation_id = "enablePipeline",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("pipeline_id" = String, Path, description = "Pipeline ID"),
+        ("value" = bool, Query, description = "Enable or disable pipeline"),
+    ),
+    responses(
+        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+        (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[put("/{org_id}/pipelines/{pipeline_id}/enable")]
+pub async fn enable_pipeline(
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, pipeline_id) = path.into_inner();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let enable = match query.get("value") {
+        Some(v) => v.parse::<bool>().unwrap_or_default(),
+        None => false,
+    };
+    crate::service::pipeline::enable_pipeline(&org_id, &pipeline_id, enable).await
 }

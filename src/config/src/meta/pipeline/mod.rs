@@ -46,6 +46,8 @@ pub struct Pipeline {
     pub id: String,
     #[serde(default)]
     pub version: i32,
+    #[serde(default = "default_status")]
+    pub enabled: bool,
     #[serde(default)]
     pub org: String, // org this pipeline belongs to. diff from source stream org_id
     pub name: String,
@@ -198,10 +200,12 @@ where
     &'r ::std::primitive::str: ::sqlx::ColumnIndex<R>,
     String: Type<R::Database> + Decode<'r, R::Database>,
     i32: Type<R::Database> + Decode<'r, R::Database>,
+    bool: Type<R::Database> + Decode<'r, R::Database>,
 {
     fn from_row(row: &'r R) -> Result<Self, Error> {
         let id: String = row.try_get("id")?;
         let version: i32 = row.try_get("version")?;
+        let enabled: bool = row.try_get("enabled")?;
         let org: String = row.try_get("org")?;
         let name: String = row.try_get("name")?;
         let description: String = row.try_get("description")?;
@@ -240,6 +244,7 @@ where
         Ok(Pipeline {
             id,
             version,
+            enabled,
             org,
             name,
             description,
@@ -293,6 +298,10 @@ fn dfs_traversal_check(
     }
 
     Ok(())
+}
+
+fn default_status() -> bool {
+    true
 }
 
 #[cfg(test)]

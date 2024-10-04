@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS pipeline
 (
     id              VARCHAR(256) not null primary key,
     version         INT not null,
+    enabled         BOOLEAN default true not null,
     name            VARCHAR(256) not null,
     description     TEXT,
     org             VARCHAR(100) not null,
@@ -107,13 +108,14 @@ CREATE TABLE IF NOT EXISTS pipeline
                 );
                 sqlx::query(
                     r#"
-INSERT INTO pipeline (id, version, name, description, org, source_type, stream_org, stream_name, stream_type, nodes, edges)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+INSERT INTO pipeline (id, version, enabled, name, description, org, source_type, stream_org, stream_name, stream_type, nodes, edges)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     ON CONFLICT DO NOTHING;
                     "#,
                 )
                 .bind(&pipeline.id)
                 .bind(pipeline.version)
+                .bind(pipeline.enabled)
                 .bind(&pipeline.name)
                 .bind(&pipeline.description)
                 .bind(&pipeline.org)
@@ -134,13 +136,14 @@ INSERT INTO pipeline (id, version, name, description, org, source_type, stream_o
                 );
                 sqlx::query(
                     r#"
-INSERT INTO pipeline (id, version, name, description, org, source_type, derived_stream, nodes, edges)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO pipeline (id, version, enabled, name, description, org, source_type, derived_stream, nodes, edges)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     ON CONFLICT DO NOTHING;
                     "#,
                 )
                 .bind(&pipeline.id)
                 .bind(pipeline.version)
+                .bind(pipeline.enabled)
                 .bind(&pipeline.name)
                 .bind(&pipeline.description)
                 .bind(&pipeline.org)
@@ -184,11 +187,12 @@ INSERT INTO pipeline (id, version, name, description, org, source_type, derived_
                 sqlx::query(
                     r#"
 UPDATE pipeline
-    SET version = $1, name = $2, description = $3, org = $4, source_type = $5, stream_org = $6, stream_name = $7, stream_type = $8, nodes = $9, edges = $10
-    WHERE id = $11;
+    SET version = $1, enabled = $2, name = $3, description = $4, org = $5, source_type = $6, stream_org = $7, stream_name = $8, stream_type = $9, nodes = $10, edges = $11
+    WHERE id = $12;
                     "#,
                 )
                 .bind(pipeline.version)
+                .bind(pipeline.enabled)
                 .bind(pipeline.name)
                 .bind(pipeline.description)
                 .bind(pipeline.org)
@@ -211,11 +215,12 @@ UPDATE pipeline
                 sqlx::query(
                     r#"
 UPDATE pipeline
-    SET version = $1, name = $2, description = $3, org = $4, source_type = $5, derived_stream = $6, nodes = $7, edges = $8
-    WHERE id = $9;
+    SET version = $1, enabled = $2, name = $3, description = $4, org = $5, source_type = $6, derived_stream = $7, nodes = $8, edges = $9
+    WHERE id = $10;
                     "#,
                 )
                 .bind(pipeline.version)
+                .bind(pipeline.enabled)
                 .bind(pipeline.name)
                 .bind(pipeline.description)
                 .bind(pipeline.org)
