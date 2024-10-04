@@ -23,7 +23,7 @@ use config::{
         cluster::RoleGroup,
         search,
         sql::OrderBy,
-        stream::{FileKey, StreamPartition, StreamParams, StreamType},
+        stream::{FileKey, StreamParams, StreamPartition, StreamType},
         usage::{RequestStats, UsageType},
     },
     metrics,

@@ -362,6 +362,26 @@ pub async fn logs_json_handler(
                                         crate::service::logs::refactor_map(local_val, fields);
                                 }
 
+                                // add `_original` and '_record_id` if required by StreamSettings
+                                if streams_need_original_set
+                                    .contains(stream_params.stream_name.as_str())
+                                    && original_data.is_some()
+                                {
+                                    local_val.insert(
+                                        ORIGINAL_DATA_COL_NAME.to_string(),
+                                        original_data.clone().unwrap().into(),
+                                    );
+                                    let record_id = crate::service::ingestion::generate_record_id(
+                                        org_id,
+                                        &stream_name,
+                                        &StreamType::Logs,
+                                    );
+                                    local_val.insert(
+                                        ID_COL_NAME.to_string(),
+                                        json::Value::String(record_id.to_string()),
+                                    );
+                                }
+
                                 let function_no = pipeline.num_of_func();
                                 let (ts_data, fn_num) = json_data_by_stream
                                     .entry(stream_params.stream_name.to_string())

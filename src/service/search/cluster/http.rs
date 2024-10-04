@@ -28,10 +28,7 @@ use infra::errors::{Error, ErrorCodes, Result};
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
-use crate::{
-    common::meta::functions::VRLResultResolver,
-    service::search::{cluster::flight, request::Request, sql::Sql},
-};
+use crate::service::search::{cluster::flight, request::Request, sql::Sql};
 
 #[tracing::instrument(name = "service:search:cluster", skip_all)]
 pub async fn search(

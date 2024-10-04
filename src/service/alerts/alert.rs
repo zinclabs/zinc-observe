@@ -350,6 +350,7 @@ pub trait AlertExt: Sync + Send + 'static {
     async fn evaluate(
         &self,
         row: Option<&Map<String, Value>>,
+        start_time: Option<i64>,
     ) -> Result<(Option<Vec<Map<String, Value>>>, i64), anyhow::Error>;
 
     /// Returns a tuple containing a boolean - if all the send notification jobs succeeded
@@ -357,7 +358,9 @@ pub trait AlertExt: Sync + Send + 'static {
     async fn send_notification(
         &self,
         rows: &[Map<String, Value>],
-    ) -> Result<(bool, String), anyhow::Error>;
+        rows_end_time: i64,
+        start_time: Option<i64>,
+    ) -> Result<(String, String), anyhow::Error>;
 }
 
 #[async_trait]
@@ -420,7 +423,7 @@ impl AlertExt for Alert {
         if no_of_error == self.destinations.len() {
             Err(anyhow::anyhow!(err_message))
         } else {
-            Ok((true, "".to_owned()))
+            Ok((success_message, err_message))
         }
     }
 }

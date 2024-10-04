@@ -196,7 +196,13 @@ fn dfs(
                 flattened = true;
             }
             let vrl_runtime = vrl_map.get(current_node_id).unwrap();
-            current_value = apply_vrl_fn(runtime, vrl_runtime, &current_value, org_id, "pipeline");
+            current_value = apply_vrl_fn(
+                runtime,
+                vrl_runtime,
+                &current_value,
+                org_id,
+                &["pipeline".to_string()],
+            );
             // current_node_id must be in graph because a FunctionNode can't be a leaf node
             let next_nodes = graph.get(current_node_id).unwrap();
             process_next_nodes(

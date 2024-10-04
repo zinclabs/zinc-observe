@@ -20,7 +20,7 @@ use config::{
     get_config,
     meta::{
         search::{ScanStats, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamPartition},
+        stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition},
     },
     utils::{
         file::scan_files,
@@ -40,7 +40,7 @@ use infra::{
 use ingester::WAL_PARQUET_METADATA;
 
 use crate::{
-    common::{infra::wal, meta::stream::StreamParams},
+    common::infra::wal,
     service::{
         db, file_list,
         search::{

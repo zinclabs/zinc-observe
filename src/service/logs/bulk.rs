@@ -35,9 +35,9 @@ use config::{
 
 use crate::{
     common::meta::ingestion::{
-            BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus, ID_COL_NAME,
-            ORIGINAL_DATA_COL_NAME,
-        },
+        BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus, ID_COL_NAME,
+        ORIGINAL_DATA_COL_NAME,
+    },
     service::{
         format_stream_name, ingestion::check_ingestion_allowed, pipeline::execution::PipelinedExt,
         schema::get_upto_discard_error,
@@ -123,21 +123,22 @@ pub async fn ingest(
             }];
 
             // Start retrieve associated pipeline and construct pipeline components
-            if let Some((pl, node_map, graph, vrl_map)) =
-                crate::service::ingestion::get_stream_pipeline_params(
-                    org_id,
-                    &stream_name,
-                    &StreamType::Logs,
-                )
-                .await
-            {
-                let pl_destinations = pl.get_all_destination_streams(&node_map, &graph);
-                streams.extend(pl_destinations);
-                stream_pipeline_params
-                    .entry(stream_name.clone())
-                    .or_insert((pl, node_map, graph, vrl_map));
+            if !stream_pipeline_params.contains_key(&stream_name) {
+                if let Some((pl, node_map, graph, vrl_map)) =
+                    crate::service::ingestion::get_stream_pipeline_params(
+                        org_id,
+                        &stream_name,
+                        &StreamType::Logs,
+                    )
+                    .await
+                {
+                    let pl_destinations = pl.get_all_destination_streams(&node_map, &graph);
+                    streams.extend(pl_destinations);
+                    stream_pipeline_params
+                        .insert(stream_name.clone(), (pl, node_map, graph, vrl_map));
+                }
             }
-            // End pipeline construction
+            // End pipeline params construction
 
             crate::service::ingestion::get_uds_and_original_data_streams(
                 &streams,
@@ -154,7 +155,7 @@ pub async fn ingest(
             // 1. original data is not an object -> won't be flattened.
             // 2. no pipeline and current StreamName not in streams_need_original_set
             let original_data = if value.is_object() {
-                if stream_pipeline_params.is_empty()
+                if !stream_pipeline_params.contains_key(&stream_name)
                     && !streams_need_original_set.contains(&stream_name)
                 {
                     None
@@ -220,6 +221,25 @@ pub async fn ingest(
                                 user_defined_schema_map.get(stream_params.stream_name.as_str())
                             {
                                 local_val = crate::service::logs::refactor_map(local_val, fields);
+                            }
+
+                            // add `_original` and '_record_id` if required by StreamSettings
+                            if streams_need_original_set.contains(&stream_name)
+                                && original_data.is_some()
+                            {
+                                local_val.insert(
+                                    ORIGINAL_DATA_COL_NAME.to_string(),
+                                    original_data.clone().unwrap().into(),
+                                );
+                                let record_id = crate::service::ingestion::generate_record_id(
+                                    org_id,
+                                    &stream_name,
+                                    &StreamType::Logs,
+                                );
+                                local_val.insert(
+                                    ID_COL_NAME.to_string(),
+                                    json::Value::String(record_id.to_string()),
+                                );
                             }
 
                             // handle timestamp
@@ -292,16 +312,14 @@ pub async fn ingest(
                 }
 
                 // add `_original` and '_record_id` if required by StreamSettings
-                if streams_need_original_set.contains(&routed_stream_name)
-                    && original_data.is_some()
-                {
+                if streams_need_original_set.contains(&stream_name) && original_data.is_some() {
                     local_val.insert(
                         ORIGINAL_DATA_COL_NAME.to_string(),
                         original_data.unwrap().into(),
                     );
                     let record_id = crate::service::ingestion::generate_record_id(
                         org_id,
-                        &routed_stream_name,
+                        &stream_name,
                         &StreamType::Logs,
                     );
                     local_val.insert(

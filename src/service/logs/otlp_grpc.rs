@@ -35,7 +35,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
 use prost::Message;
 
 use crate::{
-    common::meta::ingestion::{IngestionStatus, StreamStatus},
+    common::meta::ingestion::{IngestionStatus, StreamStatus, ID_COL_NAME, ORIGINAL_DATA_COL_NAME},
     handler::http::request::CONTENT_TYPE_PROTO,
     service::{
         format_stream_name,
@@ -88,9 +88,11 @@ pub async fn handle_grpc_request(
 
     // Start get user defined schema
     let mut user_defined_schema_map: HashMap<String, HashSet<String>> = HashMap::new();
-    crate::service::ingestion::get_user_defined_schema(
+    let mut streams_need_original_set: HashSet<String> = HashSet::new();
+    crate::service::ingestion::get_uds_and_original_data_streams(
         &stream_params,
         &mut user_defined_schema_map,
+        &mut streams_need_original_set,
     )
     .await;
     // End get user defined schema
@@ -185,6 +187,23 @@ pub async fn handle_grpc_request(
                     }
                 };
 
+                // store a copy of original data before it's being transformed and/or flattened,
+                // unless
+                // 1. original data is not an object -> won't be flattened.
+                // 2. no routing and current StreamName not in streams_need_original_set
+                let original_data = if rec.is_object() {
+                    if pipeline_params.is_none()
+                        && !streams_need_original_set.contains(&stream_name)
+                    {
+                        None
+                    } else {
+                        // otherwise, make a copy in case the routed stream needs original data
+                        Some(rec.to_string())
+                    }
+                } else {
+                    None // `item` won't be flattened, no need to store original
+                };
+
                 if let Some((pipeline, pl_node_map, pl_graph, vrl_map)) = pipeline_params.as_ref() {
                     match pipeline.execute(rec, pl_node_map, pl_graph, vrl_map, &mut runtime) {
                         Err(e) => {
@@ -210,27 +229,47 @@ pub async fn handle_grpc_request(
                                         rec,
                                         cfg.limit.ingest_flatten_level,
                                     )?;
-
-                                    // get json object
-                                    let mut local_val = match rec.take() {
-                                        json::Value::Object(v) => v,
-                                        _ => unreachable!(),
-                                    };
-
-                                    if let Some(fields) = user_defined_schema_map
-                                        .get(stream_params.stream_name.as_str())
-                                    {
-                                        local_val =
-                                            crate::service::logs::refactor_map(local_val, fields);
-                                    }
-
-                                    let function_no = pipeline.num_of_func();
-                                    let (ts_data, fn_num) = json_data_by_stream
-                                        .entry(stream_params.stream_name.to_string())
-                                        .or_insert((Vec::new(), None));
-                                    ts_data.push((timestamp, local_val));
-                                    *fn_num = Some(function_no);
                                 }
+
+                                // get json object
+                                let mut local_val = match rec.take() {
+                                    json::Value::Object(v) => v,
+                                    _ => unreachable!(),
+                                };
+
+                                if let Some(fields) =
+                                    user_defined_schema_map.get(stream_params.stream_name.as_str())
+                                {
+                                    local_val =
+                                        crate::service::logs::refactor_map(local_val, fields);
+                                }
+
+                                // add `_original` and '_record_id` if required by StreamSettings
+                                if streams_need_original_set
+                                    .contains(stream_params.stream_name.as_str())
+                                    && original_data.is_some()
+                                {
+                                    local_val.insert(
+                                        ORIGINAL_DATA_COL_NAME.to_string(),
+                                        original_data.clone().unwrap().into(),
+                                    );
+                                    let record_id = crate::service::ingestion::generate_record_id(
+                                        org_id,
+                                        &stream_name,
+                                        &StreamType::Logs,
+                                    );
+                                    local_val.insert(
+                                        ID_COL_NAME.to_string(),
+                                        json::Value::String(record_id.to_string()),
+                                    );
+                                }
+
+                                let function_no = pipeline.num_of_func();
+                                let (ts_data, fn_num) = json_data_by_stream
+                                    .entry(stream_params.stream_name.to_string())
+                                    .or_insert((Vec::new(), None));
+                                ts_data.push((timestamp, local_val));
+                                *fn_num = Some(function_no);
                             }
                         }
                     }
@@ -246,6 +285,23 @@ pub async fn handle_grpc_request(
 
                     if let Some(fields) = user_defined_schema_map.get(&stream_name) {
                         local_val = crate::service::logs::refactor_map(local_val, fields);
+                    }
+
+                    // add `_original` and '_record_id` if required by StreamSettings
+                    if streams_need_original_set.contains(&stream_name) && original_data.is_some() {
+                        local_val.insert(
+                            ORIGINAL_DATA_COL_NAME.to_string(),
+                            original_data.unwrap().into(),
+                        );
+                        let record_id = crate::service::ingestion::generate_record_id(
+                            org_id,
+                            &stream_name,
+                            &StreamType::Logs,
+                        );
+                        local_val.insert(
+                            ID_COL_NAME.to_string(),
+                            json::Value::String(record_id.to_string()),
+                        );
                     }
 
                     let (ts_data, fn_num) = json_data_by_stream

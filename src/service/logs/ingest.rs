@@ -80,7 +80,7 @@ pub async fn ingest(
         &StreamType::Logs,
     )
     .await;
-    // End pipeline construction
+    // End pipeline params construction
 
     if let Some((pl, node_map, graph, _)) = &pipeline_params {
         let pl_destinations = pl.get_all_destination_streams(node_map, graph);
@@ -167,8 +167,7 @@ pub async fn ingest(
         // 1. original data is not an object -> won't be flattened.
         // 2. no pipeline and current StreamName not in streams_need_original_set
         let original_data = if item.is_object() {
-            if pipeline_params.is_some() && !streams_need_original_set.contains(&stream_name)
-            {
+            if pipeline_params.is_none() && !streams_need_original_set.contains(&stream_name) {
                 None
             } else {
                 // otherwise, make a copy in case the routed stream needs original data
@@ -182,7 +181,7 @@ pub async fn ingest(
             match pipeline.execute(item, pl_node_map, pl_graph, vrl_map, &mut runtime) {
                 Err(e) => {
                     log::error!(
-                        "[Pipeline] {}/{}/{}: Execution error: {}. Skip and ingest original",
+                        "[Pipeline] {}/{}/{}: Execution error: {}. Skip this record",
                         pipeline.org,
                         pipeline.name,
                         pipeline.id,
@@ -217,12 +216,12 @@ pub async fn ingest(
                         }
 
                         // add `_original` and '_record_id` if required by StreamSettings
-                        if streams_need_original_set.contains(&stream_name)
+                        if streams_need_original_set.contains(stream_params.stream_name.as_str())
                             && original_data.is_some()
                         {
                             local_val.insert(
                                 ORIGINAL_DATA_COL_NAME.to_string(),
-                                original_data.unwrap().into(),
+                                original_data.clone().unwrap().into(),
                             );
                             let record_id = crate::service::ingestion::generate_record_id(
                                 org_id,

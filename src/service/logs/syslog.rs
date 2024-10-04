@@ -180,6 +180,25 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                         local_val = crate::service::logs::refactor_map(local_val, fields);
                     }
 
+                    // add `_original` and '_record_id` if required by StreamSettings
+                    if streams_need_original_set.contains(stream_params.stream_name.as_str())
+                        && original_data.is_some()
+                    {
+                        local_val.insert(
+                            ORIGINAL_DATA_COL_NAME.to_string(),
+                            original_data.clone().unwrap().into(),
+                        );
+                        let record_id = crate::service::ingestion::generate_record_id(
+                            org_id,
+                            &stream_name,
+                            &StreamType::Logs,
+                        );
+                        local_val.insert(
+                            ID_COL_NAME.to_string(),
+                            json::Value::String(record_id.to_string()),
+                        );
+                    }
+
                     // handle timestamp
                     let timestamp = match handle_timestamp(&mut local_val, min_ts) {
                         Ok(ts) => ts,
