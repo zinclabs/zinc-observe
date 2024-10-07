@@ -213,27 +213,32 @@ pub async fn search(
             let user_id = user_id.clone();
 
             let enter_span = tracing::span::Span::current();
-            let task = tokio::task::spawn(async move {
-                let trace_id = trace_id.clone();
-                req.query.start_time = delta.delta_start_time;
-                req.query.end_time = delta.delta_end_time;
+            let p_span = enter_span.clone();
+            let task = tokio::task::spawn(
+                async move {
+                    let trace_id = trace_id.clone();
+                    req.query.start_time = delta.delta_start_time;
+                    req.query.end_time = delta.delta_end_time;
 
-                let cfg = get_config();
-                if cfg.common.result_cache_enabled
-                    && cfg.common.print_key_sql
-                    && c_resp.has_cached_data
-                {
-                    log::info!(
-                        "[trace_id {trace_id}] Query new start time: {}, end time : {}",
-                        req.query.start_time,
-                        req.query.end_time
-                    );
+                    let cfg = get_config();
+                    if cfg.common.result_cache_enabled
+                        && cfg.common.print_key_sql
+                        && c_resp.has_cached_data
+                    {
+                        log::info!(
+                            "[trace_id {trace_id}] Query new start time: {}, end time : {}",
+                            req.query.start_time,
+                            req.query.end_time
+                        );
+                    }
+
+                    SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
+                        .instrument(p_span)
+                        .await
                 }
+                .instrument(enter_span),
+            );
 
-                SearchService::search(&trace_id, &org_id, stream_type, user_id, &req)
-                    .instrument(enter_span)
-                    .await
-            });
             tasks.push(task);
         }
 
