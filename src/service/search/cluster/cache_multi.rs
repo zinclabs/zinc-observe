@@ -67,6 +67,7 @@ pub async fn get_cached_results(
             "service:search:cluster:cacher:get_cached_results",
             node_id = node.id,
             node_addr = node_addr.as_str(),
+            trace_id = trace_id.as_str(),
         );
         let query_key = query_key.clone();
         let file_path = file_path.clone();
