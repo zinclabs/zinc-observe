@@ -597,7 +597,7 @@
       const query = b64EncodeUnicode(row.sql);
 
       const queryObject = {
-        stream_type: "logs",
+        stream_type: row.stream_type,
         stream,
         period: '15m',
         refresh,
