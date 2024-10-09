@@ -1,6 +1,6 @@
 <template>
     <div
-      :class="store.state.theme === 'dark' ? 'dark-theme-history-page' : 'light-theme-history-page'"
+      :class="store.state.theme === 'dark' ? 'dark-theme-history-page dark-mode' : 'light-theme-history-page'"
       >
   
       <div class="flex tw-justify-between tw-items-center" >
@@ -17,7 +17,12 @@
          Search History
         </div>
         </div>
-        <div class="flex items-center q-py-sm q-pr-md">
+        <div class="flex items-center q-py-sm q-pr-md report-list-tabs">
+          <app-tabs
+                class="q-mr-md"
+                :tabs="tabs"
+                v-model:active-tab="activeTab"
+              />
           <div class="warning-text flex  items-center q-py-xs q-px-sm q-mr-md  ">
             <q-icon name="info" class="q-mr-xs " size="16px" />
              <div>
@@ -232,7 +237,7 @@
   </template>
   <script lang="ts">
   //@ts-nocheck
-  import { ref, watch, onMounted  , nextTick,computed} from 'vue';
+  import { ref, watch, onMounted  , nextTick,computed, reactive} from 'vue';
   import {
     timestampToTimezoneDate , b64EncodeUnicode,convertDateToTimestamp } from "@/utils/zincutils";
   import { useRouter, useRoute } from 'vue-router';
@@ -247,6 +252,7 @@
   import { date , QTable , useQuasar } from 'quasar';
   import type { Ref } from "vue";
   import QTablePagination from "@/components/shared/grid/Pagination.vue";
+  import AppTabs from '@/components/common/AppTabs.vue';
 
   export default defineComponent({
     name: "SearchHistoryComponent",
@@ -254,6 +260,7 @@
       DateTime,
       NoData,
       QTablePagination,
+      AppTabs
     },
     props: {
       isClicked: {
@@ -281,6 +288,26 @@
       const columnsToBeRendered = ref([]);
       const  expandedRow = ref( []); // Array to track expanded rows
       const isLoading = ref(false);
+      const activeTab = ref("all");
+      const tabs = reactive ([
+          {
+            label: 'All',
+            value: "all",
+          },
+          {
+            label: 'Logs',
+            value: "logs",
+          },
+          {
+            label: 'Metrics',
+            value: "metrics",
+          },
+          {
+            label: 'Traces',
+            value: "traces",
+          },
+        ]);
+
 
 
       const perPageOptions: any = [
@@ -665,6 +692,8 @@
         perPageOptions,
         changePagination,
         selectedPerPage,
+        activeTab,
+        tabs,
       };
       // Watch the searchObj for changes
       
@@ -725,6 +754,51 @@ color: #0A7EBC;
 }
 .expanded-function{
   border-left: #0A7EBC 3px solid;
+}
+
+.report-list-tabs {
+    height: fit-content;
+
+    :deep(.rum-tabs) {
+      border: 1px solid #464646;
+    }
+
+    :deep(.rum-tab) {
+      &:hover {
+        background: #464646;
+      }
+
+      &.active {
+        background: #5960b2;
+        color: #ffffff !important;
+      }
+    }
+  }
+
+.report-list-tabs {
+  height: fit-content;
+
+  :deep(.rum-tabs) {
+    border: 1px solid #eaeaea;
+    height: fit-content;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  :deep(.rum-tab) {
+    width: fit-content !important;
+    padding: 4px 12px !important;
+    border: none !important;
+
+    &:hover {
+      background: #eaeaea;
+    }
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
+    }
+  }
 }
 
  </style>
