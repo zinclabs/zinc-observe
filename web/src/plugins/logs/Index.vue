@@ -573,6 +573,7 @@ export default defineComponent({
     });
 
     onBeforeMount(async () => {
+      searchObj.data.stream.streamType = "logs";
       await importSqlParser();
       if (searchObj.meta.logsVisualizeToggle == "logs") {
         // searchObj.loading = true;
