@@ -1106,7 +1106,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;

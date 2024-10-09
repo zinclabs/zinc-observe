@@ -6,7 +6,7 @@
     <div class="flex tw-justify-between tw-items-center" >
       <div class="flex items-center q-py-sm q-pl-md">
         <div
-        data-test="add-alert-back-btn"
+        data-test="alert-history-back-btn"
         class="flex justify-center items-center q-mr-md cursor-pointer"
         style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px;"
         title="Go Back"
@@ -215,7 +215,7 @@ const pagination = {
       field: key,  // Field accessor
       align: "center",
       sortable: true,
-      style: `width: ${columnWidth}px`,  // Custom width for each column
+      style: `width: ${columnWidth}px;`,  // Custom width for each column
     };
   });
 };   
@@ -378,6 +378,8 @@ const pagination = {
 
 
 <style lang="scss" scoped >
+
+
 .info-box {
   display: flex;
   flex-wrap: wrap;
@@ -417,8 +419,19 @@ const pagination = {
   border-radius: 0px;
   font-size: 18px;  
   margin-top: 10px;
-
+  th:last-child,
+  td:last-child {
+    position: relative;
+    z-index: 0 !important;
+    box-shadow: none !important
+  }
 
 }
+
+th:last-child{
+  box-shadow: none !important;
+  background-color: red;
+}
+
 
 </style>
