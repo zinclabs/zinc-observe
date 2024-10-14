@@ -193,6 +193,8 @@ export default defineComponent({
         userInfo: this.userInfo,
       });
 
+      this.VerifyAndCreateUser();
+
       //analytics
       const userId = this.userInfo.email;
 
