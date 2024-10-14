@@ -1517,27 +1517,19 @@ pub async fn search_history(
             let user: meta::user::User =
                 USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
             let stream_type_str = stream_type.to_string();
-            let mut method = "LIST";
-            let stream_name = match req.stream_name {
-                Some(ref name) => {
-                    method = "GET";
-                    name
-                }
-                None => &org_id,
-            };
 
             if user.is_external
                 && !crate::handler::http::auth::validator::check_permissions(
                     &user_id,
                     AuthExtractor {
                         auth: "".to_string(),
-                        method: method.to_string(),
+                        method: "LIST".to_string(),
                         o2_type: format!(
                             "{}_history:{}",
                             OFGA_MODELS
                                 .get(stream_type_str.as_str())
                                 .map_or(stream_type_str.as_str(), |model| model.key),
-                            stream_name
+                            org_id
                         ),
                         org_id: org_id.clone(),
                         bypass_check: false,
