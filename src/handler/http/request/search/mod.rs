@@ -1478,7 +1478,7 @@ pub async fn search_history(
     // stream_type must be specified
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        Err(_) => StreamType::Logs,
     };
 
     let mut req: config::meta::search::SearchHistoryRequest = match json::from_slice(&body) {
@@ -1574,7 +1574,6 @@ pub async fn search_history(
         .dec();
 
     let history_org_id = &cfg.common.usage_org;
-    let stream_type = StreamType::Logs;
     let search_res = SearchService::search(
         &trace_id,
         &cfg.common.usage_org,
