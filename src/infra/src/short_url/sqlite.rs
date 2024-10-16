@@ -51,13 +51,18 @@ impl ShortUrl for SqliteShortUrl {
                     id           INTEGER PRIMARY KEY AUTOINCREMENT,
                     short_id     VARCHAR(32) NOT NULL,
                     original_url VARCHAR(2048) NOT NULL,
-                    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_ts   BIGINT DEFAULT (CAST(strftime('%s', 'now') AS BIGINT) * 1000000)
                 );
                 "#,
         )
         .execute(&*client)
         .await?;
 
+        // release lock
+        drop(client);
+
+        add_created_ts_column().await?;
         Ok(())
     }
 
@@ -256,4 +261,57 @@ impl ShortUrl for SqliteShortUrl {
 
         Ok(())
     }
+}
+
+async fn add_created_ts_column() -> Result<()> {
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
+    let mut tx = client.begin().await?;
+
+    // Check if the created_ts column exists
+    let check_query = r#"
+        PRAGMA table_info(short_urls);
+    "#;
+
+    let columns = sqlx::query_as::<_, (i32, String, String, i32, Option<String>, i32)>(check_query)
+        .fetch_all(&mut *tx)
+        .await?;
+
+    let column_exists = columns.iter().any(|(_, name, ..)| name == "created_ts");
+
+    if !column_exists {
+        log::info!("[SQLITE] Adding created_ts column to short_urls table");
+
+        // Add the created_ts column
+        let alter_query = r#"
+            ALTER TABLE short_urls
+            ADD COLUMN created_ts BIGINT;
+        "#;
+
+        if let Err(e) = sqlx::query(alter_query).execute(&mut *tx).await {
+            log::error!("[SQLITE] Error adding created_ts column: {}", e);
+            return Err(e.into());
+        }
+
+        // Update existing rows with the current timestamp in microseconds
+        let update_query = r#"
+            UPDATE short_urls
+            SET created_ts = CAST(strftime('%s', 'now') AS BIGINT) * 1000000;
+        "#;
+
+        if let Err(e) = sqlx::query(update_query).execute(&mut *tx).await {
+            log::error!("[SQLITE] Error updating created_ts column: {}", e);
+            return Err(e.into());
+        }
+
+        tx.commit().await?;
+        log::info!("[SQLITE] created_ts column successfully added and updated");
+    } else {
+        log::info!("[SQLITE] created_ts column already exists in short_urls table");
+    }
+
+    // release lock
+    drop(client);
+
+    Ok(())
 }
