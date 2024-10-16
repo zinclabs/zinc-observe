@@ -47,10 +47,12 @@ impl ShortUrl for PostgresShortUrl {
                 id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                 short_id VARCHAR(32) NOT NULL,
                 original_url VARCHAR(2048) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_ts BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000000)::BIGINT
             );
             "#;
         sqlx::query(query).execute(&pool).await?;
+        add_created_ts_column().await?;
         Ok(())
     }
 
@@ -215,4 +217,42 @@ impl ShortUrl for PostgresShortUrl {
         sqlx::query(query).bind(&short_ids).execute(&pool).await?;
         Ok(())
     }
+}
+
+async fn add_created_ts_column() -> Result<()> {
+    let pool = CLIENT.clone();
+
+    // Check if the created_ts column exists
+    let check_query = r#"
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name='short_urls'
+                AND column_name='created_ts'
+            );
+        "#;
+
+    let exists: (bool,) = sqlx::query_as(check_query).fetch_one(&pool).await?;
+
+    if !exists.0 {
+        log::info!("[POSTGRES] Adding created_ts column to short_urls table");
+
+        // Column does not exist, so we can add it
+        let alter_query = r#"
+                ALTER TABLE short_urls
+                ADD COLUMN created_ts BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000000)::BIGINT;
+            "#;
+
+        if let Err(e) = sqlx::query(alter_query).execute(&pool).await {
+            log::error!(
+                "[POSTGRES] Unexpected error in adding created_ts column: {}",
+                e
+            );
+            return Err(e.into());
+        }
+    } else {
+        log::info!("[POSTGRES] created_ts column already exists in short_urls table");
+    }
+
+    Ok(())
 }
