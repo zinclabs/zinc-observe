@@ -42,28 +42,28 @@ impl ShortUrl for MysqlShortUrl {
     /// Create table short_urls
     async fn create_table(&self) -> Result<()> {
         let pool = CLIENT.clone();
+        // `created_ts` is unix timestamp in microseconds
         let query = r#"
             CREATE TABLE IF NOT EXISTS short_urls (
                 id BIGINT AUTO_INCREMENT PRIMARY KEY,
                 short_id VARCHAR(32) NOT NULL,
                 original_url VARCHAR(2048) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                created_ts BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP(CURRENT_TIMESTAMP(6)) * 1000000)
+                created_ts BIGINT NOT NULL
             );
         "#;
         sqlx::query(query).execute(&pool).await?;
-        add_created_ts_column().await?;
+        manage_short_urls_schema().await?;
         Ok(())
     }
 
-    /// Create index for short_urls at short_id and original_url
+    /// Create index for short_urls at short_id and created_ts
     async fn create_table_index(&self) -> Result<()> {
         create_index("short_urls_short_id_idx", "short_urls", true, &["short_id"]).await?;
         create_index(
-            "short_urls_created_at_idx",
+            "short_urls_created_ts_idx",
             "short_urls",
             false,
-            &["created_at"],
+            &["created_ts"],
         )
         .await?;
         Ok(())
@@ -72,12 +72,17 @@ impl ShortUrl for MysqlShortUrl {
     /// Add a new entry to the short_urls table
     async fn add(&self, short_id: &str, original_url: &str) -> Result<()> {
         let pool = CLIENT.clone();
-        let query = r#"INSERT INTO short_urls (short_id, original_url) VALUES (?, ?);"#;
+        let created_ts = Utc::now().timestamp_micros();
+
+        let query =
+            r#"INSERT INTO short_urls (short_id, original_url, created_ts) VALUES (?, ?, ?);"#;
         let result = sqlx::query(query)
             .bind(short_id)
             .bind(original_url)
+            .bind(created_ts)
             .execute(&pool)
             .await;
+
         match result {
             Ok(_) => Ok(()),
             Err(sqlx::Error::Database(err)) if err.is_unique_violation() => {
@@ -110,7 +115,7 @@ impl ShortUrl for MysqlShortUrl {
     async fn list(&self, limit: Option<i64>) -> Result<Vec<ShortUrlRecord>> {
         let pool = CLIENT.clone();
         let mut query =
-            r#"SELECT short_id, original_url FROM short_urls ORDER BY id DESC"#.to_string();
+            r#"SELECT short_id, original_url FROM short_urls ORDER BY created_ts DESC"#.to_string();
 
         if limit.is_some() {
             query.push_str(" LIMIT ?");
@@ -177,10 +182,11 @@ impl ShortUrl for MysqlShortUrl {
         limit: Option<i64>,
     ) -> Result<Vec<String>> {
         let pool = CLIENT.clone();
+        let expired_before_ts = expired_before.timestamp_micros();
 
         let mut query = r#"
             SELECT short_id FROM short_urls
-            WHERE created_at < ?
+            WHERE created_ts < ?
             "#
         .to_string();
 
@@ -188,7 +194,7 @@ impl ShortUrl for MysqlShortUrl {
             query.push_str(" LIMIT ?");
         }
 
-        let mut query = sqlx::query_as(&query).bind(expired_before);
+        let mut query = sqlx::query_as(&query).bind(expired_before_ts);
 
         if let Some(limit_value) = limit {
             query = query.bind(limit_value);
@@ -224,35 +230,141 @@ impl ShortUrl for MysqlShortUrl {
     }
 }
 
-async fn add_created_ts_column() -> Result<()> {
+// Main function to manage the schema changes for `short_urls` table.
+//
+// This function performs the following steps:
+// 1. Drops the `created_at` column if it exists.
+// 2. Drops the index on `created_at` if it exists.
+// 3. Adds the `created_ts` column if it doesn't exist.
+async fn manage_short_urls_schema() -> Result<()> {
     let pool = CLIENT.clone();
 
-    // Check if the created_ts column exists
-    let check_query = r#"
-            SELECT COUNT(*)
-            FROM information_schema.columns
-            WHERE table_name = 'short_urls'
-            AND column_name = 'created_ts';
-        "#;
+    drop_column_if_exists(&pool, "created_at").await?;
+    drop_index_if_exists(&pool, "short_urls_created_at_idx").await?;
+    add_created_ts_column_if_not_exists(&pool).await?;
 
-    let exists: (i64,) = sqlx::query_as(check_query).fetch_one(&pool).await?;
+    Ok(())
+}
 
-    if exists.0 == 0 {
+// Checks if a column exists in the `short_urls` table.
+async fn column_exists(pool: &sqlx::Pool<sqlx::MySql>, column_name: &str) -> Result<bool> {
+    let query = format!(
+        r#"
+        SELECT COUNT(*)
+        FROM information_schema.columns
+        WHERE table_name = 'short_urls'
+        AND column_name = '{}';
+        "#,
+        column_name
+    );
+
+    let exists: (i64,) = sqlx::query_as(&query).fetch_one(pool).await?;
+    Ok(exists.0 > 0)
+}
+
+// Drops a column from the `short_urls` table if it exists.
+async fn drop_column_if_exists(pool: &sqlx::Pool<sqlx::MySql>, column_name: &str) -> Result<()> {
+    if column_exists(pool, column_name).await? {
+        log::info!(
+            "[MYSQL] Dropping {} column from short_urls table",
+            column_name
+        );
+
+        let query = format!(
+            r#"
+            ALTER TABLE short_urls
+            DROP COLUMN {};
+            "#,
+            column_name
+        );
+
+        if let Err(e) = sqlx::query(&query).execute(pool).await {
+            log::error!(
+                "[MYSQL] Unexpected error in dropping {} column: {}",
+                column_name,
+                e
+            );
+            return Err(e.into());
+        }
+
+        log::info!("[MYSQL] Successfully dropped {} column", column_name);
+    } else {
+        log::info!(
+            "[MYSQL] {} column does not exist in short_urls table",
+            column_name
+        );
+    }
+
+    Ok(())
+}
+
+// Checks if an index exists on the `short_urls` table.
+async fn index_exists(pool: &sqlx::Pool<sqlx::MySql>, index_name: &str) -> Result<bool> {
+    let query = format!(
+        r#"
+        SELECT COUNT(*)
+        FROM information_schema.statistics
+        WHERE table_name = 'short_urls'
+        AND index_name = '{}';
+        "#,
+        index_name
+    );
+
+    let exists: (i64,) = sqlx::query_as(&query).fetch_one(pool).await?;
+    Ok(exists.0 > 0)
+}
+
+// Drops an index from the `short_urls` table if it exists.
+async fn drop_index_if_exists(pool: &sqlx::Pool<sqlx::MySql>, index_name: &str) -> Result<()> {
+    if index_exists(pool, index_name).await? {
+        log::info!("[MYSQL] Dropping index {} on short_urls table", index_name);
+
+        let query = format!(
+            r#"
+            DROP INDEX {} ON short_urls;
+            "#,
+            index_name
+        );
+
+        if let Err(e) = sqlx::query(&query).execute(pool).await {
+            log::error!(
+                "[MYSQL] Unexpected error in dropping index {}: {}",
+                index_name,
+                e
+            );
+            return Err(e.into());
+        }
+
+        log::info!("[MYSQL] Successfully dropped index {}", index_name);
+    } else {
+        log::info!(
+            "[MYSQL] No index named {} found on short_urls table",
+            index_name
+        );
+    }
+
+    Ok(())
+}
+
+// Adds the `created_ts` column to the `short_urls` table if it doesn't already exist.
+async fn add_created_ts_column_if_not_exists(pool: &sqlx::Pool<sqlx::MySql>) -> Result<()> {
+    if !column_exists(pool, "created_ts").await? {
         log::info!("[MYSQL] Adding created_ts column to short_urls table");
 
-        // Column does not exist, so we can add it
-        let alter_query = r#"
-                ALTER TABLE short_urls
-                ADD COLUMN created_ts BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP(CURRENT_TIMESTAMP(6)) * 1000000);
-            "#;
+        let query = r#"
+            ALTER TABLE short_urls
+            ADD COLUMN created_ts BIGINT NOT NULL;
+        "#;
 
-        if let Err(e) = sqlx::query(alter_query).execute(&pool).await {
+        if let Err(e) = sqlx::query(query).execute(pool).await {
             log::error!(
                 "[MYSQL] Unexpected error in adding created_ts column: {}",
                 e
             );
             return Err(e.into());
         }
+
+        log::info!("[MYSQL] Successfully added created_ts column");
     } else {
         log::info!("[MYSQL] created_ts column already exists in short_urls table");
     }
