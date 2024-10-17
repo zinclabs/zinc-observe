@@ -38,7 +38,7 @@ use crate::{
 pub static CLIENT_RO: Lazy<Pool<Sqlite>> = Lazy::new(connect_ro);
 pub static CLIENT_RW: Lazy<Arc<Mutex<Pool<Sqlite>>>> =
     Lazy::new(|| Arc::new(Mutex::new(connect_rw())));
-static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
+static INDICES: OnceCell<RwLock<HashSet<DBIndex>>> = OnceCell::const_new();
 
 pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
 
@@ -106,18 +106,18 @@ fn connect_ro() -> Pool<Sqlite> {
         .connect_lazy_with(db_opts)
 }
 
-async fn cache_indices() -> HashSet<DBIndex> {
+async fn cache_indices() -> RwLock<HashSet<DBIndex>> {
     let client = CLIENT_RO.clone();
     let sql = r#"SELECT name,tbl_name FROM sqlite_master where type = 'index';"#;
     let res = sqlx::query_as::<_, (String, String)>(sql)
         .fetch_all(&client)
         .await;
     match res {
-        Ok(r) => r
+        Ok(r) => RwLock::new(r
             .into_iter()
             .map(|(name, table)| DBIndex { name, table })
-            .collect(),
-        Err(_) => HashSet::new(),
+            .collect()),
+        Err(_) => RwLock::new(HashSet::new()),
     }
 }
 
@@ -804,12 +804,16 @@ pub async fn create_index(
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
     let indices = INDICES.get_or_init(cache_indices).await;
+
+    let indices = indices.read().await;
     if indices.contains(&DBIndex {
         name: idx_name.into(),
         table: table.into(),
     }) {
         return Ok(());
     }
+    drop(indices);
+
     let unique_str = if unique { "UNIQUE" } else { "" };
     log::info!("[SQLITE] creating index {} on table {}", idx_name, table);
     let sql = format!(
@@ -828,15 +832,28 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
     let indices = INDICES.get_or_init(cache_indices).await;
+
+    let indices = indices.read().await;
     if !indices.contains(&DBIndex {
         name: idx_name.into(),
         table: table.into(),
     }) {
         return Ok(());
     }
+    drop(indices);
+
     log::info!("[SQLITE] deleting index {} on table {}", idx_name, table);
     let sql = format!("DROP INDEX IF EXISTS {};", idx_name);
     sqlx::query(&sql).execute(&*client).await?;
+
+    // delete from cache
+    let mut indices = INDICES.get().unwrap().write().await;
+    indices.remove(&DBIndex {
+        name: idx_name.into(),
+        table: table.into(),
+    });
+    drop(indices);
+
     log::info!("[SQLITE] index {} deleted successfully", idx_name);
     Ok(())
 }
