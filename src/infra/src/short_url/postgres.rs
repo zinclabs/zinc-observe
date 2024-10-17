@@ -74,7 +74,8 @@ impl ShortUrl for PostgresShortUrl {
         let pool = CLIENT.clone();
         let created_ts = Utc::now().timestamp_micros();
 
-        let query = r#"INSERT INTO short_urls (short_id, original_url, created_ts) VALUES ($1, $2, $3);"#;
+        let query =
+            r#"INSERT INTO short_urls (short_id, original_url, created_ts) VALUES ($1, $2, $3);"#;
         let result = sqlx::query(query)
             .bind(short_id)
             .bind(original_url)
@@ -314,7 +315,10 @@ async fn index_exists(pool: &sqlx::Pool<sqlx::Postgres>, index_name: &str) -> Re
 // Drops an index from the `short_urls` table if it exists.
 async fn drop_index_if_exists(pool: &sqlx::Pool<sqlx::Postgres>, index_name: &str) -> Result<()> {
     if index_exists(pool, index_name).await? {
-        log::info!("[POSTGRES] Dropping index {} on short_urls table", index_name);
+        log::info!(
+            "[POSTGRES] Dropping index {} on short_urls table",
+            index_name
+        );
 
         let query = format!(
             r#"
@@ -371,7 +375,10 @@ async fn add_created_ts_column_if_not_exists(pool: &sqlx::Pool<sqlx::Postgres>) 
         );
 
         if let Err(e) = sqlx::query(&update_query).execute(pool).await {
-            log::error!("[POSTGRES] Error updating existing rows with created_ts: {}", e);
+            log::error!(
+                "[POSTGRES] Error updating existing rows with created_ts: {}",
+                e
+            );
             return Err(e.into());
         }
 
@@ -384,7 +391,10 @@ async fn add_created_ts_column_if_not_exists(pool: &sqlx::Pool<sqlx::Postgres>) 
         "#;
 
         if let Err(e) = sqlx::query(alter_query).execute(pool).await {
-            log::error!("[POSTGRES] Error setting created_ts column to NOT NULL: {}", e);
+            log::error!(
+                "[POSTGRES] Error setting created_ts column to NOT NULL: {}",
+                e
+            );
             return Err(e.into());
         }
 

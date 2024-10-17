@@ -18,11 +18,10 @@ use chrono::{DateTime, Utc};
 use sqlx::Row;
 
 use crate::{
-    db::sqlite::{create_index, CLIENT_RO, CLIENT_RW},
+    db::sqlite::{create_index, delete_index, CLIENT_RO, CLIENT_RW},
     errors::{DbError, Error, Result},
     short_url::{ShortUrl, ShortUrlRecord},
 };
-use crate::db::sqlite::delete_index;
 
 fn create_short_urls_table_query(table_name: &str) -> String {
     // `created_ts` is a Unix timestamp in microseconds
@@ -63,9 +62,7 @@ impl ShortUrl for SqliteShortUrl {
 
         let create_table_query = create_short_urls_table_query("short_urls");
 
-        sqlx::query(&create_table_query)
-        .execute(&*client)
-        .await?;
+        sqlx::query(&create_table_query).execute(&*client).await?;
 
         // release lock
         drop(client);
@@ -296,7 +293,7 @@ async fn is_migration_required() -> Result<bool> {
 
     // Query to get the table information
     let check_query = r#"PRAGMA table_info(short_urls);"#;
-    let columns = sqlx::query(&check_query).fetch_all(&client).await?;
+    let columns = sqlx::query(check_query).fetch_all(&client).await?;
 
     // Check if `created_at` column exists
     let created_at_exists = columns.iter().any(|column| {
@@ -307,8 +304,8 @@ async fn is_migration_required() -> Result<bool> {
     Ok(created_at_exists)
 }
 
-
-/// Data migration function to copy data from `short_urls` to `short_urls_new` and convert `created_at` to `created_ts`
+/// Data migration function to copy data from `short_urls` to `short_urls_new` and convert
+/// `created_at` to `created_ts`
 async fn migrate_data_to_new_table() -> Result<()> {
     if !is_migration_required().await? {
         return Ok(());
@@ -331,9 +328,7 @@ async fn migrate_data_to_new_table() -> Result<()> {
         FROM short_urls;
     "#;
 
-    let rows = sqlx::query(select_data_query)
-        .fetch_all(&mut *tx)
-        .await?;
+    let rows = sqlx::query(select_data_query).fetch_all(&mut *tx).await?;
 
     // Step 3: Insert data into the new table
     let created_ts = Utc::now().timestamp_micros();

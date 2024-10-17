@@ -113,10 +113,11 @@ async fn cache_indices() -> RwLock<HashSet<DBIndex>> {
         .fetch_all(&client)
         .await;
     match res {
-        Ok(r) => RwLock::new(r
-            .into_iter()
-            .map(|(name, table)| DBIndex { name, table })
-            .collect()),
+        Ok(r) => RwLock::new(
+            r.into_iter()
+                .map(|(name, table)| DBIndex { name, table })
+                .collect(),
+        ),
         Err(_) => RwLock::new(HashSet::new()),
     }
 }

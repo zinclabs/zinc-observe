@@ -375,7 +375,10 @@ async fn add_created_ts_column_if_not_exists(pool: &sqlx::Pool<sqlx::MySql>) -> 
         );
 
         if let Err(e) = sqlx::query(&update_query).execute(pool).await {
-            log::error!("[MYSQL] Error updating existing rows with created_ts: {}", e);
+            log::error!(
+                "[MYSQL] Error updating existing rows with created_ts: {}",
+                e
+            );
             return Err(e.into());
         }
 
