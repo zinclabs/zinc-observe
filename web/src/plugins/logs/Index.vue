@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,9 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-
   <q-page class="logPage q-my-xs" id="logPage">
-    <div v-show="!showSearchHistory"  id="secondLevel" class="full-height">
+    <div v-show="!showSearchHistory" id="secondLevel" class="full-height">
       <q-splitter
         class="logs-horizontal-splitter full-height"
         v-model="splitterModel"
@@ -235,7 +234,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span v-if="disableMoreErrorDetails">
                       <SanitizedHtmlRenderer
                         data-test="logs-search-detail-error-message"
-                        :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
+                        :htmlContent="
+                          searchObj.data.errorMsg +
+                          '<h6 style=\'font-size: 14px; margin: 0;\'>' +
+                          searchObj.data.errorDetail +
+                          '</h6>'
+                        "
+                      />
                     </span>
                   </h5>
                 </div>
@@ -256,11 +261,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-show="showSearchHistory">
       <search-history
-      ref="searchHistoryRef"
+        ref="searchHistoryRef"
         @closeSearchHistory="closeSearchHistoryfn"
         :isClicked="showSearchHistory"
-
-        />
+      />
     </div>
   </q-page>
 </template>
@@ -305,13 +309,13 @@ export default defineComponent({
   components: {
     SearchBar,
     IndexList: defineAsyncComponent(
-      () => import("@/plugins/logs/IndexList.vue"),
+      () => import("@/plugins/logs/IndexList.vue")
     ),
     SearchResult: defineAsyncComponent(
-      () => import("@/plugins/logs/SearchResult.vue"),
+      () => import("@/plugins/logs/SearchResult.vue")
     ),
     ConfirmDialog: defineAsyncComponent(
-      () => import("@/components/ConfirmDialog.vue"),
+      () => import("@/components/ConfirmDialog.vue")
     ),
     SanitizedHtmlRenderer,
     VisualizeLogsQuery,
@@ -458,7 +462,7 @@ export default defineComponent({
       fnParsedSQL,
       addOrderByToQuery,
       getRegionInfo,
-       getStreamList,
+      getStreamList,
       getFunctions,
       extractFields,
     } = useLogs();
@@ -522,7 +526,6 @@ export default defineComponent({
     // });
 
     onActivated(async () => {
-      
       // if search tab
       if (searchObj.meta.logsVisualizeToggle == "logs") {
         const queryParams: any = router.currentRoute.value.query;
@@ -569,7 +572,6 @@ export default defineComponent({
         // visualize tab
         handleRunQueryFn();
       }
-
     });
 
     onBeforeMount(async () => {
@@ -601,12 +603,14 @@ export default defineComponent({
         searchObj.meta.quickMode = store.state.zoConfig.quick_mode_enabled;
       }
     });
-    onMounted( async() => {
+    onMounted(async () => {
       //
-        if(router.currentRoute.value.query.hasOwnProperty("action") && router.currentRoute.value.query.action == "history"){
+      if (
+        router.currentRoute.value.query.hasOwnProperty("action") &&
+        router.currentRoute.value.query.action == "history"
+      ) {
         showSearchHistory.value = true;
       }
-
     });
 
     /**
@@ -617,11 +621,9 @@ export default defineComponent({
 
     watch(
       () => router.currentRoute.value.query.type,
-      
+
       (type, prev) => {
-
         if (
-
           searchObj.shouldIgnoreWatcher == false &&
           router.currentRoute.value.name === "logs" &&
           prev === "stream_explorer" &&
@@ -630,18 +632,21 @@ export default defineComponent({
           searchObj.meta.pageType = "logs";
           loadLogsData();
         }
-      },
+      }
     );
     watch(
-      ()=> router.currentRoute.value.query,
-      ()=>{
-       if(!router.currentRoute.value.query.hasOwnProperty("action") ){
-        showSearchHistory.value = false;
+      () => router.currentRoute.value.query,
+      () => {
+        if (!router.currentRoute.value.query.hasOwnProperty("action")) {
+          showSearchHistory.value = false;
+        }
+        if (
+          router.currentRoute.value.query.hasOwnProperty("action") &&
+          router.currentRoute.value.query.action == "history"
+        ) {
+          showSearchHistory.value = true;
+        }
       }
-      if(router.currentRoute.value.query.hasOwnProperty("action") && router.currentRoute.value.query.action == "history"){
-        showSearchHistory.value = true;
-      }
-    }
       // (action) => {
       //   if (action === "history") {
       //     showSearchHistory.value = true;
@@ -651,10 +656,13 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.type,
       async (type) => {
-        if(type == "search_history_re_apply"){
-          searchObj.organizationIdetifier = router.currentRoute.value.query.org_identifier;
-          searchObj.data.stream.selectedStream.value = router.currentRoute.value.query.stream;
-          searchObj.data.stream.streamType = router.currentRoute.value.query.stream_type;
+        if (type == "search_history_re_apply") {
+          searchObj.organizationIdetifier =
+            router.currentRoute.value.query.org_identifier;
+          searchObj.data.stream.selectedStream.value =
+            router.currentRoute.value.query.stream;
+          searchObj.data.stream.streamType =
+            router.currentRoute.value.query.stream_type;
           resetSearchObj();
           searchObj.data.queryResults.hits = [];
           searchObj.meta.searchApplied = false;
@@ -669,9 +677,8 @@ export default defineComponent({
           await extractFields();
           refreshData();
         }
-      },
+      }
     );
-
 
     const importSqlParser = async () => {
       const useSqlParser: any = await import("@/composables/useParser");
@@ -760,14 +767,14 @@ export default defineComponent({
               const streamData: any = getStream(
                 searchObj.data.stream.selectedStream[0],
                 searchObj.data.stream.streamType || "logs",
-                true,
+                true
               );
               searchObj.data.stream.selectedStreamFields = streamData.schema;
             }
 
             const streamFieldNames: any =
               searchObj.data.stream.selectedStreamFields.map(
-                (item: any) => item.name,
+                (item: any) => item.name
               );
 
             for (
@@ -787,12 +794,12 @@ export default defineComponent({
             ) {
               searchObj.data.query = searchObj.data.query.replace(
                 "[FIELD_LIST]",
-                searchObj.data.stream.interestingFieldList.join(","),
+                searchObj.data.stream.interestingFieldList.join(",")
               );
             } else {
               searchObj.data.query = searchObj.data.query.replace(
                 "[FIELD_LIST]",
-                "*",
+                "*"
               );
             }
           }
@@ -850,19 +857,16 @@ export default defineComponent({
       }
     };
     const showSearchHistoryfn = () => {
-
       router.push({
-          name: "logs",
-          query: {
-            action: "history",
-            org_identifier: store.state.selectedOrganization.identifier,
-            type: "search_history",
-          },
-        });
+        name: "logs",
+        query: {
+          action: "history",
+          org_identifier: store.state.selectedOrganization.identifier,
+          type: "search_history",
+        },
+      });
       showSearchHistory.value = true;
-
-
-    }
+    };
 
     function removeFieldByName(data, fieldName) {
       return data.filter((item: any) => {
@@ -883,7 +887,7 @@ export default defineComponent({
 
     const setInterestingFieldInSQLQuery = (
       field: any,
-      isFieldExistInSQL: boolean,
+      isFieldExistInSQL: boolean
     ) => {
       //implement setQuery function using node-sql-parser
       //isFieldExistInSQL is used to check if the field is already present in the query or not.
@@ -895,7 +899,7 @@ export default defineComponent({
             let filteredData = removeFieldByName(parsedSQL.columns, field.name);
 
             const index = searchObj.data.stream.interestingFieldList.indexOf(
-              field.name,
+              field.name
             );
             if (index > -1) {
               searchObj.data.stream.interestingFieldList.splice(index, 1);
@@ -932,7 +936,7 @@ export default defineComponent({
           .replace(/`/g, "")
           .replace(
             searchObj.data.stream.selectedStream[0],
-            `"${searchObj.data.stream.selectedStream[0]}"`,
+            `"${searchObj.data.stream.selectedStream[0]}"`
           );
         searchObj.data.query = newQuery;
         searchObj.data.editorValue = newQuery;
@@ -954,7 +958,7 @@ export default defineComponent({
             /SELECT\s+(.*?)\s+FROM/i,
             (match, fields) => {
               return `SELECT ${field_list} FROM`;
-            },
+            }
           );
           setQuery(searchObj.meta.quickMode);
           updateUrlQueryParams();
@@ -983,7 +987,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          "There are some errors, please fix them and try again"
         );
         return false;
       }
@@ -1009,7 +1013,7 @@ export default defineComponent({
             dashboardPanelData.layout.currentQueryIndex
           ].vrlFunctionQuery = "";
         }
-      },
+      }
     );
 
     const setFieldsAndConditions = async () => {
@@ -1022,13 +1026,13 @@ export default defineComponent({
           searchObj.meta.quickMode
             ? searchObj.data.stream.interestingFieldList
             : [],
-          logsQuery,
+          logsQuery
         );
       }
 
       const { fields, filters, streamName } = await getFieldsFromQuery(
         logsQuery ?? "",
-        store.state.zoConfig.timestamp_column ?? "_timestamp",
+        store.state.zoConfig.timestamp_column ?? "_timestamp"
       );
 
       // set stream type and stream name
@@ -1057,7 +1061,7 @@ export default defineComponent({
       // if x axis fields length is 2, then add 2nd x axis field to breakdown fields
       if (dashboardPanelData.data.queries[0].fields.x.length == 2) {
         dashboardPanelData.data.queries[0].fields.breakdown.push(
-          dashboardPanelData.data.queries[0].fields.x[1],
+          dashboardPanelData.data.queries[0].fields.x[1]
         );
         // remove 2nd x axis field from x axis fields
         dashboardPanelData.data.queries[0].fields.x.splice(1, 1);
@@ -1095,7 +1099,7 @@ export default defineComponent({
           // run query
           handleRunQueryFn();
         }
-      },
+      }
     );
 
     watch(
@@ -1103,9 +1107,9 @@ export default defineComponent({
       async () => {
         // await nextTick();
         visualizeChartData.value = JSON.parse(
-          JSON.stringify(dashboardPanelData.data),
+          JSON.stringify(dashboardPanelData.data)
         );
-      },
+      }
     );
 
     watch(
@@ -1113,7 +1117,7 @@ export default defineComponent({
       () => {
         // rerender chart
         window.dispatchEvent(new Event("resize"));
-      },
+      }
     );
 
     watch(
@@ -1126,7 +1130,7 @@ export default defineComponent({
         const dateTime =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
-                searchObj.data.datetime.relativeTimePeriod,
+                searchObj.data.datetime.relativeTimePeriod
               )
             : cloneDeep(searchObj.data.datetime);
 
@@ -1135,7 +1139,7 @@ export default defineComponent({
           end_time: new Date(dateTime.endTime),
         };
       },
-      { deep: true },
+      { deep: true }
     );
 
     const handleRunQueryFn = () => {
@@ -1150,7 +1154,7 @@ export default defineComponent({
           searchBarRef.value.dateTimeRef.refresh();
 
         visualizeChartData.value = JSON.parse(
-          JSON.stringify(dashboardPanelData.data),
+          JSON.stringify(dashboardPanelData.data)
         );
       }
     };
@@ -1173,7 +1177,7 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide(
       "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState,
+      variablesAndPanelsDataLoadingState
     );
 
     // [END] cancel running queries

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -180,7 +180,7 @@ const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 
 const ChartRenderer = defineAsyncComponent(
-  () => import("@/components/dashboards/panels/ChartRenderer.vue"),
+  () => import("@/components/dashboards/panels/ChartRenderer.vue")
 );
 
 interface Routing {
@@ -355,7 +355,7 @@ const getPipeline = () => {
         (pipeline: Pipeline) =>
           pipeline.name === route.query.name &&
           pipeline.stream_name === route.query.stream &&
-          pipeline.stream_type === route.query.stream_type,
+          pipeline.stream_type === route.query.stream_type
       );
 
       if (!_pipeline) {
@@ -409,7 +409,7 @@ const setupNodes = () => {
       createFunctionNode(
         _function.name,
         pipeline.value.stream_name,
-        _function.order,
+        _function.order
       );
 
       functions.value[_function.name] = _function;
@@ -462,7 +462,7 @@ const getFunctionFrom = (stream: string) => {
   let fromNodeName = stream;
 
   const functions = nodes.value.filter(
-    (node) => node.type === "function" && node.stream === stream,
+    (node) => node.type === "function" && node.stream === stream
   );
 
   if (functions.length) {
@@ -548,7 +548,7 @@ const addFunctionNode = (data: { data: Function }) => {
 
   if (editingFunctionName.value) {
     const editedNode = nodes.value.find(
-      (node) => node.name === editingFunctionName.value,
+      (node) => node.name === editingFunctionName.value
     );
 
     if (editedNode) editedNode.order = data.data.order;
@@ -559,8 +559,8 @@ const addFunctionNode = (data: { data: Function }) => {
       createFunctionNode(
         nodeName,
         pipeline.value.stream_name,
-        data.data.order,
-      ) as Node,
+        data.data.order
+      ) as Node
     );
   }
 
@@ -570,13 +570,13 @@ const addFunctionNode = (data: { data: Function }) => {
     .sort((a, b) =>
       a.order?.toString() && b.order?.toString()
         ? Number(a.order) - Number(b.order)
-        : 0,
+        : 0
     )
     .forEach((node) => {
       createFunctionNode(
         node.name,
         node.stream as string,
-        node.order as number,
+        node.order as number
       );
     });
 
@@ -598,7 +598,7 @@ const addFunctionNode = (data: { data: Function }) => {
 const createFunctionNode = (
   nodeName: string,
   streamName: string,
-  order: number,
+  order: number
 ) => {
   const position = getNodePosition("function");
 
@@ -630,7 +630,7 @@ const updateFunctionNodesOrder = () => {
     .sort((a, b) =>
       a.order?.toString() && b.order?.toString()
         ? Number(a.order) - Number(b.order)
-        : 0,
+        : 0
     );
 
   sortedFunctionNodes.forEach((node, index) => {
@@ -768,7 +768,7 @@ const getFunctions = () => {
       "name",
       false,
       "",
-      store.state.selectedOrganization.identifier,
+      store.state.selectedOrganization.identifier
     )
     .then((res) => {
       functions.value = {};
@@ -790,7 +790,7 @@ const deleteNode = (node: { data: Node; type: string }) => {
 
   if (node.type === "function") {
     associatedFunctions.value = associatedFunctions.value.filter(
-      (func) => func !== node.data.name,
+      (func) => func !== node.data.name
     );
     editingFunctionName.value = "";
   }
@@ -842,12 +842,12 @@ const associateFunctions = async () => {
   const associateFunctionPromises = [];
 
   const previousAssociatedFunctions = pipeline.value.functions.map(
-    (func) => func.name,
+    (func) => func.name
   );
 
   for (let i = 0; i < associatedFunctions.value.length; i++) {
     const functionIndex = previousAssociatedFunctions.indexOf(
-      associatedFunctions.value[i],
+      associatedFunctions.value[i]
     );
 
     // If function is already associated with the pipeline and order is same, skip.
@@ -869,8 +869,8 @@ const associateFunctions = async () => {
         associatedFunctions.value[i],
         {
           order: Number(functions.value[associatedFunctions.value[i]].order),
-        },
-      ),
+        }
+      )
     );
   }
   return Promise.all(associateFunctionPromises);
@@ -881,7 +881,7 @@ const deleteFunctionAssociation = (name: string) => {
     store.state.selectedOrganization.identifier,
     pipeline.value.stream_name,
     pipeline.value.stream_type,
-    name,
+    name
   );
 };
 
@@ -899,7 +899,7 @@ const savePipeline = async () => {
     for (let i = 0; i < pipeline.value.functions.length; i++) {
       if (!associatedFunctions.value.includes(pipeline.value.functions[i].name))
         deleteFunctionPromises.push(
-          deleteFunctionAssociation(pipeline.value.functions[i].name),
+          deleteFunctionAssociation(pipeline.value.functions[i].name)
         );
     }
 

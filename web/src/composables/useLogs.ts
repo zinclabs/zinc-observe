@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -457,7 +457,7 @@ const useLogs = () => {
         return await getStream(
           streamName,
           searchObj.data.stream.streamType || "logs",
-          true,
+          true
         ).then((res) => {
           searchObj.loadingStream = false;
           return res;
@@ -534,7 +534,7 @@ const useLogs = () => {
       searchObj.data.tempFunctionContent != ""
     ) {
       query["functionContent"] = b64EncodeUnicode(
-        searchObj.data.tempFunctionContent,
+        searchObj.data.tempFunctionContent
       );
     }
 
@@ -553,7 +553,10 @@ const useLogs = () => {
 
   const updateUrlQueryParams = () => {
     const query = generateURLQuery(false);
-    if(query.hasOwnProperty("type") && query.type == "search_history_re_apply"){
+    if (
+      query.hasOwnProperty("type") &&
+      query.type == "search_history_re_apply"
+    ) {
       delete query.type;
     }
     router.push({ query });
@@ -589,10 +592,10 @@ const useLogs = () => {
   const validateFilterForMultiStream = () => {
     const filterCondition = searchObj.data.editorValue;
     const parsedSQL: any = parser.astify(
-      "select * from stream where " + filterCondition,
+      "select * from stream where " + filterCondition
     );
     searchObj.data.stream.filteredField = extractFilterColumns(
-      parsedSQL?.where,
+      parsedSQL?.where
     );
 
     searchObj.data.filterErrMsg = "";
@@ -601,12 +604,12 @@ const useLogs = () => {
     for (const fieldName of searchObj.data.stream.filteredField) {
       const filteredFields: any =
         searchObj.data.stream.selectedStreamFields.filter(
-          (field: any) => field.name === fieldName,
+          (field: any) => field.name === fieldName
         );
       if (filteredFields.length > 0) {
         const streamsCount = filteredFields[0].streams.length;
         const allStreamsEqual = filteredFields.every(
-          (field: any) => field.streams.length === streamsCount,
+          (field: any) => field.streams.length === streamsCount
         );
         if (!allStreamsEqual) {
           searchObj.data.filterErrMsg += `Field '${fieldName}' exists in different number of streams.\n`;
@@ -622,12 +625,12 @@ const useLogs = () => {
 
       searchObj.data.stream.missingStreamMultiStreamFilter =
         searchObj.data.stream.selectedStream.filter(
-          (stream: any) => !fieldStreams.includes(stream),
+          (stream: any) => !fieldStreams.includes(stream)
         );
 
       if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
         searchObj.data.missingStreamMessage = `One or more filter fields do not exist in "${searchObj.data.stream.missingStreamMultiStreamFilter.join(
-          ", ",
+          ", "
         )}", hence no search is performed in the mentioned stream.\n`;
       }
     }
@@ -674,14 +677,14 @@ const useLogs = () => {
         const streamData: any = getStreams(
           searchObj.data.stream.streamType,
           true,
-          true,
+          true
         );
         searchObj.data.stream.selectedStreamFields = streamData.schema;
       }
 
       const streamFieldNames: any =
         searchObj.data.stream.selectedStreamFields.map(
-          (item: any) => item.name,
+          (item: any) => item.name
         );
 
       for (
@@ -702,7 +705,7 @@ const useLogs = () => {
         if (searchObj.data.stream.selectedStream.length == 1) {
           req.query.sql = req.query.sql.replace(
             "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(","),
+            searchObj.data.stream.interestingFieldList.join(",")
           );
         }
       } else {
@@ -712,7 +715,7 @@ const useLogs = () => {
       const timestamps: any =
         searchObj.data.datetime.type === "relative"
           ? getConsumableRelativeTime(
-              searchObj.data.datetime.relativeTimePeriod,
+              searchObj.data.datetime.relativeTimePeriod
             )
           : cloneDeep(searchObj.data.datetime);
 
@@ -767,7 +770,7 @@ const useLogs = () => {
 
         req.aggs.histogram = req.aggs.histogram.replaceAll(
           "[INTERVAL]",
-          searchObj.meta.resultGrid.chartInterval,
+          searchObj.meta.resultGrid.chartInterval
         );
       } else {
         notificationMsg.value = "Invalid date format";
@@ -777,7 +780,7 @@ const useLogs = () => {
       if (searchObj.meta.sqlMode == true) {
         req.aggs.histogram = req.aggs.histogram.replace(
           "[INDEX_NAME]",
-          searchObj.data.stream.selectedStream[0],
+          searchObj.data.stream.selectedStream[0]
         );
 
         req.aggs.histogram = req.aggs.histogram.replace("[WHERE_CLAUSE]", "");
@@ -785,7 +788,7 @@ const useLogs = () => {
         searchObj.data.query = query;
         const parsedSQL: any = fnParsedSQL();
         const histogramParsedSQL: any = fnHistogramParsedSQL(
-          req.aggs.histogram,
+          req.aggs.histogram
         );
 
         histogramParsedSQL.where = parsedSQL.where;
@@ -885,12 +888,12 @@ const useLogs = () => {
 
           req.query.sql = req.query.sql.replace(
             "[WHERE_CLAUSE]",
-            " WHERE " + whereClause,
+            " WHERE " + whereClause
           );
 
           req.aggs.histogram = req.aggs.histogram.replace(
             "[WHERE_CLAUSE]",
-            " WHERE " + whereClause,
+            " WHERE " + whereClause
           );
         } else {
           req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
@@ -899,7 +902,7 @@ const useLogs = () => {
 
         req.query.sql = req.query.sql.replace(
           "[QUERY_FUNCTIONS]",
-          queryFunctions,
+          queryFunctions
         );
 
         // in the case of multi stream, we need to pass query for each selected stream in the form of array
@@ -922,8 +925,8 @@ const useLogs = () => {
               streams = searchObj.data.stream.selectedStream.filter(
                 (streams: any) =>
                   !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
-                    streams,
-                  ),
+                    streams
+                  )
               );
             }
           }
@@ -938,7 +941,7 @@ const useLogs = () => {
             .forEach((item: any) => {
               let finalQuery: string = preSQLQuery.replace(
                 "[INDEX_NAME]",
-                item,
+                item
               );
 
               // const finalHistogramQuery: string = preHistogramSQLQuery.replace(
@@ -968,7 +971,7 @@ const useLogs = () => {
 
               finalQuery = finalQuery.replace(
                 "[FIELD_LIST]",
-                `'${item}' as _stream_name` + queryFieldList,
+                `'${item}' as _stream_name` + queryFieldList
               );
 
               // finalHistogramQuery = finalHistogramQuery.replace(
@@ -982,12 +985,12 @@ const useLogs = () => {
         } else {
           req.query.sql = req.query.sql.replace(
             "[INDEX_NAME]",
-            searchObj.data.stream.selectedStream[0],
+            searchObj.data.stream.selectedStream[0]
           );
 
           req.aggs.histogram = req.aggs.histogram.replace(
             "[INDEX_NAME]",
-            searchObj.data.stream.selectedStream[0],
+            searchObj.data.stream.selectedStream[0]
           );
         }
 
@@ -1130,7 +1133,7 @@ const useLogs = () => {
               },
             ];
             searchObj.data.queryResults.partitionDetail.paginations.push(
-              pageObject,
+              pageObject
             );
             searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
           }
@@ -1214,10 +1217,10 @@ const useLogs = () => {
                       },
                     ];
                     searchObj.data.queryResults.partitionDetail.paginations.push(
-                      pageObject,
+                      pageObject
                     );
                     searchObj.data.queryResults.partitionDetail.partitionTotal.push(
-                      -1,
+                      -1
                     );
                   }
                 }
@@ -1242,10 +1245,10 @@ const useLogs = () => {
                     },
                   ];
                   searchObj.data.queryResults.partitionDetail.paginations.push(
-                    pageObject,
+                    pageObject
                   );
                   searchObj.data.queryResults.partitionDetail.partitionTotal.push(
-                    -1,
+                    -1
                   );
                 }
               }
@@ -1332,7 +1335,7 @@ const useLogs = () => {
             },
           ];
           searchObj.data.queryResults.partitionDetail.paginations.push(
-            pageObject,
+            pageObject
           );
           searchObj.data.queryResults.partitionDetail.partitionTotal.push(-1);
         }
@@ -1392,7 +1395,7 @@ const useLogs = () => {
             partitionDetail.partitionTotal.reduce(
               (accumulator: number, currentValue: number) =>
                 accumulator + Math.max(currentValue, 0),
-              0,
+              0
             );
         }
         // partitionDetail.partitions.forEach((item: any, index: number) => {
@@ -1560,7 +1563,7 @@ const useLogs = () => {
           searchObj.meta.toggleFunction
         ) {
           queryReq.query["query_fn"] = b64EncodeUnicode(
-            searchObj.data.tempFunctionContent,
+            searchObj.data.tempFunctionContent
           );
         }
 
@@ -1608,7 +1611,7 @@ const useLogs = () => {
         delete searchObj.data.histogramQuery.aggs;
         delete queryReq.aggs;
         searchObj.data.customDownloadQueryObj = JSON.parse(
-          JSON.stringify(queryReq),
+          JSON.stringify(queryReq)
         );
         // get the current page detail and set it into query request
         queryReq.query.start_time =
@@ -1704,8 +1707,8 @@ const useLogs = () => {
 
               const partitions = JSON.parse(
                 JSON.stringify(
-                  searchObj.data.queryResults.partitionDetail.partitions,
-                ),
+                  searchObj.data.queryResults.partitionDetail.partitions
+                )
               );
 
               // is _timestamp orderby ASC then reverse the partition array
@@ -1800,7 +1803,7 @@ const useLogs = () => {
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
-        notificationMsg.value || "Error occurred during the search operation.",
+        notificationMsg.value || "Error occurred during the search operation."
       );
       notificationMsg.value = "";
     }
@@ -1837,7 +1840,7 @@ const useLogs = () => {
       searchObj.data.histogramInterval = intervalMs;
       const date = new Date();
       const startTimeDate = new Date(
-        searchObj.data.customDownloadQueryObj.query.start_time / 1000,
+        searchObj.data.customDownloadQueryObj.query.start_time / 1000
       ); // Convert microseconds to milliseconds
       if (searchObj.meta.resultGrid.chartInterval.includes("second")) {
         startTimeDate.setSeconds(startTimeDate.getSeconds() > 30 ? 30 : 0, 0); // Round to the nearest whole minute
@@ -1848,9 +1851,9 @@ const useLogs = () => {
         // startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
         startTimeDate.setMinutes(
           parseInt(
-            searchObj.meta.resultGrid.chartInterval.replace(" minute", ""),
+            searchObj.meta.resultGrid.chartInterval.replace(" minute", "")
           ),
-          0,
+          0
         ); // Round to the nearest whole minute
       } else if (searchObj.meta.resultGrid.chartInterval.includes("hour")) {
         startTimeDate.setHours(startTimeDate.getHours() + 1);
@@ -1962,7 +1965,7 @@ const useLogs = () => {
             page_type: searchObj.data.stream.streamType,
             traceparent,
           },
-          "UI",
+          "UI"
         )
         .then(async (res) => {
           // check for total records update for the partition and update pagination accordingly
@@ -2053,7 +2056,7 @@ const useLogs = () => {
 
   const getPaginatedData = async (
     queryReq: any,
-    appendResult: boolean = false,
+    appendResult: boolean = false
   ) => {
     return new Promise((resolve, reject) => {
       // // set track_total_hits true for first request of partition to get total records in partition
@@ -2108,7 +2111,7 @@ const useLogs = () => {
             page_type: searchObj.data.stream.streamType,
             traceparent,
           },
-          "UI",
+          "UI"
         )
         .then(async (res) => {
           if (
@@ -2121,7 +2124,7 @@ const useLogs = () => {
               res.data.function_error,
               res.data.new_start_time,
               res.data.new_end_time,
-              store.state.timezone,
+              store.state.timezone
             );
             searchObj.data.datetime.startTime = res.data.new_start_time;
             searchObj.data.datetime.endTime = res.data.new_end_time;
@@ -2209,7 +2212,7 @@ const useLogs = () => {
               const lastRecordTimeStamp = parseInt(
                 searchObj.data.queryResults.hits[0][
                   store.state.zoConfig.timestamp_column
-                ],
+                ]
               );
               searchObj.data.queryResults.hits = res.data.hits;
             } else {
@@ -2385,7 +2388,7 @@ const useLogs = () => {
               page_type: searchObj.data.stream.streamType,
               traceparent,
             },
-            "UI",
+            "UI"
           )
           .then(async (res: any) => {
             removeTraceId(traceId);
@@ -2398,8 +2401,8 @@ const useLogs = () => {
             const parsedSQL: any = fnParsedSQL();
             const partitions = JSON.parse(
               JSON.stringify(
-                searchObj.data.queryResults.partitionDetail.partitions,
-              ),
+                searchObj.data.queryResults.partitionDetail.partitions
+              )
             );
 
             // is _timestamp orderby ASC then reverse the partition array
@@ -2444,7 +2447,7 @@ const useLogs = () => {
                   const currentTimeToBePassed = convertDateToTimestamp(
                     dateToBePassed,
                     time,
-                    "UTC",
+                    "UTC"
                   );
                   for (
                     let currentTime: any =
@@ -2488,7 +2491,7 @@ const useLogs = () => {
                     (accumulator: number, currentValue: any) =>
                       accumulator +
                       Math.max(parseInt(currentValue.zo_sql_num, 10), 0),
-                    0,
+                    0
                   );
 
                   searchObj.data.queryResults.partitionDetail.partitionTotal[
@@ -2497,7 +2500,7 @@ const useLogs = () => {
 
                   return;
                 }
-              },
+              }
             );
 
             queryReq.query.start_time =
@@ -2653,15 +2656,15 @@ const useLogs = () => {
                 selectedStreamValues.length > 1
                   ? searchObj.data.stream.expandGroupRows[stream]
                   : selectedStreamValues.length > 1
-                    ? false
-                    : true,
-              ]),
+                  ? false
+                  : true,
+              ])
           ),
         };
         searchObj.data.stream.expandGroupRowsFieldCount = {
           common: 0,
           ...Object.fromEntries(
-            selectedStreamValues.sort().map((stream: any) => [stream, 0]),
+            selectedStreamValues.sort().map((stream: any) => [stream, 0])
           ),
         };
 
@@ -2723,7 +2726,7 @@ const useLogs = () => {
                         " hours"
                       : searchObj.data.datetime.queryRangeRestrictionInHour +
                         " hour",
-                },
+                }
               );
             }
 
@@ -2742,13 +2745,13 @@ const useLogs = () => {
               searchObj.meta.hasUserDefinedSchemas = true;
               if (store.state.zoConfig.hasOwnProperty("timestamp_column")) {
                 userDefineSchemaSettings.push(
-                  store.state.zoConfig?.timestamp_column,
+                  store.state.zoConfig?.timestamp_column
                 );
               }
 
               if (store.state.zoConfig.hasOwnProperty("all_fields_name")) {
                 userDefineSchemaSettings.push(
-                  store.state.zoConfig?.all_fields_name,
+                  store.state.zoConfig?.all_fields_name
                 );
               }
             } else {
@@ -2769,15 +2772,15 @@ const useLogs = () => {
                     searchObj.organizationIdentifier + "_" + stream.name
                   ]
                 : environmentInterestingFields.length > 0
-                  ? [...environmentInterestingFields]
-                  : [...schemaInterestingFields];
+                ? [...environmentInterestingFields]
+                : [...schemaInterestingFields];
 
             searchObj.data.stream.interestingFieldList.push(
-              ...streamInterestingFieldsLocal,
+              ...streamInterestingFieldsLocal
             );
 
             const intField = new Set(
-              searchObj.data.stream.interestingFieldList,
+              searchObj.data.stream.interestingFieldList
             );
             searchObj.data.stream.interestingFieldList = [...intField];
 
@@ -2826,7 +2829,7 @@ const useLogs = () => {
                       schemaMaps[schemaFieldsIndex].streams.length > 0
                     ) {
                       fieldObj.streams.push(
-                        ...schemaMaps[schemaFieldsIndex].streams,
+                        ...schemaMaps[schemaFieldsIndex].streams
                       );
                       searchObj.data.stream.expandGroupRowsFieldCount[
                         schemaMaps[schemaFieldsIndex].streams[0]
@@ -2848,7 +2851,7 @@ const useLogs = () => {
                     schemaMaps.splice(schemaFieldsIndex, 1);
                   } else if (commonSchemaFieldsIndex > -1) {
                     commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
-                      stream.name,
+                      stream.name
                     );
                     // searchObj.data.stream.expandGroupRowsFieldCount["common"] =
                     //   searchObj.data.stream.expandGroupRowsFieldCount[
@@ -2885,7 +2888,7 @@ const useLogs = () => {
                     schemaMaps[schemaFieldsIndex].streams.length > 0
                   ) {
                     fieldObj.streams.push(
-                      ...schemaMaps[schemaFieldsIndex].streams,
+                      ...schemaMaps[schemaFieldsIndex].streams
                     );
                     searchObj.data.stream.expandGroupRowsFieldCount[
                       schemaMaps[schemaFieldsIndex].streams[0]
@@ -2906,7 +2909,7 @@ const useLogs = () => {
                   schemaMaps.splice(schemaFieldsIndex, 1);
                 } else if (commonSchemaFieldsIndex > -1) {
                   commonSchemaMaps[commonSchemaFieldsIndex].streams.push(
-                    stream.name,
+                    stream.name
                   );
                   // searchObj.data.stream.expandGroupRowsFieldCount["common"] =
                   //   searchObj.data.stream.expandGroupRowsFieldCount["common"] +
@@ -2945,7 +2948,7 @@ const useLogs = () => {
             //as we append timestamp dynamically for userDefined schema we need to check this
             if (
               userDefineSchemaSettings.includes(
-                store.state.zoConfig?.timestamp_column,
+                store.state.zoConfig?.timestamp_column
               )
             ) {
               searchObj.data.hasSearchDataTimestampField = true;
@@ -2968,17 +2971,17 @@ const useLogs = () => {
                     maxIndex: string | number,
                     obj: {},
                     currentIndex: any,
-                    array: { [x: string]: {} },
+                    array: { [x: string]: {} }
                   ) => {
                     const numAttributes = Object.keys(obj).length;
                     const maxNumAttributes = Object.keys(
-                      array[maxIndex],
+                      array[maxIndex]
                     ).length;
                     return numAttributes > maxNumAttributes
                       ? currentIndex
                       : maxIndex;
                   },
-                  0,
+                  0
                 );
               const recordwithMaxAttribute =
                 searchObj.data.queryResults.hits[maxAttributesIndex];
@@ -3056,7 +3059,7 @@ const useLogs = () => {
         logFieldSelectedValue.push(
           ...logFilterField[
             `${store.state.selectedOrganization.identifier}_${stream}`
-          ],
+          ]
         );
       }
       let selectedFields = (logFilterField && logFieldSelectedValue) || [];
@@ -3090,7 +3093,7 @@ const useLogs = () => {
           (searchObj.meta.sqlMode == true &&
             parsedSQL.hasOwnProperty("columns") &&
             searchObj.data.queryResults?.hits[0].hasOwnProperty(
-              store.state.zoConfig.timestamp_column,
+              store.state.zoConfig.timestamp_column
             )) ||
           searchObj.meta.sqlMode == false ||
           selectedFields.includes(store.state.zoConfig.timestamp_column)
@@ -3102,13 +3105,13 @@ const useLogs = () => {
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
                 store.state.timezone,
-                "yyyy-MM-dd HH:mm:ss.SSS",
+                "yyyy-MM-dd HH:mm:ss.SSS"
               ),
             prop: (row: any) =>
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
                 store.state.timezone,
-                "yyyy-MM-dd HH:mm:ss.SSS",
+                "yyyy-MM-dd HH:mm:ss.SSS"
               ),
             label: t("search.timestamp") + ` (${store.state.timezone})`,
             header: t("search.timestamp") + ` (${store.state.timezone})`,
@@ -3152,13 +3155,13 @@ const useLogs = () => {
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
                 store.state.timezone,
-                "yyyy-MM-dd HH:mm:ss.SSS",
+                "yyyy-MM-dd HH:mm:ss.SSS"
               ),
             prop: (row: any) =>
               timestampToTimezoneDate(
                 row[store.state.zoConfig.timestamp_column] / 1000,
                 store.state.timezone,
-                "yyyy-MM-dd HH:mm:ss.SSS",
+                "yyyy-MM-dd HH:mm:ss.SSS"
               ),
             label: t("search.timestamp") + ` (${store.state.timezone})`,
             header: t("search.timestamp") + ` (${store.state.timezone})`,
@@ -3178,7 +3181,7 @@ const useLogs = () => {
         if (
           searchObj.data.resultGrid.colSizes &&
           searchObj.data.resultGrid.colSizes.hasOwnProperty(
-            searchObj.data.stream.selectedStream,
+            searchObj.data.stream.selectedStream
           )
         ) {
           sizes =
@@ -3252,7 +3255,7 @@ const useLogs = () => {
       for (let i = 0; i < 5; i++) {
         if (searchObj.data.queryResults.hits?.[i]?.[field]) {
           width = context.measureText(
-            searchObj.data.queryResults.hits[i][field],
+            searchObj.data.queryResults.hits[i][field]
           ).width;
 
           if (width > max) max = width;
@@ -3280,7 +3283,7 @@ const useLogs = () => {
 
       let totalCount = Math.max(
         searchObj.data.queryResults.hits.length,
-        searchObj.data.queryResults.total,
+        searchObj.data.queryResults.total
       );
       if (searchObj.meta.resultGrid.showPagination == false) {
         endCount = searchObj.data.queryResults.hits.length;
@@ -3292,7 +3295,7 @@ const useLogs = () => {
         ) {
           endCount = Math.min(
             startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
-            totalCount,
+            totalCount
           );
         } else {
           endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
@@ -3370,7 +3373,7 @@ const useLogs = () => {
           histogramResults.map((item: any) => [
             item.zo_sql_key,
             JSON.parse(JSON.stringify(item)),
-          ]),
+          ])
         );
 
         searchObj.data.queryResults.aggs.forEach((item: any) => {
@@ -3392,11 +3395,11 @@ const useLogs = () => {
             unparsed_x_data.push(bucket.zo_sql_key);
             // const histDate = new Date(bucket.zo_sql_key);
             xData.push(
-              histogramDateTimezone(bucket.zo_sql_key, store.state.timezone),
+              histogramDateTimezone(bucket.zo_sql_key, store.state.timezone)
             );
             // xData.push(Math.floor(histDate.getTime()))
             yData.push(parseInt(bucket.zo_sql_num, 10));
-          },
+          }
         );
 
         searchObj.data.queryResults.total = num_records;
@@ -3451,7 +3454,7 @@ const useLogs = () => {
         // }
         parsedSQL.where = null;
         sqlContext.push(
-          b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"')),
+          b64EncodeUnicode(parser.sqlify(parsedSQL).replace(/`/g, '"'))
         );
       } else {
         const parseQuery = query.split("|");
@@ -3473,8 +3476,8 @@ const useLogs = () => {
         const streamsData: any = searchObj.data.stream.selectedStream.filter(
           (streams: any) =>
             !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
-              streams,
-            ),
+              streams
+            )
         );
 
         let finalQuery: string = "";
@@ -3501,7 +3504,7 @@ const useLogs = () => {
 
           finalQuery = finalQuery.replace(
             "[FIELD_LIST]",
-            `'${item}' as _stream_name` + queryFieldList,
+            `'${item}' as _stream_name` + queryFieldList
           );
           sqlContext.push(b64EncodeUnicode(finalQuery));
         });
@@ -3706,9 +3709,12 @@ const useLogs = () => {
       searchObj.meta.refreshHistogram = true;
       initialQueryPayload.value = null;
       searchObj.data.queryResults.aggs = null;
-      if(router.currentRoute.value.query.hasOwnProperty("type") &&  router.currentRoute.value.query.type == "search_history_re_apply"){
-       delete router.currentRoute.value.query.type;
-        }   
+      if (
+        router.currentRoute.value.query.hasOwnProperty("type") &&
+        router.currentRoute.value.query.type == "search_history_re_apply"
+      ) {
+        delete router.currentRoute.value.query.type;
+      }
       await getQueryData();
     } catch (e: any) {
       console.log("Error while loading logs data");
@@ -3816,7 +3822,7 @@ const useLogs = () => {
 
     if (queryParams.stream) {
       searchObj.data.stream.selectedStream.push(
-        ...queryParams.stream.split(","),
+        ...queryParams.stream.split(",")
       );
     }
 
@@ -3826,7 +3832,10 @@ const useLogs = () => {
     }
 
     searchObj.shouldIgnoreWatcher = false;
-    if(queryParams.hasOwnProperty("type") &&  queryParams.type == "search_history_re_apply"){
+    if (
+      queryParams.hasOwnProperty("type") &&
+      queryParams.type == "search_history_re_apply"
+    ) {
       delete queryParams.type;
     }
     // TODO OK : Replace push with replace and test all scenarios
@@ -3924,7 +3933,7 @@ const useLogs = () => {
         ? queryStr != ""
           ? queryStr
           : `SELECT [FIELD_LIST] FROM "${searchObj.data.stream.selectedStream.join(
-              ",",
+              ","
             )}"`
         : "";
 
@@ -3933,7 +3942,7 @@ const useLogs = () => {
         const streamData: any = await getStream(
           stream,
           searchObj.data.stream.streamType || "logs",
-          true,
+          true
         );
 
         if (streamData.schema != undefined) {
@@ -3974,7 +3983,7 @@ const useLogs = () => {
         ) {
           query = query.replace(
             "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(","),
+            searchObj.data.stream.interestingFieldList.join(",")
           );
         } else {
           query = query.replace("[FIELD_LIST]", "*");
@@ -4023,7 +4032,7 @@ const useLogs = () => {
     sql: string,
     column: string,
     type: "ASC" | "DESC",
-    streamName: string,
+    streamName: string
   ) => {
     // Parse the SQL query into an AST
     try {
@@ -4040,7 +4049,7 @@ const useLogs = () => {
 
       // Check if _timestamp is in the SELECT clause if not SELECT *
       const includesTimestamp = !!parsedQuery.columns.find(
-        (col: any) => col?.expr?.column === column || col?.expr?.column === "*",
+        (col: any) => col?.expr?.column === column || col?.expr?.column === "*"
       );
 
       // If ORDER BY is present and doesn't include _timestamp, append it
@@ -4061,7 +4070,7 @@ const useLogs = () => {
       // Convert the AST back to a SQL string, replacing backtics with empty strings and table name with double quotes
       return quoteTableNameDirectly(
         parser.sqlify(parsedQuery).replace(/`/g, ""),
-        streamName,
+        streamName
       );
     } catch (err) {
       return sql;
@@ -4111,7 +4120,7 @@ const useLogs = () => {
   const removeTraceId = (traceId: string) => {
     searchObj.data.searchRequestTraceIds =
       searchObj.data.searchRequestTraceIds.filter(
-        (id: string) => id !== traceId,
+        (id: string) => id !== traceId
       );
   };
 
@@ -4121,7 +4130,7 @@ const useLogs = () => {
     searchService
       .delete_running_queries(
         store.state.selectedOrganization.identifier,
-        searchObj.data.searchRequestTraceIds,
+        searchObj.data.searchRequestTraceIds
       )
       .then((res) => {
         const isCancelled = res.data.some((item: any) => item.is_success);
@@ -4147,7 +4156,7 @@ const useLogs = () => {
       .finally(() => {
         searchObj.data.searchRequestTraceIds =
           searchObj.data.searchRequestTraceIds.filter(
-            (id: string) => !tracesIds.includes(id),
+            (id: string) => !tracesIds.includes(id)
           );
       });
   };
@@ -4173,7 +4182,7 @@ const useLogs = () => {
 
     if (!selectedFields.includes(store.state.zoConfig.timestamp_column)) {
       colOrder = colOrder.filter(
-        (v: any) => v !== store.state.zoConfig.timestamp_column,
+        (v: any) => v !== store.state.zoConfig.timestamp_column
       );
     }
 

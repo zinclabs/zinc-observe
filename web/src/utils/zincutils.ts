@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -39,7 +39,7 @@ const useLocalStorage = (
   key: string,
   defaultValue: unknown,
   isDelete: boolean = false,
-  isJSONValue: boolean = false,
+  isJSONValue: boolean = false
 ) => {
   try {
     const value = ref(defaultValue);
@@ -96,7 +96,7 @@ const useLocalStorage = (
     return value;
   } catch (e) {
     console.log(
-      `Error: Error in UseLocalStorage for key: ${key}, error-message : ${e}`,
+      `Error: Error in UseLocalStorage for key: ${key}, error-message : ${e}`
     );
   }
 };
@@ -119,7 +119,7 @@ export const getUserInfo = (loginString: string) => {
             payload["family_name"] = payload["name"];
             payload["given_name"] = "";
             const encodedSessionData: any = b64EncodeStandard(
-              JSON.stringify(payload),
+              JSON.stringify(payload)
             );
             useLocalUserInfo(encodedSessionData);
             decToken = payload;
@@ -131,7 +131,7 @@ export const getUserInfo = (loginString: string) => {
         } else {
           decToken = getDecodedAccessToken(propArr[1]);
           const encodedSessionData: any = b64EncodeStandard(
-            JSON.stringify(decToken),
+            JSON.stringify(decToken)
           );
           useLocalUserInfo(encodedSessionData);
         }
@@ -179,7 +179,7 @@ export const b64EncodeUnicode = (str: string) => {
     return btoa(
       encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
         return String.fromCharCode(parseInt(`0x${p1}`));
-      }),
+      })
     )
       .replace(/\+/g, "-")
       .replace(/\//g, "_")
@@ -199,9 +199,9 @@ export const b64DecodeUnicode = (str: string) => {
           atob(str.replace(/\-/g, "+").replace(/\_/g, "/").replace(/\./g, "=")),
           function (c) {
             return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-          },
+          }
         )
-        .join(""),
+        .join("")
     );
   } catch (e) {
     console.log("Error: getBase64Decode: error while decoding.");
@@ -215,8 +215,8 @@ export const b64EncodeStandard = (str: string) => {
         /%([0-9A-F]{2})/g,
         function (match, p1: any) {
           return String.fromCharCode(parseInt(`0x${p1}`));
-        },
-      ),
+        }
+      )
     );
   } catch (e) {
     console.log("Error: getBase64Encode: error while encoding.");
@@ -230,7 +230,7 @@ export const b64DecodeStandard = (str: string) => {
         .call(atob(str), function (c) {
           return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
         })
-        .join(""),
+        .join("")
     );
   } catch (e) {
     console.log("Error: getBase64Decode: error while decoding.");
@@ -364,8 +364,8 @@ export const getPath = () => {
     window.location.origin == "http://localhost:8081"
       ? "/"
       : pos > -1
-        ? window.location.pathname.slice(0, pos + 5)
-        : "";
+      ? window.location.pathname.slice(0, pos + 5)
+      : "";
   const cloudPath = import.meta.env.BASE_URL;
   return config.isCloud == "true" ? cloudPath : path;
 };
@@ -510,14 +510,14 @@ export const mergeRoutes: any = (route1: any, route2: any) => {
   // Iterate through route1 and add its elements to mergedRoutes
   for (const r1 of route1) {
     const matchingRoute = route2.find(
-      (r2: any) => r2.path === r1.path && r2.name === r1.name,
+      (r2: any) => r2.path === r1.path && r2.name === r1.name
     );
 
     if (matchingRoute) {
       // If a matching route is found in route2, merge the children
       const mergedChildren = mergeRoutes(
         r1.children || [],
-        matchingRoute.children || [],
+        matchingRoute.children || []
       );
       mergedRoutes.push({
         ...r1,
@@ -559,7 +559,7 @@ export function formatDuration(ms: number) {
 export const timestampToTimezoneDate = (
   unixMilliTimestamp: number,
   timezone: string = "UTC",
-  format: string = "yyyy-MM-dd HH:mm:ss.SSS",
+  format: string = "yyyy-MM-dd HH:mm:ss.SSS"
 ) => {
   return DateTime.fromMillis(Math.floor(unixMilliTimestamp))
     .setZone(timezone)
@@ -568,15 +568,13 @@ export const timestampToTimezoneDate = (
 
 export const histogramDateTimezone: any = (
   utcTime: any,
-  timezone: string = "UTC",
+  timezone: string = "UTC"
 ) => {
   if (timezone == "UTC") return Math.floor(new Date(utcTime).getTime());
   else {
     return (
       Math.floor(
-        DateTime.fromISO(utcTime, { zone: "UTC" })
-          .setZone(timezone)
-          .toSeconds(),
+        DateTime.fromISO(utcTime, { zone: "UTC" }).setZone(timezone).toSeconds()
       ) * 1000
     );
   }
@@ -587,7 +585,7 @@ export const histogramDateTimezone: any = (
 // const inputTimezone = "Pacific/Pitcairn";
 export const convertToUtcTimestamp = (
   inputDatetime: string,
-  inputTimezone: string,
+  inputTimezone: string
 ) => {
   // Create a DateTime object with the input datetime and timezone
   const dt = DateTime.fromFormat(inputDatetime, "yyyy/MM/dd HH:mm:ss", {
@@ -602,7 +600,7 @@ export const convertToUtcTimestamp = (
 
 export const localTimeSelectedTimezoneUTCTime = async (
   time: any,
-  timezone: string,
+  timezone: string
 ) => {
   await importMoment();
   // Creating a Date object using the timestamp
@@ -619,7 +617,7 @@ export const localTimeSelectedTimezoneUTCTime = async (
   // Create a moment object using the provided date, time, and timezone
   const convertedDate = moment.tz(
     { year, month, day, hour, minute, second },
-    timezone,
+    timezone
   );
 
   // Convert the moment object to a Unix timestamp (in seconds)
@@ -710,19 +708,19 @@ export const getFunctionErrorMessage = (
   message: string,
   newStartTime: number,
   newEndTime: number,
-  timezone = "UTC",
+  timezone = "UTC"
 ) => {
   try {
     // Convert timestamps to formatted dates using timestampToTimezoneDate function
     const startTimeFormatted = timestampToTimezoneDate(
       newStartTime / 1000,
       timezone,
-      "yyyy-MM-dd HH:mm:ss",
+      "yyyy-MM-dd HH:mm:ss"
     );
     const endTimeFormatted = timestampToTimezoneDate(
       newEndTime / 1000,
       timezone,
-      "yyyy-MM-dd HH:mm:ss",
+      "yyyy-MM-dd HH:mm:ss"
     );
 
     return `${message} (Data returned for: ${startTimeFormatted} to ${endTimeFormatted})`;
@@ -822,7 +820,7 @@ export const getTimezoneOffset = () => {
   const convertedDateTime = convertDateToTimestamp(
     scheduleDate,
     scheduleTime,
-    ScheduleTimezone,
+    ScheduleTimezone
   );
 
   return convertedDateTime.offset;
@@ -831,7 +829,7 @@ export const getTimezoneOffset = () => {
 export const convertDateToTimestamp = (
   date: string,
   time: string,
-  timezone: string,
+  timezone: string
 ) => {
   const browserTime =
     "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";

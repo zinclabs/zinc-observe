@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -45,7 +45,11 @@
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <q-btn
-          v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length && disable"
+          v-if="
+            config.isEnterprise == 'true' &&
+            searchRequestTraceIds.length &&
+            disable
+          "
           class="q-ml-sm"
           outline
           padding="xs"
@@ -98,7 +102,10 @@
                 data-test="dashboard-viewpanel-variables-value-selector"
               />
               <div style="flex: 1; overflow: hidden">
-                <div class="tw-flex tw-justify-end tw-mr-2">
+                <div
+                  class="tw-flex tw-justify-end tw-mr-2"
+                  data-test="view-panel-last-refreshed-at"
+                >
                   <span v-if="lastTriggeredAt" class="lastRefreshedAt">
                     <span class="lastRefreshedAtIcon">🕑</span
                     ><RelativeTime
@@ -122,6 +129,7 @@
                   @update:initialVariableValues="onUpdateInitialVariableValues"
                   @last-triggered-at-update="handleLastTriggeredAtUpdate"
                   data-test="dashboard-viewpanel-panel-schema-renderer"
+                  style="height: calc(100% - 21px)"
                 />
               </div>
               <DashboardErrorsComponent
@@ -215,7 +223,7 @@ export default defineComponent({
     let parser: any;
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard",
+      "dashboard"
     );
     const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
@@ -293,7 +301,7 @@ export default defineComponent({
                 if (!histogramInterval.value.value) {
                   histogramExpr.args.value = histogramExpr.args.value.slice(
                     0,
-                    1,
+                    1
                   );
                 }
 
@@ -326,7 +334,7 @@ export default defineComponent({
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-      },
+      }
     );
 
     const onDataZoom = (event: any) => {
@@ -363,11 +371,11 @@ export default defineComponent({
           route.query.dashboard,
           props.panelId,
           route.query.folder,
-          route.query.tab ?? dashboardPanelData.data.panels[0]?.tabId,
+          route.query.tab ?? dashboardPanelData.data.panels[0]?.tabId
         );
         Object.assign(
           dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData)),
+          JSON.parse(JSON.stringify(panelData))
         );
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -380,8 +388,8 @@ export default defineComponent({
           : dashboardPanelData.data.queries
               .map((q: any) =>
                 [...q.fields.x, ...q.fields.y, ...q.fields.z].find(
-                  (f: any) => f.aggregationFunction == "histogram",
-                ),
+                  (f: any) => f.aggregationFunction == "histogram"
+                )
               )
               .filter((field: any) => field != undefined);
 
@@ -425,9 +433,9 @@ export default defineComponent({
           await getDashboard(
             store,
             route.query.dashboard,
-            route.query.folder ?? "default",
-          ),
-        ),
+            route.query.folder ?? "default"
+          )
+        )
       );
       currentDashboardData.data = data;
 
@@ -468,7 +476,7 @@ export default defineComponent({
       props?.initialVariableValues?.values?.forEach((variable: any) => {
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value,
+            (item: any) => item.name && item.operator && item.value
           );
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,
@@ -476,7 +484,7 @@ export default defineComponent({
             value: item.value,
           }));
           variableObj[`${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters),
+            JSON.stringify(encodedFilters)
           );
         } else {
           variableObj[`${variable.name}`] = variable.value;
@@ -502,12 +510,12 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide(
       "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState,
+      variablesAndPanelsDataLoadingState
     );
 
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
-        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds
       ).filter((item: any) => item.length > 0);
       return searchIds.flat() as string[];
     });
@@ -520,10 +528,10 @@ export default defineComponent({
     };
 
     const disable = ref(false);
-    
+
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels,
+        variablesAndPanelsDataLoadingState.panels
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });

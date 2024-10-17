@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,9 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="q-ma-md">
       <CopyContent class="q-mt-sm" :content="content" />
     </div>
-    <div style="margin-left: 20px;" >
+    <div style="margin-left: 20px">
       Check further documentation at
-      <a target="_blank"
+      <a
+        target="_blank"
         href="https://axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve/"
         >https://axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve/</a
       >

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -35,7 +35,7 @@ export const convertPanelData = async (
   chartPanelRef: any,
   hoveredSeriesState: any,
   resultMetaData: any,
-  metadata: any,
+  metadata: any
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -66,7 +66,7 @@ export const convertPanelData = async (
             data,
             store,
             chartPanelRef,
-            hoveredSeriesState,
+            hoveredSeriesState
           )),
         };
       } else {
@@ -81,7 +81,7 @@ export const convertPanelData = async (
             chartPanelRef,
             hoveredSeriesState,
             resultMetaData,
-            metadata,
+            metadata
           )),
         };
       }

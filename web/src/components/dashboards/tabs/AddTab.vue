@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -153,14 +153,14 @@ export default defineComponent({
         dashboardData.value = await getDashboard(
           store,
           props.dashboardId,
-          props.folderId ?? route.query.folder ?? "default",
+          props.folderId ?? route.query.folder ?? "default"
         );
         tabData.value = JSON.parse(
           JSON.stringify(
             dashboardData?.value?.tabs?.find(
-              (tab: any) => tab.tabId === props.tabId,
-            ),
-          ),
+              (tab: any) => tab.tabId === props.tabId
+            )
+          )
         );
       }
     };
@@ -181,7 +181,7 @@ export default defineComponent({
               props.dashboardId,
               props.folderId ?? route.query.folder ?? "default",
               tabData.value.tabId,
-              tabData.value,
+              tabData.value
             );
 
             // emit refresh to rerender
@@ -197,7 +197,7 @@ export default defineComponent({
               store,
               props.dashboardId,
               props.folderId ?? route.query.folder ?? "default",
-              tabData.value,
+              tabData.value
             );
 
             // emit refresh to rerender
@@ -217,7 +217,7 @@ export default defineComponent({
             showConfictErrorNotificationWithRefreshBtn(
               error?.response?.data?.message ??
                 error?.message ??
-                (props.editMode ? "Failed to update tab" : "Failed to add tab"),
+                (props.editMode ? "Failed to update tab" : "Failed to add tab")
             );
           } else {
             showErrorNotification(
@@ -225,7 +225,7 @@ export default defineComponent({
                 (props.editMode ? "Failed to update tab" : "Failed to add tab"),
               {
                 timeout: 2000,
-              },
+              }
             );
           }
         } finally {

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -256,12 +256,12 @@ const deleteTemplate = () => {
       })
       .then(() => {
         q.notify({
-            type: "positive",
-            message: `Template ${confirmDelete.value.data.name} deleted successfully`,
-            timeout: 2000,
-          });
-        
-        getTemplates()
+          type: "positive",
+          message: `Template ${confirmDelete.value.data.name} deleted successfully`,
+          timeout: 2000,
+        });
+
+        getTemplates();
       })
       .catch((err) => {
         if (err.response.data.code === 409) {

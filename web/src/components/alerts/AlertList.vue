@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -277,7 +277,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 fill-input
                 hide-selected
                 :input-debounce="400"
-
               />
               <div class="flex justify-center q-mt-lg">
                 <q-btn
@@ -350,7 +349,7 @@ export default defineComponent({
   components: {
     QTablePagination,
     AddAlert: defineAsyncComponent(
-      () => import("@/components/alerts/AddAlert.vue"),
+      () => import("@/components/alerts/AddAlert.vue")
     ),
     NoData,
     ConfirmDialog,
@@ -471,7 +470,7 @@ export default defineComponent({
           "name",
           false,
           "",
-          store.state.selectedOrganization.identifier,
+          store.state.selectedOrganization.identifier
         )
         .then((res) => {
           var counter = 1;
@@ -510,10 +509,10 @@ export default defineComponent({
               uuid: data.uuid,
               owner: data.owner,
               last_triggered_at: convertUnixToQuasarFormat(
-                data.last_triggered_at,
+                data.last_triggered_at
               ),
               last_satisfied_at: convertUnixToQuasarFormat(
-                data.last_satisfied_at,
+                data.last_satisfied_at
               ),
             };
           });
@@ -556,7 +555,7 @@ export default defineComponent({
       () => router.currentRoute.value.query.action,
       (action) => {
         if (!action) showAddAlertDialog.value = false;
-      },
+      }
     );
     const getDestinations = () => {
       destinationService
@@ -571,7 +570,7 @@ export default defineComponent({
             type: "negative",
             message: "Error while fetching destinations.",
             timeout: 3000,
-          }),
+          })
         );
     };
 
@@ -588,7 +587,7 @@ export default defineComponent({
             type: "negative",
             message: "Error while fetching templates.",
             timeout: 3000,
-          }),
+          })
         );
     };
     const perPageOptions: any = [
@@ -636,7 +635,7 @@ export default defineComponent({
     };
     const submitForm = async () => {
       const alertToBeCloned = alerts.value.find(
-        (alert) => alert.uuid === toBeCloneUUID.value,
+        (alert) => alert.uuid === toBeCloneUUID.value
       ) as Alert;
 
       const dismiss = $q.notify({
@@ -681,7 +680,7 @@ export default defineComponent({
             store.state.selectedOrganization.identifier,
             alertToBeCloned.stream_name,
             alertToBeCloned.stream_type,
-            alertToBeCloned,
+            alertToBeCloned
           )
           .then((res) => {
             dismiss();
@@ -724,7 +723,7 @@ export default defineComponent({
     };
     const showAddUpdateFn = (props: any) => {
       formData.value = alerts.value.find(
-        (alert: any) => alert.uuid === props.row?.uuid,
+        (alert: any) => alert.uuid === props.row?.uuid
       ) as Alert;
       //use this comment for testing multi_time_range shifts
       // if( formData.value){
@@ -782,7 +781,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           selectedDelete.value.stream_name,
           selectedDelete.value.name,
-          selectedDelete.value.stream_type,
+          selectedDelete.value.stream_type
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -832,7 +831,7 @@ export default defineComponent({
       update(() => {
         const value = val.toLowerCase();
         filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1,
+          (column: any) => column.toLowerCase().indexOf(value) > -1
         );
       });
       return filteredOptions;
@@ -847,7 +846,7 @@ export default defineComponent({
         indexOptions.value = streams.value[toBeClonestreamType.value].map(
           (data: any) => {
             return data.name;
-          },
+          }
         );
         updateStreamName(toBeClonestreamName.value);
 
@@ -877,7 +876,7 @@ export default defineComponent({
     const toggleAlertState = (row: any) => {
       alertStateLoadingMap.value[row.uuid] = true;
       const alert: Alert = alerts.value.find(
-        (alert) => alert.uuid === row.uuid,
+        (alert) => alert.uuid === row.uuid
       ) as Alert;
       alertsService
         .toggleState(
@@ -885,7 +884,7 @@ export default defineComponent({
           alert.stream_name,
           alert.name,
           !alert?.enabled,
-          alert.stream_type,
+          alert.stream_type
         )
         .then(() => {
           alert.enabled = !alert.enabled;

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -286,7 +286,7 @@ export default defineComponent({
     ConfirmDialog,
     QueryTypeSelector,
     queryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue"),
+      () => import("@/components/QueryEditor.vue")
     ),
   },
   emits: ["searchdata"],
@@ -303,7 +303,7 @@ export default defineComponent({
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard",
+      "dashboard"
     );
 
     const { getAllFunctions } = useFunctions();
@@ -374,14 +374,14 @@ export default defineComponent({
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const splitterModel = ref(
-      promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70,
+      promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70
     );
 
     watch(
       () => splitterModel.value,
       () => {
         window.dispatchEvent(new Event("resize"));
-      },
+      }
     );
     const confirmQueryModeChangeDialog = ref(false);
 
@@ -412,7 +412,7 @@ export default defineComponent({
         } else {
           splitterModel.value = 70;
         }
-      },
+      }
     );
 
     const removeTab = async (index) => {
@@ -457,7 +457,7 @@ export default defineComponent({
       () => dashboardPanelData.layout.showQueryBar,
       () => {
         window.dispatchEvent(new Event("resize"));
-      },
+      }
     );
 
     // this is only for VRLs
@@ -499,7 +499,7 @@ export default defineComponent({
       () => dashboardPanelData.meta.errors.queryErrors,
       () => {
         window.dispatchEvent(new Event("resize"));
-      },
+      }
     );
 
     const updatePromQLQuery = async (event, value) => {

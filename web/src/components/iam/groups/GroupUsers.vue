@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -218,7 +218,7 @@ watch(
   },
   {
     deep: true,
-  },
+  }
 );
 
 const updateUserTable = async (value: string) => {
@@ -240,7 +240,7 @@ const getchOrgUsers = async () => {
   hasFetchedOrgUsers.value = true;
   return new Promise(async (resolve) => {
     const data: any = await usersState.getOrgUsers(
-      store.state.selectedOrganization.identifier,
+      store.state.selectedOrganization.identifier
     );
 
     usersState.users = cloneDeep(
@@ -250,7 +250,7 @@ const getchOrgUsers = async () => {
           "#": index + 1,
           isInGroup: groupUsersMap.value.has(user.email),
         };
-      }),
+      })
     );
 
     users.value = cloneDeep(usersState.users).map(
@@ -260,7 +260,7 @@ const getchOrgUsers = async () => {
           email: user.email,
           isInGroup: groupUsersMap.value.has(user.email),
         };
-      },
+      }
     );
     resolve(true);
   });

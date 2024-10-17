@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -45,7 +45,7 @@ const applyValueMapping = (value: any, mappings: any) => {
 export const convertTableData = (
   panelSchema: any,
   searchQueryData: any,
-  store: any,
+  store: any
 ) => {
   // if no data than return it
   if (
@@ -81,7 +81,7 @@ export const convertTableData = (
     const xAxisKeys = x.map((key: any) => key.alias);
     const yAxisKeys = y.map((key: any) => key.alias);
     responseKeys = responseKeys?.filter(
-      (key: any) => !xAxisKeys.includes(key) && !yAxisKeys.includes(key),
+      (key: any) => !xAxisKeys.includes(key) && !yAxisKeys.includes(key)
     );
 
     // create panelSchema fields object
@@ -152,7 +152,7 @@ export const convertTableData = (
         // value mapping
         const valueMapping = applyValueMapping(
           val,
-          panelSchema.config?.mappings,
+          panelSchema.config?.mappings
         );
 
         if (valueMapping != null) {
@@ -168,7 +168,7 @@ export const convertTableData = (
           // value mapping
           const valueMapping = applyValueMapping(
             val,
-            panelSchema.config?.mappings,
+            panelSchema.config?.mappings
           );
 
           if (valueMapping != null) {
@@ -182,8 +182,8 @@ export const convertTableData = (
                     val,
                     panelSchema.config?.unit,
                     panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals ?? 2,
-                  ),
+                    panelSchema.config?.decimals ?? 2
+                  )
                 ) ?? 0
               }`
             : val;
@@ -197,7 +197,7 @@ export const convertTableData = (
           // value mapping
           const valueMapping = applyValueMapping(
             val,
-            panelSchema.config?.mappings,
+            panelSchema.config?.mappings
           );
 
           if (valueMapping != null) {
@@ -209,8 +209,8 @@ export const convertTableData = (
               typeof val === "string"
                 ? `${val}Z`
                 : new Date(val)?.getTime() / 1000,
-              store.state.timezone,
-            ),
+              store.state.timezone
+            )
           );
         };
       }
@@ -219,7 +219,7 @@ export const convertTableData = (
   } else {
     // lets get all columns from a particular field
     const transposeColumns = searchQueryData[0].map(
-      (it: any) => it[transposeColumn] ?? "",
+      (it: any) => it[transposeColumn] ?? ""
     );
 
     let uniqueTransposeColumns: any = [];
@@ -262,7 +262,7 @@ export const convertTableData = (
 
           if (!isNaN(parsedDate.getTime())) {
             formattedDate = formatDate(
-              toZonedTime(parsedDate, store.state.timezone),
+              toZonedTime(parsedDate, store.state.timezone)
             );
           }
 
@@ -302,7 +302,7 @@ export const convertTableData = (
           // value mapping
           const valueMapping = applyValueMapping(
             val,
-            panelSchema.config?.mappings,
+            panelSchema.config?.mappings
           );
 
           if (valueMapping != null) {
@@ -318,7 +318,7 @@ export const convertTableData = (
             // value mapping
             const valueMapping = applyValueMapping(
               val,
-              panelSchema.config?.mappings,
+              panelSchema.config?.mappings
             );
 
             if (valueMapping != null) {
@@ -332,8 +332,8 @@ export const convertTableData = (
                       val,
                       panelSchema.config?.unit,
                       panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals ?? 2,
-                    ),
+                      panelSchema.config?.decimals ?? 2
+                    )
                   ) ?? 0
                 }`
               : val;
@@ -346,7 +346,7 @@ export const convertTableData = (
             // value mapping
             const valueMapping = applyValueMapping(
               val,
-              panelSchema.config?.mappings,
+              panelSchema.config?.mappings
             );
 
             if (valueMapping != null) {
@@ -357,8 +357,8 @@ export const convertTableData = (
                 typeof val === "string"
                   ? `${val}Z`
                   : new Date(val)?.getTime() / 1000,
-                store.state.timezone,
-              ),
+                store.state.timezone
+              )
             );
           };
         }
@@ -378,13 +378,13 @@ export const convertTableData = (
                   typeof value === "string"
                     ? `${value}Z`
                     : new Date(value)?.getTime() / 1000,
-                  store.state.timezone,
-                ),
+                  store.state.timezone
+                )
               )
             : value;
           return acc;
         },
-        {},
+        {}
       );
       obj["label"] = it.label || transposeColumnLabel; // Add the label corresponding to each column
       return obj;

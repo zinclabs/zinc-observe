@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -111,7 +111,7 @@ export default defineComponent({
   components: {
     VariableSettings,
     GeneralSettings,
-    TabsSettings
+    TabsSettings,
   },
   emits: ["refresh"],
   setup(props, { emit }) {

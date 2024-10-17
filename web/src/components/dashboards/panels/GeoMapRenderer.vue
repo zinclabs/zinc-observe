@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -199,7 +199,7 @@ export default defineComponent({
             props.data.options?.lmap?.center[1],
             props.data.options?.lmap?.center[0],
           ],
-          props.data.options?.lmap?.zoom,
+          props.data.options?.lmap?.zoom
         );
       }
       // L.geoJson(mapData).addTo(lmap);
@@ -248,11 +248,11 @@ export default defineComponent({
               props.data.options?.lmap?.center[1],
               props.data.options?.lmap?.center[0],
             ],
-            props.data.options?.lmap?.zoom,
+            props.data.options?.lmap?.zoom
           );
         }
       },
-      { deep: true },
+      { deep: true }
     );
     return { chartRef };
   },

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="column full-height no-wrap searchdetaildialog"
     data-test="dialog-box"
   >
- 
     <q-card-section class="q-pa-md q-pb-md">
       <div class="row items-center no-wrap">
         <div class="col">
@@ -76,8 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="tab-panels-container"
       v-model="tab"
       animated
-    >   
-
+    >
       <q-tab-panel name="json" class="q-pa-none">
         <q-card-section
           data-test="log-detail-json-content"
@@ -209,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-item
                         v-if="
                           !searchObj.data.stream.selectedFields.includes(
-                            value.toString(),
+                            value.toString()
                           )
                         "
                         clickable
@@ -385,7 +383,6 @@ export default defineComponent({
     },
   },
   methods: {
-
     toggleIncludeSearchTerm(term: string) {
       // if (flag == false) {
       this.$emit("add:searchterm", term);
@@ -439,7 +436,7 @@ export default defineComponent({
     const toggleWrapLogDetails = () => {
       window.localStorage.setItem(
         "wrap-log-details",
-        shouldWrapValues.value ? "true" : "false",
+        shouldWrapValues.value ? "true" : "false"
       );
     };
 
@@ -466,7 +463,7 @@ export default defineComponent({
           type: "positive",
           message: "Content Copied Successfully!",
           timeout: 1000,
-        }),
+        })
       );
     };
 

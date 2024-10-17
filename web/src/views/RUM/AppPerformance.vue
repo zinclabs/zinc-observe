@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -186,7 +186,7 @@ export default defineComponent({
       () => activePerformanceTab.value,
       () => {
         updateRoute();
-      },
+      }
     );
 
     const route = useRoute();
@@ -218,7 +218,7 @@ export default defineComponent({
 
     watch(
       () => routeName.value,
-      () => updateTabOnRouteChange(),
+      () => updateTabOnRouteChange()
     );
 
     const updateTabOnRouteChange = () => {
@@ -285,8 +285,8 @@ export default defineComponent({
       valueType: params.period
         ? "relative"
         : params.from && params.to
-          ? "absolute"
-          : "relative",
+        ? "absolute"
+        : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : null,
@@ -369,7 +369,7 @@ export default defineComponent({
         store,
         route.query.dashboard,
         panelId,
-        route.query.folder ?? "default",
+        route.query.folder ?? "default"
       );
       await loadDashboard();
     };

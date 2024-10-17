@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -108,7 +108,7 @@ export default defineComponent({
       () => props.variableItem,
       () => {
         options.value = props.variableItem?.options;
-      },
+      }
     );
 
     // isAllSelected should be true if all options are selected and false otherwise
@@ -123,7 +123,7 @@ export default defineComponent({
     const toggleSelectAll = () => {
       if (!isAllSelected.value) {
         selectedValue.value = fieldsFilteredOptions.value.map(
-          (option: any) => option.value,
+          (option: any) => option.value
         );
       } else {
         selectedValue.value = [];
@@ -140,13 +140,18 @@ export default defineComponent({
       if (selectedValue.value || selectedValue.value == "") {
         if (Array.isArray(selectedValue.value)) {
           if (selectedValue.value.length > 2) {
-            const firstTwoValues = selectedValue.value.slice(0, 2).map((it: any) => it === "" ? "<blank>" : it).join(", ");
+            const firstTwoValues = selectedValue.value
+              .slice(0, 2)
+              .map((it: any) => (it === "" ? "<blank>" : it))
+              .join(", ");
             const remainingCount = selectedValue.value.length - 2;
             return `${firstTwoValues} ...+${remainingCount} more`;
           } else if (props.variableItem.options.length == 0) {
             return "(No Data Found)";
           } else {
-            return selectedValue.value.map((it: any) => it === "" ? "<blank>" : it).join(", ");
+            return selectedValue.value
+              .map((it: any) => (it === "" ? "<blank>" : it))
+              .join(", ");
           }
         } else if (selectedValue.value == "") {
           return "<blank>";

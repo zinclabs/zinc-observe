@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2024 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,13 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::ops::ControlFlow;
+
 use sqlparser::{
-    ast::{Expr, Function, GroupByExpr, Query, SelectItem, SetExpr, Statement},
+    ast::{Expr, Function, GroupByExpr, Query, SelectItem, SetExpr, Statement, Visit, Visitor},
     dialect::GenericDialect,
     parser::Parser,
 };
 
-pub const AGGREGATE_UDF_LIST: [&str; 8] = [
+pub const AGGREGATE_UDF_LIST: [&str; 9] = [
     "min",
     "max",
     "avg",
@@ -28,14 +30,20 @@ pub const AGGREGATE_UDF_LIST: [&str; 8] = [
     "median",
     "array_agg",
     "approx_percentile_cont",
+    "percentile_cont",
 ];
 
 pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
 
-    for statement in ast {
+    for statement in ast.iter() {
         if let Statement::Query(query) = statement {
-            if is_aggregate_in_select(&query) || has_group_by(&query) || has_having(&query) {
+            if is_aggregate_in_select(query)
+                || has_group_by(query)
+                || has_having(query)
+                || has_join(query)
+                || has_subquery(statement)
+            {
                 return Ok(true);
             }
         }
@@ -117,5 +125,48 @@ fn has_having(query: &Query) -> bool {
         select.having.is_some()
     } else {
         false
+    }
+}
+
+fn has_join(query: &Query) -> bool {
+    if let SetExpr::Select(ref select) = *query.body {
+        select.from.len() > 1
+            || select
+                .from
+                .first()
+                .map_or(false, |table| !table.joins.is_empty())
+    } else {
+        false
+    }
+}
+
+fn has_subquery(stat: &Statement) -> bool {
+    let mut visitor = SubqueryVisitor::new();
+    stat.visit(&mut visitor);
+    visitor.is_subquery
+}
+
+struct SubqueryVisitor {
+    pub is_subquery: bool,
+}
+
+impl SubqueryVisitor {
+    fn new() -> Self {
+        Self { is_subquery: false }
+    }
+}
+
+impl Visitor for SubqueryVisitor {
+    type Break = ();
+
+    fn pre_visit_expr(&mut self, expr: &Expr) -> ControlFlow<Self::Break> {
+        match expr {
+            Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. } => {
+                self.is_subquery = true;
+                return ControlFlow::Break(());
+            }
+            _ => {}
+        }
+        ControlFlow::Continue(())
     }
 }

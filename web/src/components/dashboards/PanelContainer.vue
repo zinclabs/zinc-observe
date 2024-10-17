@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           padding="1px"
           @click="
             PanleSchemaRendererRef?.tableRendererRef?.downloadTableAsCSV(
-              props.data.title,
+              props.data.title
             )
           "
           title="Download as a CSV"
@@ -364,7 +364,7 @@ export default defineComponent({
             query.function_error,
             query.new_start_time,
             query.new_end_time,
-            store.state.timezone,
+            store.state.timezone
           );
           combinedWarnings.push(combinedMessage);
         }
@@ -384,7 +384,7 @@ export default defineComponent({
     // to store and show warning if the cached data is different with current time range
     const isCachedDataDifferWithCurrentTimeRange: any = ref(false);
     const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (
-      isDiffer: boolean,
+      isDiffer: boolean
     ) => {
       isCachedDataDifferWithCurrentTimeRange.value = isDiffer;
     };
@@ -406,7 +406,7 @@ export default defineComponent({
 
       const metaDataDynamic = metaData.value?.queries?.every((it: any) => {
         const vars = it?.variables?.filter(
-          (it: any) => it.type === "dynamicVariable",
+          (it: any) => it.type === "dynamicVariable"
         );
         return vars?.length == adhocVariables?.length;
       });
@@ -453,7 +453,7 @@ export default defineComponent({
           route.query.dashboard,
           panelData,
           route.query.folder ?? "default",
-          route.query.tab ?? data.panels[0]?.tabId,
+          route.query.tab ?? data.panels[0]?.tabId
         );
 
         // Show a success notification.
@@ -478,7 +478,7 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Panel duplication failed",
+              "Panel duplication failed"
           );
         } else {
           showErrorNotification(error?.message ?? "Panel duplication failed");

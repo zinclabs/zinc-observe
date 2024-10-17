@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -318,7 +318,7 @@ onBeforeMount(() => {
       }));
       resultTotal.value = reportsTableRows.value.length;
       staticReportsList.value = JSON.parse(
-        JSON.stringify(reportsTableRows.value),
+        JSON.stringify(reportsTableRows.value)
       );
       filterReports();
     })
@@ -370,7 +370,7 @@ const toggleReportState = (report: any) => {
     .toggleReportState(
       store.state.selectedOrganization.identifier,
       report.name,
-      !report.enabled,
+      !report.enabled
     )
     .then(() => {
       report.enabled = !report.enabled;
@@ -419,12 +419,12 @@ const deleteReport = (report: any) => {
   reports
     .deleteReport(
       store.state.selectedOrganization.identifier,
-      deleteDialog.value.data,
+      deleteDialog.value.data
     )
     .then(() => {
       // Find the index of the row that matches the condition
       const deleteIndex = reportsTableRows.value.findIndex(
-        (row: any) => row.name === deleteDialog.value.data,
+        (row: any) => row.name === deleteDialog.value.data
       );
 
       // Check if a matching row was found
@@ -463,11 +463,11 @@ const filterReports = () => {
   // If reports are cached, show only cached reports
   if (activeTab.value === "cached") {
     reportsTableRows.value = (staticReportsList.value as any).filter(
-      (report: any) => !report.destinations.length,
+      (report: any) => !report.destinations.length
     );
   } else {
     reportsTableRows.value = (staticReportsList.value as any).filter(
-      (report: any) => report.destinations.length,
+      (report: any) => report.destinations.length
     );
   }
 
@@ -477,7 +477,7 @@ const filterReports = () => {
         ...report,
         "#": index + 1,
       };
-    },
+    }
   ) as any[];
 
   resultTotal.value = reportsTableRows.value.length;

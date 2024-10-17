@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -54,7 +54,7 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
-    const content = `[sinks.zinc]
+    const content = `[sinks.openobserve]
 type = "http"
 inputs = [ source or transform id ]
 uri = "${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json"

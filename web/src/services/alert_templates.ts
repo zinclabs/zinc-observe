@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,8 +21,10 @@ const template = {
   },
   update: ({ org_identifier, template_name, data }: any) => {
     return http().put(
-      `/api/${org_identifier}/alerts/templates/${encodeURIComponent(template_name)}`,
-      data,
+      `/api/${org_identifier}/alerts/templates/${encodeURIComponent(
+        template_name
+      )}`,
+      data
     );
   },
   list: ({ org_identifier }: any) => {
@@ -30,12 +32,16 @@ const template = {
   },
   get_by_name: ({ org_identifier, template_name }: any) => {
     return http().get(
-      `/api/${org_identifier}/alerts/templates/${encodeURIComponent(template_name)}`,
+      `/api/${org_identifier}/alerts/templates/${encodeURIComponent(
+        template_name
+      )}`
     );
   },
   delete: ({ org_identifier, template_name }: any) => {
     return http().delete(
-      `/api/${org_identifier}/alerts/templates/${encodeURIComponent(template_name)}`,
+      `/api/${org_identifier}/alerts/templates/${encodeURIComponent(
+        template_name
+      )}`
     );
   },
 };

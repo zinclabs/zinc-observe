@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -82,8 +82,7 @@ export default function (store: any) {
           // if user is not logged in, then user will be redirected to login page and after successful login, user will be redirected to the short URL
           if (Object.hasOwn(to.query, "short_url")) {
             window.sessionStorage.setItem("redirectURI", to.query.short_url);
-          }
-          else {
+          } else {
             window.sessionStorage.setItem("redirectURI", window.location.href);
           }
         }

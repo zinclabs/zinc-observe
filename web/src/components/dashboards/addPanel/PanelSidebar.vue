@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="sidebar" :class="{ open: isOpen }">
     <div v-if="!isOpen" class="sidebar-header-collapsed" @click="toggleSidebar">
       <!-- <div class="collapsed-icon">+</div> -->
-      <q-icon name="expand_all" class="collapsed-icon rotate-90" data-test="dashboard-sidebar"/>
+      <q-icon
+        name="expand_all"
+        class="collapsed-icon rotate-90"
+        data-test="dashboard-sidebar"
+      />
       <div class="collapsed-title">{{ title }}</div>
     </div>
     <div v-else class="sidebar-header-expanded">

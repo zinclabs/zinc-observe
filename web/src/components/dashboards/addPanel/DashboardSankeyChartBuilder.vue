@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.source.column,
-              'source',
+              'source'
             )
           "
         >
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.target.column,
-              'target',
+              'target'
             )
           "
         >
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.value.column,
-              'value',
+              'value'
             )
           "
         >
@@ -498,7 +498,7 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard",
+      "dashboard"
     );
     const {
       dashboardPanelData,
@@ -547,7 +547,7 @@ export default defineComponent({
           expansionItems.value = true;
           expansionItems.filter = true;
         }
-      },
+      }
     );
 
     const onDrop = (e: any, targetAxis: string) => {
@@ -580,11 +580,11 @@ export default defineComponent({
 
         const dragName =
           selectedStreamFieldsBasedOnUserDefinedSchema.value.find(
-            (item: any) => item?.name === dragElement,
+            (item: any) => item?.name === dragElement
           );
         const customDragName =
           dashboardPanelData.meta.stream.customQueryFields.find(
-            (item: any) => item?.name === dragElement,
+            (item: any) => item?.name === dragElement
           );
 
         if (dragName || customDragName) {

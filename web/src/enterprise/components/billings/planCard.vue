@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -96,8 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="q-mt-lg q-mb-xl">
         <div class="q-mt-sm" v-for="rule in planData.included">
-          <q-icon name="check_circle" size="20px"
-:color="cardColor" />
+          <q-icon name="check_circle" size="20px" :color="cardColor" />
           <span class="q-ml-sm text-body1 text-weight-redular">{{ rule }}</span>
         </div>
       </div>

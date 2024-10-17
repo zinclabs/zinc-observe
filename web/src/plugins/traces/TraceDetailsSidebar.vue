@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -457,11 +457,11 @@ export default defineComponent({
       },
       {
         deep: true,
-      },
+      }
     );
 
     const getDuration = computed(() =>
-      formatTimeWithSuffix(props.span.duration),
+      formatTimeWithSuffix(props.span.duration)
     );
 
     onBeforeMount(() => {
@@ -476,12 +476,12 @@ export default defineComponent({
         field: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
+            "MMM DD, YYYY HH:mm:ss.SSS Z"
           ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
+            "MMM DD, YYYY HH:mm:ss.SSS Z"
           ),
         label: "Timestamp",
         align: "left",
@@ -503,12 +503,12 @@ export default defineComponent({
         field: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
+            "MMM DD, YYYY HH:mm:ss.SSS Z"
           ),
         prop: (row: any) =>
           date.formatDate(
             Math.floor(row[store.state.zoConfig.timestamp_column] / 1000000),
-            "MMM DD, YYYY HH:mm:ss.SSS Z",
+            "MMM DD, YYYY HH:mm:ss.SSS Z"
           ),
         label: "Timestamp",
         align: "left",
@@ -545,7 +545,7 @@ export default defineComponent({
 
     const getExceptionEvents = computed(() => {
       return spanDetails.value.events.filter(
-        (event: any) => event.name === "exception",
+        (event: any) => event.name === "exception"
       );
     });
 
@@ -580,14 +580,14 @@ export default defineComponent({
       spanDetails.attrs[store.state.zoConfig.timestamp_column] =
         date.formatDate(
           Math.floor(
-            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
+            spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000
           ),
-          "MMM DD, YYYY HH:mm:ss.SSS Z",
+          "MMM DD, YYYY HH:mm:ss.SSS Z"
         );
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       spanDetails.events = JSON.parse(props.span.events || "[]").map(
-        (event: any) => event,
+        (event: any) => event
       );
 
       return spanDetails;
@@ -626,7 +626,7 @@ export default defineComponent({
       {
         deep: true,
         immediate: true,
-      },
+      }
     );
     function formatStackTrace(trace: any) {
       // Split the trace into lines

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -161,7 +161,7 @@ const props = defineProps({
 const { t } = useI18n();
 
 const scheduledReports = ref<ScheduledDashboardReport[]>(
-  props.reports as ScheduledDashboardReport[],
+  props.reports as ScheduledDashboardReport[]
 );
 
 const formattedReports = ref<ScheduledDashboardReport[]>([]);
@@ -192,7 +192,7 @@ watch(
   },
   {
     deep: true,
-  },
+  }
 );
 
 const formatReports = () => {
@@ -209,7 +209,7 @@ const formatReports = () => {
         ? convertUnixToQuasarFormat(report.lastTriggeredAt)
         : "-",
       created_at: convertUnixToQuasarFormat(
-        new Date(report.createdAt).getTime() * 1000,
+        new Date(report.createdAt).getTime() * 1000
       ),
       orgId: report.orgId,
       isCached: !report.destinations.length,
@@ -243,7 +243,7 @@ const filterReports = () => {
         ...report,
         "#": index + 1,
       };
-    },
+    }
   );
 
   resultTotal.value = formattedReports.value.length;
@@ -360,13 +360,21 @@ const getFrequencyValue = (frequency: any) => {
       case "once":
         return `Once`;
       case "hours":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Hours" : "Hour"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
+          frequency.interval > 1 ? "Hours" : "Hour"
+        }`;
       case "weeks":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Weeks" : "Week"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
+          frequency.interval > 1 ? "Weeks" : "Week"
+        }`;
       case "months":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Months" : "Month"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
+          frequency.interval > 1 ? "Months" : "Month"
+        }`;
       case "days":
-        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${frequency.interval > 1 ? "Days" : "Day"}`;
+        return `Every ${frequency.interval > 1 ? frequency.interval : ""} ${
+          frequency.interval > 1 ? "Days" : "Day"
+        }`;
       default:
         return "";
     }

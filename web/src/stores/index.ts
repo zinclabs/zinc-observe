@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,10 +27,10 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
     ? import.meta.env.VITE_OPENOBSERVE_ENDPOINT.slice(0, -1)
     : import.meta.env.VITE_OPENOBSERVE_ENDPOINT
   : window.location.origin == "http://localhost:8081"
-    ? "/"
-    : pos > -1
-      ? window.location.origin + window.location.pathname.slice(0, pos)
-      : window.location.origin;
+  ? "/"
+  : pos > -1
+  ? window.location.origin + window.location.pathname.slice(0, pos)
+  : window.location.origin;
 
 const organizationObj = {
   organizationPasscode: "",

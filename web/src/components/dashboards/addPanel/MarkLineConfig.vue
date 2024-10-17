@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@
           <q-input
             v-if="
               ['xAxis', 'yAxis'].includes(
-                dashboardPanelData.data.config.mark_line[index].type,
+                dashboardPanelData.data.config.mark_line[index].type
               )
             "
             v-model="dashboardPanelData.data.config.mark_line[index].value"
@@ -140,10 +140,10 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard",
+      "dashboard"
     );
     const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
+      dashboardPanelDataPageKey
     );
 
     onBeforeMount(() => {

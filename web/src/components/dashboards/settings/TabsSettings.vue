@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -195,7 +195,7 @@ export default defineComponent({
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
-        route.query.folder ?? "default",
+        route.query.folder ?? "default"
       );
     };
     const {
@@ -224,7 +224,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           currentDashboardData.data.dashboardId,
           currentDashboardData.data,
-          route.query.folder ?? "default",
+          route.query.folder ?? "default"
         );
 
         // emit refresh to rerender
@@ -238,7 +238,7 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab reorder failed",
+              "Tab reorder failed"
           );
         } else {
           showErrorNotification(error?.message ?? "Tab reorder failed");
@@ -253,10 +253,8 @@ export default defineComponent({
       editTabId.value = tabId;
       editTabObj.data = JSON.parse(
         JSON.stringify(
-          currentDashboardData.data.tabs.find(
-            (tab: any) => tab.tabId === tabId,
-          ),
-        ),
+          currentDashboardData.data.tabs.find((tab: any) => tab.tabId === tabId)
+        )
       );
     };
 
@@ -269,7 +267,7 @@ export default defineComponent({
             currentDashboardData.data.dashboardId,
             route.query.folder ?? "default",
             editTabObj.data.tabId,
-            editTabObj.data,
+            editTabObj.data
           );
 
           // emit refresh to rerender
@@ -288,7 +286,7 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab updation failed",
+              "Tab updation failed"
           );
         } else {
           showErrorNotification(error?.message ?? "Tab updation failed");
@@ -326,7 +324,7 @@ export default defineComponent({
           route.query.dashboard,
           route.query.folder,
           tabIdToBeDeleted.value,
-          moveTabId,
+          moveTabId
         );
         await getDashboardData();
 
@@ -344,7 +342,7 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab deletion failed",
+              "Tab deletion failed"
           );
         } else {
           showErrorNotification(error?.message ?? "Tab deletion failed", {

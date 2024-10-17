@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -126,7 +126,12 @@ export default defineComponent({
     const confirmUpdate = ref<boolean>(false);
 
     onBeforeMount(() => {
-      const ingestRoutes = ["prometheus", "otelCollector", "telegraf", "cloudwatchMetrics"];
+      const ingestRoutes = [
+        "prometheus",
+        "otelCollector",
+        "telegraf",
+        "cloudwatchMetrics",
+      ];
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
           name: router.currentRoute.value.name,

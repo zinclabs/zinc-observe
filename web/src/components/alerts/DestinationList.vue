@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -257,7 +257,7 @@ export default defineComponent({
       () => router.currentRoute.value.query.action,
       (action) => {
         if (!action) showDestinationEditor.value = false;
-      },
+      }
     );
 
     const getDestinations = () => {
@@ -303,12 +303,12 @@ export default defineComponent({
         editDestination(null);
       if (router.currentRoute.value.query.action === "update")
         editDestination(
-          getDestinationByName(router.currentRoute.value.query.name as string),
+          getDestinationByName(router.currentRoute.value.query.name as string)
         );
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find(
-        (destination) => destination.name === name,
+        (destination) => destination.name === name
       );
     };
     const editDestination = (destination: any) => {

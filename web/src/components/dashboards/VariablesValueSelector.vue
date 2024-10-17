@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -154,13 +154,13 @@ export default defineComponent({
       props?.variablesConfig?.list?.forEach((item: any) => {
         let initialValue =
           item.type == "dynamic_filters"
-            ? (JSON.parse(
+            ? JSON.parse(
                 decodeURIComponent(
                   // if initial value is not exist, use the default value : %5B%5D(which is [] in base64)
-                  props.initialVariableValues?.value[item.name] ?? "%5B%5D",
-                ),
-              ) ?? [])
-            : (props.initialVariableValues?.value[item.name] ?? null);
+                  props.initialVariableValues?.value[item.name] ?? "%5B%5D"
+                )
+              ) ?? []
+            : props.initialVariableValues?.value[item.name] ?? null;
 
         if (item.multiSelect) {
           initialValue = Array.isArray(initialValue)
@@ -202,8 +202,8 @@ export default defineComponent({
           JSON.parse(
             decodeURIComponent(
               // if initial value is not exist, use the default value : %5B%5D(which is [] in base64)
-              props.initialVariableValues?.value["Dynamic filters"] ?? "%5B%5D",
-            ),
+              props.initialVariableValues?.value["Dynamic filters"] ?? "%5B%5D"
+            )
           ) ?? [];
 
         // push the variable to the list
@@ -223,7 +223,7 @@ export default defineComponent({
 
       // need to build variables dependency graph on variables config list change
       variablesDependencyGraph = buildVariablesDependencyGraph(
-        variablesData.values,
+        variablesData.values
       );
     };
 
@@ -256,7 +256,7 @@ export default defineComponent({
 
         // load all variables
         loadAllVariablesData();
-      },
+      }
     );
 
     // you may need to query the data if the variable configs or the data/time changes
@@ -267,14 +267,14 @@ export default defineComponent({
         rejectAllPromises();
 
         loadAllVariablesData();
-      },
+      }
     );
     watch(
       () => variablesData,
       () => {
         emitVariablesData();
       },
-      { deep: true },
+      { deep: true }
     );
 
     const emitVariablesData = () => {
@@ -285,7 +285,7 @@ export default defineComponent({
     // it is used to change/update initial variables values from outside the component
     // NOTE: right now, it is not used after variables in variables feature
     const changeInitialVariableValues = async (
-      newInitialVariableValues: any,
+      newInitialVariableValues: any
     ) => {
       // reject all promises
       rejectAllPromises();
@@ -304,7 +304,7 @@ export default defineComponent({
     };
     const handleQueryValuesLogic = (
       currentVariable: any,
-      oldVariableSelectedValues: any[],
+      oldVariableSelectedValues: any[]
     ) => {
       // Pre-calculate the options values array
       const optionsValues =
@@ -315,7 +315,7 @@ export default defineComponent({
         // old selected values
         const selectedValues = currentVariable.options
           .filter((option: any) =>
-            oldVariableSelectedValues.includes(option.value),
+            oldVariableSelectedValues.includes(option.value)
           )
           .map((option: any) => option.value);
 
@@ -328,7 +328,7 @@ export default defineComponent({
           switch (currentVariable?.selectAllValueForMultiSelect) {
             case "custom":
               currentVariable.value = optionsValues.filter((value: any) =>
-                currentVariable?.customMultiSelectValue.includes(value),
+                currentVariable?.customMultiSelectValue.includes(value)
               );
               break;
             case "all":
@@ -343,7 +343,7 @@ export default defineComponent({
 
         // old selected value
         const oldValue = currentVariable.options.find(
-          (option: any) => option.value === oldVariableSelectedValues[0],
+          (option: any) => option.value === oldVariableSelectedValues[0]
         )?.value;
 
         // if old value exist, select the old value
@@ -356,7 +356,7 @@ export default defineComponent({
             const customValue = currentVariable.options.find(
               (variableOption: any) =>
                 variableOption.value ===
-                currentVariable.customMultiSelectValue[0],
+                currentVariable.customMultiSelectValue[0]
             );
 
             // customValue can be undefined or default value
@@ -373,7 +373,7 @@ export default defineComponent({
 
     const handleCustomVariablesLogic = (
       currentVariable: any,
-      oldVariableSelectedValues: any[],
+      oldVariableSelectedValues: any[]
     ) => {
       // Pre-calculate the selected options values array
       const selectedOptionsValues =
@@ -386,7 +386,7 @@ export default defineComponent({
         // old selected values
         const selectedValues = currentVariable.options
           .filter((option: any) =>
-            oldVariableSelectedValues.includes(option.value),
+            oldVariableSelectedValues.includes(option.value)
           )
           .map((option: any) => option.value);
 
@@ -407,7 +407,7 @@ export default defineComponent({
 
         // old selected value
         const oldValue = currentVariable.options.find(
-          (option: any) => option.value === oldVariableSelectedValues[0],
+          (option: any) => option.value === oldVariableSelectedValues[0]
         )?.value;
 
         // if old value exist, select the old value
@@ -467,7 +467,7 @@ export default defineComponent({
         ].parentVariables.find((parentVariable: any) => {
           // get whole parent variable object from parent variable name
           const variableData = variablesData?.values?.find(
-            (variable: any) => variable?.name == parentVariable,
+            (variable: any) => variable?.name == parentVariable
           );
 
           // if parentVariable is not loaded, return
@@ -497,11 +497,11 @@ export default defineComponent({
                   name: condition.name,
                   operator: condition.operator,
                   value: condition.value,
-                }),
+                })
               );
               let queryContext = await addLabelsToSQlQuery(
                 dummyQuery,
-                constructedFilter,
+                constructedFilter
               );
               // replace variables placeholders
               // NOTE: must use for of loop because we have return statement in the loop
@@ -522,12 +522,12 @@ export default defineComponent({
 
                     queryContext = queryContext.replace(
                       `'$${variable.name}'`,
-                      `${arrayValues}`,
+                      `${arrayValues}`
                     );
                   } else {
                     queryContext = queryContext.replace(
                       `$${variable.name}`,
-                      variable.value,
+                      variable.value
                     );
                   }
                 }
@@ -547,10 +547,10 @@ export default defineComponent({
                 org_identifier: store.state.selectedOrganization.identifier,
                 stream_name: currentVariable.query_data.stream,
                 start_time: new Date(
-                  props.selectedTimeDate?.start_time?.toISOString(),
+                  props.selectedTimeDate?.start_time?.toISOString()
                 ).getTime(),
                 end_time: new Date(
-                  props.selectedTimeDate?.end_time?.toISOString(),
+                  props.selectedTimeDate?.end_time?.toISOString()
                 ).getTime(),
                 fields: [currentVariable.query_data.field],
                 size: currentVariable?.query_data?.max_record_size
@@ -566,10 +566,10 @@ export default defineComponent({
                 currentVariable.options = res.data.hits
                   .find(
                     (field: any) =>
-                      field.field === currentVariable.query_data.field,
+                      field.field === currentVariable.query_data.field
                   )
                   .values.filter(
-                    (value: any) => value.zo_sql_key || value.zo_sql_key === "",
+                    (value: any) => value.zo_sql_key || value.zo_sql_key === ""
                   )
                   .map((value: any) => ({
                     label:
@@ -583,7 +583,7 @@ export default defineComponent({
                 let oldVariableSelectedValues: any = [];
                 if (oldVariablesData[currentVariable.name]) {
                   oldVariableSelectedValues = Array.isArray(
-                    oldVariablesData[currentVariable.name],
+                    oldVariablesData[currentVariable.name]
                   )
                     ? oldVariablesData[currentVariable.name]
                     : [oldVariablesData[currentVariable.name]];
@@ -597,12 +597,12 @@ export default defineComponent({
                   if (currentVariable.type === "custom") {
                     handleCustomVariablesLogic(
                       currentVariable,
-                      oldVariableSelectedValues,
+                      oldVariableSelectedValues
                     );
                   } else {
                     handleQueryValuesLogic(
                       currentVariable,
-                      oldVariableSelectedValues,
+                      oldVariableSelectedValues
                     );
                   }
                 } else {
@@ -649,7 +649,7 @@ export default defineComponent({
             let oldVariableSelectedValues: any = [];
             if (oldVariablesData[currentVariable.name]) {
               oldVariableSelectedValues = Array.isArray(
-                oldVariablesData[currentVariable.name],
+                oldVariablesData[currentVariable.name]
               )
                 ? oldVariablesData[currentVariable.name]
                 : [oldVariablesData[currentVariable.name]];
@@ -659,12 +659,12 @@ export default defineComponent({
             if (currentVariable.type === "custom") {
               handleCustomVariablesLogic(
                 currentVariable,
-                oldVariableSelectedValues,
+                oldVariableSelectedValues
               );
             } else {
               handleQueryValuesLogic(
                 currentVariable,
-                oldVariableSelectedValues,
+                oldVariableSelectedValues
               );
             }
             resolve(true);
@@ -707,7 +707,7 @@ export default defineComponent({
             // if all variables are loaded, set isVariablesLoading to false
             variablesData.isVariablesLoading = variablesData.values.some(
               (val: { isLoading: any; isVariableLoadingPending: any }) =>
-                val.isLoading || val.isVariableLoadingPending,
+                val.isLoading || val.isVariableLoadingPending
             );
 
             // now, load all it's child variables
@@ -722,7 +722,7 @@ export default defineComponent({
                 }
                 return indices;
               },
-              [],
+              []
             );
 
             // will force update the variables data
@@ -730,8 +730,8 @@ export default defineComponent({
 
             Promise.all(
               childVariableIndices.map((childIndex: number) =>
-                loadSingleVariableDataByIndex(childIndex),
-              ),
+                loadSingleVariableDataByIndex(childIndex)
+              )
             );
           }
         })
@@ -769,8 +769,8 @@ export default defineComponent({
 
       Promise.all(
         variablesData.values.map((it: any, index: number) =>
-          loadSingleVariableDataByIndex(index),
-        ),
+          loadSingleVariableDataByIndex(index)
+        )
       );
     };
 
@@ -778,7 +778,7 @@ export default defineComponent({
       for (const variableName of variablesDependencyGraph[currentVariable]
         .childVariables) {
         const variableObj = variablesData.values.find(
-          (it: any) => it.name === variableName,
+          (it: any) => it.name === variableName
         );
         variableObj.isVariableLoadingPending = true;
         setLoadingStateToAllChildNode(variableObj.name);
@@ -804,8 +804,8 @@ export default defineComponent({
 
       Promise.all(
         variablesData.values.map((it: any, index: number) =>
-          loadSingleVariableDataByIndex(index),
-        ),
+          loadSingleVariableDataByIndex(index)
+        )
       );
     };
 

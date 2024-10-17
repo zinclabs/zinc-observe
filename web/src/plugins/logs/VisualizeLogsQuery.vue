@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -294,7 +294,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "logs",
+      "logs"
     );
     const { t } = useI18n();
     const store = useStore();
@@ -316,7 +316,7 @@ export default defineComponent({
       async () => {
         // await nextTick();
         chartData.value = JSON.parse(JSON.stringify(visualizeChartData.value));
-      },
+      }
     );
 
     const isOutDated = computed(() => {
@@ -333,7 +333,7 @@ export default defineComponent({
       () => dashboardPanelData.layout.isConfigPanelOpen,
       () => {
         window.dispatchEvent(new Event("resize"));
-      },
+      }
     );
 
     // resize the chart when query editor is opened and closed
@@ -348,7 +348,7 @@ export default defineComponent({
               expandedSplitterHeight.value;
           }
         }
-      },
+      }
     );
 
     const layoutSplitterUpdated = () => {
@@ -381,7 +381,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any,
+        hoveredTime?: any
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -403,7 +403,7 @@ export default defineComponent({
         // set errors into errorData
         props.errorData.errors = errors;
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          "There are some errors, please fix them and try again"
         );
         return;
       } else {
@@ -473,7 +473,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.latitude.alias,
+          ]?.fields?.latitude.alias
         );
       }
 
@@ -489,7 +489,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.longitude.alias,
+          ]?.fields?.longitude.alias
         );
       }
 
@@ -505,7 +505,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.weight.alias,
+          ]?.fields?.weight.alias
         );
       }
 
@@ -521,7 +521,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.source.alias,
+          ]?.fields?.source.alias
         );
       }
 
@@ -537,7 +537,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.target.alias,
+          ]?.fields?.target.alias
         );
       }
 
@@ -553,7 +553,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.value.alias,
+          ]?.fields?.value.alias
         );
       }
 

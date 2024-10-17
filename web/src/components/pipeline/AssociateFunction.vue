@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -187,7 +187,7 @@ interface StreamRoute {
 }
 
 const AddFunction = defineAsyncComponent(
-  () => import("../functions/AddFunction.vue"),
+  () => import("../functions/AddFunction.vue")
 );
 
 const props = defineProps({
@@ -269,7 +269,7 @@ watch(
   {
     deep: true,
     immediate: true,
-  },
+  }
 );
 
 onBeforeMount(() => {

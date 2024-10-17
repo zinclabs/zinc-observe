@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -174,7 +174,7 @@ const isSchemaEvolutionEnabled = computed(() => {
 const showDataRetention = computed(
   () =>
     !!(store.state.zoConfig.data_retention_days || false) &&
-    streamInputs.value.stream_type !== "enrichment_tables",
+    streamInputs.value.stream_type !== "enrichment_tables"
 );
 
 const saveStream = async () => {
@@ -183,7 +183,7 @@ const saveStream = async () => {
   await getStream(
     streamInputs.value.name,
     streamInputs.value.stream_type,
-    false,
+    false
   )
     .then(() => {
       q.notify({
@@ -203,7 +203,7 @@ const saveStream = async () => {
       store.state.selectedOrganization.identifier,
       streamInputs.value.name,
       streamInputs.value.stream_type,
-      payload,
+      payload
     )
     .then(() => {
       q.notify({
@@ -216,7 +216,7 @@ const saveStream = async () => {
         .schema(
           store.state.selectedOrganization.identifier,
           streamInputs.value.name,
-          streamInputs.value.stream_type,
+          streamInputs.value.stream_type
         )
         .then((streamRes: any) => {
           addStream(streamRes.data);

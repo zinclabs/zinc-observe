@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -479,7 +479,7 @@ export default defineComponent({
       if (
         route.query.folder &&
         store.state.organizationData.folders.find(
-          (it: any) => it.folderId === route.query.folder,
+          (it: any) => it.folderId === route.query.folder
         )
       ) {
         activeFolderId.value = route.query.folder;
@@ -505,7 +505,7 @@ export default defineComponent({
           },
         });
       },
-      { deep: true },
+      { deep: true }
     );
 
     const changePagination = (val: { label: string; value: any }) => {
@@ -546,7 +546,7 @@ export default defineComponent({
         const dashboard = await getDashboard(
           store,
           dashboardId,
-          activeFolderId.value ?? "default",
+          activeFolderId.value ?? "default"
         );
 
         // Duplicate the dashboard
@@ -560,7 +560,7 @@ export default defineComponent({
         await dashboardService.create(
           store.state.selectedOrganization.identifier,
           data,
-          activeFolderId.value || "default",
+          activeFolderId.value || "default"
         );
 
         await getDashboards();
@@ -602,7 +602,7 @@ export default defineComponent({
     const dashboards = computed(function () {
       const dashboardList = toRaw(
         store.state.organizationData?.allDashboardList[activeFolderId.value] ??
-          [],
+          []
       );
       return dashboardList.map((board: any, index) => {
         return {
@@ -632,7 +632,7 @@ export default defineComponent({
           await deleteDashboardById(
             store,
             selectedDelete.value.id,
-            activeFolderId.value ?? "default",
+            activeFolderId.value ?? "default"
           );
           showPositiveNotification("Dashboard deleted successfully.");
         } catch (err) {
@@ -694,7 +694,7 @@ export default defineComponent({
               "Folder deletion failed",
             {
               timeout: 2000,
-            },
+            }
           );
         } finally {
           confirmDeleteFolderDialog.value = false;

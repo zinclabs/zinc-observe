@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -344,10 +344,10 @@ export default defineComponent({
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard",
+      "dashboard"
     );
     const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
+      dashboardPanelDataPageKey
     );
 
     const getDefaultDrilldownData = () => ({
@@ -375,10 +375,10 @@ export default defineComponent({
             JSON.stringify(
               dashboardPanelData.data.config.drilldown[
                 props?.drilldownDataIndex
-              ],
-            ),
+              ]
+            )
           )
-        : getDefaultDrilldownData(),
+        : getDefaultDrilldownData()
     );
     const dashboardList: any = ref([]);
     const tabList: any = ref([]);
@@ -414,7 +414,7 @@ export default defineComponent({
             dashboardList?.value[0]?.value ?? "";
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
         }
-      },
+      }
     );
 
     // on dashboard change, reset tab value
@@ -426,7 +426,7 @@ export default defineComponent({
           // take first value from new options list
           drilldownData.value.data.tab = tabList?.value[0]?.value ?? "";
         }
-      },
+      }
     );
 
     const folderList = computed(() => {
@@ -449,7 +449,7 @@ export default defineComponent({
       // get folder data
       // by using folder name, find folder data
       const folderData = store.state.organizationData.folders?.find(
-        (folder: any) => folder.name === drilldownData.value.data.folder,
+        (folder: any) => folder.name === drilldownData.value.data.folder
       );
 
       // if no folder with same forder name found, return
@@ -461,7 +461,7 @@ export default defineComponent({
       // get all dashboards from folder
       const allDashboardList = await getAllDashboardsByFolderId(
         store,
-        folderData?.folderId,
+        folderData?.folderId
       );
 
       // make list of dashboards
@@ -478,7 +478,7 @@ export default defineComponent({
       // get folder data
       // by using folder name, find folder data
       const folderData = store.state.organizationData.folders?.find(
-        (folder: any) => folder.name === drilldownData.value.data.folder,
+        (folder: any) => folder.name === drilldownData.value.data.folder
       );
 
       // if no folder with same forder name found, return
@@ -490,14 +490,14 @@ export default defineComponent({
       // get all dashboards from folder
       const allDashboardList = await getAllDashboardsByFolderId(
         store,
-        folderData?.folderId,
+        folderData?.folderId
       );
 
       // get dashboard data
       // by using dashboard name, find dashboard data
       const dashboardData = allDashboardList?.find(
         (dashboard: any) =>
-          dashboard.title === drilldownData.value.data.dashboard,
+          dashboard.title === drilldownData.value.data.dashboard
       );
 
       // if no dashboard with same dashboard name found, return
@@ -629,16 +629,16 @@ export default defineComponent({
         drilldownData.value.data.dashboard
       ) {
         const folder = store.state.organizationData.folders.find(
-          (folder: any) => folder.name === drilldownData.value.data.folder,
+          (folder: any) => folder.name === drilldownData.value.data.folder
         );
 
         const allDashboardData = await getAllDashboardsByFolderId(
           store,
-          folder.folderId,
+          folder.folderId
         );
         const dashboardData = allDashboardData.find(
           (dashboard: any) =>
-            dashboard.title === drilldownData.value.data.dashboard,
+            dashboard.title === drilldownData.value.data.dashboard
         );
 
         if (dashboardData) {
@@ -646,7 +646,7 @@ export default defineComponent({
             (variable: any) => ({
               label: variable.name,
               value: variable.name,
-            }),
+            })
           );
           variableNamesFn.value = optionsList;
         } else {

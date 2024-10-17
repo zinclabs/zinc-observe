@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -37,7 +37,7 @@ export function useWorker() {
 
   function runWorker<T, R>(
     data: T,
-    workerFunction: (data: T) => R,
+    workerFunction: (data: T) => R
   ): Promise<R> {
     return new Promise((resolve, reject) => {
       // Convert the function to a string
@@ -54,7 +54,7 @@ export function useWorker() {
           };
         `,
         ],
-        { type: "application/javascript" },
+        { type: "application/javascript" }
       );
 
       // Create a worker from the blob

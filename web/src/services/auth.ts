@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,7 @@ const auth = {
   get_dex_login: async () => {
     const res = await http().get("/config/dex_login");
     return res.data;
-  }
-}
+  },
+};
 
 export default auth;

@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -73,7 +73,7 @@ const users = {
   getRoles: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/users/roles`);
   },
- logout: () => {
+  logout: () => {
     return http().get(`/config/logout`);
   },
 };

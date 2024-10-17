@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -77,10 +77,10 @@ export default defineComponent({
     const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard",
+      "dashboard"
     );
     const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
+      dashboardPanelDataPageKey
     );
 
     const showValueMappingPopUp = ref(false);

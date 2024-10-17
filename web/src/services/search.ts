@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -33,7 +33,10 @@ const search = {
     search_type: string = "UI"
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
-    const use_cache: boolean = (window as any).use_cache !== undefined ? (window as any).use_cache : true;
+    const use_cache: boolean =
+      (window as any).use_cache !== undefined
+        ? (window as any).use_cache
+        : true;
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     if (typeof query.query.sql != "string") {
@@ -196,25 +199,24 @@ const search = {
   },
   get_history: (org_identifier: string, startTime = null, endTime = null) => {
     const payload: any = {
-      stream_type : "logs",
+      stream_type: "logs",
       org_identifier,
-      user_email : null,
+      user_email: null,
     };
     // Add startTime and endTime to the payload if provided
     if (startTime) {
       payload.start_time = startTime;
     }
-  
+
     if (endTime) {
       payload.end_time = endTime;
     }
-  
+
     return http().post(
       `/api/${org_identifier}/_search_history`,
       payload // Send the payload as the request body
     );
   },
-  
 };
 
 export default search;

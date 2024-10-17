@@ -1,4 +1,4 @@
-<!-- Copyright 2024 Zinc Labs Inc.
+<!-- Copyright 2024 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -29,8 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         Click here</a
       >
-      to explore the process of setting up a CloudWatch custom metric stream with Data Firehose to OpenObserve. You may choose JSON or OpenTelemetry 1.0 as the output format.
-      <p class="q-ml-lg text-italic" style="padding-right: 2px">Note: Output is available under Logs with stream name 'cloudwatch_metrics'.</p>
+      to explore the process of setting up a CloudWatch custom metric stream
+      with Data Firehose to OpenObserve. You may choose JSON or OpenTelemetry
+      1.0 as the output format.
+      <p class="q-ml-lg text-italic" style="padding-right: 2px">
+        Note: Output is available under Logs with stream name
+        'cloudwatch_metrics'.
+      </p>
     </div>
   </div>
 </template>
@@ -70,7 +75,7 @@ export default defineComponent({
       protocol: url.protocol.replace(":", ""),
       tls: url.protocol === "https:" ? "On" : "Off",
     };
-    
+
     const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/cloudwatch_metrics/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
     return {

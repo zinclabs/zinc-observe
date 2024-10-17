@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -178,7 +178,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <h5 class="text-center">
               <SanitizedHtmlRenderer
                 data-test="logs-search-error-message"
-                :htmlContent="searchObj.data.errorMsg + '<h6 style=\'font-size: 14px; margin: 0;\'>'+ searchObj.data.errorDetail + '</h6>'"/>
+                :htmlContent="
+                  searchObj.data.errorMsg +
+                  '<h6 style=\'font-size: 14px; margin: 0;\'>' +
+                  searchObj.data.errorDetail +
+                  '</h6>'
+                "
+              />
               <br />
               <q-item-label>{{
                 searchObj.data.additionalErrorMsg

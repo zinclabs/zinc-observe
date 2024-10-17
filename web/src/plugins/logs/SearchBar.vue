@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="
                               handleFavoriteSavedView(
                                 props.row,
-                                favoriteViews.includes(props.row.view_id),
+                                favoriteViews.includes(props.row.view_id)
                               )
                             "
                           >
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click.stop="
                               handleFavoriteSavedView(
                                 props.row,
-                                favoriteViews.includes(props.row.view_id),
+                                favoriteViews.includes(props.row.view_id)
                               )
                             "
                           >
@@ -406,7 +406,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="history"
           :title="'Search History'"
           @click="showSearchHistoryfn"
-          
         ></q-btn>
         <div class="float-left">
           <date-time
@@ -1049,7 +1048,7 @@ export default defineComponent({
             query: this.searchObj.data.customDownloadQueryObj,
             page_type: this.searchObj.data.stream.streamType,
           },
-          "UI",
+          "UI"
         )
         .then((res) => {
           this.customDownloadDialog = false;
@@ -1174,7 +1173,7 @@ export default defineComponent({
       (fields) => {
         if (fields != undefined && fields.length) updateFieldKeywords(fields);
       },
-      { immediate: true, deep: true },
+      { immediate: true, deep: true }
     );
 
     watch(
@@ -1182,7 +1181,7 @@ export default defineComponent({
       (funs) => {
         if (funs.length) updateFunctionKeywords(funs);
       },
-      { immediate: true, deep: true },
+      { immediate: true, deep: true }
     );
 
     onBeforeMount(async () => {
@@ -1315,7 +1314,7 @@ export default defineComponent({
           if (searchObj.data.parsedQuery?.from?.length > 0) {
             if (
               !searchObj.data.stream.selectedStream.includes(
-                searchObj.data.parsedQuery.from[0].table,
+                searchObj.data.parsedQuery.from[0].table
               ) &&
               searchObj.data.parsedQuery.from[0].table !== streamName
             ) {
@@ -1391,12 +1390,12 @@ export default defineComponent({
           value.selectedDate.from = timestampToTimezoneDate(
             value.startTime / 1000,
             store.state.timezone,
-            "yyyy/MM/DD",
+            "yyyy/MM/DD"
           );
           value.selectedTime.startTime = timestampToTimezoneDate(
             value.startTime / 1000,
             store.state.timezone,
-            "HH:mm",
+            "HH:mm"
           );
 
           dateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
@@ -1582,7 +1581,7 @@ export default defineComponent({
       if (isSavedFunctionAction.value == "create") {
         callTransform = jsTransformService.create(
           store.state.selectedOrganization.identifier,
-          formData.value,
+          formData.value
         );
 
         callTransform
@@ -1624,7 +1623,7 @@ export default defineComponent({
           saveFunctionLoader.value = true;
           callTransform = jsTransformService.update(
             store.state.selectedOrganization.identifier,
-            formData.value,
+            formData.value
           );
 
           callTransform
@@ -1635,7 +1634,7 @@ export default defineComponent({
               });
 
               const transformIndex = searchObj.data.transforms.findIndex(
-                (obj) => obj.name === formData.value.name,
+                (obj) => obj.name === formData.value.name
               );
               if (transformIndex !== -1) {
                 searchObj.data.transforms[transformIndex].name =
@@ -1743,7 +1742,7 @@ export default defineComponent({
         } else {
           const needle = val.toLowerCase();
           functionOptions.value = searchObj.data.transforms.filter(
-            (v) => v.name?.toLowerCase().indexOf(needle) > -1,
+            (v) => v.name?.toLowerCase().indexOf(needle) > -1
           );
         }
       });
@@ -1775,7 +1774,7 @@ export default defineComponent({
       savedviewsService
         .getViewDetail(
           store.state.selectedOrganization.identifier,
-          item.view_id,
+          item.view_id
         )
         .then(async (res) => {
           if (res.status == 200) {
@@ -1818,32 +1817,32 @@ export default defineComponent({
               // ----- Here we are explicitly handling stream change for multistream -----
               let selectedStreams = [];
               const streamValues = searchObj.data.stream.streamLists.map(
-                (item) => item.value,
+                (item) => item.value
               );
               if (typeof extractedObj.data.stream.selectedStream == "object") {
                 if (
                   extractedObj.data.stream.selectedStream.hasOwnProperty(
-                    "value",
+                    "value"
                   )
                 ) {
                   selectedStreams.push(
-                    extractedObj.data.stream.selectedStream.value,
+                    extractedObj.data.stream.selectedStream.value
                   );
                 } else {
                   selectedStreams.push(
-                    ...extractedObj.data.stream.selectedStream,
+                    ...extractedObj.data.stream.selectedStream
                   );
                 }
               } else {
                 selectedStreams.push(extractedObj.data.stream.selectedStream);
               }
               const streamNotExist = selectedStreams.filter(
-                (stream_str) => !streamValues.includes(stream_str),
+                (stream_str) => !streamValues.includes(stream_str)
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace(
                   "[STREAM_NAME]",
-                  streamNotExist,
+                  streamNotExist
                 );
                 throw new Error(errMsg);
                 return;
@@ -1882,7 +1881,7 @@ export default defineComponent({
                     name: "",
                     function: searchObj.data.tempFunctionContent,
                   },
-                  false,
+                  false
                 );
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
@@ -1893,7 +1892,7 @@ export default defineComponent({
                     name: "",
                     function: "",
                   },
-                  false,
+                  false
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
@@ -1928,15 +1927,15 @@ export default defineComponent({
               if (typeof extractedObj.data.stream.selectedStream == "object") {
                 if (
                   extractedObj.data.stream.selectedStream.hasOwnProperty(
-                    "value",
+                    "value"
                   )
                 ) {
                   selectedStreams.push(
-                    extractedObj.data.stream.selectedStream.value,
+                    extractedObj.data.stream.selectedStream.value
                   );
                 } else {
                   selectedStreams.push(
-                    ...extractedObj.data.stream.selectedStream,
+                    ...extractedObj.data.stream.selectedStream
                   );
                 }
               } else {
@@ -1959,7 +1958,7 @@ export default defineComponent({
 
               const streamData = await getStreams(
                 searchObj.data.stream.streamType,
-                true,
+                true
               );
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
@@ -1967,15 +1966,15 @@ export default defineComponent({
               // searchObj.value = mergeDeep(searchObj, extractedObj);
 
               const streamValues = searchObj.data.stream.streamLists.map(
-                (item) => item.value,
+                (item) => item.value
               );
               const streamNotExist = selectedStreams.filter(
-                (stream_str) => !streamValues.includes(stream_str),
+                (stream_str) => !streamValues.includes(stream_str)
               );
               if (streamNotExist.length > 0) {
                 let errMsg = t("search.streamNotExist").replace(
                   "[STREAM_NAME]",
-                  streamNotExist,
+                  streamNotExist
                 );
                 throw new Error(errMsg);
                 return;
@@ -1987,7 +1986,7 @@ export default defineComponent({
                     name: "",
                     function: searchObj.data.tempFunctionContent,
                   },
-                  false,
+                  false
                 );
                 searchObj.data.tempFunctionContent =
                   extractedObj.data.tempFunctionContent;
@@ -1998,7 +1997,7 @@ export default defineComponent({
                     name: "",
                     function: "",
                   },
-                  false,
+                  false
                 );
                 searchObj.data.tempFunctionContent = "";
                 searchObj.meta.functionEditorPlaceholderFlag = true;
@@ -2035,7 +2034,7 @@ export default defineComponent({
             if (
               extractedObj.data.resultGrid.colOrder &&
               extractedObj.data.resultGrid.colOrder.hasOwnProperty(
-                searchObj.data.stream.selectedStream,
+                searchObj.data.stream.selectedStream
               )
             ) {
               searchObj.data.stream.selectedFields =
@@ -2050,7 +2049,7 @@ export default defineComponent({
             if (
               extractedObj.data.resultGrid.colSizes &&
               extractedObj.data.resultGrid.colSizes.hasOwnProperty(
-                searchObj.data.stream.selectedStream,
+                searchObj.data.stream.selectedStream
               )
             ) {
               searchObj.data.resultGrid.colSizes[
@@ -2119,7 +2118,7 @@ export default defineComponent({
             saveViewLoader.value = true;
             updateSavedViews(
               savedViewSelectedName.value.view_id,
-              savedViewSelectedName.value.view_name,
+              savedViewSelectedName.value.view_name
             );
           });
         } else {
@@ -2138,7 +2137,7 @@ export default defineComponent({
         savedviewsService
           .delete(
             store.state.selectedOrganization.identifier,
-            deleteViewID.value,
+            deleteViewID.value
           )
           .then((res) => {
             if (res.status == 200) {
@@ -2293,7 +2292,7 @@ export default defineComponent({
                     searchObj.data.savedViews[index].payload = viewObj.data;
                     searchObj.data.savedViews[index].view_name = viewName;
                   }
-                },
+                }
               );
 
               $q.notify({
@@ -2345,7 +2344,7 @@ export default defineComponent({
       const queryString = Object.entries(queryObj)
         .map(
           ([key, value]) =>
-            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
+            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
         )
         .join("&");
 
@@ -2398,12 +2397,12 @@ export default defineComponent({
         ) {
           searchObj.data.query = searchObj.data.query.replace(
             "[FIELD_LIST]",
-            searchObj.data.stream.interestingFieldList.join(","),
+            searchObj.data.stream.interestingFieldList.join(",")
           );
         } else {
           searchObj.data.query = searchObj.data.query.replace(
             "[FIELD_LIST]",
-            "*",
+            "*"
           );
         }
       } else {
@@ -2448,7 +2447,7 @@ export default defineComponent({
             let favoriteViewsList = localSavedViews.value;
             if (favoriteViewsList.length > 0) {
               favoriteViewsList = favoriteViewsList.filter(
-                (item) => item.view_id != row.view_id,
+                (item) => item.view_id != row.view_id
               );
               // for (const [key, item] of favoriteViewsList.entries()) {
               //   console.log(item, key);
@@ -2556,7 +2555,7 @@ export default defineComponent({
 
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "logs",
+      "logs"
     );
     const { dashboardPanelData, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
@@ -2580,12 +2579,12 @@ export default defineComponent({
 
     const variablesAndPanelsDataLoadingState = inject(
       "variablesAndPanelsDataLoadingState",
-      {},
+      {}
     );
 
     const visualizeSearchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
-        variablesAndPanelsDataLoadingState?.searchRequestTraceIds,
+        variablesAndPanelsDataLoadingState?.searchRequestTraceIds
       ).filter((item: any) => item.length > 0);
 
       return searchIds.flat() as string[];
@@ -2601,7 +2600,7 @@ export default defineComponent({
 
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels,
+        variablesAndPanelsDataLoadingState.panels
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });
@@ -2761,7 +2760,7 @@ export default defineComponent({
               if (query.toLowerCase().includes("order by")) {
                 const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
                   query,
-                  "order by",
+                  "order by"
                 );
                 query =
                   beforeOrderBy.trim() +
@@ -2772,7 +2771,7 @@ export default defineComponent({
               } else if (query.toLowerCase().includes("limit")) {
                 const [beforeLimit, afterLimit] = queryIndexSplit(
                   query,
-                  "limit",
+                  "limit"
                 );
                 query =
                   beforeLimit.trim() + " AND " + filter + " limit" + afterLimit;
@@ -2783,7 +2782,7 @@ export default defineComponent({
               if (query.toLowerCase().includes("order by")) {
                 const [beforeOrderBy, afterOrderBy] = queryIndexSplit(
                   query,
-                  "order by",
+                  "order by"
                 );
                 query =
                   beforeOrderBy.trim() +
@@ -2794,7 +2793,7 @@ export default defineComponent({
               } else if (query.toLowerCase().includes("limit")) {
                 const [beforeLimit, afterLimit] = queryIndexSplit(
                   query,
-                  "limit",
+                  "limit"
                 );
                 query =
                   beforeLimit.trim() +

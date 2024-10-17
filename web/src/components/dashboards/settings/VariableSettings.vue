@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -250,9 +250,9 @@ export default defineComponent({
             await getDashboard(
               store,
               route.query.dashboard,
-              route.query.folder ?? "default",
-            ),
-          ),
+              route.query.folder ?? "default"
+            )
+          )
         )?.variables?.list ?? [];
 
       dashboardVariableData.data = (dashboardVariablesList.value || []).map(
@@ -261,10 +261,10 @@ export default defineComponent({
             "#": index < 9 ? `0${index + 1}` : index + 1,
             name: it.name,
             type: variableTypes.value.find(
-              (type: any) => type.value === it.type,
+              (type: any) => type.value === it.type
             )?.label,
           };
-        },
+        }
       );
     };
 
@@ -287,7 +287,7 @@ export default defineComponent({
             store,
             route.query.dashboard,
             variableName,
-            route.query.folder ?? "default",
+            route.query.folder ?? "default"
           );
 
           await getDashboardData();
@@ -302,7 +302,7 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Variable deletion failed",
+              "Variable deletion failed"
           );
         } else {
           showErrorNotification(error?.message ?? "Variable deletion failed", {

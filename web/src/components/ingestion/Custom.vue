@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -105,7 +105,12 @@ export default defineComponent({
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier
     );
-    const metricRoutes = ["prometheus", "otelCollector", "telegraf", "cloudwatchMetrics"];
+    const metricRoutes = [
+      "prometheus",
+      "otelCollector",
+      "telegraf",
+      "cloudwatchMetrics",
+    ];
     const traceRoutes = ["tracesOTLP"];
     const rumRoutes = ["frontendMonitoring"];
 

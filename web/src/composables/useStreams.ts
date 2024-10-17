@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -35,7 +35,7 @@ const useStreams = () => {
   const getStreams = async (
     _streamName: string = "",
     schema: boolean,
-    notify: boolean = true,
+    notify: boolean = true
   ) => {
     return new Promise(async (resolve, reject) => {
       const streamName = _streamName || "all";
@@ -71,7 +71,7 @@ const useStreams = () => {
             ];
 
             const streamsToFetch = streamList.filter(
-              (_stream) => !streams[_stream],
+              (_stream) => !streams[_stream]
             );
 
             getStreamsPromise.value = Promise.allSettled(
@@ -79,9 +79,9 @@ const useStreams = () => {
                 StreamService.nameList(
                   store.state.selectedOrganization.identifier,
                   streamType,
-                  schema,
-                ),
-              ),
+                  schema
+                )
+              )
             );
 
             getStreamsPromise.value
@@ -93,7 +93,7 @@ const useStreams = () => {
                 });
 
                 areAllStreamsFetched.value = streamList.every(
-                  (stream) => !!streams[stream],
+                  (stream) => !!streams[stream]
                 );
 
                 getStreamsPromise.value = null;
@@ -110,7 +110,7 @@ const useStreams = () => {
             getStreamsPromise.value = StreamService.nameList(
               store.state.selectedOrganization.identifier,
               _streamName,
-              schema,
+              schema
             );
             getStreamsPromise.value
               .then((res: any) => {
@@ -159,7 +159,7 @@ const useStreams = () => {
     streamName: string,
     streamType: string,
     schema: boolean,
-    force: boolean = false,
+    force: boolean = false
   ): Promise<any> => {
     return new Promise(async (resolve, reject) => {
       if (!streamName || !streamType) {
@@ -186,7 +186,7 @@ const useStreams = () => {
           streams[streamType].list.length &&
           Object.prototype.hasOwnProperty.call(
             streamsIndexMapping[streamType],
-            streamName,
+            streamName
           )
         ) {
           const streamIndex = streamsIndexMapping[streamType][streamName];
@@ -197,9 +197,11 @@ const useStreams = () => {
               const _stream: any = await StreamService.schema(
                 store.state.selectedOrganization.identifier,
                 streamName,
-                streamType,
-              ); 
-              streams[streamType].list[streamIndex] = removeSchemaFields(_stream.data);
+                streamType
+              );
+              streams[streamType].list[streamIndex] = removeSchemaFields(
+                _stream.data
+              );
             } catch (err) {
               return reject("Error while fetching schema");
             }
@@ -230,7 +232,7 @@ const useStreams = () => {
       streamName: string;
       streamType: string;
       schema: boolean;
-    }>,
+    }>
   ): Promise<any[]> => {
     return Promise.all(
       _streams.map(async ({ streamName, streamType, schema }) => {
@@ -246,7 +248,7 @@ const useStreams = () => {
             streams[streamType].list.length &&
             Object.prototype.hasOwnProperty.call(
               streamsIndexMapping[streamType],
-              streamName,
+              streamName
             )
           ) {
             const streamIndex = streamsIndexMapping[streamType][streamName];
@@ -257,10 +259,12 @@ const useStreams = () => {
               const fetchedStream = await StreamService.schema(
                 store.state.selectedOrganization.identifier,
                 streamName,
-                streamType,
+                streamType
               );
 
-              streams[streamType].list[streamIndex] = removeSchemaFields(fetchedStream.data);
+              streams[streamType].list[streamIndex] = removeSchemaFields(
+                fetchedStream.data
+              );
             }
           }
 
@@ -272,17 +276,17 @@ const useStreams = () => {
           // Use reject in Promise.all to catch errors specifically.
           throw new Error(e.message);
         }
-      }),
+      })
     );
   };
 
-  function removeSchemaFields (streamData: any) {
-    if(streamData.schema){
+  function removeSchemaFields(streamData: any) {
+    if (streamData.schema) {
       streamData.schema = streamData.schema.filter((field: any) => {
-        return field.name != '_original' && field.name != '_o2_id';
+        return field.name != "_original" && field.name != "_o2_id";
       });
     }
-    return streamData
+    return streamData;
   }
 
   const isStreamFetched = (streamType: string) => {
@@ -363,7 +367,7 @@ const useStreams = () => {
     if (
       Object.prototype.hasOwnProperty.call(
         streamsIndexMapping[streamType],
-        streamName,
+        streamName
       )
     ) {
       const indexToRemove = streamsIndexMapping[streamType][streamName];
@@ -462,8 +466,8 @@ const useStreams = () => {
       return objA === objB;
     }
 
-    const keysA = Object.keys(objA)
-    const keysB = Object.keys(objB)
+    const keysA = Object.keys(objA);
+    const keysB = Object.keys(objB);
 
     if (keysA.length !== keysB.length) return false;
 
@@ -527,17 +531,18 @@ const useStreams = () => {
         add = result.add;
         remove = result.remove;
         remove = remove.filter((item: any) => {
-          const isInAdd = add.some((addItem: any) => addItem.field === item.field);
-        
+          const isInAdd = add.some(
+            (addItem: any) => addItem.field === item.field
+          );
+
           // Only keep in `remove` if not in `add` and `disabled` is false
           return !isInAdd && item.disabled === false;
         });
-        
       } else {
         // For other attributes, do a simple array comparison
         add = currentArray.filter((item: any) => !previousArray.includes(item));
         remove = previousArray.filter(
-          (item: any) => !currentArray.includes(item),
+          (item: any) => !currentArray.includes(item)
         );
       }
 

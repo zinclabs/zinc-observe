@@ -144,7 +144,7 @@ test.describe(" visualize UI testcases", () => {
     await page.locator('[data-test="logs-logs-toggle"]').click();
     await page.waitForTimeout(1000);
     await page.locator('[data-test="logs-visualize-toggle"]').click();
-    await expect(page.locator(".q-list > div:nth-child(3)")).toBeVisible();
+  await page.locator('[data-test="selected-chart-bar-item"]').click();
     await page.locator('[data-test="dashboard-x-item-_timestamp"]').click();
     await expect(
       page.locator('[data-test="dashboard-x-item-_timestamp"]')
@@ -199,7 +199,8 @@ test.describe(" visualize UI testcases", () => {
       )
       .click();
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
-    await page.locator(".q-list > div:nth-child(5)").click();
+   await page.locator('[data-test="selected-chart-line-item"]').click();
+
     await expect(
       page.locator('[data-test="chart-renderer"] canvas')
     ).toBeVisible();
@@ -211,7 +212,7 @@ test.describe(" visualize UI testcases", () => {
         y: 135,
       },
     });
-    await page.locator(".q-pa-none > .q-list > div").first().click();
+    await page.locator('[data-test="selected-chart-area-item"]').click();
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
@@ -219,7 +220,7 @@ test.describe(" visualize UI testcases", () => {
         y: 127,
       },
     });
-    await page.locator(".q-list > div:nth-child(2)").click();
+    await page.locator('[data-test="selected-chart-area-stacked-item"]').click();
     await page.locator('[data-test="logs-search-bar-visualize-refresh-btn"]').click();
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
@@ -235,28 +236,28 @@ test.describe(" visualize UI testcases", () => {
         y: 52,
       },
     });
-    await page.locator(".q-list > div:nth-child(6)").click();
+    await page.locator('[data-test="selected-chart-scatter-item"]').click();
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
         x: 362,
         y: 30,
       },
     });
-    await page.locator("div:nth-child(11)").click();
+    await page.locator('[data-test="selected-chart-pie-item"]').click();
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
         x: 650,
         y: 85,
       },
     });
-    await page.locator("div:nth-child(12)").click();
+    await page.locator('[data-test="selected-chart-donut-item"]').click();
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
         x: 216,
         y: 53,
       },
     });
-    await page.locator("div:nth-child(17)").click();
+    await page.locator('[data-test="selected-chart-gauge-item"]').click();
     await page.locator('[data-test="chart-renderer"] canvas').click({
       position: {
         x: 423,

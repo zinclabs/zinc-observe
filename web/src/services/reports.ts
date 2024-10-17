@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,7 @@ const reports = {
     org_identifier: string = "",
     folder_id: string = "",
     dashboard_id: string = "",
-    cache: boolean = false,
+    cache: boolean = false
   ) => {
     let query = "";
 
@@ -42,7 +42,7 @@ const reports = {
   },
   getReport: (org_identifier: string, reportName: string) => {
     return http().get(
-      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
+      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`
     );
   },
   createReport: (org_identifier: string, payload: any) => {
@@ -51,26 +51,28 @@ const reports = {
   updateReport: (org_identifier: string, payload: any) => {
     return http().put(
       `/api/${org_identifier}/reports/${encodeURIComponent(payload.name)}`,
-      payload,
+      payload
     );
   },
   deleteReport: (org_identifier: string, reportName: string) => {
     return http().delete(
-      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
+      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`
     );
   },
   triggerReport: (org_identifier: string, reportName: string) => {
     return http().put(
-      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/trigger`,
+      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/trigger`
     );
   },
   toggleReportState: (
     org_identifier: string,
     reportName: string,
-    state: boolean,
+    state: boolean
   ) => {
     return http().put(
-      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/enable?value=${state}`,
+      `/api/${org_identifier}/reports/${encodeURIComponent(
+        reportName
+      )}/enable?value=${state}`
     );
   },
 };

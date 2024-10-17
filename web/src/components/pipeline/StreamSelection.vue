@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -243,7 +243,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
+      (column: any) => column.toLowerCase().indexOf(value) > -1
     );
   });
   return filteredOptions;

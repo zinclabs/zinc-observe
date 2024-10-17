@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -57,7 +57,7 @@ export const usePanelDataLoader = (
   forceLoad: any,
   searchType: any,
   dashboardId: any,
-  folderId: any,
+  folderId: any
 ) => {
   const log = (...args: any[]) => {
     // if (true) {
@@ -76,7 +76,7 @@ export const usePanelDataLoader = (
       JSON.stringify([
         ...(getDependentVariablesData() || []),
         ...(getDynamicVariablesData() || []),
-      ]),
+      ])
     ),
     forceLoad: toRaw(forceLoad.value),
     // searchType: toRaw(searchType.value),
@@ -87,7 +87,7 @@ export const usePanelDataLoader = (
   const { getPanelCache, savePanelCache } = usePanelCache(
     folderId?.value,
     dashboardId?.value,
-    panelSchema.value.id,
+    panelSchema.value.id
   );
 
   const state = reactive({
@@ -116,7 +116,7 @@ export const usePanelDataLoader = (
       {
         start_time: selectedTimeObj?.value?.start_time?.getTime(),
         end_time: selectedTimeObj?.value?.end_time?.getTime(),
-      },
+      }
     );
   };
 
@@ -128,14 +128,14 @@ export const usePanelDataLoader = (
             ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
             ?.filter((it: any) => {
               const regexForVariable = new RegExp(
-                `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
+                `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`
               );
 
               return panelSchema.value.queries
                 ?.map((q: any) => regexForVariable.test(q?.query))
                 ?.includes(true);
-            }),
-        ),
+            })
+        )
       )
     : [];
 
@@ -146,8 +146,8 @@ export const usePanelDataLoader = (
             ?.filter((it: any) => it.type === "dynamic_filters")
             ?.map((it: any) => it?.value)
             ?.flat()
-            ?.filter((it: any) => it?.operator && it?.name && it?.value),
-        ),
+            ?.filter((it: any) => it?.operator && it?.name && it?.value)
+        )
       )
     : [];
   // let currentAdHocVariablesData: any = null;
@@ -221,12 +221,12 @@ export const usePanelDataLoader = (
         () => {
           if (ifPanelVariablesCompletedLoading()) {
             log(
-              "waitForTheVariablesToLoad: variables are loaded (inside watch)",
+              "waitForTheVariablesToLoad: variables are loaded (inside watch)"
             );
             resolve();
             stopWatching(); // Stop watching once isVisible is true
           }
-        },
+        }
       );
 
       // Listen to the abort signal
@@ -249,7 +249,7 @@ export const usePanelDataLoader = (
    */
   const callWithAbortController = async <T>(
     fn: () => Promise<T>,
-    signal: AbortSignal,
+    signal: AbortSignal
   ): Promise<T> => {
     return new Promise<T>((resolve, reject) => {
       const result = fn();
@@ -330,7 +330,7 @@ export const usePanelDataLoader = (
         timestamps.end_time != "Invalid Date"
       ) {
         startISOTimestamp = new Date(
-          timestamps.start_time.toISOString(),
+          timestamps.start_time.toISOString()
         ).getTime();
         endISOTimestamp = new Date(timestamps.end_time.toISOString()).getTime();
       } else {
@@ -352,7 +352,7 @@ export const usePanelDataLoader = (
 
       log(
         "loadData: panelcache: no cache restored, continue firing, runCount ",
-        runCount,
+        runCount
       );
 
       runCount++;
@@ -369,7 +369,7 @@ export const usePanelDataLoader = (
               it.query,
               startISOTimestamp,
               endISOTimestamp,
-              panelSchema.value.queryType,
+              panelSchema.value.queryType
             );
 
             const { query: query2, metadata: metadata2 } =
@@ -395,7 +395,7 @@ export const usePanelDataLoader = (
                     start_time: startISOTimestamp,
                     end_time: endISOTimestamp,
                   }),
-                abortController.signal,
+                abortController.signal
               );
 
               state.errorDetail = "";
@@ -406,7 +406,7 @@ export const usePanelDataLoader = (
             } finally {
               removeTraceId(traceId);
             }
-          },
+          }
         );
 
         // Wait for all query promises to resolve
@@ -446,7 +446,7 @@ export const usePanelDataLoader = (
             if (it.config?.time_shift && it.config?.time_shift?.length > 0) {
               // convert time shift to milliseconds
               const timeShiftInMilliSecondsArray = it.config?.time_shift?.map(
-                (it: any) => convertOffsetToSeconds(it.offSet),
+                (it: any) => convertOffsetToSeconds(it.offSet)
               );
 
               // append 0 seconds to the timeShiftInMilliSecondsArray at 0th index
@@ -462,13 +462,13 @@ export const usePanelDataLoader = (
                     it.query,
                     startISOTimestamp - timeRangeGap * 1000,
                     endISOTimestamp - timeRangeGap * 1000,
-                    panelSchema.value.queryType,
+                    panelSchema.value.queryType
                   );
 
                 const { query: query2, metadata: metadata2 } =
                   await applyDynamicVariables(
                     query1,
-                    panelSchema.value.queryType,
+                    panelSchema.value.queryType
                   );
                 const query = query2;
                 const metadata: any = {
@@ -496,7 +496,7 @@ export const usePanelDataLoader = (
               try {
                 // get search queries
                 const searchQueries = timeShiftQueries.map(
-                  (it: any) => it.searchRequestObj,
+                  (it: any) => it.searchRequestObj
                 );
 
                 const { traceparent, traceId } = generateTraceContext();
@@ -531,9 +531,9 @@ export const usePanelDataLoader = (
                           page_type: pageType,
                           traceparent,
                         },
-                        searchType.value ?? "Dashboards",
+                        searchType.value ?? "Dashboards"
                       ),
-                    abortControllerRef.signal,
+                    abortControllerRef.signal
                   );
                   // remove past error detail
                   state.errorDetail = "";
@@ -551,7 +551,7 @@ export const usePanelDataLoader = (
 
                     // throw error
                     throw new Error(
-                      `Function error: ${searchRes.data.function_error}`,
+                      `Function error: ${searchRes.data.function_error}`
                     );
                   }
 
@@ -576,7 +576,7 @@ export const usePanelDataLoader = (
                       state.data[i] = [...(searchRes.data.hits[i] ?? [])];
                     } else {
                       throw new Error(
-                        "Invalid response format: Expected an array, but received an object. Please update your function.",
+                        "Invalid response format: Expected an array, but received an object. Please update your function."
                       );
                     }
 
@@ -589,7 +589,7 @@ export const usePanelDataLoader = (
                     // Update the metadata for the current query
                     Object.assign(
                       state.metadata.queries[i],
-                      timeShiftQueries[i]?.metadata ?? {},
+                      timeShiftQueries[i]?.metadata ?? {}
                     );
                   }
 
@@ -611,13 +611,13 @@ export const usePanelDataLoader = (
                 it.query,
                 startISOTimestamp,
                 endISOTimestamp,
-                panelSchema.value.queryType,
+                panelSchema.value.queryType
               );
 
               const { query: query2, metadata: metadata2 } =
                 await applyDynamicVariables(
                   query1,
-                  panelSchema.value.queryType,
+                  panelSchema.value.queryType
                 );
 
               const query = query2;
@@ -653,7 +653,7 @@ export const usePanelDataLoader = (
                       page_type: pageType,
                       traceparent,
                     }),
-                  abortControllerRef.signal,
+                  abortControllerRef.signal
                 );
 
                 // if aborted, return
@@ -688,7 +688,7 @@ export const usePanelDataLoader = (
                 // Update the metadata for the current query
                 Object.assign(
                   state.metadata.queries[currentQueryIndex],
-                  metadata,
+                  metadata
                 );
 
                 // remaining query range
@@ -717,7 +717,7 @@ export const usePanelDataLoader = (
                               query: {
                                 sql: await changeHistogramInterval(
                                   query,
-                                  histogramInterval,
+                                  histogramInterval
                                 ),
                                 query_fn: it.vrlFunctionQuery
                                   ? b64EncodeUnicode(it.vrlFunctionQuery)
@@ -732,9 +732,9 @@ export const usePanelDataLoader = (
                             page_type: pageType,
                             traceparent,
                           },
-                          searchType.value ?? "Dashboards",
+                          searchType.value ?? "Dashboards"
                         ),
-                      abortControllerRef.signal,
+                      abortControllerRef.signal
                     );
                     // remove past error detail
                     state.errorDetail = "";
@@ -752,7 +752,7 @@ export const usePanelDataLoader = (
 
                       // throw error
                       throw new Error(
-                        `Function error: ${searchRes.data.function_error}`,
+                        `Function error: ${searchRes.data.function_error}`
                       );
                     }
 
@@ -821,8 +821,7 @@ export const usePanelDataLoader = (
                           // set function error
                           state.resultMetaData[
                             currentQueryIndex
-                          ].function_error =
-                            `Query duration is modified due to query range restriction of ${max_query_range} hours`;
+                          ].function_error = `Query duration is modified due to query range restriction of ${max_query_range} hours`;
                           // set the new start time and end time
                           state.resultMetaData[currentQueryIndex].new_end_time =
                             endISOTimestamp;
@@ -889,7 +888,7 @@ export const usePanelDataLoader = (
     async () => {
       log("PanelSchema/Time Wather: called");
       loadData(); // Loading the data
-    },
+    }
   );
 
   /**
@@ -902,7 +901,7 @@ export const usePanelDataLoader = (
     query: any,
     startISOTimestamp: any,
     endISOTimestamp: any,
-    queryType: any,
+    queryType: any
   ) => {
     const metadata: any[] = [];
 
@@ -929,16 +928,16 @@ export const usePanelDataLoader = (
     const __rate_interval: any = Math.max(
       getTimeInSecondsBasedOnUnit(
         formattedInterval.value,
-        formattedInterval.unit,
+        formattedInterval.unit
       ) + scrapeInterval,
-      4 * scrapeInterval,
+      4 * scrapeInterval
     );
 
     //get interval in ms
     const __interval_ms =
       getTimeInSecondsBasedOnUnit(
         formattedInterval.value,
-        formattedInterval.unit,
+        formattedInterval.unit
       ) * 1000;
 
     const fixedVariables = [
@@ -1016,7 +1015,7 @@ export const usePanelDataLoader = (
             }
             query = query.replaceAll(
               placeHolderObj.placeHolder,
-              placeHolderObj.value,
+              placeHolderObj.value
             );
           });
         } else {
@@ -1064,7 +1063,7 @@ export const usePanelDataLoader = (
           query,
           variable.name,
           variable.value,
-          variable.operator,
+          variable.operator
         );
       });
     }
@@ -1135,7 +1134,7 @@ export const usePanelDataLoader = (
 
   const removeTraceId = (traceId: string) => {
     state.searchRequestTraceIds = state.searchRequestTraceIds.filter(
-      (id: any) => id !== traceId,
+      (id: any) => id !== traceId
     );
   };
 
@@ -1177,7 +1176,7 @@ export const usePanelDataLoader = (
         loadData();
       }
     },
-    { deep: true },
+    { deep: true }
   );
 
   // [START] Variables functions
@@ -1185,14 +1184,14 @@ export const usePanelDataLoader = (
     variablesData.value?.values?.some(
       (it: any) =>
         it.type === "dynamic_filters" &&
-        (it.isLoading || it.isVariableLoadingPending),
+        (it.isLoading || it.isVariableLoadingPending)
     );
 
   const areDependentVariablesStillLoadingWith = (
-    newDependentVariablesData: any,
+    newDependentVariablesData: any
   ) =>
     newDependentVariablesData?.some(
-      (it: any) => it.isLoading || it.isVariableLoadingPending,
+      (it: any) => it.isLoading || it.isVariableLoadingPending
     );
 
   const getDependentVariablesData = () =>
@@ -1200,7 +1199,7 @@ export const usePanelDataLoader = (
       ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
       ?.filter((it: any) => {
         const regexForVariable = new RegExp(
-          `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
+          `.*\\$\\{?${it.name}(?::(csv|pipe|doublequote|singlequote))?}?.*`
         );
 
         return panelSchema.value.queries
@@ -1228,16 +1227,16 @@ export const usePanelDataLoader = (
   };
 
   const updateCurrentDependentVariablesData = (
-    newDependentVariablesData: any,
+    newDependentVariablesData: any
   ) => {
     currentDependentVariablesData = JSON.parse(
-      JSON.stringify(newDependentVariablesData),
+      JSON.stringify(newDependentVariablesData)
     );
   };
 
   const updateCurrentDynamicVariablesData = (newDynamicVariablesData: any) => {
     currentDynamicVariablesData = JSON.parse(
-      JSON.stringify(newDynamicVariablesData),
+      JSON.stringify(newDynamicVariablesData)
     );
   };
 
@@ -1263,11 +1262,11 @@ export const usePanelDataLoader = (
   };
 
   const isAllRegularVariablesValuesSameWith = (
-    newDependentVariablesData: any,
+    newDependentVariablesData: any
   ) =>
     newDependentVariablesData.every((it: any) => {
       const oldValue = currentDependentVariablesData.find(
-        (it2: any) => it2.name == it.name,
+        (it2: any) => it2.name == it.name
       );
       // return it.value == oldValue?.value && oldValue?.value != "";
       return it.multiSelect
@@ -1278,7 +1277,7 @@ export const usePanelDataLoader = (
   const isAllDynamicVariablesValuesSameWith = (newDynamicVariablesData: any) =>
     newDynamicVariablesData.every((it: any) => {
       const oldValue = currentDynamicVariablesData?.find(
-        (it2: any) => it2.name == it.name,
+        (it2: any) => it2.name == it.name
       );
       return (
         oldValue?.value != "" &&
@@ -1339,30 +1338,30 @@ export const usePanelDataLoader = (
 
     log(
       "Step3: newDependentVariablesData,",
-      JSON.stringify(newDependentVariablesData, null, 2),
+      JSON.stringify(newDependentVariablesData, null, 2)
     );
     log(
       "Step3: newDynamicVariablesData...",
-      JSON.stringify(newDynamicVariablesData, null, 2),
+      JSON.stringify(newDynamicVariablesData, null, 2)
     );
 
     // if the length of the any of the regular and old dynamic data has changed,
     // we need to fire the query
     log(
       "Step3: newDependentVariablesData?.length",
-      newDependentVariablesData?.length,
+      newDependentVariablesData?.length
     );
     log(
       "Step3: newDynamicVariablesData?.length",
-      newDynamicVariablesData?.length,
+      newDynamicVariablesData?.length
     );
     log(
       "Step3: currentDependentVariablesData?.length",
-      currentDependentVariablesData?.length,
+      currentDependentVariablesData?.length
     );
     log(
       "Step3: currentAdHocVariablesData?.length",
-      currentDynamicVariablesData?.length,
+      currentDynamicVariablesData?.length
     );
 
     if (
@@ -1374,7 +1373,7 @@ export const usePanelDataLoader = (
       updateCurrentDynamicVariablesData(newDynamicVariablesData);
 
       log(
-        "Step3: length of the any of the regular and old dynamic data has changed, we need to fire the query",
+        "Step3: length of the any of the regular and old dynamic data has changed, we need to fire the query"
       );
       return true;
     }
@@ -1394,11 +1393,11 @@ export const usePanelDataLoader = (
 
     log(
       "Step4: newDependentVariablesData.length",
-      newDependentVariablesData?.length,
+      newDependentVariablesData?.length
     );
     log(
       "Step4: newDynamicVariablesData.length",
-      newDynamicVariablesData?.length,
+      newDynamicVariablesData?.length
     );
 
     // execute different scenarios based on the count of variables
@@ -1411,7 +1410,7 @@ export const usePanelDataLoader = (
       !newDependentVariablesData?.length && !newDynamicVariablesData?.length;
 
       log(
-        "Step4: 1: no variables are there, no waiting, can call the api, returning true...",
+        "Step4: 1: no variables are there, no waiting, can call the api, returning true..."
       );
 
       return true;
@@ -1478,17 +1477,17 @@ export const usePanelDataLoader = (
 
       log(
         "Step4: 4: isAllRegularVariablesValuesSame",
-        isAllRegularVariablesValuesSame,
+        isAllRegularVariablesValuesSame
       );
       log(
         "Step4: 4: isAllDynamicVariablesValuesSame",
-        isAllDynamicVariablesValuesSame,
+        isAllDynamicVariablesValuesSame
       );
 
       // if any has changed
       if (isAllRegularVariablesValuesSame && isAllDynamicVariablesValuesSame) {
         log(
-          "Step4: 4: regular and dynamic variables has same old value, returning false",
+          "Step4: 4: regular and dynamic variables has same old value, returning false"
         );
         return false;
       }
@@ -1561,11 +1560,11 @@ export const usePanelDataLoader = (
     log("usePanelDataLoader: panelcache: tempPanelCacheKey", tempPanelCacheKey);
     log(
       "usePanelDataLoader: panelcache: omit(getCacheKey())",
-      omit(getCacheKey(), keysToIgnore),
+      omit(getCacheKey(), keysToIgnore)
     );
     log(
       "usePanelDataLoader: panelcache: omit(tempPanelCacheKey))",
-      omit(tempPanelCacheKey, keysToIgnore),
+      omit(tempPanelCacheKey, keysToIgnore)
     );
 
     // check if it is stale or not
@@ -1574,7 +1573,7 @@ export const usePanelDataLoader = (
       Object.keys(tempPanelCacheValue).length > 0 &&
       isEqual(
         omit(getCacheKey(), keysToIgnore),
-        omit(tempPanelCacheKey, keysToIgnore),
+        omit(tempPanelCacheKey, keysToIgnore)
       )
     ) {
       // const cache = getPanelCache();

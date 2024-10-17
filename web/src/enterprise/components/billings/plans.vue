@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -21,30 +21,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("billing.plans") }}
       </div>
       <div>
-        <q-btn v-if="listSubscriptionResponse.hasOwnProperty('card')" class="q-ml-md q-mb-xs text-bold" outline
-          padding="sm lg" color="white" text-color="black" no-caps :label="t('billing.manageCards')" @click="
+        <q-btn
+          v-if="listSubscriptionResponse.hasOwnProperty('card')"
+          class="q-ml-md q-mb-xs text-bold"
+          outline
+          padding="sm lg"
+          color="white"
+          text-color="black"
+          no-caps
+          :label="t('billing.manageCards')"
+          @click="
             onChangePaymentDetail(
               listSubscriptionResponse.card.gateway_account_id
             )
-            " />
+          "
+        />
       </div>
     </div>
-    <div class="row justify-start text-h6 text-weight-bold q-pl-xl q-pb-xs subtitle">
+    <div
+      class="row justify-start text-h6 text-weight-bold q-pl-xl q-pb-xs subtitle"
+    >
       {{ t("billing.subtitle") }}
     </div>
-    <div v-if="store.state.selectedOrganization.hasOwnProperty('note') &&
-      store.state.selectedOrganization.note
-      " class="row justify-start warning-message text-negative text-h6 q-pl-xl q-pb-lg">
-      <q-icon name="warning" class="q-pt-sm"></q-icon>{{ store.state.selectedOrganization.note }}
+    <div
+      v-if="
+        store.state.selectedOrganization.hasOwnProperty('note') &&
+        store.state.selectedOrganization.note
+      "
+      class="row justify-start warning-message text-negative text-h6 q-pl-xl q-pb-lg"
+    >
+      <q-icon name="warning" class="q-pt-sm"></q-icon
+      >{{ store.state.selectedOrganization.note }}
     </div>
     <div v-if="loading">
-      <q-spinner-dots color="primary" size="40px" style="margin: 0 auto; display: block" />
+      <q-spinner-dots
+        color="primary"
+        size="40px"
+        style="margin: 0 auto; display: block"
+      />
     </div>
     <div v-else class="row q-gutter-md justify-center">
-      <plan-card v-for="plan in Plans" :key="plan.id" :plan="plan" :isPaidPlan="planType" :freeLoading="freeLoading"
-        :proLoading="proLoading" @update:freeSubscription="subscribeFreePlan"
+      <plan-card
+        v-for="plan in Plans"
+        :key="plan.id"
+        :plan="plan"
+        :isPaidPlan="planType"
+        :freeLoading="freeLoading"
+        :proLoading="proLoading"
+        @update:freeSubscription="subscribeFreePlan"
         @update:proSubscription="onLoadSubscription('pro')"
-        @update:businessSubscription="onLoadSubscription('business')"></plan-card>
+        @update:businessSubscription="onLoadSubscription('business')"
+      ></plan-card>
     </div>
 
     <!-- <div v-if="listSubscriptionResponse.card" style="min-height: 80%"> -->
@@ -58,9 +85,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-btn icon="close" flat round dense v-close-popup="true" />
         </q-card-section>
         <q-card-section>
-          <iframe ref="updatesubscriptionref" title="Update Subscription checkout" v-if="updatePaymentResponse"
-            :src="updatePaymentResponse.url" allowfullscreen frameborder="0"
-            style="min-height: 70vh; min-width: 100%"></iframe>
+          <iframe
+            ref="updatesubscriptionref"
+            title="Update Subscription checkout"
+            v-if="updatePaymentResponse"
+            :src="updatePaymentResponse.url"
+            allowfullscreen
+            frameborder="0"
+            style="min-height: 70vh; min-width: 100%"
+          ></iframe>
           <div v-else>Loading...</div>
         </q-card-section>
       </q-card>
@@ -78,8 +111,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-section>
-          <iframe ref="subscriptionref" title="Subscription checkout" v-if="!isActiveSubscription && hostedResponse.url"
-            :src="hostedResponse.url" allowfullscreen frameborder="0" style="min-height: 70vh; min-width: 100%"></iframe>
+          <iframe
+            ref="subscriptionref"
+            title="Subscription checkout"
+            v-if="!isActiveSubscription && hostedResponse.url"
+            :src="hostedResponse.url"
+            allowfullscreen
+            frameborder="0"
+            style="min-height: 70vh; min-width: 100%"
+          ></iframe>
           <div v-else>Loading...</div>
         </q-card-section>
       </q-card>
@@ -88,13 +128,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-dialog v-model="confirm_downgrade_subscription" persistent>
       <q-card>
         <q-card-section class="row items-center">
-          <span class="q-ml-sm"><q-avatar icon="warning" size="sm" color="primary" text-color="white" class="q-mr-sm" />{{
-            t("billing.downgradeMessage") }}</span>
+          <span class="q-ml-sm"
+            ><q-avatar
+              icon="warning"
+              size="sm"
+              color="primary"
+              text-color="white"
+              class="q-mr-sm"
+            />{{ t("billing.downgradeMessage") }}</span
+          >
         </q-card-section>
 
         <q-card-actions align="right">
-          <q-btn :label="t('common.cancel')" color="secondary" v-close-popup="true" />
-          <q-btn :label="t('common.confirm')" color="primary" v-close-popup="true" @click="onUnsubscribe" />
+          <q-btn
+            :label="t('common.cancel')"
+            color="secondary"
+            v-close-popup="true"
+          />
+          <q-btn
+            :label="t('common.confirm')"
+            color="primary"
+            v-close-popup="true"
+            @click="onUnsubscribe"
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>

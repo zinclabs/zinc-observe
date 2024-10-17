@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -99,18 +99,18 @@ export default defineComponent({
                     ? col.field(row)
                     : row[col.field === void 0 ? col.name : col.field],
                   col.format,
-                  row,
-                ),
+                  row
+                )
               )
-              .join(","),
-          ),
+              .join(",")
+          )
         )
         .join("\r\n");
 
       const status = exportFile(
         (title ?? "table-export") + ".csv",
         content,
-        "text/csv",
+        "text/csv"
       );
 
       if (status === true) {
@@ -129,7 +129,7 @@ export default defineComponent({
       const foundValue = findFirstValidMappedValue(
         value,
         props?.valueMapping,
-        "color",
+        "color"
       );
 
       if (foundValue && foundValue?.color) {
@@ -142,7 +142,9 @@ export default defineComponent({
         }
 
         const isDark = isDarkColor(hex);
-        return `background-color: ${hex}; color: ${isDark ? "#ffffff" : "#000000"}`;
+        return `background-color: ${hex}; color: ${
+          isDark ? "#ffffff" : "#000000"
+        }`;
       }
       return "";
     };

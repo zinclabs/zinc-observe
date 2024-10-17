@@ -29,7 +29,7 @@
       "purl": "pkg:cargo/openobserve@0.1.0",
       "externalReferences": [
         {
-          "url": "https://zinc.dev/",
+          "url": "https://openobserve.ai/",
           "type": "website",
           "hashes": []
         },

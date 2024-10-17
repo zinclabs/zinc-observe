@@ -1,7 +1,7 @@
 // Vitest Snapshot v1
 
 exports[`Vector > should render content 1`] = `
-"[sinks.zinc]
+"[sinks.openobserve]
 type = \\"http\\"
 inputs = [ source or transform id ]
 uri = \\"http://localhost:808/api/zinc_next/default/_json\\"

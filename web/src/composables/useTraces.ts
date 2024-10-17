@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -211,7 +211,7 @@ const useTraces = () => {
   }
 
   const copyTracesUrl = (
-    customTimeRange: { from: string; to: string } | null = null,
+    customTimeRange: { from: string; to: string } | null = null
   ) => {
     const queryParams = getUrlQueryParams(true);
 
@@ -223,7 +223,7 @@ const useTraces = () => {
     const queryString = Object.entries(queryParams)
       .map(
         ([key, value]: any) =>
-          `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
+          `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
       )
       .join("&");
 

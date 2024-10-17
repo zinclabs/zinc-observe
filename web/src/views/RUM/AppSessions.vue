@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -436,11 +436,14 @@ const getSessions = () => {
   updateUrlQueryParams();
 
   searchService
-    .search({
-      org_identifier: store.state.selectedOrganization.identifier,
-      query: req,
-      page_type: "logs",
-    }, "RUM")
+    .search(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: req,
+        page_type: "logs",
+      },
+      "RUM"
+    )
     .then((res) => {
       res.data.hits.forEach((hit: any) => {
         sessionState.data.sessions[hit.session_id] = hit;
@@ -489,11 +492,14 @@ const getSessionLogs = (req: any) => {
 
   isLoading.value.push(true);
   searchService
-    .search({
-      org_identifier: store.state.selectedOrganization.identifier,
-      query: req,
-      page_type: "logs",
-    }, "RUM")
+    .search(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: req,
+        page_type: "logs",
+      },
+      "RUM"
+    )
     .then((res) => {
       const hits = res.data.hits;
       hits.forEach((hit: any) => {

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -283,8 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-dialog v-model="logout_confirm" persistent>
     <q-card>
       <q-card-section class="row items-center">
-        <q-avatar icon="info"
-color="primary" text-color="white" />
+        <q-avatar icon="info" color="primary" text-color="white" />
         <span class="q-ml-sm"
           >As you've chosen to change your password, you'll be automatically
           logged out.</span
@@ -292,8 +291,7 @@ color="primary" text-color="white" />
       </q-card-section>
 
       <q-card-actions align="right">
-        <q-btn flat label="Ok"
-color="primary" @click="signout" />
+        <q-btn flat label="Ok" color="primary" @click="signout" />
       </q-card-actions>
     </q-card>
   </q-dialog>

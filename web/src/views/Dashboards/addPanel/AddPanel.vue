@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -405,7 +405,7 @@ export default defineComponent({
     PanelSchemaRenderer,
     RelativeTime,
     DashboardQueryEditor: defineAsyncComponent(
-      () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue"),
+      () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue")
     ),
     QueryInspector,
     CustomHTMLEditor,
@@ -485,7 +485,7 @@ export default defineComponent({
       data.values.forEach((variable: any) => {
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value,
+            (item: any) => item.name && item.operator && item.value
           );
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,
@@ -493,7 +493,7 @@ export default defineComponent({
             value: item.value,
           }));
           variableObj[`var-${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters),
+            JSON.stringify(encodedFilters)
           );
         } else {
           variableObj[`var-${variable.name}`] = variable.value;
@@ -558,12 +558,12 @@ export default defineComponent({
           route.query.dashboard,
           route.query.panelId,
           route.query.folder,
-          route.query.tab,
+          route.query.tab
         );
 
         Object.assign(
           dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData)),
+          JSON.parse(JSON.stringify(panelData))
         );
 
         // check if vrl function exists
@@ -611,8 +611,8 @@ export default defineComponent({
       valueType: params.period
         ? "relative"
         : params.from && params.to
-          ? "absolute"
-          : "relative",
+        ? "absolute"
+        : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : "15m",
@@ -628,9 +628,9 @@ export default defineComponent({
           await getDashboard(
             store,
             route.query.dashboard,
-            route.query.folder ?? "default",
-          ),
-        ),
+            route.query.folder ?? "default"
+          )
+        )
       );
       // console.timeEnd("AddPanel:loadDashboard");
 
@@ -713,7 +713,7 @@ export default defineComponent({
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         // console.timeEnd("watch:dashboardPanelData.data.type");
-      },
+      }
     );
 
     watch(selectedDate, () => {
@@ -729,7 +729,7 @@ export default defineComponent({
         // console.time("watch:dashboardPanelData.layout.isConfigPanelOpen");
         window.dispatchEvent(new Event("resize"));
         // console.timeEnd("watch:dashboardPanelData.layout.isConfigPanelOpen");
-      },
+      }
     );
 
     // resize the chart when query editor is opened and closed
@@ -746,7 +746,7 @@ export default defineComponent({
           }
         }
         // console.timeEnd("watch:dashboardPanelData.layout.showQueryBar");
-      },
+      }
     );
 
     const runQuery = () => {
@@ -758,7 +758,7 @@ export default defineComponent({
       // Also update variables data
       Object.assign(
         updatedVariablesData,
-        JSON.parse(JSON.stringify(variablesData)),
+        JSON.parse(JSON.stringify(variablesData))
       );
 
       // copy the data object excluding the reactivity
@@ -829,7 +829,7 @@ export default defineComponent({
         }
         // console.timeEnd("watch:dashboardPanelData.data");
       },
-      { deep: true },
+      { deep: true }
     );
 
     const beforeUnloadHandler = (e: any) => {
@@ -892,7 +892,7 @@ export default defineComponent({
 
       if (errors.length) {
         showErrorNotification(
-          "There are some errors, please fix them and try again",
+          "There are some errors, please fix them and try again"
         );
       }
 
@@ -916,12 +916,11 @@ export default defineComponent({
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
-              "Error saving panel configuration : " +
-                errorMessageOnSave.message,
+              "Error saving panel configuration : " + errorMessageOnSave.message
             );
             return;
           }
@@ -937,12 +936,12 @@ export default defineComponent({
             dashId,
             dashboardPanelData.data,
             route.query.folder ?? "default",
-            route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+            route.query.tab ?? currentDashboardData.data.tabs[0].tabId
           );
           if (errorMessageOnSave instanceof Error) {
             errorData.errors.push(
               "Error saving panel configuration  : " +
-                errorMessageOnSave.message,
+                errorMessageOnSave.message
             );
             return;
           }
@@ -970,7 +969,7 @@ export default defineComponent({
               error?.message ??
               (editMode.value
                 ? "Error while updating panel"
-                : "Error while creating panel"),
+                : "Error while creating panel")
           );
         } else {
           showErrorNotification(
@@ -980,7 +979,7 @@ export default defineComponent({
                 : "Error while creating panel"),
             {
               timeout: 2000,
-            },
+            }
           );
         }
       }
@@ -1080,7 +1079,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.latitude.alias,
+          ]?.fields?.latitude.alias
         );
       }
 
@@ -1096,7 +1095,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.longitude.alias,
+          ]?.fields?.longitude.alias
         );
       }
 
@@ -1112,7 +1111,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.weight.alias,
+          ]?.fields?.weight.alias
         );
       }
 
@@ -1128,7 +1127,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.source.alias,
+          ]?.fields?.source.alias
         );
       }
 
@@ -1144,7 +1143,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.target.alias,
+          ]?.fields?.target.alias
         );
       }
 
@@ -1160,7 +1159,7 @@ export default defineComponent({
         aliasList.push(
           dashboardPanelData?.data?.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.value.alias,
+          ]?.fields?.value.alias
         );
       }
 
@@ -1190,7 +1189,7 @@ export default defineComponent({
         dataIndex: number,
         seriesIndex: number,
         panelId: any,
-        hoveredTime?: any,
+        hoveredTime?: any
       ) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
@@ -1215,12 +1214,12 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide(
       "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState,
+      variablesAndPanelsDataLoadingState
     );
 
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
-        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds
       ).filter((item: any) => item.length > 0);
 
       return searchIds.flat() as string[];
@@ -1236,7 +1235,7 @@ export default defineComponent({
 
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels,
+        variablesAndPanelsDataLoadingState.panels
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });

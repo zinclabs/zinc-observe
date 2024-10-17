@@ -1,4 +1,4 @@
-// Copyright 2023 Zinc Labs Inc.
+// Copyright 2023 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,8 +22,7 @@ const http = () => {
   const instance = axios.create({
     // timeout: 10000,
     baseURL: store.state.API_ENDPOINT,
-    headers: {
-    },
+    headers: {},
   });
 
   instance.interceptors.response.use(

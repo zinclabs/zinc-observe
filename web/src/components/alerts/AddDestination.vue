@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -395,7 +395,7 @@ const getFormattedTemplates = computed(() =>
         return true;
       else if (formData.value.type !== "email") return true;
     })
-    .map((template: any) => template.name),
+    .map((template: any) => template.name)
 );
 
 const isValidDestination = computed(
@@ -405,7 +405,7 @@ const isValidDestination = computed(
       formData.value.method &&
       formData.value.type === "http") ||
       (formData.value.type === "email" && formData.value.emails.length)) &&
-    formData.value.template,
+    formData.value.template
 );
 const saveDestination = () => {
   if (!isValidDestination.value) {
@@ -495,7 +495,7 @@ const addApiHeader = (key: string = "", value: string = "") => {
 };
 const deleteApiHeader = (header: any) => {
   apiHeaders.value = apiHeaders.value.filter(
-    (_header) => _header.uuid !== header.uuid,
+    (_header) => _header.uuid !== header.uuid
   );
   if (formData.value.headers[header.key])
     delete formData.value.headers[header.key];

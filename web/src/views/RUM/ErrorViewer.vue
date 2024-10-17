@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -95,11 +95,14 @@ const getErrorLogs = () => {
   req.query.sql = `select * from ${errorTrackingState.data.stream.errorStream} where type='error' or type='action' or type='view' or (type='resource' and resource_type='xhr') order by ${store.state.zoConfig.timestamp_column}`;
   isLoading.value.push(true);
   searchService
-    .search({
-      org_identifier: store.state.selectedOrganization.identifier,
-      query: req,
-      page_type: "logs",
-    }, "RUM")
+    .search(
+      {
+        org_identifier: store.state.selectedOrganization.identifier,
+        query: req,
+        page_type: "logs",
+      },
+      "RUM"
+    )
     .then((res) => {
       const errorIndex = res.data.hits.findIndex(
         (hit: any) => hit.error_id === errorDetails.value.error_id
@@ -145,11 +148,14 @@ const getError = () => {
     req.query.sql = `select * from ${errorTrackingState.data.stream.errorStream} where type='error' and ${store.state.zoConfig.timestamp_column}=${getTimestamp.value} order by ${store.state.zoConfig.timestamp_column} desc`;
     isLoading.value.push(true);
     searchService
-      .search({
-        org_identifier: store.state.selectedOrganization.identifier,
-        query: req,
-        page_type: "logs",
-      }, "RUM")
+      .search(
+        {
+          org_identifier: store.state.selectedOrganization.identifier,
+          query: req,
+          page_type: "logs",
+        },
+        "RUM"
+      )
       .then((res) => {
         errorDetails.value = { ...res.data.hits[0] };
         errorDetails.value["category"] = [];

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -813,7 +813,7 @@ import { useQuasar } from "quasar";
 import cronParser from "cron-parser";
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
+  () => import("@/components/QueryEditor.vue")
 );
 
 const props = defineProps([
@@ -879,11 +879,11 @@ const regularFunctions = ["avg", "max", "min", "sum", "count"];
 const aggFunctions = computed(() =>
   props.alertData.stream_type === "metrics"
     ? [...regularFunctions, ...metricFunctions]
-    : [...regularFunctions],
+    : [...regularFunctions]
 );
 
 const _isAggregationEnabled = ref(
-  tab.value === "custom" && props.isAggregationEnabled,
+  tab.value === "custom" && props.isAggregationEnabled
 );
 
 const promqlCondition = ref(props.promql_condition);
@@ -1041,7 +1041,7 @@ watch(
   () => functionsList.value,
   (functions: any[]) => {
     functionOptions.value = [...functions];
-  },
+  }
 );
 
 const vrlFunctionContent = computed({
@@ -1150,7 +1150,7 @@ const filterNumericColumns = (val: string, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredNumericColumns.value = getNumericColumns.value.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1
     );
   });
 };

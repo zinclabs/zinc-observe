@@ -1,5 +1,5 @@
 <!-- eslint-disable no-prototype-builtins -->
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.organizationData.isDataIngested == false
         "
       >
-        {{ t('ingestion.redirectionIngestionMsg') }}
+        {{ t("ingestion.redirectionIngestionMsg") }}
       </span>
       <ConfirmDialog
         title="Reset Token"
@@ -84,8 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model="confirmRUMUpdate"
       />
     </div>
-    <q-tabs v-model="ingestTabType" horizontal
-align="left">
+    <q-tabs v-model="ingestTabType" horizontal align="left">
       <q-route-tab
         default
         name="recommended"
@@ -212,7 +211,12 @@ export default defineComponent({
     const ingestTabType = ref("recommended");
 
     const activeTab = ref("recommended");
-    const metricRoutes = ["prometheus", "otelCollector", "telegraf", "cloudwatchMetrics"];
+    const metricRoutes = [
+      "prometheus",
+      "otelCollector",
+      "telegraf",
+      "cloudwatchMetrics",
+    ];
     const traceRoutes = ["tracesOTLP"];
     const rumRoutes = ["frontendMonitoring"];
 

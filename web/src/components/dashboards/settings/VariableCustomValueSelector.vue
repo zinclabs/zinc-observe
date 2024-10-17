@@ -1,4 +1,4 @@
-<!-- Copyright 2023 Zinc Labs Inc.
+<!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -108,7 +108,7 @@ export default defineComponent({
       () => props.variableItem,
       () => {
         options.value = props.variableItem?.options;
-      },
+      }
     );
 
     // isAllSelected should be true if all options are selected and false otherwise
@@ -123,7 +123,7 @@ export default defineComponent({
     const toggleSelectAll = () => {
       if (!isAllSelected.value) {
         selectedValue.value = fieldsFilteredOptions.value.map(
-          (option: any) => option.value,
+          (option: any) => option.value
         );
       } else {
         selectedValue.value = [];
@@ -144,7 +144,7 @@ export default defineComponent({
               .slice(0, 2)
               .map((val) => {
                 const option = props.variableItem?.options?.find(
-                  (opt: any) => opt.value === val,
+                  (opt: any) => opt.value === val
                 );
                 return option ? option.label : val;
               })
@@ -156,7 +156,7 @@ export default defineComponent({
             return selectedValue.value
               .map((val) => {
                 const option = props.variableItem?.options?.find(
-                  (opt: any) => opt.value === val,
+                  (opt: any) => opt.value === val
                 );
                 return option ? option.label : val;
               })
@@ -164,7 +164,7 @@ export default defineComponent({
           }
         } else {
           const option = props.variableItem?.options?.find(
-            (opt: any) => opt.value === selectedValue.value,
+            (opt: any) => opt.value === selectedValue.value
           );
           return option ? option.label : selectedValue.value;
         }
