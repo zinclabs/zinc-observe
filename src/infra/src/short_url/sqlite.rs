@@ -22,6 +22,23 @@ use crate::{
     errors::{DbError, Error, Result},
     short_url::{ShortUrl, ShortUrlRecord},
 };
+use crate::db::sqlite::delete_index;
+
+fn create_short_urls_table_query(table_name: &str) -> String {
+    // `created_ts` is a Unix timestamp in microseconds
+    format!(
+        r#"
+        CREATE TABLE IF NOT EXISTS {table_name}
+        (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            short_id     VARCHAR(32) NOT NULL,
+            original_url VARCHAR(2048) NOT NULL,
+            created_ts   BIGINT NOT NULL
+        );
+        "#,
+        table_name = table_name
+    )
+}
 
 pub struct SqliteShortUrl {}
 
@@ -44,25 +61,16 @@ impl ShortUrl for SqliteShortUrl {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
 
-        sqlx::query(
-            r#"
-                CREATE TABLE IF NOT EXISTS short_urls
-                (
-                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                    short_id     VARCHAR(32) NOT NULL,
-                    original_url VARCHAR(2048) NOT NULL,
-                    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    created_ts   BIGINT DEFAULT (CAST(strftime('%s', 'now') AS BIGINT) * 1000000)
-                );
-                "#,
-        )
+        let create_table_query = create_short_urls_table_query("short_urls");
+
+        sqlx::query(&create_table_query)
         .execute(&*client)
         .await?;
 
         // release lock
         drop(client);
 
-        add_created_ts_column().await?;
+        migrate_created_at_to_created_ts().await?;
         Ok(())
     }
 
@@ -70,10 +78,10 @@ impl ShortUrl for SqliteShortUrl {
     async fn create_table_index(&self) -> Result<()> {
         create_index("short_urls_short_id_idx", "short_urls", true, &["short_id"]).await?;
         create_index(
-            "short_urls_created_at_idx",
+            "short_urls_created_ts_idx",
             "short_urls",
             false,
-            &["created_at"],
+            &["created_ts"],
         )
         .await?;
         Ok(())
@@ -83,11 +91,16 @@ impl ShortUrl for SqliteShortUrl {
     async fn add(&self, short_id: &str, original_url: &str) -> Result<()> {
         let client = CLIENT_RW.clone();
         let client = client.lock().await;
+        let created_ts = Utc::now().timestamp_micros();
+
         let mut tx = client.begin().await?;
-        let query = r#"INSERT INTO short_urls (short_id, original_url) VALUES ($1, $2);"#;
+
+        let query =
+            r#"INSERT INTO short_urls (short_id, original_url, created_ts) VALUES ($1, $2, $3);"#;
         let result = sqlx::query(query)
             .bind(short_id)
             .bind(original_url)
+            .bind(created_ts)
             .execute(&mut *tx)
             .await;
 
@@ -133,7 +146,7 @@ impl ShortUrl for SqliteShortUrl {
     async fn list(&self, limit: Option<i64>) -> Result<Vec<ShortUrlRecord>> {
         let client = CLIENT_RO.clone();
         let mut query =
-            r#"SELECT short_id, original_url FROM short_urls ORDER BY id DESC"#.to_string();
+            r#"SELECT short_id, original_url FROM short_urls ORDER BY created_ts DESC"#.to_string();
 
         if limit.is_some() {
             query.push_str(" LIMIT $1");
@@ -204,6 +217,7 @@ impl ShortUrl for SqliteShortUrl {
         limit: Option<i64>,
     ) -> Result<Vec<String>> {
         let client = CLIENT_RO.clone();
+        let expired_before_ts = expired_before.timestamp_micros();
 
         let mut query = r#"
             SELECT short_id FROM short_urls
@@ -215,7 +229,7 @@ impl ShortUrl for SqliteShortUrl {
             query.push_str(" LIMIT $2");
         }
 
-        let mut query = sqlx::query_as(&query).bind(expired_before);
+        let mut query = sqlx::query_as(&query).bind(expired_before_ts);
 
         if let Some(limit_value) = limit {
             query = query.bind(limit_value);
@@ -263,55 +277,111 @@ impl ShortUrl for SqliteShortUrl {
     }
 }
 
-async fn add_created_ts_column() -> Result<()> {
+/// Main migration function to migrate from `created_at` to `created_ts`
+async fn migrate_created_at_to_created_ts() -> Result<()> {
+    migrate_data_to_new_table().await?;
+    migrate_schema_changes().await?;
+    log::info!("[SQLITE] Migration from `created_at` to `created_ts` completed successfully");
+    Ok(())
+}
+
+async fn is_migration_required() -> Result<bool> {
+    let client = CLIENT_RO.clone();
+
+    // Query to get the table information
+    let check_query = r#"PRAGMA table_info(short_urls);"#;
+    let columns = sqlx::query(&check_query).fetch_all(&client).await?;
+
+    // Check if `created_at` column exists
+    let created_at_exists = columns.iter().any(|column| {
+        let column_name: String = column.get("name");
+        column_name == "created_at"
+    });
+
+    if created_at_exists {
+        log::info!("[SQLITE] Migration required: `created_at` column exists");
+    } else {
+        log::info!("[SQLITE] Migration not required: `created_at` column does not exist");
+    }
+
+    Ok(created_at_exists)
+}
+
+
+/// Data migration function to copy data from `short_urls` to `short_urls_new` and convert `created_at` to `created_ts`
+async fn migrate_data_to_new_table() -> Result<()> {
+    if !is_migration_required().await? {
+        return Ok(());
+    }
+
+    delete_index("short_urls_short_id_idx", "short_urls").await?;
+    delete_index("short_urls_created_at_idx", "short_urls").await?;
+
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
-    let mut tx = client.begin().await?;
 
-    // Check if the created_ts column exists
-    let check_query = r#"
-        PRAGMA table_info(short_urls);
+    // Step 1: Create a new table without `created_at` and with `created_ts`
+    let mut tx = client.begin().await?;
+    let create_table_query = create_short_urls_table_query("short_urls_new");
+    sqlx::query(&create_table_query).execute(&mut *tx).await?;
+
+    // Step 2: Fetch data from the old table
+    let select_data_query = r#"
+        SELECT id, short_id, original_url
+        FROM short_urls;
     "#;
 
-    let columns = sqlx::query_as::<_, (i32, String, String, i32, Option<String>, i32)>(check_query)
+    let rows = sqlx::query(select_data_query)
         .fetch_all(&mut *tx)
         .await?;
 
-    let column_exists = columns.iter().any(|(_, name, ..)| name == "created_ts");
+    // Step 3: Insert data into the new table
+    let created_ts = Utc::now().timestamp_micros();
+    for row in rows {
+        let id: i64 = row.get("id");
+        let short_id: String = row.get("short_id");
+        let original_url: String = row.get("original_url");
 
-    if !column_exists {
-        log::info!("[SQLITE] Adding created_ts column to short_urls table");
-
-        // Add the created_ts column
-        let alter_query = r#"
-            ALTER TABLE short_urls
-            ADD COLUMN created_ts BIGINT;
+        // Insert the row into the new table
+        let insert_query = r#"
+            INSERT INTO short_urls_new (id, short_id, original_url, created_ts)
+            VALUES ($1, $2, $3, $4);
         "#;
 
-        if let Err(e) = sqlx::query(alter_query).execute(&mut *tx).await {
-            log::error!("[SQLITE] Error adding created_ts column: {}", e);
-            return Err(e.into());
-        }
-
-        // Update existing rows with the current timestamp in microseconds
-        let update_query = r#"
-            UPDATE short_urls
-            SET created_ts = CAST(strftime('%s', 'now') AS BIGINT) * 1000000;
-        "#;
-
-        if let Err(e) = sqlx::query(update_query).execute(&mut *tx).await {
-            log::error!("[SQLITE] Error updating created_ts column: {}", e);
-            return Err(e.into());
-        }
-
-        tx.commit().await?;
-        log::info!("[SQLITE] created_ts column successfully added and updated");
-    } else {
-        log::info!("[SQLITE] created_ts column already exists in short_urls table");
+        sqlx::query(insert_query)
+            .bind(id)
+            .bind(short_id)
+            .bind(original_url)
+            .bind(created_ts)
+            .execute(&mut *tx)
+            .await?;
     }
 
-    // release lock
-    drop(client);
+    tx.commit().await?;
+    log::info!("[SQLITE] Data migration to `short_urls_new` completed successfully");
+
+    Ok(())
+}
+
+/// Schema migration function to drop old table and indexes, and rename the new table
+async fn migrate_schema_changes() -> Result<()> {
+    let client = CLIENT_RW.clone();
+    let client = client.lock().await;
+
+    // Step 2: Start a new transaction for schema changes
+    let mut tx = client.begin().await?;
+
+    // Step 3: Drop the old table
+    let drop_old_table_query = "DROP TABLE short_urls;";
+    sqlx::query(drop_old_table_query).execute(&mut *tx).await?;
+
+    // Step 4: Rename the new table to the original table name
+    let rename_table_query = "ALTER TABLE short_urls_new RENAME TO short_urls;";
+    sqlx::query(rename_table_query).execute(&mut *tx).await?;
+
+    // Commit the schema changes transaction
+    tx.commit().await?;
+    log::info!("[SQLITE] Schema migration completed: renamed `short_urls_new` to `short_urls`");
 
     Ok(())
 }
