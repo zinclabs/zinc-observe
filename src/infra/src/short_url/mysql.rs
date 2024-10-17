@@ -347,24 +347,52 @@ async fn drop_index_if_exists(pool: &sqlx::Pool<sqlx::MySql>, index_name: &str) 
 }
 
 // Adds the `created_ts` column to the `short_urls` table if it doesn't already exist.
+// If the column is added, it populates existing rows with a default value.
 async fn add_created_ts_column_if_not_exists(pool: &sqlx::Pool<sqlx::MySql>) -> Result<()> {
     if !column_exists(pool, "created_ts").await? {
         log::info!("[MYSQL] Adding created_ts column to short_urls table");
 
+        // Step 1: Add the column as nullable
         let query = r#"
             ALTER TABLE short_urls
-            ADD COLUMN created_ts BIGINT NOT NULL;
+            ADD COLUMN created_ts BIGINT;
         "#;
 
         if let Err(e) = sqlx::query(query).execute(pool).await {
-            log::error!(
-                "[MYSQL] Unexpected error in adding created_ts column: {}",
-                e
-            );
+            log::error!("[MYSQL] Error adding nullable created_ts column: {}", e);
             return Err(e.into());
         }
 
-        log::info!("[MYSQL] Successfully added created_ts column");
+        // Step 2: Update existing rows with a default timestamp
+        let fallback_timestamp = Utc::now().timestamp_micros();
+        let update_query = format!(
+            r#"
+            UPDATE short_urls
+            SET created_ts = {}
+            WHERE created_ts IS NULL;
+            "#,
+            fallback_timestamp
+        );
+
+        if let Err(e) = sqlx::query(&update_query).execute(pool).await {
+            log::error!("[MYSQL] Error updating existing rows with created_ts: {}", e);
+            return Err(e.into());
+        }
+
+        log::info!("[MYSQL] Successfully updated existing rows with created_ts");
+
+        // Step 3: Alter the column to be NOT NULL after populating existing rows
+        let alter_query = r#"
+            ALTER TABLE short_urls
+            MODIFY COLUMN created_ts BIGINT NOT NULL;
+        "#;
+
+        if let Err(e) = sqlx::query(alter_query).execute(pool).await {
+            log::error!("[MYSQL] Error setting created_ts column to NOT NULL: {}", e);
+            return Err(e.into());
+        }
+
+        log::info!("[MYSQL] Successfully added and updated created_ts column");
     } else {
         log::info!("[MYSQL] created_ts column already exists in short_urls table");
     }
