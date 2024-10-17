@@ -279,9 +279,15 @@ impl ShortUrl for SqliteShortUrl {
 
 /// Main migration function to migrate from `created_at` to `created_ts`
 async fn migrate_created_at_to_created_ts() -> Result<()> {
-    migrate_data_to_new_table().await?;
-    migrate_schema_changes().await?;
-    log::info!("[SQLITE] Migration from `created_at` to `created_ts` completed successfully");
+    if is_migration_required().await? {
+        log::info!("[SQLITE] Migration required: `created_at` column exists");
+        migrate_data_to_new_table().await?;
+        migrate_schema_changes().await?;
+        log::info!("[SQLITE] Migration from `created_at` to `created_ts` completed successfully");
+    } else {
+        log::info!("[SQLITE] Migration not required: `created_at` column does not exist");
+    }
+
     Ok(())
 }
 
@@ -297,12 +303,6 @@ async fn is_migration_required() -> Result<bool> {
         let column_name: String = column.get("name");
         column_name == "created_at"
     });
-
-    if created_at_exists {
-        log::info!("[SQLITE] Migration required: `created_at` column exists");
-    } else {
-        log::info!("[SQLITE] Migration not required: `created_at` column does not exist");
-    }
 
     Ok(created_at_exists)
 }
@@ -365,6 +365,10 @@ async fn migrate_data_to_new_table() -> Result<()> {
 
 /// Schema migration function to drop old table and indexes, and rename the new table
 async fn migrate_schema_changes() -> Result<()> {
+    if !is_migration_required().await? {
+        return Ok(());
+    }
+
     let client = CLIENT_RW.clone();
     let client = client.lock().await;
 
