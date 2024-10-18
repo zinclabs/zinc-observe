@@ -299,6 +299,9 @@ pub async fn update_stream_settings(
             if let Some(store_original_data) = update_settings.store_original_data {
                 settings.store_original_data = store_original_data;
             }
+            if let Some(approx_partition) = update_settings.approx_partition {
+                settings.approx_partition = approx_partition;
+            }
             if let Some(flatten_level) = update_settings.flatten_level {
                 settings.flatten_level = Some(flatten_level);
             }

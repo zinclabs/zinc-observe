@@ -450,6 +450,7 @@ export default defineComponent({
     const newSchemaFields = ref([]);
     const activeTab = ref("allFields");
     let previousSchemaVersion: any = null;
+    const approxPartition = ref(false);
 
     const selectedFields = ref([]);
 
@@ -491,6 +492,7 @@ export default defineComponent({
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
       maxQueryRange.value = 0;
       storeOriginalData.value = false;
+      approxPartition.value = false;
     });
 
     const isSchemaEvolutionEnabled = computed(() => {
@@ -645,7 +647,9 @@ export default defineComponent({
           store.state.zoConfig.data_retention_days;
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
-      storeOriginalData.value = streamResponse.settings.store_original_data;
+      storeOriginalData.value =
+        streamResponse.settings.store_original_data || false;
+      approxPartition.value = streamResponse.settings.approx_partition || false;
 
       if (!streamResponse.schema) {
         loadingState.value = false;
@@ -728,6 +732,7 @@ export default defineComponent({
         settings["data_retention"] = Number(dataRetentionDays.value);
       }
       settings["store_original_data"] = storeOriginalData.value;
+      settings["approx_partition"] = approxPartition.value;
 
       const newSchemaFieldsSet = new Set(
         newSchemaFields.value.map((field) =>
@@ -1006,6 +1011,7 @@ export default defineComponent({
       getImageURL,
       dataRetentionDays,
       storeOriginalData,
+      approxPartition,
       maxQueryRange,
       showDataRetention,
       formatSizeFromMB,

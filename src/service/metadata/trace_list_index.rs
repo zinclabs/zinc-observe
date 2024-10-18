@@ -206,6 +206,7 @@ impl TraceListIndex {
                 max_query_range: 0,
                 defined_schema_fields: None,
                 store_original_data: false,
+                approx_partition: false,
             };
 
             stream::save_stream_settings(org_id, STREAM_NAME, StreamType::Metadata, settings)
