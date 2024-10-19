@@ -145,7 +145,7 @@
     "tickets": "Ticket",
     "organizations": "Organizations",
     "function": "Functions",
-    "ingestion": "Ingestion",
+    "ingestion": "Data sources",
     "metrics": "Metrics",
     "slack": "Slack",
     "help": "Help",
