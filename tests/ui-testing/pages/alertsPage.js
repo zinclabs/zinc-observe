@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
-import{CommomnLocator} from '../pages/CommonLocator';
-import{ dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator } from '../pages/CommonLocator.js';
+
+import{ dateTimeButtonLocator, relative30SecondsButtonLocator } from '../pages/CommonLocator.js';
 
 export  class AlertPage {
     constructor(page) {
@@ -13,7 +13,7 @@ export  class AlertPage {
     
       this.dateTimeButton = dateTimeButtonLocator;
       this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
-      this.absoluteTab = absoluteTabLocator;
+      
 
     
 

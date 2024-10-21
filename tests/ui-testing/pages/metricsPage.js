@@ -3,11 +3,15 @@ import { expect } from '@playwright/test';
 import{ dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue, oneDateMonthLocator } from '../pages/CommonLocator.js';
 
 
-export  class ReportsPage {
+export  class MetricsPage {
+
   constructor(page) {
     this.page = page;
-    this.reportsMenuItem = page.locator('[data-test="menu-link-\\/reports-item"]');
-    this.addReportButton = page.locator('[data-test="report-list-add-report-btn"]');
+
+    this.metricsMenuLink = page.locator('[data-test="menu-link-\\/metrics-item"]');
+    	this.indexDropdown = page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
+    	this.searchIndexInput = page.locator('[data-test="log-search-index-list-select-stream"]');
+
 
     this.dateTimeButton = dateTimeButtonLocator;
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
@@ -19,13 +23,16 @@ export  class ReportsPage {
 
   }
 
-  async navigateToReports() {
-    await this.reportsMenuItem.click();
-  }
+  async openMetricsPage() {
+    	await this.metricsMenuLink.click();
+	}
 
-  async addNewReport() {
-    await this.addReportButton.click();
-  }
+	async selectIndex(indexName) {
+    	await this.indexDropdown.click();
+    	await this.searchIndexInput.fill(indexName);
+    	await this.page.getByText(indexName).click();
+	}
+
 
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
@@ -63,15 +70,17 @@ export  class ReportsPage {
     
   }
 
+
   async verifyDateTime(startTime, endTime) {
-    // await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
-     await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
-   }
- 
-   async signOut() {
-     await this.profileButton.click();
-     await this.signOutButton.click();
-   }
+   // await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+    await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
+  }
+
+  async signOut() {
+    await this.profileButton.click();
+    await this.signOutButton.click();
+  }
+  
 }
 
 
