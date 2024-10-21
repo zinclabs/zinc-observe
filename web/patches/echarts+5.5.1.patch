@@ -1,0 +1,93 @@
+diff --git a/node_modules/echarts/dist/echarts.common.js b/node_modules/echarts/dist/echarts.common.js
+index c645ca4..1d97506 100644
+--- a/node_modules/echarts/dist/echarts.common.js
++++ b/node_modules/echarts/dist/echarts.common.js
+@@ -50523,13 +50523,13 @@
+       };
+       TooltipHTMLContent.prototype.getSize = function () {
+         var el = this.el;
+-        return [el.offsetWidth, el.offsetHeight];
++        return [el?.offsetWidth, el?.offsetHeight];
+       };
+       TooltipHTMLContent.prototype.moveTo = function (zrX, zrY) {
+         var styleCoord = this._styleCoord;
+         makeStyleCoord(styleCoord, this._zr, this._container, zrX, zrY);
+         if (styleCoord[0] != null && styleCoord[1] != null) {
+-          var style_1 = this.el.style;
++          var style_1 = this.el?.style || {};
+           var transforms = assembleTransform(styleCoord[0], styleCoord[1]);
+           each(transforms, function (transform) {
+             style_1[transform[0]] = transform[1];
+diff --git a/node_modules/echarts/dist/echarts.esm.js b/node_modules/echarts/dist/echarts.esm.js
+index 93bb6d7..e1564e8 100644
+--- a/node_modules/echarts/dist/echarts.esm.js
++++ b/node_modules/echarts/dist/echarts.esm.js
+@@ -74184,7 +74184,7 @@ var TooltipHTMLContent = /** @class */function () {
+   };
+   TooltipHTMLContent.prototype.getSize = function () {
+     var el = this.el;
+-    return [el.offsetWidth, el.offsetHeight];
++    return [el?.offsetWidth, el?.offsetHeight];
+   };
+   TooltipHTMLContent.prototype.moveTo = function (zrX, zrY) {
+     var styleCoord = this._styleCoord;
+diff --git a/node_modules/echarts/dist/echarts.esm.mjs b/node_modules/echarts/dist/echarts.esm.mjs
+index daac359..b46a4a9 100644
+--- a/node_modules/echarts/dist/echarts.esm.mjs
++++ b/node_modules/echarts/dist/echarts.esm.mjs
+@@ -74184,13 +74184,13 @@ var TooltipHTMLContent = /** @class */function () {
+   };
+   TooltipHTMLContent.prototype.getSize = function () {
+     var el = this.el;
+-    return [el.offsetWidth, el.offsetHeight];
++    return [el?.offsetWidth, el?.offsetHeight];
+   };
+   TooltipHTMLContent.prototype.moveTo = function (zrX, zrY) {
+     var styleCoord = this._styleCoord;
+     makeStyleCoord(styleCoord, this._zr, this._container, zrX, zrY);
+     if (styleCoord[0] != null && styleCoord[1] != null) {
+-      var style_1 = this.el.style;
++      var style_1 = this.el?.style || {};
+       var transforms = assembleTransform(styleCoord[0], styleCoord[1]);
+       each(transforms, function (transform) {
+         style_1[transform[0]] = transform[1];
+diff --git a/node_modules/echarts/dist/echarts.js b/node_modules/echarts/dist/echarts.js
+index 7a86326..74b0287 100644
+--- a/node_modules/echarts/dist/echarts.js
++++ b/node_modules/echarts/dist/echarts.js
+@@ -74190,13 +74190,13 @@
+       };
+       TooltipHTMLContent.prototype.getSize = function () {
+         var el = this.el;
+-        return [el.offsetWidth, el.offsetHeight];
++        return [el?.offsetWidth, el?.offsetHeight];
+       };
+       TooltipHTMLContent.prototype.moveTo = function (zrX, zrY) {
+         var styleCoord = this._styleCoord;
+         makeStyleCoord(styleCoord, this._zr, this._container, zrX, zrY);
+         if (styleCoord[0] != null && styleCoord[1] != null) {
+-          var style_1 = this.el.style;
++          var style_1 = this.el?.style || {};
+           var transforms = assembleTransform(styleCoord[0], styleCoord[1]);
+           each(transforms, function (transform) {
+             style_1[transform[0]] = transform[1];
+diff --git a/node_modules/echarts/lib/component/tooltip/TooltipHTMLContent.js b/node_modules/echarts/lib/component/tooltip/TooltipHTMLContent.js
+index 716e13d..9b17d95 100644
+--- a/node_modules/echarts/lib/component/tooltip/TooltipHTMLContent.js
++++ b/node_modules/echarts/lib/component/tooltip/TooltipHTMLContent.js
+@@ -336,13 +336,13 @@ var TooltipHTMLContent = /** @class */function () {
+   };
+   TooltipHTMLContent.prototype.getSize = function () {
+     var el = this.el;
+-    return [el.offsetWidth, el.offsetHeight];
++    return [el?.offsetWidth, el?.offsetHeight];
+   };
+   TooltipHTMLContent.prototype.moveTo = function (zrX, zrY) {
+     var styleCoord = this._styleCoord;
+     makeStyleCoord(styleCoord, this._zr, this._container, zrX, zrY);
+     if (styleCoord[0] != null && styleCoord[1] != null) {
+-      var style_1 = this.el.style;
++      var style_1 = this.el?.style || {};
+       var transforms = assembleTransform(styleCoord[0], styleCoord[1]);
+       each(transforms, function (transform) {
+         style_1[transform[0]] = transform[1];
