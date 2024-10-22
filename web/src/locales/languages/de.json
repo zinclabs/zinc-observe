@@ -145,7 +145,7 @@
     "tickets": "Fahrkarte",
     "organizations": "Organisationen",
     "function": "Funktionen",
-    "ingestion": "Einlesen",
+    "ingestion": "Datenquellen",
     "metrics": "Metriken",
     "slack": "Slack",
     "help": "Hilfe",
@@ -423,7 +423,7 @@
     "loading": "Wird geladen..."
   },
   "ingestion": {
-    "header": "Einlesen",
+    "header": "Datenquellen",
     "passwordLabel": "Token zurücksetzen",
     "resetTokenBtnLabel": "Token zurücksetzen",
     "resetRUMTokenLabel": "RUM-Token zurücksetzen",

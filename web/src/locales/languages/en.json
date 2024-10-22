@@ -461,7 +461,7 @@
     "loading": "Loading..."
   },
   "ingestion": {
-    "header": "Ingestion",
+    "header": "Data sources",
     "passwordLabel": "Reset Token",
     "resetTokenBtnLabel": "Reset Token",
     "resetRUMTokenLabel": "Reset RUM Token",

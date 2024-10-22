@@ -145,7 +145,7 @@
     "tickets": "Boleto",
     "organizations": "Organizaciones",
     "function": "Funciones",
-    "ingestion": "Ingestión",
+    "ingestion": "Fuentes de datos",
     "metrics": "Métricas",
     "slack": "Slack",
     "help": "Ayuda",
@@ -423,7 +423,7 @@
     "loading": "Cargando..."
   },
   "ingestion": {
-    "header": "Ingestión",
+    "header": "Fuentes de datos",
     "passwordLabel": "Restablecer token",
     "resetTokenBtnLabel": "Restablecer token",
     "resetRUMTokenLabel": "Restablecer el token RUM",

@@ -145,7 +145,7 @@
     "tickets": "チケット",
     "organizations": "組織",
     "function": "ファンクション",
-    "ingestion": "インジェスト",
+    "ingestion": "データソース",
     "metrics": "メトリクス",
     "slack": "Slack",
     "help": "ヘルプ",
@@ -423,7 +423,7 @@
     "loading": "読み込み中..."
   },
   "ingestion": {
-    "header": "インジェスト",
+    "header": "データソース",
     "passwordLabel": "トークンをリセット",
     "resetTokenBtnLabel": "トークンをリセット",
     "resetRUMTokenLabel": "RUM トークンをリセット",

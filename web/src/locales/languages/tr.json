@@ -145,7 +145,7 @@
     "tickets": "Bilet",
     "organizations": "Organizasyonlar",
     "function": "Fonksiyonlar",
-    "ingestion": "Yutma",
+    "ingestion": "Veri kaynakları",
     "metrics": "Metrikler",
     "slack": "Gevşek",
     "help": "Yardım",
@@ -423,7 +423,7 @@
     "loading": "Yükleniyor..."
   },
   "ingestion": {
-    "header": "Yutma",
+    "header": "Veri kaynakları",
     "passwordLabel": "Simgeyi Sıfırla",
     "resetTokenBtnLabel": "Simgeyi Sıfırla",
     "resetRUMTokenLabel": "RUM Jetonunu Sıfırla",

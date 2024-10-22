@@ -145,7 +145,7 @@
     "tickets": "티켓",
     "organizations": "조직",
     "function": "함수",
-    "ingestion": "섭취",
+    "ingestion": "데이터 소스",
     "metrics": "메트릭",
     "slack": "슬랙",
     "help": "도움말",
@@ -423,7 +423,7 @@
     "loading": "로딩 중..."
   },
   "ingestion": {
-    "header": "섭취",
+    "header": "데이터 소스",
     "passwordLabel": "리셋 토큰",
     "resetTokenBtnLabel": "리셋 토큰",
     "resetRUMTokenLabel": "RUM 토큰 초기화",

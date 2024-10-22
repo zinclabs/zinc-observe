@@ -145,7 +145,7 @@
     "tickets": "Ticket",
     "organizations": "Organisaties",
     "function": "Functies",
-    "ingestion": "Inslikken",
+    "ingestion": "Gegevensbronnen",
     "metrics": "Metrieken",
     "slack": "Slack",
     "help": "Hulp",
@@ -423,7 +423,7 @@
     "loading": "Bezig met laden..."
   },
   "ingestion": {
-    "header": "Inslikken",
+    "header": "Gegevensbronnen",
     "passwordLabel": "Token opnieuw instellen",
     "resetTokenBtnLabel": "Token opnieuw instellen",
     "resetRUMTokenLabel": "RUM-token opnieuw instellen",

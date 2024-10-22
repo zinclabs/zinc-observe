@@ -145,7 +145,7 @@
     "tickets": "工单",
     "organizations": "组织",
     "function": "函数",
-    "ingestion": "采集",
+    "ingestion": "數據來源",
     "metrics": "指标",
     "slack": "Slack",
     "help": "帮助",
@@ -423,7 +423,7 @@
     "loading": "加载中..."
   },
   "ingestion": {
-    "header": "采集",
+    "header": "數據來源",
     "passwordLabel": "Token",
     "resetTokenBtnLabel": "重置 Token",
     "resetRUMTokenLabel": "重置 RUM Token",
