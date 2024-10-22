@@ -479,6 +479,8 @@ export default defineComponent({
       { label: "Secondary index", value: "secondaryIndexKey" },
       { label: "Bloom filter", value: "bloomFilterKey" },
       { label: "KeyValue partition", value: "keyPartition" },
+      { label: "Prefix partition", value: "prefixPartition" },
+
       { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
       { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
       { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },
@@ -585,6 +587,8 @@ export default defineComponent({
         property.level = level;
 
         if (partition.types === "value") fieldIndices.push("keyPartition");
+        if (partition.types === "prefix") fieldIndices.push("prefixPartition");
+
 
         if (partition.types?.hash)
           fieldIndices.push(`hashPartition_${partition.types.hash}`);
@@ -761,6 +765,19 @@ export default defineComponent({
             });
           }
 
+          if( property.level && index === 'prefixPartition'){
+            settings.partition_keys.push({
+              field: property.name,
+              types: "prefix",
+            });
+          }
+          else if(index === 'prefixPartition'){
+            added_part_keys.push({
+              field: property.name,
+              types: "prefix",
+            });
+          }
+
           if (index?.includes("hashPartition")) {
             const [, buckets] = index.split("_");
 
@@ -868,16 +885,22 @@ export default defineComponent({
         selectedIndices += schema.index_type[i];
       }
 
+      if(selectedIndices.includes('prefixPartition') && option.value.includes('keyPartition')){
+        return true;
+      }
+      if(selectedIndices.includes('keyPartition') && option.value.includes('prefixPartition')){
+        return true;
+      }
       if (
         selectedIndices.includes("hashPartition") &&
         selectedHashPartition !== option.value &&
         (option.value.includes("hashPartition") ||
-          option.value.includes("keyPartition"))
+          option.value.includes("keyPartition") || option.value.includes("prefixPartition"))
+
       )
         return true;
-
       if (
-        selectedIndices.includes("keyPartition") &&
+       ( selectedIndices.includes("keyPartition") || selectedIndices.includes("prefixPartition"))&&
         option.value.includes("hashPartition")
       )
         return true;

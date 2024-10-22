@@ -87,6 +87,8 @@ use crate::{
 };
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
+static SKIPPED_LOCK_FILES: Lazy<RwLock<HashSet<String>>> =
+    Lazy::new(|| RwLock::new(HashSet::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = get_config();
@@ -221,6 +223,26 @@ async fn prepare_files(
         };
         // check if the file is processing
         if PROCESSING_FILES.read().await.contains(&file_key) {
+            // check if the file is still locking
+            if SKIPPED_LOCK_FILES.read().await.contains(&file_key)
+                && !wal::lock_files_exists(&file_key)
+            {
+                log::warn!(
+                    "[INGESTER:JOB] the file was released, delete it: {}",
+                    file_key
+                );
+                if tokio::fs::remove_file(&wal_dir.join(&file_key))
+                    .await
+                    .is_ok()
+                {
+                    // delete metadata from cache
+                    WAL_PARQUET_METADATA.write().await.remove(&file_key);
+                    // need release all the files
+                    PROCESSING_FILES.write().await.remove(&file_key);
+                    // delete from skip list
+                    SKIPPED_LOCK_FILES.write().await.remove(&file_key);
+                }
+            }
             continue;
         }
 
@@ -449,7 +471,9 @@ async fn move_files(
 
         // check if allowed to delete the file
         for file in new_file_list.iter() {
-            loop {
+            let mut need_skip = true;
+            // wait for 5s
+            for _ in 0..50 {
                 if wal::lock_files_exists(&file.key) {
                     log::warn!(
                         "[INGESTER:JOB:{thread_id}] the file is still in use, waiting for a few ms: {}",
@@ -457,8 +481,17 @@ async fn move_files(
                     );
                     time::sleep(time::Duration::from_millis(100)).await;
                 } else {
+                    need_skip = false;
                     break;
                 }
+            }
+            if need_skip {
+                log::warn!(
+                    "[INGESTER:JOB:{thread_id}] the file is still in use, add it to the skip_list: {}",
+                    file.key
+                );
+                SKIPPED_LOCK_FILES.write().await.insert(file.key.clone());
+                continue;
             }
 
             let ret = tokio::fs::remove_file(&wal_dir.join(&file.key)).await;

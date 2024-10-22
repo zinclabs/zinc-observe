@@ -32,19 +32,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator class="separator" />
 
     <div class="about_data">
-      <div class="row head">
-        <div class="col-1">{{ t("about.version") }}</div>
-        <div class="col-6 col-md-5 col-lg-4">{{ t("about.commitHash") }}</div>
-        <div class="col-3 col-md-3 col-lg-2">{{ t("about.buildDate") }}</div>
+      <div>
+        <span class="inline-block text-bold" style="width: 100px"
+          >{{ t("about.version") }}:</span
+        >
+        {{ store.state.zoConfig.version }}
       </div>
-      <div class="row body">
-        <div class="col-1">{{ store.state.zoConfig.version }}</div>
-        <div class="col-6 col-md-5 col-lg-4">
-          {{ store.state.zoConfig.commit_hash }}
-        </div>
-        <div class="col-3 col-md-3 col-lg-2">
-          {{ store.state.zoConfig.build_date }}
-        </div>
+      <div>
+        <span class="inline-block text-bold" style="width: 100px"
+          >{{ t("about.commitHash") }}:</span
+        >
+        {{ store.state.zoConfig.commit_hash }}
+      </div>
+      <div>
+        <span class="inline-block text-bold" style="width: 100px"
+          >{{ t("about.buildDate") }}:</span
+        >
+        {{ store.state.zoConfig.build_date }}
       </div>
     </div>
     <div class="about_data q-mt-lg">

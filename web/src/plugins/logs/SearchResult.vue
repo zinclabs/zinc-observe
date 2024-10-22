@@ -381,6 +381,7 @@ export default defineComponent({
       refreshPartitionPagination,
       filterHitsColumns,
       reorderSelectedFields,
+      getFilterExpressionByFieldType,
     } = useLogs();
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
@@ -441,9 +442,17 @@ export default defineComponent({
       searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
     };
 
-    const addSearchTerm = (term: string) => {
-      // searchObj.meta.showDetailTab = false;
-      searchObj.data.stream.addToFilter = term;
+    const addSearchTerm = (
+      field: string | number,
+      field_value: string | number | boolean,
+      action: string,
+    ) => {
+      const searchExpression = getFilterExpressionByFieldType(
+        field,
+        field_value,
+        action,
+      );
+      searchObj.data.stream.addToFilter = searchExpression;
     };
 
     const removeSearchTerm = (term: string) => {

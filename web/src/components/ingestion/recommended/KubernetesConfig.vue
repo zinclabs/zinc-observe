@@ -4,7 +4,7 @@
     <div class="text-subtitle1 q-pl-xs q-mt-md">Install cert-manager</div>
     <ContentCopy
       class="q-mt-sm"
-      content="kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.1/cert-manager.yaml"
+      content="kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.16.1/cert-manager.yaml"
     />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">

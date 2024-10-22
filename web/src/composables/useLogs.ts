@@ -2704,6 +2704,7 @@ const useLogs = () => {
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
+            console.log("stream", stream)
             if (searchObj.data.stream.selectedStream.length > 1) {
               schemaMaps.push({
                 name: convertToCamelCase(stream.name),
@@ -3759,6 +3760,10 @@ const useLogs = () => {
     let fromTimestamp, toTimestamp;
 
     switch (period.slice(-1)) {
+      case "s":
+        fromTimestamp = currentTime.getTime() - parseInt(period) * 1000; // 1 second = 1000 milliseconds
+        toTimestamp = currentTime.getTime();
+        break;
       case "m":
         fromTimestamp = currentTime.getTime() - parseInt(period) * 60000; // 1 minute = 60000 milliseconds
         toTimestamp = currentTime.getTime();
@@ -4226,6 +4231,69 @@ const useLogs = () => {
     return selectedFields;
   };
 
+  const getFilterExpressionByFieldType = (
+    field: string | number,
+    field_value: string | number | boolean,
+    action: string,
+  ) => {
+    let operator = action == "include" ? "=" : "!=";
+    try {
+      let fieldType: string = "utf8";
+
+      const getStreamFieldTypes = (stream: any) => {
+        if (!stream.schema) return {};
+        return Object.fromEntries(
+          stream.schema.map((schema: any) => [schema.name, schema.type]),
+        );
+      };
+
+      const fieldTypeList = searchObj.data.streamResults.list
+        .filter((stream: any) =>
+          searchObj.data.stream.selectedStream.includes(stream.name),
+        )
+        .reduce(
+          (acc: any, stream: any) => ({
+            ...acc,
+            ...getStreamFieldTypes(stream),
+          }),
+          {},
+      );
+
+      if (Object.hasOwn(fieldTypeList, field)) {
+        fieldType = fieldTypeList[field];
+      }
+
+      if (
+        field_value === "null" ||
+        field_value === "" ||
+        field_value === null
+      ) {
+        operator = action == "include" ? "is" : "is not";
+        field_value = "null";
+      }
+      let expression =
+        field_value == "null"
+          ? `${field} ${operator} ${field_value}`
+          : `${field} ${operator} '${field_value}'`;
+
+      const isNumericType = (type: string) =>
+        ["int64", "float64"].includes(type.toLowerCase());
+      const isBooleanType = (type: string) => type.toLowerCase() === "boolean";
+
+      if (isNumericType(fieldType)) {
+        expression = `${field} ${operator} ${field_value}`;
+      } else if (isBooleanType(fieldType)) {
+        operator = action == "include" ? "is" : "is not";
+        expression = `${field} ${operator} ${field_value}`;
+      }
+
+      return expression;
+    } catch (e: any) {
+      console.log("Error while getting filter expression by field type", e);
+      return `${field} ${operator} '${field_value}'`;
+    }
+  };
+
   return {
     searchObj,
     searchAggData,
@@ -4267,6 +4335,7 @@ const useLogs = () => {
     resetHistogramWithError,
     isNonAggregatedQuery,
     extractTimestamps,
+    getFilterExpressionByFieldType,
   };
 };
 

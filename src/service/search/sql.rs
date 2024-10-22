@@ -44,7 +44,7 @@ use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
         FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, SelectItem,
-        SetExpr, VisitMut, VisitorMut,
+        SetExpr, Statement, VisitMut, VisitorMut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -181,6 +181,13 @@ impl Sql {
         let mut histogram_interval_visitor =
             HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
+
+        // NOTE: only this place can modify the sql
+        // 9. add _timestamp is need
+        if !is_complex_query(&mut statement) {
+            let mut add_timestamp_visitor = AddTimestampVisitor::new();
+            statement.visit(&mut add_timestamp_visitor);
+        }
 
         Ok(Sql {
             sql: statement.to_string(),
@@ -745,6 +752,135 @@ impl VisitorMut for FieldNameVisitor {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Identifier(ident) = expr {
             self.field_names.insert(ident.value.clone());
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+// add _timestamp to the query like `SELECT name FROM t` -> `SELECT _timestamp, name FROM t`
+struct AddTimestampVisitor {}
+
+impl AddTimestampVisitor {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VisitorMut for AddTimestampVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let SetExpr::Select(select) = query.body.as_mut() {
+            let mut has_timestamp = false;
+            for item in select.projection.iter_mut() {
+                match item {
+                    SelectItem::UnnamedExpr(expr) => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor
+                            .field_names
+                            .contains(&get_config().common.column_timestamp)
+                        {
+                            has_timestamp = true;
+                            break;
+                        }
+                    }
+                    SelectItem::ExprWithAlias { expr, alias: _ } => {
+                        let mut visitor = FieldNameVisitor::new();
+                        expr.visit(&mut visitor);
+                        if visitor
+                            .field_names
+                            .contains(&get_config().common.column_timestamp)
+                        {
+                            has_timestamp = true;
+                            break;
+                        }
+                    }
+                    SelectItem::Wildcard(_) => {
+                        has_timestamp = true;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            if !has_timestamp {
+                select.projection.insert(
+                    0,
+                    SelectItem::UnnamedExpr(Expr::Identifier(Ident::new(
+                        get_config().common.column_timestamp.clone(),
+                    ))),
+                );
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
+fn is_complex_query(statement: &mut Statement) -> bool {
+    let mut visitor = ComplexQueryVisitor::new();
+    statement.visit(&mut visitor);
+    visitor.is_complex
+}
+
+// check if the query is complex query
+// 1. has subquery
+// 2. has join
+// 3. has group by
+// 4. has aggregate
+struct ComplexQueryVisitor {
+    pub is_complex: bool,
+}
+
+impl ComplexQueryVisitor {
+    fn new() -> Self {
+        Self { is_complex: false }
+    }
+}
+
+impl VisitorMut for ComplexQueryVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_ref() {
+            // check if has group by
+            match select.group_by {
+                GroupByExpr::Expressions(ref expr, _) => self.is_complex = !expr.is_empty(),
+                _ => self.is_complex = true,
+            }
+            // check if has join
+            if select.from.len() > 1 || select.from.iter().any(|from| !from.joins.is_empty()) {
+                self.is_complex = true;
+            }
+            if self.is_complex {
+                return ControlFlow::Break(());
+            }
+        }
+        ControlFlow::Continue(())
+    }
+
+    fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
+        match expr {
+            // check if has subquery
+            Expr::Subquery(_) | Expr::Exists { .. } | Expr::InSubquery { .. } => {
+                self.is_complex = true;
+            }
+            // check if has aggregate function or window function
+            Expr::Function(func) => {
+                if AGGREGATE_UDF_LIST
+                    .contains(&trim_quotes(&func.name.to_string().to_lowercase()).as_str())
+                    || func.filter.is_some()
+                    || func.over.is_some()
+                    || !func.within_group.is_empty()
+                {
+                    self.is_complex = true;
+                }
+            }
+            // check select * from table
+            Expr::Wildcard => self.is_complex = true,
+            _ => {}
+        }
+        if self.is_complex {
+            return ControlFlow::Break(());
         }
         ControlFlow::Continue(())
     }

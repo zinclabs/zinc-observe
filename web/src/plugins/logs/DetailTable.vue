@@ -157,9 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-include-field-btn"
-                            @click="
-                              toggleIncludeSearchTerm(`${value}='${key}'`)
-                            "
+                            @click="toggleIncludeSearchTerm(value, key, 'include')"
                             ><q-btn
                               title="Add to search query"
                               size="6px"
@@ -188,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <q-item-label
                             data-test="log-details-exclude-field-btn"
                             @click="
-                              toggleExcludeSearchTerm(`${value}!='${key}'`)
+                              toggleExcludeSearchTerm(value, key, 'exclude')
                             "
                             ><q-btn
                               title="Add to search query"
@@ -383,19 +381,19 @@ export default defineComponent({
     },
   },
   methods: {
-    toggleIncludeSearchTerm(term: string) {
-      // if (flag == false) {
-      this.$emit("add:searchterm", term);
-      // } else {
-      //   this.$emit("remove:searchterm", term);
-      // }
+    toggleIncludeSearchTerm(
+      field: string | number,
+      field_value: string | number | boolean,
+      action: string,
+    ) {
+      this.$emit("add:searchterm", field, field_value, action);
     },
-    toggleExcludeSearchTerm(term: string) {
-      // if (flag == false) {
-      this.$emit("add:searchterm", term);
-      // } else {
-      //   this.$emit("remove:searchterm", term);
-      // }
+    toggleExcludeSearchTerm(
+      field: string | number,
+      field_value: string | number | boolean,
+      action: string,
+    ) {
+      this.$emit("add:searchterm", field, field_value, action);
     },
     searchTimeBoxed(rowData: any, size: number) {
       this.$emit("search:timeboxed", {

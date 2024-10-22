@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :counter-label="counterLabelFn"
             style="width: 550px"
             max-file-size="20481"
-            accept=".png, .jpg, .jpeg, .svg, .jpeg2, image/*"
+            accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
             @rejected="onRejected"
             @update:model-value="uploadImage"
             class="q-mx-none"
@@ -396,10 +396,9 @@ export default defineComponent({
 
     const sanitizeInput = (text: string): string => {
       // Limit input to 100 characters
-      const limitedInput = text.slice(0, 100);
-      
+        
       // Used DOMPurify for thorough sanitization
-      return DOMPurify.sanitize(limitedInput);
+      return DOMPurify.sanitize(text);
     };
 
 
@@ -413,6 +412,15 @@ export default defineComponent({
       }
 
       customText.value = sanitizeInput(customText.value);
+      if(customText.value.length > 100) {
+        q.notify({
+          type: "negative",
+          message: "Text should be less than 100 characters.",
+          timeout: 2000,
+        });
+        loadingState.value = false;
+        return;
+      }
 
       settingsService
         .updateCustomText(
@@ -467,7 +475,7 @@ export default defineComponent({
       onSubmit,
       files,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {
-        return `(Only .png, .jpg, .jpeg, .gif, .bmp, .tif formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
+        return `(Only .png, .jpg, .jpeg, .gif, .bmp, formats & size <=20kb & Max Size: 150x30px) ${CounterLabelParams.filesNumber} file | ${CounterLabelParams.totalSize}`;
       },
       filesImages: ref(null),
       filesMaxSize: ref(null),

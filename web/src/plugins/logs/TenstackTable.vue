@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         width: !defaultColumns
           ? table.getCenterTotalSize() + 'px'
           : wrap
-          ? width
-            ? width - 12 + 'px'
-            : '100%'
-          : '100%',
+            ? width
+              ? width - 12 + 'px'
+              : '100%'
+            : '100%',
       }"
     >
       <thead
@@ -52,8 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               defaultColumns && wrap
                 ? width - 12 + 'px'
                 : defaultColumns
-                ? tableRowSize + 'px'
-                : table.getTotalSize() + 'px',
+                  ? tableRowSize + 'px'
+                  : table.getTotalSize() + 'px',
             minWidth: '100%',
             background: store.state.theme === 'dark' ? '#565656' : '#F5F5F5',
           }"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="
                 getSortingHandler(
                   $event,
-                  header.column.getToggleSortingHandler()
+                  header.column.getToggleSortingHandler(),
                 )
               "
               class="tw-overflow-hidden tw-text-ellipsis"
@@ -296,8 +296,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     cell.column.columnDef.enableResizing
                       ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
                       : wrap
-                      ? width - 260 - 12 + 'px'
-                      : 'auto',
+                        ? width - 260 - 12 + 'px'
+                        : 'auto',
                   height: wrap ? '100%' : '20px',
                 }"
                 :class="tableCellClass"
@@ -461,7 +461,7 @@ watch(
   },
   {
     deep: true,
-  }
+  },
 );
 
 watch(
@@ -480,14 +480,14 @@ watch(
   },
   {
     deep: true,
-  }
+  },
 );
 
 watch(
   () => columnOrder.value,
   () => {
     emits("update:columnOrder", columnOrder.value, props.columns);
-  }
+  },
 );
 
 const tableCellClass = computed(() => [
@@ -543,7 +543,7 @@ onMounted(() => {
 });
 
 const hasDefaultSourceColumn = computed(
-  () => props.defaultColumns && columnOrder.value.includes("source")
+  () => props.defaultColumns && columnOrder.value.includes("source"),
 );
 
 const updateTableWidth = async () => {
@@ -578,12 +578,12 @@ watch(
   () => headers.value,
   (newVal) => {
     isResizingHeader.value = newVal.some((header) =>
-      header.column.getIsResizing()
+      header.column.getIsResizing(),
     );
   },
   {
     deep: true,
-  }
+  },
 );
 
 const parentRef = ref<HTMLElement | null>(null);
@@ -610,8 +610,9 @@ const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
 
 const setExpandedRows = () => {
   props.expandedRows.forEach((index: any) => {
+    const virtualIndex = calculateVirtualIndex(index);
     if (index < props.rows.length) {
-      expandRow(index as number);
+      expandRow(virtualIndex as number);
     }
   });
 };
@@ -619,8 +620,12 @@ const setExpandedRows = () => {
 const copyLogToClipboard = (value: any, copyAsJson: boolean = true) => {
   emits("copy", value, copyAsJson);
 };
-const addSearchTerm = (value: string) => {
-  emits("addSearchTerm", value);
+const addSearchTerm = (
+  field: string,
+  field_value: string | number | boolean,
+  action: string,
+) => {
+  emits("addSearchTerm", field, field_value, action);
 };
 const addFieldToTable = (value: string) => {
   emits("addFieldToTable", value);
@@ -646,7 +651,7 @@ const handleDragEnd = async () => {
     columnOrder.value[0] !== store.state.zoConfig.timestamp_column
   ) {
     const newColumnOrder = columnOrder.value.filter(
-      (column: any) => column !== store.state.zoConfig.timestamp_column
+      (column: any) => column !== store.state.zoConfig.timestamp_column,
     );
     newColumnOrder.unshift(store.state.zoConfig.timestamp_column);
     columnOrder.value = [...newColumnOrder];
@@ -666,11 +671,11 @@ const expandRow = async (index: number) => {
 
   if (expandedRowIndices.value.includes(index)) {
     expandedRowIndices.value = expandedRowIndices.value.filter(
-      (i) => i !== index
+      (i) => i !== index,
     );
 
     expandedRowIndices.value = expandedRowIndices.value.map((i) =>
-      i > index ? i - 1 : i
+      i > index ? i - 1 : i,
     );
 
     tableRows.value.splice(index + 1, 1);
@@ -684,7 +689,7 @@ const expandRow = async (index: number) => {
     });
 
     expandedRowIndices.value = expandedRowIndices.value.map((i) =>
-      i > index ? i + 1 : i
+      i > index ? i + 1 : i,
     );
   }
 
@@ -710,6 +715,16 @@ const calculateActualIndex = (index: number): number => {
     }
   });
   return actualIndex;
+};
+
+const calculateVirtualIndex = (index: number): number => {
+  let virtualIndex = index;
+  expandedRowIndices.value.forEach((expandedIndex) => {
+    if (expandedIndex !== -1 && expandedIndex < virtualIndex) {
+      virtualIndex += 1;
+    }
+  });
+  return virtualIndex;
 };
 
 const handleDataRowClick = (row: any, index: number) => {

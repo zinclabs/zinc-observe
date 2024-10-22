@@ -87,7 +87,7 @@ jobs:
       matrix:
         browser: [chrome]
         testfilename: 
-          ["sanity.spec.js", "alerts.spec.js", "schema.spec.js", "logspage.spec.js", "logsqueries.spec.js", "logsquickmode.spec.js", "multiselect-stream.spec.js", "pipeline.spec.js", "dashboardtype.spec.js", "dashboard.spec.js", "visualize.spec.js", "unflattened.spec.js"]
+          ["sanity.spec.js", "alerts.spec.js", "schema.spec.js", "logspage.spec.js", "logsqueries.spec.js", "logsquickmode.spec.js", "multiselect-stream.spec.js", "pipeline.spec.js", "dashboardtype.spec.js", "dashboard.spec.js", "visualize.spec.js", "unflattened.spec.js","secondsPrecisionAdded.spec.js"]
           
     steps:
       - name: Clone the current repo

@@ -141,7 +141,7 @@
               <q-item-section>
                 <q-item-label
                   data-test="log-details-include-field-btn"
-                  @click.stop="addSearchTerm(`${key}='${value[key]}'`)"
+                  @click.stop="addSearchTerm(key, value[key], 'include')"
                   v-close-popup
                   ><q-btn
                     title="Add to search query"
@@ -169,7 +169,7 @@
               <q-item-section>
                 <q-item-label
                   data-test="log-details-exclude-field-btn"
-                  @click.stop="addSearchTerm(`${key}!='${value[key]}'`)"
+                  @click.stop="addSearchTerm(key, value[key], 'exclude')"
                   v-close-popup
                   ><q-btn
                     title="Add to search query"
@@ -308,8 +308,12 @@ export default {
           ? JSON.parse(unflattendData.value)
           : props.value,
       );    };
-    const addSearchTerm = (value: string) => {
-      emit("addSearchTerm", value);
+    const addSearchTerm = (
+      field: string,
+      field_value: string | number | boolean,
+      action: string,
+    ) => {
+      emit("addSearchTerm", field, field_value, action);
     };
     const addFieldToTable = (value: string) => {
       emit("addFieldToTable", value);

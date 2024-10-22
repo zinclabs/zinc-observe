@@ -16,7 +16,7 @@
     <q-btn
       class="q-mr-xs"
       size="6px"
-      @click.prevent.stop="addSearchTerm(`${column.id}='${row[column.id]}'`)"
+      @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'include')"
       :data-test="`log-details-include-field-${row[column.id]}`"
       title="Include Term"
       round
@@ -27,7 +27,7 @@
     </q-btn>
     <q-btn
       size="6px"
-      @click.prevent.stop="addSearchTerm(`${column.id}!='${row[column.id]}'`)"
+      @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'exclude')"
       title="Exclude Term"
       :data-test="`log-details-exclude-field-${row[column.id]}`"
       round
@@ -63,8 +63,12 @@ const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable"]);
 const copyLogToClipboard = (value: any) => {
   emit("copy", value, false);
 };
-const addSearchTerm = (value: string) => {
-  emit("addSearchTerm", value);
+const addSearchTerm = (
+  field: string,
+  field_value: string | number | boolean,
+  action: string,
+) => {
+  emit("addSearchTerm", field, field_value, action);
 };
 
 const backgroundClass = computed(() =>
