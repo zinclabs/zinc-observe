@@ -285,6 +285,12 @@ const getStreamPayload = () => {
           types: "value",
         });
       }
+      if (index === "prefixPartition") {
+        settings.partition_keys.push({
+          field: field.name,
+          types: "prefix",
+        });
+      }
 
       if (index.includes("hashPartition")) {
         const [, buckets] = index.split("_");
