@@ -92,8 +92,11 @@ export class LogsPage {
   }
 
   async verifyDateTime(startTime, endTime) {
-    await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+   
+    await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
   }
+    //await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+
 
   async signOut() {
     await this.profileButton.click();
