@@ -213,7 +213,7 @@ export const isGivenFieldInOrderBy = async (
 
   if (ast?.orderby) {
     for (const item of ast.orderby) {
-      if (item?.expr?.column === fieldAlias) {
+      if (item?.expr?.column?.expr?.value === fieldAlias) {
         return item.type; // 'ASC' or 'DESC'
       }
     }
@@ -232,15 +232,16 @@ function extractFields(parsedAst: any, timeField: string) {
     };
 
     if (column.expr.type === "column_ref") {
-      field.column = column?.expr?.column ?? timeField;
+      field.column = column?.expr?.column?.expr?.value ?? timeField;
     } else if (column.expr.type === "aggr_func") {
-      field.column = column?.expr?.args?.expr?.column ?? timeField;
+      field.column = column?.expr?.args?.expr?.column?.expr?.value ?? timeField;
       field.aggregationFunction = column?.expr?.name?.toLowerCase() ?? "count";
     } else if (column.expr.type === "function") {
       // histogram field
-      field.column = column?.expr?.args?.value[0]?.column ?? timeField;
+      field.column =
+        column?.expr?.args?.value[0]?.column?.expr?.value ?? timeField;
       field.aggregationFunction =
-        column?.expr?.name?.[0]?.value?.toLowerCase() ?? "histogram";
+        column?.expr?.name?.name[0]?.value?.toLowerCase() ?? "histogram";
     }
 
     field.alias = column?.as ?? field?.column ?? timeField;
@@ -254,6 +255,9 @@ function extractFields(parsedAst: any, timeField: string) {
   );
 
   if (allFieldsSelected) {
+    // empty fields array
+    fields = [];
+
     // Add histogram(_timestamp) and count(_timestamp) to the fields array
     fields.push(
       {
@@ -331,7 +335,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: condition?.operator,
           value: `'${condition?.right?.value}'`,
           logicalOperator: "AND",
@@ -341,7 +345,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: "<>",
           value: `'${condition?.right?.value}'`,
           logicalOperator: "AND",
@@ -356,7 +360,7 @@ function parseCondition(condition: any) {
         return {
           type: "list",
           values: values,
-          column: condition?.left?.column ?? "",
+          column: condition?.left?.column?.expr?.value ?? "",
           operator: null,
           value: null,
           logicalOperator: "AND",
@@ -367,7 +371,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: "Is Null",
           value: null,
           logicalOperator: "AND",
@@ -378,7 +382,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: "Is Not Null",
           value: null,
           logicalOperator: "AND",
@@ -388,7 +392,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: "Contains",
           value: `'${condition?.right?.value}'`,
           logicalOperator: "AND",
@@ -398,7 +402,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.left?.column,
+          column: condition?.left?.column?.expr?.value,
           operator: "Not Contains",
           value: `'${condition?.right?.value}'`,
           logicalOperator: "AND",
@@ -427,7 +431,7 @@ function parseCondition(condition: any) {
         return {
           type: "condition",
           values: [],
-          column: condition?.args?.value[0]?.column ?? "",
+          column: condition?.args?.value[0]?.column?.expr?.value ?? "",
           operator: conditionName,
           value: condition?.args?.value[1]?.value ?? "",
           logicalOperator: "AND",
