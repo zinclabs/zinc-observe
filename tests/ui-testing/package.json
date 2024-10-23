@@ -14,7 +14,8 @@
     "cypress-multi-reporters": "^1.6.2",
     "cypress-xpath": "^2.0.1",
     "mocha": "^10.2.0",
-    "mochawesome": "^7.1.3"
+    "mochawesome": "^7.1.3",
+    "nyc": "^17.1.0"
   },
   "dependencies": {
     "@google-cloud/local-auth": "^2.1.0",

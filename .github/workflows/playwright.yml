@@ -120,7 +120,7 @@ jobs:
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
           echo "ORGNAME=${ORGNAME}" >> .env
           mv .env tests/ui-testing
-          cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }}
+          cd tests/ui-testing && npm ci && npx playwright test ./playwright-tests/${{ matrix.testfilename }} && npx nyc report
 
       # - name: Check OpenObserve logs
       #   if: always()

@@ -1,0 +1,9 @@
+{
+    "extension": [".ts", ".js"],
+    "include": ["src/**/*.ts"],
+    "exclude": ["node_modules/**", "test/**"],
+    "reporter": ["text", "html"],
+    "sourceMap": true,
+    "instrument": true,
+    "excludeAfterRemap": false
+  }

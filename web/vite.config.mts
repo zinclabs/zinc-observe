@@ -27,6 +27,8 @@ import fs from "fs-extra";
 import monacoEditorPlugin from "vite-plugin-monaco-editor";
 import visualizer from "rollup-plugin-visualizer";
 
+import istanbul from "vite-plugin-istanbul";
+
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
   dotenv.config({ path: ".env.production" });
@@ -46,7 +48,7 @@ const enterpriseResolverPlugin = {
 
       const enterprisePath = path.resolve(
         __dirname,
-        `./src/enterprise/${fileName}`
+        `./src/enterprise/${fileName}`,
       );
       const defaultPath = path.resolve(__dirname, `./src/${fileName}`);
 
@@ -108,9 +110,17 @@ export default defineConfig({
     quasar({
       sassVariables: "src/styles/quasar-variables.sass",
     }),
+    istanbul({
+      include: "src/*",
+      exclude: ["node_modules", "test/"],
+      extension: [".js", ".ts", ".vue"],
+      requireEnv: false,
+      cypress: true,
+      forceBuildInstrument: true,
+    }),
     enterpriseResolverPlugin,
     vueJsx(),
-    monacoEditorPlugin({
+    monacoEditorPlugin.default({
       customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
     }),
     isTesting && monacoEditorTestResolver(),
@@ -119,7 +129,7 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
       "@enterprise": fileURLToPath(
-        new URL("./src/enterprise", import.meta.url)
+        new URL("./src/enterprise", import.meta.url),
       ),
       stream: "rollup-plugin-node-polyfills/polyfills/stream",
       events: "rollup-plugin-node-polyfills/polyfills/events",
@@ -136,7 +146,7 @@ export default defineConfig({
     rollupOptions: {
       plugins: [
         nodePolyfills(),
-        visualizer({
+        visualizer.default({
           open: true,
           gzipSize: true,
           brotliSize: true,
