@@ -269,13 +269,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         trigger_data_stream.error = Some(err_string);
         // update its status and retries
         if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
-            if !get_config().limit.pause_alerts_on_retries {
-                new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
-                    .unwrap()
-                    .num_microseconds()
-                    .unwrap();
-                db::scheduler::update_trigger(new_trigger).await?;
-            } else {
+            if get_config().limit.pause_alerts_on_retries {
                 // It has been tried the maximum time, just disable the alert
                 // and show the error.
                 if let Some(mut alert) =
@@ -293,16 +287,14 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                         log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
                     }
                 }
-                // update its status and retries
-                db::scheduler::update_status(
-                    &new_trigger.org,
-                    new_trigger.module,
-                    &new_trigger.module_key,
-                    db::scheduler::TriggerStatus::Waiting,
-                    trigger.retries + 1,
-                )
-                .await?;
             }
+            // This didn't work, update the next_run_at to the next expected trigger time
+            new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+            new_trigger.data = "".to_string();
+            db::scheduler::update_trigger(new_trigger).await?;
         } else {
             // update its status and retries
             db::scheduler::update_status(
