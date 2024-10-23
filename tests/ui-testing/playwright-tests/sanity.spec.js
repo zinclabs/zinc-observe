@@ -3,6 +3,9 @@ import logData from "../../ui-testing/cypress/fixtures/log.json";
 import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 import { toZonedTime } from "date-fns-tz";
+import {extractCoverage} from "./utils/coverage"
+const fs = require('fs');
+
 
 test.describe.configure({ mode: "parallel" });
 const folderName = `Folder ${Date.now()}`;
@@ -97,6 +100,11 @@ test.describe("Sanity testcases", () => {
     await selectStreamAndStreamTypeForLogs(page, logData.Stream);
     await applyQueryButton(page);
     // const streams = page.waitForResponse("**/api/default/streams**");
+  });
+
+
+  test.afterAll(async ({ page }) => {
+    await extractCoverage(page)
   });
 
   test("should display quick mode toggle button", async ({ page }) => {
