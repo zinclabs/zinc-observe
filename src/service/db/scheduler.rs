@@ -27,8 +27,11 @@ use {
 };
 
 #[derive(Default, Serialize, Deserialize, Debug)]
-pub struct DerivedTriggerData {
-    pub period_end_time: i64,
+pub struct ScheduledTriggerData {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub period_end_time: Option<i64>,
+    #[serde(default)]
+    pub tolerance: i64,
 }
 
 #[inline]

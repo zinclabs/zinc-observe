@@ -24,3 +24,10 @@ pub fn get_rand_element<T>(arr: &[T]) -> &T {
 pub fn generate_random_string(len: usize) -> String {
     Alphanumeric.sample_string(&mut rand::thread_rng(), len)
 }
+
+/// Generate random number within the given range
+pub fn get_rand_num_within(min: u64, max: u64) -> u64 {
+    let mut buf = [0u8; 1];
+    getrandom::getrandom(&mut buf).unwrap();
+    min + buf[0] as u64 % (max - min)
+}

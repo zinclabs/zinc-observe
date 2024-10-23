@@ -918,6 +918,12 @@ pub struct Limit {
     pub scheduler_max_retries: i32,
     #[env_config(name = "ZO_SCHEDULER_PAUSE_ALERT_AFTER_RETRIES", default = false)]
     pub pause_alerts_on_retries: bool,
+    #[env_config(
+        name = "ZO_ALERT_CONSIDERABLE_DELAY",
+        default = 20,
+        help = "Integer value representing the delay in percentage of the alert frequency that will be included in alert evaluation timerange. Default is 20. This can be changed in runtime."
+    )]
+    pub alert_considerable_delay: i32,
     #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
     pub scheduler_clean_interval: u64,
     #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
