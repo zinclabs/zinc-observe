@@ -634,6 +634,17 @@ export default defineComponent({
      * This watcher is used to check if the user has changed the stream type from stream explorer to logs.
      * This gets triggered when stream explorer is active and user clicks on logs icon from left menu sidebar. Then we need to redirect the user to logs page again.
      */
+     watch(
+      () => splitterModel.value,
+      (val) => {
+        if(val == 80 ){
+            splitterModel.value = 80;
+        }
+        else{
+         searchObj.config.splitterModelUserDraggedValue = val;
+        }
+      }
+    );
 
     watch(
       () => router.currentRoute.value.query.type,
@@ -650,6 +661,13 @@ export default defineComponent({
         }
       },
     );
+    watch(
+  [() => searchObj.config.editorSplitterModel, () => searchObj.meta.queryEditorPlaceholderFlag, () => searchObj.meta.functionEditorPlaceholderFlag],
+  ([splitterModelVal, isQueryFocused, isFnFocused]) => {
+    splitterModel.value = splitterModelVal;
+  },
+);
+
     watch(
       () => router.currentRoute.value.query,
       () => {

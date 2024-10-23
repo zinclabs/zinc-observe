@@ -600,6 +600,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </q-splitter>
+        <q-btn
+      data-test="logs-search-field-list-collapse-btn"
+      :icon="searchObj.config.isFullScreen ? 'fullscreen_exit' : 'fullscreen'"
+      :title="searchObj.config.isFullScreen ? 'Collapse' : 'Expand'"
+      dense
+      size="10px"
+      round
+      class="field-list-collapse-btn"
+      color="primary"
+      style="position: absolute; bottom: 10px; right: 10px; z-index: 10;" 
+      @click="toggleFullScreen"
+    ></q-btn>
       </div>
     </div>
 
@@ -1110,6 +1122,8 @@ export default defineComponent({
     } = useLogs();
     const queryEditorRef = ref(null);
 
+
+
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
 
@@ -1120,6 +1134,7 @@ export default defineComponent({
     const savedFunctionName: string = ref("");
     const savedFunctionSelectedName: string = ref("");
     const saveFunctionLoader = ref(false);
+
 
     // confirm dialog for logs visualization toggle
     const confirmLogsVisualizeModeChangeDialog = ref(false);
@@ -1203,6 +1218,18 @@ export default defineComponent({
         queryEditorRef?.value?.triggerAutoComplete;
       getSuggestions();
     };
+
+    const toggleFullScreen = () =>{
+      searchObj.config.isFullScreen = !searchObj.config.isFullScreen;
+
+      if(searchObj.config.isFullScreen){
+        searchObj.config.editorSplitterModel = 80;
+      }
+      if(!searchObj.config.isFullScreen){
+        searchObj.config.editorSplitterModel = searchObj.config.splitterModelUserDraggedValue;
+      }
+
+    }
 
     const getColumnNames = (columnData: any) => {
       const columnNames = [];
@@ -1488,6 +1515,7 @@ export default defineComponent({
       window.removeEventListener("click", () => {
         fnEditorRef?.value?.resetEditorLayout();
       });
+      
     });
 
     onActivated(() => {
@@ -2665,6 +2693,7 @@ export default defineComponent({
       visualizeSearchRequestTraceIds,
       disable,
       cancelVisualizeQueries,
+      toggleFullScreen,
     };
   },
   computed: {

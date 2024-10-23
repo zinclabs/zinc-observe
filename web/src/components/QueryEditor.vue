@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="logs-query-editor"
     ref="editorRef"
     :id="editorId"
+
   />
 </template>
 
@@ -211,6 +212,10 @@ export default defineComponent({
       );
 
       editorObj.onDidFocusEditorWidget(() => {
+        searchObj.config.editorSplitterModel = 80;
+        searchObj.config.isFullScreen = true;
+
+
         emit("focus");
       });
 
@@ -222,6 +227,11 @@ export default defineComponent({
         editorObj?.layout();
       });
 
+      window.addEventListener("resize", async () => {
+        await nextTick();
+        editorObj?.layout();
+        // queryEditorRef.value.resetEditorLayout();
+      });
       window.addEventListener("resize", async () => {
         await nextTick();
         editorObj?.layout();
@@ -267,6 +277,8 @@ export default defineComponent({
       }
 
       setupEditor();
+      window.addEventListener('keydown', handleKeydown);
+
     });
 
     onActivated(async () => {
@@ -285,6 +297,8 @@ export default defineComponent({
 
     onUnmounted(() => {
       provider.value?.dispose();
+      window.removeEventListener('keydown', handleKeydown); // Clean up the event listener
+
     });
 
     const enableCodeFolding = computed(() => {
@@ -298,6 +312,20 @@ export default defineComponent({
         editorObj.updateOptions({ readOnly: props.readOnly });
       }
     );
+
+    watch(
+      [() => searchObj.meta.functionEditorPlaceholderFlag, ()=> searchObj.meta.queryEditorPlaceholderFlag , () => searchObj.meta.toggleFunction],
+      () =>{
+       if(searchObj.meta.functionEditorPlaceholderFlag && searchObj.meta.queryEditorPlaceholderFlag) {
+        if(searchObj.config.isFullScreen ) {
+          searchObj.config.editorSplitterModel = searchObj.config.splitterModelUserDraggedValue;
+          searchObj.config.isFullScreen = false;
+        }
+
+       
+      }
+    }
+    )
 
     watch(
       () => store.state.theme,
@@ -373,6 +401,18 @@ export default defineComponent({
         }
       );
     };
+
+    const handleKeydown = (event :any) => {
+      if (event.key === 'Escape') {
+        if(searchObj.config.isFullScreen) {
+          searchObj.config.editorSplitterModel = 30;
+          searchObj.config.isFullScreen = false;
+          emit("blur")
+        }
+      }
+    };
+
+
 
     const resetEditorLayout = () => {
       editorObj?.layout();

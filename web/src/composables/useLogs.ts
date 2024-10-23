@@ -69,6 +69,9 @@ const defaultObject = {
   config: {
     splitterModel: 20,
     lastSplitterPosition: 0,
+    splitterModelUserDraggedValue : 10,
+    isFullScreen:false,
+    editorSplitterModel : 10,
     splitterLimit: [0, 40],
     fnSplitterModel: 60,
     fnLastSplitterPosition: 0,
