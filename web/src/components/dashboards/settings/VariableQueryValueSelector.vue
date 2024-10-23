@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       filled
       outlined
       dense
-      v-model="selectedValue"
+      v-model="tempSelectedValue"
       :display-value="displayValue"
       :label="variableItem?.label || variableItem?.name"
       :options="fieldsFilteredOptions"
@@ -81,6 +81,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-item-section>
         </q-item>
       </template>
+
+      <template v-if="variableItem.multiSelect" v-slot:after-options>
+        <div class="q-pa-sm tw-text-end">
+          <q-btn
+            @click="applySelection"
+            class="no-border q-py-xs"
+            color="secondary"
+            no-caps
+            size="sm"
+            data-test="dashboard-variable-query-value-selector-apply-btn"
+          >
+            Apply
+          </q-btn>
+        </div>
+      </template>
     </q-select>
   </div>
 </template>
@@ -94,7 +109,10 @@ export default defineComponent({
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
-    //get v-model value for selected value  using props
+    // Temporary selection value
+    const tempSelectedValue = ref(props.variableItem?.value);
+
+    // Actual selected value used
     const selectedValue = ref(props.variableItem?.value);
 
     const options = toRef(props.variableItem, "options");
@@ -108,32 +126,34 @@ export default defineComponent({
       () => props.variableItem,
       () => {
         options.value = props.variableItem?.options;
-      }
+        tempSelectedValue.value = selectedValue.value;
+      },
     );
 
     // isAllSelected should be true if all options are selected and false otherwise
     const isAllSelected = computed(() => {
       return (
         fieldsFilteredOptions.value.length > 0 &&
-        selectedValue.value.length === fieldsFilteredOptions.value.length
+        tempSelectedValue.value.length === fieldsFilteredOptions.value.length
       );
     });
 
     // Function to toggle select/deselect all options
     const toggleSelectAll = () => {
       if (!isAllSelected.value) {
-        selectedValue.value = fieldsFilteredOptions.value.map(
-          (option: any) => option.value
+        tempSelectedValue.value = fieldsFilteredOptions.value.map(
+          (option: any) => option.value,
         );
       } else {
-        selectedValue.value = [];
+        tempSelectedValue.value = [];
       }
     };
 
-    // update selected value
-    watch(selectedValue, () => {
+    // apply the temporary selection to the actual selected value
+    const applySelection = () => {
+      selectedValue.value = tempSelectedValue.value;
       emit("update:modelValue", selectedValue.value);
-    });
+    };
 
     // Display the selected value
     const displayValue = computed(() => {
@@ -166,12 +186,14 @@ export default defineComponent({
     });
 
     return {
+      tempSelectedValue,
       selectedValue,
       fieldsFilterFn,
       fieldsFilteredOptions,
       isAllSelected,
       toggleSelectAll,
       displayValue,
+      applySelection,
     };
   },
 });
