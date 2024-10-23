@@ -40,6 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
       @update:model-value="onValueChange"
+      @blur="clickOutsideOfPopup"
+      @hide="clickOutsideOfPopup"
     >
       <template v-slot:no-option>
         <q-item>
@@ -166,6 +168,11 @@ export default defineComponent({
       }
     };
 
+    const clickOutsideOfPopup = () => {
+      selectedValue.value = tempSelectedValue.value;
+      emit("update:modelValue", selectedValue.value);
+    };
+
     // Display the selected value
     const displayValue = computed(() => {
       if (selectedValue.value || selectedValue.value == "") {
@@ -206,6 +213,7 @@ export default defineComponent({
       displayValue,
       applySelection,
       onValueChange,
+      clickOutsideOfPopup,
     };
   },
 });
