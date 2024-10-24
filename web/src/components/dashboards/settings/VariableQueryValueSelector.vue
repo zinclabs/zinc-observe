@@ -159,7 +159,7 @@ export default defineComponent({
     };
 
     // Update value based on multi-select mode
-    const onValueChange = (value) => {
+    const onValueChange = (value: any) => {
       if (!props.variableItem.multiSelect) {
         selectedValue.value = value;
         emit("update:modelValue", value);
