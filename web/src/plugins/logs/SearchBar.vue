@@ -601,17 +601,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </q-splitter>
         <q-btn
-      data-test="logs-search-field-list-collapse-btn"
-      :icon="searchObj.config.isFullScreen ? 'fullscreen_exit' : 'fullscreen'"
-      :title="searchObj.config.isFullScreen ? 'Collapse' : 'Expand'"
-      dense
-      size="10px"
-      round
-      class="field-list-collapse-btn"
-      color="primary"
-      style="position: absolute; bottom: 10px; right: 10px; z-index: 10;" 
-      @click="toggleFullScreen"
-    ></q-btn>
+          data-test="logs-search-query-editor-full-screen-btn"
+          :icon="searchObj.config.isFullScreen ? 'fullscreen_exit' : 'fullscreen'"
+          :title="searchObj.config.isFullScreen ? 'Collapse' : 'Expand'"
+          dense
+          size="10px"
+          round
+          class="field-list-collapse-btn"
+          color="primary"
+          style="position: absolute; bottom: 10px; right: 10px; z-index: 10;" 
+          @click="toggleFullScreen"
+        ></q-btn>
       </div>
     </div>
 
