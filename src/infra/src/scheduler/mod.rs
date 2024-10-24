@@ -232,3 +232,10 @@ pub async fn is_empty() -> bool {
 pub async fn clear() -> Result<()> {
     CLIENT.clear().await
 }
+
+/// Returns the scheduler_max_retries set through environment config
+/// The bool element in the tuple indicates if the retries are enabled
+pub fn get_scheduler_max_retries() -> (bool, i32) {
+    let max_retries = config::get_config().limit.scheduler_max_retries;
+    (max_retries > 0, max_retries.unsigned_abs() as i32)
+}

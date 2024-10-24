@@ -26,6 +26,7 @@ use config::{
 };
 use cron::Schedule;
 use futures::future::try_join_all;
+use infra::scheduler::get_scheduler_max_retries;
 use proto::cluster_rpc;
 
 use crate::{
@@ -97,6 +98,7 @@ fn get_max_considerable_delay(frequency: i64) -> i64 {
 }
 
 async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
+    let (_, max_retries) = get_scheduler_max_retries();
     log::debug!(
         "Inside handle_alert_triggers: processing trigger: {}",
         &trigger.module_key
@@ -156,6 +158,34 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         // update trigger, check on next week
         new_trigger.next_run_at += Duration::try_days(7).unwrap().num_microseconds().unwrap();
         new_trigger.is_silenced = true;
+        db::scheduler::update_trigger(new_trigger).await?;
+        return Ok(());
+    }
+
+    if trigger.retries >= max_retries {
+        // It has been tried the maximum time, just update the
+        // next_run_at to the next expected trigger time
+        log::info!(
+            "This alert trigger: {}/{} has passed maximum retries, skipping to next run",
+            &new_trigger.org,
+            &new_trigger.module_key
+        );
+        if alert.trigger_condition.frequency_type == FrequencyType::Cron {
+            let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
+            // tz_offset is in minutes
+            let tz_offset = FixedOffset::east_opt(alert.tz_offset * 60).unwrap();
+            new_trigger.next_run_at = schedule
+                .upcoming(tz_offset)
+                .next()
+                .unwrap()
+                .timestamp_micros();
+        } else {
+            new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
+                .unwrap()
+                .num_microseconds()
+                .unwrap();
+        }
+        new_trigger.data = "".to_string();
         db::scheduler::update_trigger(new_trigger).await?;
         return Ok(());
     }
@@ -268,7 +298,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         }
         trigger_data_stream.error = Some(err_string);
         // update its status and retries
-        if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
+        if trigger.retries + 1 >= max_retries {
             if get_config().limit.pause_alerts_on_retries {
                 // It has been tried the maximum time, just disable the alert
                 // and show the error.
@@ -289,11 +319,23 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 }
             }
             // This didn't work, update the next_run_at to the next expected trigger time
-            new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
-                .unwrap()
-                .num_microseconds()
-                .unwrap();
+            if alert.trigger_condition.frequency_type == FrequencyType::Cron {
+                let schedule = Schedule::from_str(&alert.trigger_condition.cron)?;
+                // tz_offset is in minutes
+                let tz_offset = FixedOffset::east_opt(alert.tz_offset * 60).unwrap();
+                new_trigger.next_run_at = schedule
+                    .upcoming(tz_offset)
+                    .next()
+                    .unwrap()
+                    .timestamp_micros();
+            } else {
+                new_trigger.next_run_at += Duration::try_seconds(alert.trigger_condition.frequency)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap();
+            }
             new_trigger.data = "".to_string();
+            trigger_data_stream.next_run_at = new_trigger.next_run_at;
             db::scheduler::update_trigger(new_trigger).await?;
         } else {
             // update its status and retries
@@ -444,7 +486,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                     &new_trigger.org,
                     &new_trigger.module_key
                 );
-                if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
+                if trigger.retries + 1 >= max_retries {
                     // It has been tried the maximum time, just update the
                     // next_run_at to the next expected trigger time
                     log::debug!(
@@ -463,6 +505,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                     // will be used to evaluate the alert.
                     trigger_data.period_end_time = None;
                     new_trigger.data = json::to_string(&trigger_data).unwrap();
+                    trigger_data_stream.next_run_at = new_trigger.next_run_at;
                     db::scheduler::update_trigger(new_trigger).await?;
                 } else {
                     // Otherwise update its status only
@@ -545,6 +588,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 }
 
 async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), anyhow::Error> {
+    let (_, max_retires) = get_scheduler_max_retries();
     log::debug!(
         "Inside handle_report_trigger,org: {}, module_key: {}",
         &trigger.org,
@@ -650,6 +694,17 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         evaluation_took_in_secs: None,
     };
 
+    if trigger.retries >= max_retires {
+        // It has been tried the maximum time, just update the
+        // next_run_at to the next expected trigger time
+        log::info!(
+            "This report trigger: {org_id}/{report_name} has passed maximum retries, skipping to next run",
+            org_id = &new_trigger.org,
+            report_name = report_name
+        );
+        db::scheduler::update_trigger(new_trigger).await?;
+        return Ok(());
+    }
     match report.send_subscribers().await {
         Ok(_) => {
             log::info!("Report {} sent to destination", report_name);
@@ -663,12 +718,13 @@ async fn handle_report_triggers(trigger: db::scheduler::Trigger) -> Result<(), a
         }
         Err(e) => {
             log::error!("Error sending report to subscribers: {e}");
-            if trigger.retries + 1 >= get_config().limit.scheduler_max_retries && !run_once {
+            if trigger.retries + 1 >= max_retires && !run_once {
                 // It has been tried the maximum time, just update the
                 // next_run_at to the next expected trigger time
                 log::debug!(
                     "This report trigger: {org_id}/{report_name} has reached maximum possible retries"
                 );
+                trigger_data_stream.next_run_at = new_trigger.next_run_at;
                 db::scheduler::update_trigger(new_trigger).await?;
             } else {
                 if run_once {
@@ -715,6 +771,7 @@ async fn handle_derived_stream_triggers(
         "Inside handle_derived_stream_triggers processing trigger: {}",
         trigger.module_key
     );
+    let (_, max_retries) = get_scheduler_max_retries();
 
     // module_key format: stream_type/stream_name/pipeline_name/derived_stream_name
     let columns = trigger.module_key.split('/').collect::<Vec<_>>();
@@ -781,6 +838,35 @@ async fn handle_derived_stream_triggers(
         retries: 0,
         ..trigger.clone()
     };
+
+    if trigger.retries >= max_retries {
+        // It has been tried the maximum time, just update the
+        // next_run_at to the next expected trigger time
+        log::info!(
+            "This DerivedStream trigger: {}/{} has passed maximum retries, skipping to next run",
+            &new_trigger.org,
+            &new_trigger.module_key
+        );
+        if derived_stream.trigger_condition.frequency_type == FrequencyType::Cron {
+            let schedule = Schedule::from_str(&derived_stream.trigger_condition.cron)?;
+            // tz_offset is in minutes
+            let tz_offset = FixedOffset::east_opt(derived_stream.tz_offset * 60).unwrap();
+            new_trigger.next_run_at = schedule
+                .upcoming(tz_offset)
+                .next()
+                .unwrap()
+                .timestamp_micros();
+        } else {
+            new_trigger.next_run_at +=
+                Duration::try_minutes(derived_stream.trigger_condition.frequency)
+                    .unwrap()
+                    .num_microseconds()
+                    .unwrap();
+        }
+        new_trigger.data = "".to_string();
+        db::scheduler::update_trigger(new_trigger).await?;
+        return Ok(());
+    }
 
     // evaluate trigger and configure trigger next run time
     let (ret, end_time) = derived_stream.evaluate(None, start_time).await?;
@@ -906,7 +992,7 @@ async fn handle_derived_stream_triggers(
                         new_trigger.org,
                         new_trigger.module_key
                     );
-                    if trigger.retries + 1 >= get_config().limit.scheduler_max_retries {
+                    if trigger.retries + 1 >= max_retries {
                         // It has been tried the maximum time, just update the
                         // next_run_at to the next expected trigger time
                         log::debug!(
@@ -914,6 +1000,7 @@ async fn handle_derived_stream_triggers(
                             &new_trigger.org,
                             &new_trigger.module_key
                         );
+                        trigger_data_stream.next_run_at = new_trigger.next_run_at;
                         db::scheduler::update_trigger(new_trigger).await?;
                     } else {
                         // Otherwise update its status only
