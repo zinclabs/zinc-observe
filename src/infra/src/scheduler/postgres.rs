@@ -19,7 +19,7 @@ use chrono::Duration;
 use config::metrics::DB_QUERY_NUMS;
 use sqlx::Row;
 
-use super::{Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
+use super::{get_scheduler_max_retries, Trigger, TriggerModule, TriggerStatus, TRIGGERS_KEY};
 use crate::{
     db::{self, postgres::CLIENT},
     errors::{DbError, Error, Result},
@@ -291,6 +291,10 @@ WHERE org = $7 AND module_key = $8 AND module = $9;"#,
         report_timeout: i64,
     ) -> Result<Vec<Trigger>> {
         let pool = CLIENT.clone();
+        let (include_max, mut max_retries) = get_scheduler_max_retries();
+        if include_max {
+            max_retries += 1;
+        }
 
         let now = chrono::Utc::now().timestamp_micros();
         let report_max_time = now
@@ -331,7 +335,7 @@ RETURNING *;"#;
             .bind(report_max_time)
             .bind(TriggerStatus::Waiting)
             .bind(now)
-            .bind(config::get_config().limit.scheduler_max_retries)
+            .bind(max_retries)
             .bind(true)
             .bind(false)
             .bind(concurrency)
@@ -402,12 +406,16 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     /// retries >= threshold set through environment
     async fn clean_complete(&self) -> Result<()> {
         let pool = CLIENT.clone();
+        let (include_max, mut max_retries) = get_scheduler_max_retries();
+        if include_max {
+            max_retries += 1;
+        }
         DB_QUERY_NUMS
             .with_label_values(&["delete", "scheduled_jobs"])
             .inc();
         sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = $1 OR retries >= $2;"#)
             .bind(TriggerStatus::Completed)
-            .bind(config::get_config().limit.scheduler_max_retries)
+            .bind(max_retries)
             .execute(&pool)
             .await?;
         Ok(())
