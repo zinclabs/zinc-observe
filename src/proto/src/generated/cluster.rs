@@ -1031,6 +1031,8 @@ pub struct QueryStatus {
     pub scan_stats: ::core::option::Option<ScanStats>,
     #[prost(enumeration = "WorkGroup", optional, tag = "10")]
     pub work_group: ::core::option::Option<i32>,
+    #[prost(string, optional, tag = "11")]
+    pub search_type: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

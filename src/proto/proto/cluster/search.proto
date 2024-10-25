@@ -81,6 +81,7 @@ message QueryStatus {
     optional Query           query = 8;
     optional ScanStats  scan_stats = 9;
     optional WorkGroup work_group = 10;
+    optional string   search_type = 11;
 }
 
 enum WorkGroup {
