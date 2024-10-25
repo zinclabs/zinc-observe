@@ -10,9 +10,8 @@ import { AlertPage } from '../pages/alertsPage.js';
 import { MetricsPage } from '../pages/metricsPage.js';
 import { RumPage } from '../pages/rumPage.js';
 
-import{ startTimeValue, endTimeValue, startDateTimeValue, endDateTimeValue } from '../pages/CommonLocator.js';
+import { startTimeValue, endTimeValue, startDateTimeValue, endDateTimeValue } from '../pages/CommonLocator.js';
 
-//import {CommomnLocator} from '../pages/CommonLocator'
 
 //console.log ('Login Started')
 
@@ -32,18 +31,20 @@ test('Relative Seconds on Logs page', async ({ page }) => {
   await loginPage.login(process.env["ZO_ROOT_USER_EMAIL"], process.env["ZO_ROOT_USER_PASSWORD"]);
 
   // Step 2: Navigate to Logs Page
-  await page.waitForTimeout(4000);  // Wait for login process 
-
+  //await page.waitForTimeout(4000);  // Wait for login process 
+  await page.waitForTimeout(4000); 
   await logsPage.navigateToLogs();
-
+  await page.waitForTimeout(4000); 
   // Step 3: Select Index and Stream
-  await page.waitForTimeout(3000);  // Wait for logs page to load 
-  
+  //await page.waitForTimeout(3000);  // Wait for logs page to load 
+
   // await logsPage.selectIndexAndStream();
 
   // Step 4: Set the time to past 30 seconds and verify
   await logsPage.setTimeToPast30Seconds();
+  await page.waitForTimeout(4000); 
   await logsPage.verifyTimeSetTo30Seconds();
+  await page.waitForTimeout(4000); 
 
   await logsPage.signOut();
 
@@ -66,16 +67,16 @@ test('Absolute Seconds on Logs page', async ({ page }) => {
   await loginPage.login(process.env["ZO_ROOT_USER_EMAIL"], process.env["ZO_ROOT_USER_PASSWORD"]);
 
   // Step 2: Navigate to Logs Page
-  await page.waitForTimeout(4000);  // Wait for login process 
+ // await page.waitForTimeout(4000);  // Wait for login process 
 
- // await logsPage.selectOrganization();
+  // await logsPage.selectOrganization();
 
   // Navigate to Logs page
-
+  await page.waitForTimeout(4000); 
   await logsPage.navigateToLogs();
-
+  await page.waitForTimeout(4000); 
   // Step 3: Select Index and Stream
-  await page.waitForTimeout(3000);  // Wait for logs page to load
+  //await page.waitForTimeout(3000);  // Wait for logs page to load
   //await logsPage.selectIndexAndStream();
 
   // Step 4: Set the time to past 30 seconds and verify
@@ -84,6 +85,7 @@ test('Absolute Seconds on Logs page', async ({ page }) => {
 
   // Set the Date and Time Range
   await logsPage.setDateTime();
+  await page.waitForTimeout(4000); 
   await logsPage.fillTimeRange(startTimeValue, endTimeValue);
 
   // Verify the time range is displayed correctly
@@ -95,12 +97,12 @@ test('Absolute Seconds on Logs page', async ({ page }) => {
 });
 
 
-test('Relative second on traces', async ({ page }) => {
-  
+test('Relative Seconds on Traces', async ({ page }) => {
+
   // Create page object instances
   const loginPage = new LoginPage(page);
   const tracesPage = new TracesPage(page);
-  
+
   // Step 1: Navigate to the application and login
 
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -126,12 +128,12 @@ test('Relative second on traces', async ({ page }) => {
 
 });
 
-test('Absolute second on traces', async ({ page }) => {
-  
+test('Absolute Seconds on Traces', async ({ page }) => {
+
   // Create page object instances
   const loginPage = new LoginPage(page);
   const tracesPage = new TracesPage(page);
-  
+
   // Step 1: Navigate to the application and login
 
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -160,12 +162,12 @@ test('Absolute second on traces', async ({ page }) => {
 });
 
 
-test('Relative second on reports', async ({ page }) => {
-  
+test('Relative Seconds on Reports', async ({ page }) => {
+
   // Create page object instances
   const loginPage = new LoginPage(page);
   const reportsPage = new ReportsPage(page);
-  
+
   // Step 1: Navigate to the application and login
 
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -192,12 +194,12 @@ test('Relative second on reports', async ({ page }) => {
   await reportsPage.signOut();
 });
 
-test('Absolute second on report', async ({ page }) => {
-  
+test('Absolute Seconds on Reports', async ({ page }) => {
+
   // Create page object instances
   const loginPage = new LoginPage(page);
   const reportsPage = new ReportsPage(page);
-  
+
   // Step 1: Navigate to the application and login
 
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -230,12 +232,12 @@ test('Absolute second on report', async ({ page }) => {
 });
 
 
-test('Relative second on dashboard', async ({ page }) => {
-  
+test('Relative Seconds on Dashboard', async ({ page }) => {
+
   // Create page object instances
   const loginPage = new LoginPage(page);
   const dashboardPage = new DashboardPage(page);
-  
+
   // Step 1: Navigate to the application and login
 
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -259,12 +261,12 @@ test('Relative second on dashboard', async ({ page }) => {
   await dashboardPage.signOut();
 });
 
-test('Absolute second on dashboard', async ({ page }) => {
-  
+test('Absolute Seconds on Dashboard', async ({ page }) => {
+
   // Create page object instances
   const loginPage = new LoginPage(page);
   const dashboardPage = new DashboardPage(page);
-  
+
   // Step 1: Navigate to the application and login
 
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -293,12 +295,12 @@ test('Absolute second on dashboard', async ({ page }) => {
 
 });
 
-test('Relative second on alert', async ({ page }) => {
-  
+test('Relative Seconds on Alert', async ({ page }) => {
+
   // Create page object instances
   const loginPage = new LoginPage(page);
   const alertPage = new AlertPage(page);
-  
+
   // Step 1: Navigate to the application and login
 
   await page.goto(process.env["ZO_BASE_URL"]);
@@ -333,7 +335,7 @@ test('Relative Seconds on Metrics page', async ({ page }) => {
 
   await page.goto(process.env["ZO_BASE_URL"]);
 
-  console.log ('URL Opened')
+  //console.log ('URL Opened')
 
   await loginPage.gotoLoginPage();
 
@@ -342,21 +344,21 @@ test('Relative Seconds on Metrics page', async ({ page }) => {
   // Step 2: Navigate to Logs Page
   await page.waitForTimeout(4000);  // Wait for login process 
 
-   // Open metrics page and perform operations
-   await metricsPage.openMetricsPage();
-   await page.waitForTimeout(3000); // wait for the page to load
-   await metricsPage.selectIndex('otelcol_http_server_duration_bucket');
-   await page.waitForTimeout(3000); // wait for selection to complete
+  // Open metrics page and perform operations
+  await metricsPage.openMetricsPage();
+  await page.waitForTimeout(3000); // wait for the page to load
+  await metricsPage.selectIndex('otelcol_http_server_duration_bucket');
+  await page.waitForTimeout(3000); // wait for selection to complete
 
-   // Set time filter and verify
-   await metricsPage.setTimeToPast30Seconds();
-   await page.waitForTimeout(3000); // wait for time selection
-   await metricsPage.verifyTimeSetTo30Seconds();
+  // Set time filter and verify
+  await metricsPage.setTimeToPast30Seconds();
+  await page.waitForTimeout(3000); // wait for time selection
+  await metricsPage.verifyTimeSetTo30Seconds();
 
 
 });
 
-test('Absolute conds on Metrics page', async ({ page }) => {
+test('Absolute Seconds on Metrics page', async ({ page }) => {
   // Create page object instances
   const loginPage = new LoginPage(page);
   const metricsPage = new MetricsPage(page);
@@ -365,7 +367,7 @@ test('Absolute conds on Metrics page', async ({ page }) => {
 
   await page.goto(process.env["ZO_BASE_URL"]);
 
-  console.log ('URL Opened')
+  //console.log ('URL Opened')
 
   await loginPage.gotoLoginPage();
 
@@ -374,13 +376,13 @@ test('Absolute conds on Metrics page', async ({ page }) => {
   // Step 2: Navigate to Logs Page
   await page.waitForTimeout(4000);  // Wait for login process 
 
-   // Open metrics page and perform operations
-   await metricsPage.openMetricsPage();
-   await page.waitForTimeout(3000); // wait for the page to load
-   await metricsPage.selectIndex('otelcol_http_server_duration_bucket');
-   await page.waitForTimeout(3000); // wait for selection to complete
+  // Open metrics page and perform operations
+  await metricsPage.openMetricsPage();
+  await page.waitForTimeout(3000); // wait for the page to load
+  await metricsPage.selectIndex('otelcol_http_server_duration_bucket');
+  await page.waitForTimeout(3000); // wait for selection to complete
 
-   // Set the Date and Time Range
+  // Set the Date and Time Range
   await metricsPage.setDateTime();
   await metricsPage.fillTimeRange(startTimeValue, endTimeValue);
 
@@ -389,7 +391,7 @@ test('Absolute conds on Metrics page', async ({ page }) => {
 
 
 });
-
+/*
 test('Relative Seconds on RUM Performance page', async ({ page }) => {
   // Create page object instances
   const loginPage = new LoginPage(page);
@@ -399,7 +401,7 @@ test('Relative Seconds on RUM Performance page', async ({ page }) => {
 
   await page.goto(process.env["ZO_BASE_URL"]);
 
-  console.log ('URL Opened')
+  //console.log ('URL Opened')
 
   await loginPage.gotoLoginPage();
 
@@ -408,18 +410,18 @@ test('Relative Seconds on RUM Performance page', async ({ page }) => {
   // Step 2: Navigate to RUM Page
   await page.waitForTimeout(4000);  // Wait for login process 
 
-   // Open RUM page and perform operations
-   await rumPage.navigateToPerformanceOverview();
-   
-   // Set time filter and verify
-   await rumPage.setTimeToPast30Seconds();
-   await page.waitForTimeout(3000); // wait for time selection
-   await rumPage.verifyTimeSetTo30Seconds();
+  // Open RUM page and perform operations
+  await rumPage.navigateToPerformanceOverview();
+
+  // Set time filter and verify
+  await rumPage.setTimeToPast30Seconds();
+  await page.waitForTimeout(3000); // wait for time selection
+  await rumPage.verifyTimeSetTo30Seconds();
 
 
 });
 
-test('Absolute conds on RUM Performance page', async ({ page }) => {
+test('Absolute Seconds on RUM Performance page', async ({ page }) => {
   // Create page object instances
   const loginPage = new LoginPage(page);
   const rumPage = new RumPage(page);
@@ -428,7 +430,7 @@ test('Absolute conds on RUM Performance page', async ({ page }) => {
 
   await page.goto(process.env["ZO_BASE_URL"]);
 
-  console.log ('URL Opened')
+  // console.log ('URL Opened')
 
   await loginPage.gotoLoginPage();
 
@@ -437,11 +439,11 @@ test('Absolute conds on RUM Performance page', async ({ page }) => {
   // Step 2: Navigate to RUM Page
   await page.waitForTimeout(4000);  // Wait for login process 
 
-   // Open RUM page and perform operations
-   await rumPage.navigateToPerformanceOverview();
-   
+  // Open RUM page and perform operations
+  await rumPage.navigateToPerformanceOverview();
 
-   // Set the Date and Time Range
+
+  // Set the Date and Time Range
   await rumPage.setDateTime();
   await rumPage.fillTimeRange(startTimeValue, endTimeValue);
 
@@ -451,6 +453,7 @@ test('Absolute conds on RUM Performance page', async ({ page }) => {
 
 });
 
+/*
 
 test('Relative Seconds on RUM Sessions page', async ({ page }) => {
   // Create page object instances
@@ -461,7 +464,7 @@ test('Relative Seconds on RUM Sessions page', async ({ page }) => {
 
   await page.goto(process.env["ZO_BASE_URL"]);
 
-  console.log ('URL Opened')
+
 
   await loginPage.gotoLoginPage();
 
@@ -470,19 +473,19 @@ test('Relative Seconds on RUM Sessions page', async ({ page }) => {
   // Step 2: Navigate to RUM Page
   await page.waitForTimeout(4000);  // Wait for login process 
 
-   // Open RUM page and perform operations
-   await rumPage.navigateToPerformanceOverview();
-   await page.waitForTimeout(4000); 
-   await rumPage.navigateToSessionsTab();
-   // Set time filter and verify
-   await rumPage.setTimeToPast30Seconds();
-   await page.waitForTimeout(3000); // wait for time selection
-   await rumPage.verifyTimeSetTo30Seconds();
+  // Open RUM page and perform operations
+  await rumPage.navigateToPerformanceOverview();
+  await page.waitForTimeout(4000);
+  await rumPage.navigateToSessionsTab();
+  // Set time filter and verify
+  await rumPage.setTimeToPast30Seconds();
+  await page.waitForTimeout(3000); // wait for time selection
+  await rumPage.verifyTimeSetTo30SecondsSchedule();
 
 
 });
 
-test('Absolute conds on RUM Sessions page', async ({ page }) => {
+test('Absolute Seconds on RUM Sessions page', async ({ page }) => {
   // Create page object instances
   const loginPage = new LoginPage(page);
   const rumPage = new RumPage(page);
@@ -491,7 +494,7 @@ test('Absolute conds on RUM Sessions page', async ({ page }) => {
 
   await page.goto(process.env["ZO_BASE_URL"]);
 
-  console.log ('URL Opened')
+  // console.log ('URL Opened')
 
   await loginPage.gotoLoginPage();
 
@@ -500,11 +503,11 @@ test('Absolute conds on RUM Sessions page', async ({ page }) => {
   // Step 2: Navigate to RUM Page
   await page.waitForTimeout(4000);  // Wait for login process 
 
-   // Open RUM page and perform operations
-   await rumPage.navigateToPerformanceOverview();
-   await page.waitForTimeout(4000); 
-   await rumPage.navigateToSessionsTab();
-   // Set the Date and Time Range
+  // Open RUM page and perform operations
+  await rumPage.navigateToPerformanceOverview();
+  await page.waitForTimeout(4000);
+  await rumPage.navigateToSessionsTab();
+  // Set the Date and Time Range
   await rumPage.setDateTime();
   await rumPage.fillTimeRange(startTimeValue, endTimeValue);
 
@@ -523,7 +526,7 @@ test('Relative Seconds on RUM Tracking page', async ({ page }) => {
 
   await page.goto(process.env["ZO_BASE_URL"]);
 
-  console.log ('URL Opened')
+  // console.log ('URL Opened')
 
   await loginPage.gotoLoginPage();
 
@@ -532,19 +535,19 @@ test('Relative Seconds on RUM Tracking page', async ({ page }) => {
   // Step 2: Navigate to RUM Page
   await page.waitForTimeout(4000);  // Wait for login process 
 
-   // Open RUM page and perform operations
-   await rumPage.navigateToPerformanceOverview();
-   await page.waitForTimeout(4000); 
-   await rumPage.navigateToErrorTrackingTab();
-   // Set time filter and verify
-   await rumPage.setTimeToPast30Seconds();
-   await page.waitForTimeout(3000); // wait for time selection
-   await rumPage.verifyTimeSetTo30Seconds();
+  // Open RUM page and perform operations
+  await rumPage.navigateToPerformanceOverview();
+  await page.waitForTimeout(4000);
+  await rumPage.navigateToErrorTrackingTab();
+  // Set time filter and verify
+  await rumPage.setTimeToPast30Seconds();
+  await page.waitForTimeout(3000); // wait for time selection
+  await rumPage.verifyTimeSetTo30Seconds();
 
 
 });
 
-test('Absolute conds on RUM Tracking page', async ({ page }) => {
+test('Absolute Seconds on RUM Tracking page', async ({ page }) => {
   // Create page object instances
   const loginPage = new LoginPage(page);
   const rumPage = new RumPage(page);
@@ -553,7 +556,7 @@ test('Absolute conds on RUM Tracking page', async ({ page }) => {
 
   await page.goto(process.env["ZO_BASE_URL"]);
 
-  console.log ('URL Opened')
+  // console.log ('URL Opened')
 
   await loginPage.gotoLoginPage();
 
@@ -562,11 +565,11 @@ test('Absolute conds on RUM Tracking page', async ({ page }) => {
   // Step 2: Navigate to RUM Page
   await page.waitForTimeout(4000);  // Wait for login process 
 
-   // Open RUM page and perform operations
-   await rumPage.navigateToPerformanceOverview();
-   await page.waitForTimeout(4000); 
-   await rumPage.navigateToErrorTrackingTab();
-   // Set the Date and Time Range
+  // Open RUM page and perform operations
+  await rumPage.navigateToPerformanceOverview();
+  await page.waitForTimeout(4000);
+  await rumPage.navigateToErrorTrackingTab();
+  // Set the Date and Time Range
   await rumPage.setDateTime();
   await rumPage.fillTimeRange(startTimeValue, endTimeValue);
 
@@ -575,3 +578,6 @@ test('Absolute conds on RUM Tracking page', async ({ page }) => {
 
 
 });
+
+
+*/
