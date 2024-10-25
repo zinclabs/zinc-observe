@@ -78,9 +78,11 @@ async fn run_schedule_jobs() -> Result<(), anyhow::Error> {
 }
 
 async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(
-        get_config().limit.scheduler_clean_interval,
-    ));
+    let scheduler_clean_interval = get_config().limit.scheduler_clean_interval;
+    if scheduler_clean_interval < 0 {
+        return Ok(());
+    }
+    let mut interval = time::interval(time::Duration::from_secs(scheduler_clean_interval as u64));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;
@@ -91,9 +93,11 @@ async fn clean_complete_jobs() -> Result<(), anyhow::Error> {
 }
 
 async fn watch_timeout_jobs() -> Result<(), anyhow::Error> {
-    let mut interval = time::interval(time::Duration::from_secs(
-        get_config().limit.scheduler_watch_interval,
-    ));
+    let scheduler_watch_interval = get_config().limit.scheduler_watch_interval;
+    if scheduler_watch_interval < 0 {
+        return Ok(());
+    }
+    let mut interval = time::interval(time::Duration::from_secs(scheduler_watch_interval as u64));
     interval.tick().await; // trigger the first run
     loop {
         interval.tick().await;

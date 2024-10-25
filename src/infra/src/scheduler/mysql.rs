@@ -19,7 +19,9 @@ use chrono::Duration;
 use config::metrics::DB_QUERY_NUMS;
 use sqlx::Row;
 
-use super::{Trigger, TriggerId, TriggerModule, TriggerStatus, TRIGGERS_KEY};
+use super::{
+    get_scheduler_max_retries, Trigger, TriggerId, TriggerModule, TriggerStatus, TRIGGERS_KEY,
+};
 use crate::{
     db::{
         self,
@@ -299,6 +301,10 @@ WHERE org = ? AND module_key = ? AND module = ?;"#,
         report_timeout: i64,
     ) -> Result<Vec<Trigger>> {
         let pool = CLIENT.clone();
+        let (include_max, mut max_retries) = get_scheduler_max_retries();
+        if include_max {
+            max_retries += 1;
+        }
 
         log::debug!("Start pulling scheduled_job");
         let now = chrono::Utc::now().timestamp_micros();
@@ -327,7 +333,7 @@ FOR UPDATE;
         )
         .bind(TriggerStatus::Waiting)
         .bind(now)
-        .bind(config::get_config().limit.scheduler_max_retries)
+        .bind(max_retries)
         .bind(true)
         .bind(false)
         .bind(concurrency)
@@ -451,13 +457,17 @@ WHERE id IN ({});",
     /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
     /// retries >= threshold set through environment
     async fn clean_complete(&self) -> Result<()> {
+        let (include_max, mut max_retries) = get_scheduler_max_retries();
+        if include_max {
+            max_retries += 1;
+        }
         let pool = CLIENT.clone();
         DB_QUERY_NUMS
             .with_label_values(&["delete", "scheduled_jobs"])
             .inc();
         sqlx::query(r#"DELETE FROM scheduled_jobs WHERE status = ? OR retries >= ?;"#)
             .bind(TriggerStatus::Completed)
-            .bind(config::get_config().limit.scheduler_max_retries)
+            .bind(max_retries)
             .execute(&pool)
             .await?;
         Ok(())

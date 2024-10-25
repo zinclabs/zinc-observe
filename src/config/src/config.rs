@@ -949,9 +949,9 @@ pub struct Limit {
     )]
     pub alert_considerable_delay: i32,
     #[env_config(name = "ZO_SCHEDULER_CLEAN_INTERVAL", default = 30)] // seconds
-    pub scheduler_clean_interval: u64,
+    pub scheduler_clean_interval: i64,
     #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
-    pub scheduler_watch_interval: u64,
+    pub scheduler_watch_interval: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]
