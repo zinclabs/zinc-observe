@@ -88,7 +88,7 @@ async setDateTime() {
 
 
   async verifyDateTime(startTime, endTime) {
-    // await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+    // await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`); check
      await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
    }
  
