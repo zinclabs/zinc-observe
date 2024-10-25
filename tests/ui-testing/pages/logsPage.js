@@ -58,7 +58,7 @@ export class LogsPage {
   }
   /*
     async adjustFilterParameters() {
-      await this.page.filterMessage.first().click(); check
+      await this.page.filterMessage.first().click(); 
     }
   */
 

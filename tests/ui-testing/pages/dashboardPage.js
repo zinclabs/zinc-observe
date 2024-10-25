@@ -25,7 +25,7 @@ export class DashboardPage {
   async navigateToDashboards() {
     await this.page.waitForSelector('[data-test="menu-link-\\/dashboards-item"]');
     await this.dashboardsMenuItem.click({ force: true });
-    //await this.page.waitForTimeout(5000); time
+    //await this.page.waitForTimeout(5000); 
   }
 
   async addDashboard(dashboardName) {

@@ -38,7 +38,7 @@ export  class MetricsPage {
 
 
   async setTimeToPast30Seconds() {
-    // Set the time filter to the last 30 seconds time
+    // Set the time filter to the last 30 seconds 
     await this.page.locator(this.dateTimeButton).click({ force: true });
     await this.relative30SecondsButton.click({ force: true });
   }

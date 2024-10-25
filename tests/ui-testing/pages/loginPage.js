@@ -15,7 +15,7 @@ export class LoginPage {
   }
 
   async login(username, password) {
-    // Fill in user credentials and login check
+    // Fill in user credentials and login 
     //await this.page.getByText('Login as internal user').click();
    // 
     await this.userIdInput.fill(username);
