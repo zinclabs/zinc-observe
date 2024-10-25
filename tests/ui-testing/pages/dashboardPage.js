@@ -29,13 +29,14 @@ export class DashboardPage {
   }
 
   async addDashboard(dashboardName) {
-    await this.page.waitForSelector
+    await this.page.waitForSelector('[data-test="dashboard-add"]');
     await this.addDashboardButton.click({ force: true });
     //await this.page.waitForTimeout(5000);
-    await expect(this.page.locator(this.dashboardNameInput)).toBeVisible();
+   // await expect(this.page.locator(this.dashboardNameInput)).toBeVisible();
+   await this.page.waitForSelector('[data-test="add-dashboard-name"]');
     await this.page.locator(this.dashboardNameInput).fill(dashboardName);
-    await expect(this.page.locator(this.dashboardSubmitButton)).toBeVisible();
-    await this.page.waitForSelector
+    //await expect(this.page.locator(this.dashboardSubmitButton)).toBeVisible();
+    await this.page.waitForSelector('[data-test="dashboard-add-submit"]');
     await this.page.locator(this.dashboardSubmitButton).click({ force: true });
    // await this.page.waitForTimeout(5000);
   }

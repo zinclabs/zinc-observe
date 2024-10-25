@@ -7,7 +7,8 @@ export  class AlertPage {
       this.page = page;
       this.alertMenu = this.page.locator('[data-test="menu-link-\\/alerts-item"]');
       this.addAlertButton = this.page.locator('[data-test="alert-list-add-alert-btn"]');
-      this.sqlOption = this.page.getByText('SQL');
+      //this.sqlOption = this.page.getByText('SQL');
+      this.sqlOption = this.page.locator('[data-test="scheduled-alert-sql-tab"]');
       this.addTimeRangeButton = this.page.locator('[data-test="multi-time-range-alerts-add-btn"]');
 
     
@@ -31,8 +32,9 @@ export  class AlertPage {
   async createAlert() {
     await this.page.waitForSelector('[data-test="alert-list-add-alert-btn"]');
     await this.addAlertButton.click({ force: true });
-    // await this.page.waitForSelector
-    await this.sqlOption.click({ force: true });
+    await this.page.waitForSelector('[data-test="scheduled-alert-sql-tab"]');
+   // await this.sqlOption.click({ force: true });
+   await this.sqlOption.click({ force: true });
     await this.page.waitForSelector('[data-test="multi-time-range-alerts-add-btn"]');
     await this.addTimeRangeButton.click({ force: true });
     

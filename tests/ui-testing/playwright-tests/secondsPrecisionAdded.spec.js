@@ -51,7 +51,7 @@ test('Relative Seconds on Logs ', async ({ page }) => {
 });
 
 
-test('Absolute Seconds on Logs page', async ({ page }) => {
+test('Absolute Seconds on Logs', async ({ page }) => {
   // Create page object instances
   const loginPage = new LoginPage(page);
   const logsPage = new LogsPage(page);
@@ -345,6 +345,7 @@ test('Relative Seconds on Metrics page', async ({ page }) => {
 
   // Open metrics page and perform operations
   await metricsPage.openMetricsPage();
+  
   await page.waitForTimeout(3000); // wait for the page to load
   await metricsPage.selectIndex('otelcol_http_server_duration_bucket');
   await page.waitForTimeout(3000); // wait for selection to complete

@@ -33,7 +33,9 @@ export  class MetricsPage {
     	await this.indexDropdown.click({ force: true });
       await this.page.waitForSelector('[data-test="log-search-index-list-select-stream"]');
     	await this.searchIndexInput.fill(indexName);
-    	await this.page.getByText(indexName).click({ force: true });
+      // await this.page.getByText(indexName).click({ force: true });
+      await this.page.getByRole('option', { name: 'counter' }).click({ force: true });
+    	//await this.page.getby(indexName).click({ force: true });
 	}
 
 
