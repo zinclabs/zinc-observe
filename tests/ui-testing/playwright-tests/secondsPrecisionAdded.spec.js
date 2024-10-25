@@ -15,7 +15,7 @@ import { startTimeValue, endTimeValue, startDateTimeValue, endDateTimeValue } fr
 
 //console.log ('Login Started')
 
-test('Relative Seconds on Logs page', async ({ page }) => {
+test('Relative Seconds on Logs ', async ({ page }) => {
   // Create page object instances
   const loginPage = new LoginPage(page);
   const logsPage = new LogsPage(page);

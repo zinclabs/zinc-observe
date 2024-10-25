@@ -39,7 +39,7 @@ export  class AlertPage {
   }
 
   async setTimeToPast30Seconds() {
-    // Set the time filter to the last 30 seconds
+    // Set the time filter to the last 30 seconds time
    // await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
     await this.page.waitForSelector(dateTimeButtonLocator);
     await this.page.locator(this.dateTimeButton).click({ force: true });
