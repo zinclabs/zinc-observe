@@ -13,16 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod ws_proxy;
+
 use ::config::{
     get_config,
     meta::cluster::{Role, RoleGroup},
     utils::rand::get_rand_element,
 };
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
+use actix_web_actors::ws;
+use tokio::sync::mpsc;
 
-use crate::common::infra::cluster;
+use crate::{common::infra::cluster, router::http::ws_proxy::CustomWebSocketHandlers};
 
-const QUERIER_ROUTES: [&str; 18] = [
+const QUERIER_ROUTES: [&str; 19] = [
     "/config",
     "/summary",
     "/organizations",
@@ -31,6 +35,7 @@ const QUERIER_ROUTES: [&str; 18] = [
     "/streams",
     "/clusters",
     "/query_manager",
+    "/ws",
     "/_search",
     "/_around",
     "/_values",
@@ -155,6 +160,32 @@ async fn dispatch(
     let new_url = get_url(path).await;
     if new_url.is_error {
         return Ok(HttpResponse::ServiceUnavailable().body(new_url.value));
+    }
+
+    // check if the request is a websocket request
+    if path.starts_with("/ws") {
+        log::info!(
+            "Websocket request received on dispatcher: {}",
+            new_url.value.to_string()
+        );
+
+        // Upgrade to a websocket connection
+        let ws_res = ws::start(
+            CustomWebSocketHandlers {
+                tx: mpsc::unbounded_channel().0,
+                url: new_url.value.clone(),
+            },
+            &req,
+            payload,
+        );
+        let res = match ws_res {
+            Ok(res) => Ok(res),
+            Err(e) => {
+                log::error!("WebSocket upgrade failed: {}", e);
+                Ok(HttpResponse::ServiceUnavailable().body(e.to_string()))
+            }
+        };
+        return res;
     }
 
     // send query
