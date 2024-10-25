@@ -820,14 +820,6 @@ export default defineComponent({
             }
           }
 
-          // Removed order by as it creating problem while clicking on the URL generated from the Alert. It's appending order by and that is causing issue if _timestamp column not added in select clause
-          // searchObj.data.query = addOrderByToQuery(
-          //   searchObj.data.query,
-          //   store.state.zoConfig.timestamp_column,
-          //   "DESC",
-          //   searchObj.data.stream.selectedStream.join(","),
-          // );
-
           searchObj.data.editorValue = searchObj.data.query;
 
           searchBarRef.value.updateQuery();
@@ -887,12 +879,11 @@ export default defineComponent({
     function removeFieldByName(data, fieldName) {
       return data.filter((item: any) => {
         if (item.expr) {
-          if (item.expr.column === fieldName) {
-            return false;
-          }
           if (
-            item.expr.type === "aggr_func" &&
-            item.expr.args.expr.column === fieldName
+            (item.expr.type === "column_ref" &&
+              item.expr?.column?.expr?.value === fieldName) ||
+            (item.expr.type === "aggr_func" &&
+              item.expr?.args?.expr?.column?.value === fieldName)
           ) {
             return false;
           }
@@ -935,6 +926,7 @@ export default defineComponent({
               type: "column_ref",
               column: field.name,
             },
+            type: "expr",
           });
         }
 
@@ -944,6 +936,7 @@ export default defineComponent({
               type: "column_ref",
               column: "*",
             },
+            type: "expr",
           });
         }
 

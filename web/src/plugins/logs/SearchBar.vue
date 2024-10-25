@@ -1204,31 +1204,27 @@ export default defineComponent({
       getSuggestions();
     };
 
-    function getColumnNames(data) {
+    const getColumnNames = (columnData: any) => {
       const columnNames = [];
-      data.forEach((item) => {
-        if (item.expr && item.expr.column) {
-          columnNames.push(item.expr.column);
-        } else if (item.expr && item.expr.args && item.expr.args.expr) {
-          if (item.expr.args.expr.column) {
-            columnNames.push(item.expr.args.expr.column);
-          } else if (item.expr.args.expr.value) {
-            columnNames.push(item.expr.args.expr.value);
+      for (const item of columnData) {
+        if (item.expr.type === "column_ref") {
+          columnNames.push(item.expr.column?.expr?.value);
+        } else if (item.expr.type === "aggr_func") {
+          if (item.expr.args?.expr?.hasOwnProperty("column")) {
+            columnNames.push(item.expr.args?.expr?.column?.value);
+          } else if (item.expr.args?.expr?.value) {
+            columnNames.push(item.expr.args?.expr?.value);
           }
-        } else if (
-          item.expr &&
-          item.expr.name &&
-          item.expr.type === "function"
-        ) {
+        } else if (item.expr.type === "function") {
           item.expr.args.value.map((val) => {
             if (val.type === "column_ref") {
-              columnNames.push(val.column);
+              columnNames.push(val.column?.expr?.value);
             }
           });
         }
-      });
+      }
       return columnNames;
-    }
+    };
 
     const updateQueryValue = (value: string) => {
       if (searchObj.meta.quickMode == true) {
@@ -1243,25 +1239,6 @@ export default defineComponent({
           searchObj.data.stream.selectedStream = [parsedSQL.from[0].table];
           onStreamChange(value);
         }
-        // if (
-        //   parsedSQL.hasOwnProperty("columns") &&
-        //   parsedSQL?.columns.length > 0
-        // ) {
-        //   const columnNames = getColumnNames(parsedSQL?.columns);
-        //   searchObj.data.stream.interestingFieldList = [];
-        //   for (const [index, col] of columnNames.entries()) {
-        //     if (
-        //       !searchObj.data.stream.interestingFieldList.includes(col) &&
-        //       col != "*"
-        //     ) {
-        //       // searchObj.data.stream.interestingFieldList.push(col);
-        //       for (const stream of searchObj.data.streamResults.list) {
-        //         if (stream.value == col) {
-        //           searchObj.data.stream.interestingFieldList.push(col);
-        //         }
-        //       }
-        //     }
-        //   }
         if (parsedSQL?.columns?.length > 0) {
           const columnNames = getColumnNames(parsedSQL?.columns);
           searchObj.data.stream.interestingFieldList = [];

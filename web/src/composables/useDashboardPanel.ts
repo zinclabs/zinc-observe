@@ -1256,28 +1256,28 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         dashboardPanelData.layout.currentQueryIndex
       ].fields.x = dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.x.filter((it: any) => !it.isDerived);
+      ].fields?.x?.filter((it: any) => !it.isDerived);
 
       // remove from y axis
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.y = dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.y.filter((it: any) => !it.isDerived);
+      ].fields?.y?.filter((it: any) => !it.isDerived);
 
       // remove from z axis
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.z = dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.z.filter((it: any) => !it.isDerived);
+      ].fields?.z?.filter((it: any) => !it.isDerived);
 
       // remove from breakdown
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].fields.breakdown = dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.breakdown.filter((it: any) => !it.isDerived);
+      ].fields?.breakdown?.filter((it: any) => !it.isDerived);
 
       // remove from latitude
       if (

@@ -163,6 +163,7 @@ const streamIndexType = [
   { label: "Secondary index", value: "secondaryIndexKey" },
   { label: "Bloom filter", value: "bloomFilterKey" },
   { label: "KeyValue partition", value: "keyPartition" },
+  { label: "Prefix partition", value: "prefixPartition" },
   { label: "Hash partition (8 Buckets)", value: "hashPartition_8" },
   { label: "Hash partition (16 Buckets)", value: "hashPartition_16" },
   { label: "Hash partition (32 Buckets)", value: "hashPartition_32" },
@@ -209,17 +210,22 @@ const disableOptions = (schema: any, option: any) => {
     }
     selectedIndices += schema.index_type[i];
   }
-
+  if(selectedIndices.includes('prefixPartition') && option.value.includes('keyPartition')){
+        return true;
+      }
+  if(selectedIndices.includes('keyPartition') && option.value.includes('prefixPartition')){
+    return true;
+  }
   if (
     selectedIndices.includes("hashPartition") &&
     selectedHashPartition !== option.value &&
     (option.value.includes("hashPartition") ||
-      option.value.includes("keyPartition"))
+      option.value.includes("keyPartition") || option.value.includes("prefixPartition"))
+
   )
     return true;
-
   if (
-    selectedIndices.includes("keyPartition") &&
+    ( selectedIndices.includes("keyPartition") || selectedIndices.includes("prefixPartition"))&&
     option.value.includes("hashPartition")
   )
     return true;
