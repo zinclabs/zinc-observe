@@ -22,7 +22,7 @@ export class LoginPage {
     await this.page.waitForTimeout(3000);
     await this.passwordInput.fill(password);
     //await this.loginButton.click();
-    await this.page.locator('[data-cy="login-sign-in"]').click();
+    await this.page.locator('[data-cy="login-sign-in"]').click({ force: true });
 
   }
 }

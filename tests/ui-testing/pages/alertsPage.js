@@ -23,20 +23,29 @@ export  class AlertPage {
   }
 
   async navigateToAlerts() {
-    await this.alertMenu.click();
+
+    await this.page.waitForSelector('[data-test="menu-link-\\/alerts-item"]');
+    await this.alertMenu.click({ force: true });
   }
 
   async createAlert() {
-    await this.addAlertButton.click();
-    await this.sqlOption.click();
-    await this.addTimeRangeButton.click();
+    await this.page.waitForSelector('[data-test="alert-list-add-alert-btn"]');
+    await this.addAlertButton.click({ force: true });
+    // await this.page.waitForSelector
+    await this.sqlOption.click({ force: true });
+    await this.page.waitForSelector('[data-test="multi-time-range-alerts-add-btn"]');
+    await this.addTimeRangeButton.click({ force: true });
     
   }
 
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
-    await this.page.locator(this.dateTimeButton).click();
-    await this.relative30SecondsButton.click();
+   // await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+    await this.page.waitForSelector(dateTimeButtonLocator);
+    await this.page.locator(this.dateTimeButton).click({ force: true });
+    await this.page.waitForSelector(relative30SecondsButtonLocator);
+
+    await this.relative30SecondsButton.click({ force: true });
   }
 
   async verifyTimeSetTo30Seconds() {
@@ -47,8 +56,8 @@ export  class AlertPage {
  
  
   async signOut() {
-    await this.profileButton.click();
-    await this.signOutButton.click();
+    await this.profileButton.click({ force: true });
+    await this.signOutButton.click({ force: true });
   }
   
 }

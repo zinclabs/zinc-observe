@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 
-import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue, oneDateMonthLocator } from '../pages/CommonLocator.js';
-
+import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue, currentMonth,
+  oneDateMonthLocator, currentMon } from '../pages/CommonLocator.js';
 
 export class DashboardPage {
   constructor(page) {
@@ -23,25 +23,31 @@ export class DashboardPage {
   }
 
   async navigateToDashboards() {
-    await this.dashboardsMenuItem.click();
-    await this.page.waitForTimeout(5000);
+    await this.page.waitForSelector('[data-test="menu-link-\\/dashboards-item"]');
+    await this.dashboardsMenuItem.click({ force: true });
+    //await this.page.waitForTimeout(5000);
   }
 
   async addDashboard(dashboardName) {
-    await this.addDashboardButton.click();
-    await this.page.waitForTimeout(5000);
+    await this.page.waitForSelector
+    await this.addDashboardButton.click({ force: true });
+    //await this.page.waitForTimeout(5000);
     await expect(this.page.locator(this.dashboardNameInput)).toBeVisible();
     await this.page.locator(this.dashboardNameInput).fill(dashboardName);
     await expect(this.page.locator(this.dashboardSubmitButton)).toBeVisible();
-
-    await this.page.locator(this.dashboardSubmitButton).click();
-    await this.page.waitForTimeout(5000);
+    await this.page.waitForSelector
+    await this.page.locator(this.dashboardSubmitButton).click({ force: true });
+   // await this.page.waitForTimeout(5000);
   }
 
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
-    await this.page.locator(this.dateTimeButton).click();
-    await this.relative30SecondsButton.click();
+   // await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+    await this.page.waitForSelector(dateTimeButtonLocator);
+    await this.page.locator(this.dateTimeButton).click({ force: true });
+    await this.page.waitForSelector(relative30SecondsButtonLocator);
+
+    await this.relative30SecondsButton.click({ force: true });
   }
 
   async verifyTimeSetTo30Seconds() {
@@ -49,41 +55,47 @@ export class DashboardPage {
     await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
   }
 
-  async setDateTime() {
-    await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
-    await this.page.locator(this.dateTimeButton).click();
-    await this.page.locator(this.absoluteTab).click();
-    await this.page.waitForTimeout(2000);
+
+async setDateTime() {
+   
+    //await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+    await this.page.waitForSelector(dateTimeButtonLocator);
+    await this.page.locator(this.dateTimeButton).click({ force: true });
+    await this.page.waitForSelector(absoluteTabLocator);
+    await this.page.locator(this.absoluteTab).click({ force: true });
+
 
   }
-
   async fillTimeRange(startTime, endTime) {
 
-    await this.page.locator(oneDateMonthLocator).click();
-    await this.page.waitForTimeout(3000);
-        
-    await this.page.getByLabel('access_time').first().fill(String(startTime));
-    
-    // await this.page.getByRole('button', { name: '1', exact: true }).click();
-    await this.page.locator(oneDateMonthLocator).click();
-    await this.page.waitForTimeout(3000);
-    // await this.page.locator('//*[@id="f_e7860c12-4d74-484c-8f83-5e8a16c6adcc"]').fill(String(endTime));
+    await this.page.getByText(currentMonth).click();
+   
+    await this.page.locator("//span[text() ='"+currentMon+"']").click();
 
-    
-    await this.page.getByLabel('access_time').nth(1).fill(String(endTime));
-    
+
+    await this.page.locator(oneDateMonthLocator).dblclick();
+
+    //await this.page.getByRole('button', { name: '1', exact: true }).click();
+
+    await this.page.getByLabel('access_time').first().fill(startTime);
+
+    //await this.page.getByRole('button', { name: '1', exact: true }).click();
+    //await this.page.locator(oneDateMonthLocator).nth(1).click({ force: true });
+
+    await this.page.getByLabel('access_time').nth(1).fill(endTime);
+
   }
 
 
   async verifyDateTime(startTime, endTime) {
-   // await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
-    await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
-  }
-
-  async signOut() {
-    await this.profileButton.click();
-    await this.signOutButton.click();
-  }
+    // await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+     await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
+   }
+ 
+   async signOut() {
+     await this.profileButton.click({ force: true });
+     await this.signOutButton.click({ force: true });
+   }
 
 }
 

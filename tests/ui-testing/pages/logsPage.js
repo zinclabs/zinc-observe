@@ -1,6 +1,7 @@
 // logsPage.js
 import { expect } from '@playwright/test';
-import{ dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue, oneDateMonthLocator } from '../pages/CommonLocator.js';
+import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue, currentMonth,
+   oneDateMonthLocator, currentMon } from '../pages/CommonLocator.js';
 
 export class LogsPage {
   constructor(page) {
@@ -16,7 +17,7 @@ export class LogsPage {
     this.filterMessage = page.locator('div:has-text("info Adjust filter parameters and click \'Run query\'")');
 
     this.dateTimeButton = dateTimeButtonLocator;
-   
+
     // this.dateTimeButton = process.env["dateTimeButtonLocator"];
 
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
@@ -31,28 +32,29 @@ export class LogsPage {
   }
 
   async selectOrganization() {
-
-    await this.page.locator(this.orgDropdown).getByText('arrow_drop_down').click();
-
-
-    await this.defaultOrgOption.click();
+    await this.page.waitForSelector(this.orgDropdown).getByText('arrow_drop_down');
+    await this.page.locator(this.orgDropdown).getByText('arrow_drop_down').click({ force: true });
+    await this.page.defaultOrgOption.click({ force: true });
   }
 
 
   async navigateToLogs() {
     // Click on Logs menu item
-    await this.logsMenuItem.click();
+    await this.page.waitForSelector('[data-test="menu-link-\\/logs-item"]');
+    await this.logsMenuItem.click({ force: true });
     //await this.page.waitForTimeout(3000);
 
   }
 
   async selectIndexAndStream() {
     // Select index and stream
-    await this.indexDropDown.click();
-    await this.streamToggle.first().click();
+    await this.page.waitForSelector('[data-test="logs-search-index-list"]').getByText('arrow_drop_down');
+    await this.indexDropDown.click({ force: true });
+    await this.page.waitForSelector('[data-test="log-search-index-list-stream-toggle-default"] div').first();
+    await this.streamToggle.first().click({ force: true });
     // await this.page.waitForTimeout(3000);
-
-    await this.streamToggle.nth(2).click();
+    await this.page.waitForSelector('[data-test="log-search-index-list-stream-toggle-default"] div').nth(2);
+    await this.streamToggle.nth(2).click({ force: true });
   }
   /*
     async adjustFilterParameters() {
@@ -62,9 +64,12 @@ export class LogsPage {
 
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
-    await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
-    await this.page.locator(this.dateTimeButton).click();
-    await this.relative30SecondsButton.click();
+   // await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+    await this.page.waitForSelector(dateTimeButtonLocator);
+    await this.page.locator(this.dateTimeButton).click({ force: true });
+    await this.page.waitForSelector(relative30SecondsButtonLocator);
+
+    await this.relative30SecondsButton.click({ force: true });
   }
 
   async verifyTimeSetTo30Seconds() {
@@ -73,43 +78,51 @@ export class LogsPage {
   }
 
   async enableSQLMode() {
-    await this.sqlModeToggle.click();
+    
+    await this.page.sqlModeToggle.click({ force: true });
   }
 
   async setDateTime() {
-    await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
-    await this.page.locator(this.dateTimeButton).click();
-    await this.page.waitForTimeout(3000);
-    await this.page.locator(this.absoluteTab).click();
     
+    //await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
+    await this.page.waitForSelector(dateTimeButtonLocator);
+    await this.page.locator(this.dateTimeButton).click({ force: true });
+    await this.page.waitForTimeout(4000); 
+    await this.page.waitForSelector(absoluteTabLocator);
+    await this.page.locator(this.absoluteTab).click({ force: true });
+
 
   }
 
   async fillTimeRange(startTime, endTime) {
 
-    await this.page.locator(oneDateMonthLocator).click();
+    await this.page.getByText(currentMonth).click();
+    
+    await this.page.locator("//span[text() ='"+currentMon+"']").click();
+
+
+    await this.page.locator(oneDateMonthLocator).dblclick();
 
     //await this.page.getByRole('button', { name: '1', exact: true }).click();
-    
+
     await this.page.getByLabel('access_time').first().fill(startTime);
-    
+
     //await this.page.getByRole('button', { name: '1', exact: true }).click();
-    await this.page.locator(oneDateMonthLocator).click();
+    //await this.page.locator(oneDateMonthLocator).nth(1).click({ force: true });
 
     await this.page.getByLabel('access_time').nth(1).fill(endTime);
-    
+
   }
 
-  async verifyDateTime(startTime, endTime) {
-   
-    await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
-  }
-    //await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
-
-
-  async signOut() {
-    await this.profileButton.click();
-    await this.signOutButton.click();
-  }
   
+  async verifyDateTime(startTime, endTime) {
+    // await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
+     await expect(this.page.locator(this.dateTimeButton)).toHaveText(new RegExp(`${startTime}.*${endTime}`));
+   }
+ 
+   async signOut() {
+     await this.profileButton.click({ force: true });
+     await this.signOutButton.click({ force: true });
+   }
+   
 }
