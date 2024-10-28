@@ -12,7 +12,7 @@ const path = require('path');
 
 test('Logo Upload on Management ', async ({ page }) => {
     // Create page object instances
-    const filePath = path.resolve(__dirname, '../attachment/004.bmp');
+    const filePath = path.resolve(__dirname, '../attachment/1001.png');
 
     const loginPage = new LoginPage(page);
     const managementPage = new ManagementPage(page);
