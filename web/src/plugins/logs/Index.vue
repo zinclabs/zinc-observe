@@ -19,27 +19,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <q-page class="logPage q-my-xs" id="logPage">
     <div v-show="!showSearchHistory" id="secondLevel" class="full-height">
-      <q-splitter
-        class="logs-horizontal-splitter full-height"
-        v-model="splitterModel"
-        horizontal
-      >
-        <template v-slot:before>
-          <search-bar
-            data-test="logs-search-bar"
-            ref="searchBarRef"
-            :fieldValues="fieldValues"
-            :key="searchObj.data.transforms.length || -1"
-            @searchdata="searchData"
-            @onChangeInterval="onChangeInterval"
-            @onChangeTimezone="refreshTimezone"
-            @handleQuickModeChange="handleQuickModeChange"
-            @handleRunQueryFn="handleRunQueryFn"
-            @on-auto-interval-trigger="onAutoIntervalTrigger"
-            @showSearchHistory="showSearchHistoryfn"
-          />
-        </template>
-        <template v-slot:after>
+      <div>
+        <search-bar
+          data-test="logs-search-bar"
+          ref="searchBarRef"
+          :fieldValues="fieldValues"
+          :key="searchObj.data.transforms.length || -1"
+          @searchdata="searchData"
+          @onChangeInterval="onChangeInterval"
+          @onChangeTimezone="refreshTimezone"
+          @handleQuickModeChange="handleQuickModeChange"
+          @handleRunQueryFn="handleRunQueryFn"
+          @on-auto-interval-trigger="onAutoIntervalTrigger"
+          @showSearchHistory="showSearchHistoryfn"
+        />
+      </div>
           <div
             id="thirdLevel"
             class="row scroll relative-position thirdlevel full-height overflow-hidden logsPageMainSection"
@@ -93,6 +87,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #after>
+                <div
+                  class="row query-editor-container"
+                >
+                  <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%">
+                    <q-splitter
+                      class="logs-search-splitter"
+                      no-scroll
+                      v-model="searchObj.config.fnSplitterModel"
+                      :limits="searchObj.config.fnSplitterLimit"
+                      style="width: 100%; height: 100%"
+                    >
+                      <template #before>
+                        <query-editor
+                          data-test="logs-search-bar-query-editor"
+                          editor-id="logsQueryEditor"
+                          ref="queryEditorRef"
+                          class="monaco-editor"
+                        />
+                      </template>
+                      <template #after>
+                        <div
+                          data-test="logs-vrl-function-editor"
+                          style="width: 100%; height: 100%"
+                        >
+                          <query-editor
+                            data-test="logs-vrl-function-editor"
+                            editor-id="fnEditor"
+                            ref="fnEditorRef"
+                            class="monaco-editor"
+                            language="vrl"
+                          />
+                        </div>
+                      </template>
+                    </q-splitter>
+                  </div>
+                </div>
                 <div
                   v-if="
                     searchObj.data.filterErrMsg !== '' &&
@@ -270,8 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :errorData="visualizeErrorData"
             ></VisualizeLogsQuery>
           </div>
-        </template>
-      </q-splitter>
+        
     </div>
     <div v-show="showSearchHistory">
       <search-history
@@ -317,11 +346,13 @@ import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 
 export default defineComponent({
   name: "PageSearch",
   components: {
     SearchBar,
+    QueryEditor,
     IndexList: defineAsyncComponent(
       () => import("@/plugins/logs/IndexList.vue"),
     ),
@@ -1190,6 +1221,8 @@ export default defineComponent({
     );
 
     // [END] cancel running queries
+    const fnEditorRef: any = ref(null);
+    const queryEditorRef = ref(null);
 
     return {
       t,
@@ -1236,6 +1269,8 @@ export default defineComponent({
       resetHistogramWithError,
       fnParsedSQL,
       isNonAggregatedQuery,
+      queryEditorRef,
+      fnEditorRef
     };
   },
   computed: {
@@ -1495,4 +1530,30 @@ $navbarHeight: 64px;
     width: 100%;
   }
 }
+.query-editor-container {
+    height: 100px !important;
+  }
+
+  #logsQueryEditor,
+  #fnEditor {
+    height: 100% !important;
+  }
+  #fnEditor {
+    width: 100%;
+    border-radius: 5px;
+    border: 0px solid #dbdbdb;
+    overflow: hidden;
+  }
+
+  .empty-query .monaco-editor-background {
+    background-image: url("../../assets/images/common/query-editor.png");
+    background-repeat: no-repeat;
+    background-size: 115px;
+  }
+
+  .empty-function .monaco-editor-background {
+    background-image: url("../../assets/images/common/vrl-function.png");
+    background-repeat: no-repeat;
+    background-size: 170px;
+  }
 </style>

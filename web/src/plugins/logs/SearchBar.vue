@@ -543,66 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <div class="row query-editor-container" v-show="searchObj.meta.showQuery">
-      <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%">
-        <q-splitter
-          class="logs-search-splitter"
-          no-scroll
-          v-model="searchObj.config.fnSplitterModel"
-          :limits="searchObj.config.fnSplitterLimit"
-          style="width: 100%; height: 100%"
-        >
-          <template #before>
-            <query-editor
-              data-test="logs-search-bar-query-editor"
-              editor-id="logsQueryEditor"
-              ref="queryEditorRef"
-              class="monaco-editor"
-              v-model:query="searchObj.data.query"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
-              @keydown.ctrl.enter="handleRunQueryFn"
-              @update:query="updateQueryValue"
-              @run-query="handleRunQueryFn"
-              :class="
-                searchObj.data.editorValue == '' &&
-                searchObj.meta.queryEditorPlaceholderFlag
-                  ? 'empty-query'
-                  : ''
-              "
-              @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
-              @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
-            />
-          </template>
-          <template #after>
-            <div
-              data-test="logs-vrl-function-editor"
-              v-show="searchObj.meta.toggleFunction"
-              style="width: 100%; height: 100%"
-            >
-              <query-editor
-                data-test="logs-vrl-function-editor"
-                ref="fnEditorRef"
-                editor-id="fnEditor"
-                class="monaco-editor"
-                v-model:query="searchObj.data.tempFunctionContent"
-                :class="
-                  searchObj.data.tempFunctionContent == '' &&
-                  searchObj.meta.functionEditorPlaceholderFlag
-                    ? 'empty-function'
-                    : ''
-                "
-                @keydown.ctrl.enter="handleRunQueryFn"
-                language="vrl"
-                @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
-                @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
-              />
-            </div>
-          </template>
-        </q-splitter>
-      </div>
-    </div>
-
+    
     <q-dialog ref="confirmDialog" v-model="confirmDialogVisible">
       <q-card>
         <q-card-section>
