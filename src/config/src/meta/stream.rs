@@ -726,12 +726,19 @@ impl StreamPartition {
                 let bucket = h % n;
                 bucket.to_string()
             }
-            StreamPartitionType::Prefix => value
-                .to_ascii_lowercase()
-                .chars()
-                .next()
-                .unwrap_or('_')
-                .to_string(),
+            StreamPartitionType::Prefix => {
+                let c = value
+                    .to_ascii_lowercase()
+                    .chars()
+                    .next()
+                    .unwrap_or('_')
+                    .to_string();
+                if c.is_ascii() {
+                    c
+                } else {
+                    urlencoding::encode(&c).into_owned()
+                }
+            }
         }
     }
 }
