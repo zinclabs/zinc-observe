@@ -29,7 +29,7 @@ export
     }
 
     async updateCustomLogoText(text) {
-
+        await this.page.waitForSelector("[data-test='settings_ent_logo_custom_text_edit_btn']");
         await this.submitButton.click({ force: true });
         await this.page.waitForSelector("[aria-label ='Custom Logo Text']");
         await this.customLogoText.fill(text);
