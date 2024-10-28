@@ -247,7 +247,7 @@ dotenv_config = "0.1"
 dotenvy = "0.15"
 env_logger = "0.10"
 etcd-client = { version = "0.12", features = ["tls"] }
-faststr = "0.2"
+faststr = { version = "0.2", features = ["serde"] }
 flate2 = { version = "1.0", features = ["zlib"] }
 futures = "0.3"
 fst = { version = "0.4.7", features = ["levenshtein"] }
@@ -320,6 +320,7 @@ tracing-subscriber = { version = "0.3.0", features = [
   "json",
 ] }
 url = "2.2"
+urlencoding = "2.1"
 utoipa = { version = "4", features = ["actix_extras", "openapi_extensions"] }
 utoipa-swagger-ui = { version = "4", features = ["actix-web"] }
 vrl = { version = "0.17.0", features = ["value", "compiler", "test"] }

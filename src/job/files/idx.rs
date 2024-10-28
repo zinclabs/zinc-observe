@@ -64,7 +64,7 @@ pub(crate) async fn write_parquet_index_to_disk(
         return Err(anyhow::anyhow!("No record batches found"));
     };
 
-    println!(
+    log::debug!(
         "write_parquet_index_to_disk: batches row counts: {:?}",
         batches.iter().map(|b| b.num_rows()).sum::<usize>()
     );
@@ -73,7 +73,7 @@ pub(crate) async fn write_parquet_index_to_disk(
     let partitioned_batches = generate_prefixed_batches(schema.clone(), batches)?;
 
     for (prefix, batch) in partitioned_batches.iter() {
-        println!(
+        log::debug!(
             "write_parquet_index_to_disk: prefix: {}, row count: {}",
             prefix,
             batch.num_rows()

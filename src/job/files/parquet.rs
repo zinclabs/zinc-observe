@@ -554,11 +554,14 @@ async fn merge_files(
     let mut total_records = 0;
 
     let stream_fields_num = latest_schema.fields().len();
+    let max_file_size = std::cmp::min(
+        cfg.limit.max_file_size_on_disk as i64,
+        cfg.compact.max_file_size as i64,
+    );
     for file in files_with_size.iter() {
         if new_file_size > 0
-            && (new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
-                || new_compressed_file_size + file.meta.compressed_size
-                    > cfg.compact.max_file_size as i64
+            && (new_file_size + file.meta.original_size > max_file_size
+                || new_compressed_file_size + file.meta.compressed_size > max_file_size
                 || (cfg.limit.file_move_fields_limit > 0
                     && stream_fields_num >= cfg.limit.file_move_fields_limit))
         {

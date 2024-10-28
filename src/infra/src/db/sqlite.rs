@@ -451,20 +451,7 @@ impl super::Db for SqliteDb {
             } else {
                 None
             };
-            if new_value.is_some() {
-                if let Err(e) = CHANNEL
-                    .watch_tx
-                    .clone()
-                    .send(Event::Put(EventData {
-                        key: key.to_string(),
-                        value: Some(Bytes::from("")),
-                        start_dt,
-                    }))
-                    .await
-                {
-                    log::error!("[SQLITE] send event error: {}", e);
-                }
-            } else if value.is_some() {
+            if new_value.is_some() || value.is_some() {
                 if let Err(e) = CHANNEL
                     .watch_tx
                     .clone()

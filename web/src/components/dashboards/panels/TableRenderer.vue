@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-table
-    class="my-sticky-virtscroll-table"
+    :class="[
+      'my-sticky-virtscroll-table',
+      { 'no-position-absolute': store.state.printMode },
+    ]"
     virtual-scroll
     v-model:pagination="pagination"
     :rows-per-page-options="[0]"
@@ -43,6 +46,7 @@ import useNotifications from "@/composables/useNotifications";
 import { exportFile } from "quasar";
 import { defineComponent, ref } from "vue";
 import { findFirstValidMappedValue } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "TableRenderer",
@@ -66,6 +70,8 @@ export default defineComponent({
   emits: ["row-click"],
   setup(props: any) {
     const tableRef: any = ref(null);
+    const store = useStore();
+
     const { showErrorNotification, showPositiveNotification } =
       useNotifications();
     function wrapCsvValue(val: any, formatFn?: any, row?: any) {
@@ -165,6 +171,7 @@ export default defineComponent({
       downloadTableAsCSV,
       tableRef,
       getStyle,
+      store,
     };
   },
 });
@@ -208,6 +215,11 @@ export default defineComponent({
     will-change: auto !important;
   }
 }
+
+.no-position-absolute {
+  position: static !important;
+}
+
 .my-sticky-virtscroll-table.q-dark {
   :deep(.q-table__top),
   :deep(.q-table__bottom),
