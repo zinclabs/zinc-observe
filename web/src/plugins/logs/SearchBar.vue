@@ -1582,14 +1582,7 @@ export default defineComponent({
       }
     };
 
-    const resetFunctionContent = () => {
-      fnEditorRef.value.setValue("");
-      store.dispatch("setSavedFunctionDialog", false);
-      isSavedFunctionAction.value = "create";
-      savedFunctionName.value = "";
-      saveFunctionLoader.value = false;
-      savedFunctionSelectedName.value = "";
-    };
+
 
     const resetEditorLayout = () => {
       setTimeout(() => {
@@ -2545,7 +2538,7 @@ export default defineComponent({
       updateQuery,
       downloadLogs,
       saveFunction,
-      resetFunctionContent,
+      // resetFunctionContent,
       resetEditorLayout,
       populateFunctionImplementation,
       functionModel,
@@ -2621,12 +2614,12 @@ export default defineComponent({
     confirmMessageSavedView() {
       return "Are you sure you want to update the saved view?";
     },
-    resetFunction() {
-      return this.searchObj.data.tempFunctionName;
-    },
-    resetFunctionDefinition() {
-      return this.searchObj.data.tempFunctionContent;
-    },
+    // resetFunction() {
+    //   return this.searchObj.data.tempFunctionName;
+    // },
+    // resetFunctionDefinition() {
+    //   return this.searchObj.data.tempFunctionContent;
+    // },
   },
   watch: {
     addSearchTerm() {
@@ -2737,23 +2730,23 @@ export default defineComponent({
           this.queryEditorRef.setValue(this.searchObj.data.query);
       }
     },
-    toggleFunction(newVal) {
-      if (newVal == false) {
-        this.searchObj.config.fnSplitterModel = 99.5;
-        this.resetFunctionContent();
-      } else {
-        this.searchObj.config.fnSplitterModel = 60;
-      }
-      this.resetEditorLayout();
-    },
-    resetFunction(newVal) {
-      if (newVal == "" && store.state.savedViewFlag == false) {
-        this.resetFunctionContent();
-      }
-    },
-    resetFunctionDefinition(newVal) {
-      if (newVal == "") this.resetFunctionContent();
-    },
+    // toggleFunction(newVal) {
+    //   if (newVal == false) {
+    //     this.searchObj.config.fnSplitterModel = 99.5;
+    //     this.resetFunctionContent();
+    //   } else {
+    //     this.searchObj.config.fnSplitterModel = 60;
+    //   }
+    //   this.resetEditorLayout();
+    // },
+    // resetFunction(newVal) {
+    //   if (newVal == "" && store.state.savedViewFlag == false) {
+    //     this.resetFunctionContent();
+    //   }
+    // },
+    // resetFunctionDefinition(newVal) {
+    //   if (newVal == "") this.resetFunctionContent();
+    // },
   },
 });
 </script>

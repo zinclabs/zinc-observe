@@ -62,35 +62,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       setInterestingFieldInSQLQuery
                     "
                   />
-                  <q-btn
-                    data-test="logs-search-field-list-collapse-btn"
-                    :icon="
-                      searchObj.meta.showFields
-                        ? 'chevron_left'
-                        : 'chevron_right'
-                    "
-                    :title="
-                      searchObj.meta.showFields
-                        ? 'Collapse Fields'
-                        : 'Open Fields'
-                    "
-                    dense
-                    size="20px"
-                    round
-                    class="q-mr-xs field-list-collapse-btn"
-                    color="primary"
-                    :style="{
-                      right: searchObj.meta.showFields ? '-20px' : '-24px',
-                    }"
-                    @click="collapseFieldList"
-                  ></q-btn>
+                  
+                 
                 </div>
+                
               </template>
               <template #after>
                 <div
                   class="row query-editor-container"
                 >
-                  <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%" :class="{ 'query-editor-container-focus': isFocused }">
+                  <div class="col" style="border-top: 1px solid #dbdbdb; border-bottom: 1px solid #dbdbdb; height: 100%" :class="{ 'query-editor-container-focus': isFocused }">
+                    <q-btn
+                      data-test="logs-search-field-list-collapse-btn"
+                      :icon="isFocused ? 'fullscreen_exit' : 'fullscreen'"
+                      :title="isFocused ? 'Collapse' : 'Expand'"
+                      dense
+                      size="10px"
+                      round
+                      class="field-list-collapse-btn"
+                      color="primary"
+                      @click="toggleFullScreen"
+                      style="position: absolute; top: 5px; right: 5px; z-index: 10;"
+                    ></q-btn>
                     <q-splitter
                       class="logs-search-splitter"
                       no-scroll
@@ -104,7 +97,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           editor-id="logsQueryEditor"
                           ref="queryEditorRef"
                           class="monaco-editor"
-                          @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
+                          v-model:query="searchObj.data.query"
+                        :keywords="autoCompleteKeywords"
+                        :suggestions="autoCompleteSuggestions"
+                        @keydown.ctrl.enter="handleRunQueryFn"
+                        @update:query="updateQueryValue"
+                        @run-query="handleRunQueryFn"
+                        :class="
+                          searchObj.data.editorValue == '' &&
+                          searchObj.meta.queryEditorPlaceholderFlag
+                            ? 'empty-query'
+                            : ''
+                        "
+                        @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
                         @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
                         />
                       </template>
@@ -119,13 +124,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ref="fnEditorRef"
                             class="monaco-editor"
                             language="vrl"
-                             @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
-                @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
+                            v-model:query="searchObj.data.tempFunctionContent"
+                            :class="
+                              searchObj.data.tempFunctionContent == '' &&
+                              searchObj.meta.functionEditorPlaceholderFlag
+                                ? 'empty-function'
+                                : ''
+                            "
+                            @keydown.ctrl.enter="handleRunQueryFn"
+                            @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
+                            @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
                           />
                         </div>
                       </template>
+                      
                     </q-splitter>
+                    
                   </div>
+                  
                 </div>
                 <div
                   v-if="
@@ -264,6 +280,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="logs-search-search-result"
                   class="full-height search-result-container"
                 >
+                <q-btn
+                    data-test="logs-search-field-list-collapse-btn"
+                    :icon="
+                      searchObj.meta.showFields
+                        ? 'chevron_left'
+                        : 'chevron_right'
+                    "
+                    :title="
+                      searchObj.meta.showFields
+                        ? 'Collapse Fields'
+                        : 'Open Fields'
+                    "
+                    dense
+                    size="10px"
+                    round
+                    style="left: -8px; z-index: 10; position: absolute;"
+                    class="q-mr-xs field-list-collapse-btn"
+                    color="primary"
+                    @click="collapseFieldList"
+                  ></q-btn>
                   <search-result
                     ref="searchResultRef"
                     :expandedLogs="expandedLogs"
@@ -329,6 +365,7 @@ import {
   defineAsyncComponent,
   provide,
   onMounted,
+  onUnmounted
 } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -343,6 +380,7 @@ import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useLogs from "@/composables/useLogs";
 import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useSqlSuggestions from "@/composables/useSuggestions";
 import { reactive } from "vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
@@ -493,6 +531,12 @@ export default defineComponent({
     const $q = useQuasar();
     const disableMoreErrorDetails: boolean = ref(false);
     const searchHistoryRef = ref(null);
+    const isSavedFunctionAction: string = ref("create");
+    const functionModel: string = ref(null);
+    const savedFunctionName: string = ref("");
+    const savedFunctionSelectedName: string = ref("");
+    const saveFunctionLoader = ref(false);
+
     let {
       searchObj,
       getQueryData,
@@ -517,6 +561,14 @@ export default defineComponent({
       resetHistogramWithError,
       isNonAggregatedQuery,
     } = useLogs();
+    const {
+      autoCompleteData,
+      autoCompleteKeywords,
+      autoCompleteSuggestions,
+      getSuggestions,
+      updateFieldKeywords,
+      updateFunctionKeywords,
+    } = useSqlSuggestions();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
     const showSearchHistory = ref(false);
@@ -576,6 +628,11 @@ export default defineComponent({
     // resetSearchObj();
     // resetStreamData();
     // });
+    onUnmounted (() => {
+      window.removeEventListener("click", () => {
+        fnEditorRef?.value?.resetEditorLayout();
+      });
+    });
 
     onActivated(async () => {
       // if search tab
@@ -656,12 +713,26 @@ export default defineComponent({
       }
     });
     onMounted(async () => {
+
       //
       if (
         router.currentRoute.value.query.hasOwnProperty("action") &&
         router.currentRoute.value.query.action == "history"
       ) {
         showSearchHistory.value = true;
+      }
+
+      if (
+        router.currentRoute.value.query.functionContent ||
+        searchObj.data.tempFunctionContent
+      ) {
+        searchObj.meta.toggleFunction = true;
+        const fnContent = router.currentRoute.value.query.functionContent
+          ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
+          : searchObj.data.tempFunctionContent;
+        fnEditorRef?.value?.setValue(fnContent);
+        fnEditorRef?.value?.resetEditorLayout();
+        searchObj.config.fnSplitterModel = 60;
       }
     });
 
@@ -751,6 +822,10 @@ export default defineComponent({
       const { sqlParser }: any = useSqlParser.default();
       parser = await sqlParser();
     };
+
+    const toggleFullScreen = () =>{
+      isFocused.value = !isFocused.value;
+    }
 
     const runQueryFn = async () => {
       // searchObj.data.resultGrid.currentPage = 0;
@@ -888,6 +963,36 @@ export default defineComponent({
       if (searchObj.meta.showFields) searchObj.meta.showFields = false;
       else searchObj.meta.showFields = true;
     };
+    const resetFunctionContent = () => {
+      fnEditorRef?.value?.setValue("");
+      store.dispatch("setSavedFunctionDialog", false);
+      isSavedFunctionAction.value = "create";
+      savedFunctionName.value = "";
+      saveFunctionLoader.value = false;
+      savedFunctionSelectedName.value = "";
+    };
+
+    const resetEditorLayout = () => {
+      setTimeout(() => {
+        queryEditorRef?.value?.resetEditorLayout();
+        fnEditorRef?.value?.resetEditorLayout();
+      }, 100);
+    };
+
+    const populateFunctionImplementation = (fnValue, flag = false) => {
+      if (flag) {
+        $q.notify({
+          type: "positive",
+          message: `${fnValue.name} function applied successfully.`,
+          timeout: 3000,
+        });
+      }
+      searchObj.meta.toggleFunction = true;
+      searchObj.config.fnSplitterModel = 60;
+      fnEditorRef.value.setValue(fnValue.function);
+      searchObj.data.tempFunctionName = fnValue.name;
+      searchObj.data.tempFunctionContent = fnValue.function;
+    };
 
     const areStreamsPresent = computed(() => {
       return !!searchObj.data.stream.streamLists.length;
@@ -914,6 +1019,15 @@ export default defineComponent({
         handleRunQueryFn();
       }
     };
+    const updateAutoComplete = (value) => {
+      autoCompleteData.value.query = value;
+      autoCompleteData.value.cursorIndex =
+        queryEditorRef?.value?.getCursorIndex();
+      autoCompleteData.value.fieldValues = fieldValues;
+      autoCompleteData.value.popup.open =
+        queryEditorRef?.value?.triggerAutoComplete;
+      getSuggestions();
+    };
     const showSearchHistoryfn = () => {
       router.push({
         name: "logs",
@@ -924,6 +1038,123 @@ export default defineComponent({
         },
       });
       showSearchHistory.value = true;
+    };
+
+    const updateQueryValue = (value: string) => {
+      if (searchObj.meta.quickMode == true) {
+        const parsedSQL = fnParsedSQL();
+
+        if (
+          parsedSQL != undefined &&
+          parsedSQL.hasOwnProperty("from") &&
+          parsedSQL?.from.length > 0 &&
+          parsedSQL?.from[0].table !== searchObj.data.stream.selectedStream[0]
+        ) {
+          searchObj.data.stream.selectedStream = [parsedSQL.from[0].table];
+          onStreamChange(value);
+        }
+        if (parsedSQL?.columns?.length > 0) {
+          const columnNames = getColumnNames(parsedSQL?.columns);
+          searchObj.data.stream.interestingFieldList = [];
+          for (const col of columnNames) {
+            if (
+              !searchObj.data.stream.interestingFieldList.includes(col) &&
+              col != "*"
+            ) {
+              // searchObj.data.stream.interestingFieldList.push(col);
+              const localInterestingFields: any = useLocalInterestingFields();
+              let localFields: any = {};
+              if (localInterestingFields.value != null) {
+                localFields = localInterestingFields.value;
+              }
+              for (const stream of searchObj.data.stream.selectedStreamFields) {
+                if (
+                  stream.name == col &&
+                  !searchObj.data.stream.interestingFieldList.includes(col)
+                ) {
+                  searchObj.data.stream.interestingFieldList.push(col);
+                  localFields[
+                    searchObj.organizationIdentifier +
+                      "_" +
+                      searchObj.data.stream.selectedStream[0]
+                  ] = searchObj.data.stream.interestingFieldList;
+                }
+              }
+              useLocalInterestingFields(localFields);
+            }
+          }
+
+          for (const item of searchObj.data.stream.selectedStreamFields) {
+            if (
+              searchObj.data.stream.interestingFieldList.includes(item.name)
+            ) {
+              item.isInterestingField = true;
+            } else {
+              item.isInterestingField = false;
+            }
+          }
+        }
+      }
+
+      searchObj.data.editorValue = value;
+
+      updateAutoComplete(value);
+      try {
+        if (searchObj.meta.sqlMode == true) {
+          searchObj.data.parsedQuery = parser.astify(value);
+          if (searchObj.data.parsedQuery?.from?.length > 0) {
+            if (
+              !searchObj.data.stream.selectedStream.includes(
+                searchObj.data.parsedQuery.from[0].table
+              ) &&
+              searchObj.data.parsedQuery.from[0].table !== streamName
+            ) {
+              let streamFound = false;
+              searchObj.data.stream.selectedStream = [];
+
+              streamName = searchObj.data.parsedQuery.from[0].table;
+              searchObj.data.streamResults.list.forEach((stream) => {
+                if (stream.name == searchObj.data.parsedQuery.from[0].table) {
+                  streamFound = true;
+                  let itemObj = {
+                    label: stream.name,
+                    value: stream.name,
+                  };
+
+                  // searchObj.data.stream.selectedStream = itemObj;
+                  searchObj.data.stream.selectedStream.push(itemObj.value);
+                  onStreamChange(searchObj.data.editorValue);
+                  // searchObj.data.stream.selectedStreamFields = [];
+
+                  // if (searchObj.data.stream.selectedStreamFields.length == 0)
+                  //  {
+                  //     const data = await getStream (
+                  //       searchObj.data.stream.selectedStream[0],
+                  //       searchObj.data.stream.streamType || "logs",
+                  //       true
+                  //  )
+                  //  searchObj.data.stream.selectedStreamFields = data.schema
+
+                  // }
+                }
+              });
+              if (streamFound == false) {
+                // searchObj.data.stream.selectedStream = { label: "", value: "" };
+                searchObj.data.stream.selectedStream = [];
+                searchObj.data.stream.selectedStreamFields = [];
+                $q.notify({
+                  message: "Stream not found",
+                  color: "negative",
+                  position: "top",
+                  timeout: 2000,
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.log(e, "Logs: Error while updating query value");
+      }
     };
 
     function removeFieldByName(data, fieldName) {
@@ -941,6 +1172,7 @@ export default defineComponent({
         return true;
       });
     }
+
 
     const setInterestingFieldInSQLQuery = (
       field: any,
@@ -1291,6 +1523,17 @@ export default defineComponent({
       queryEditorRef,
       fnEditorRef,
       isFocused,
+      toggleFullScreen,
+      updateQueryValue,
+      autoCompleteKeywords,
+      autoCompleteSuggestions,
+      updateQueryValue, 
+      updateAutoComplete, 
+      resetFunctionContent,
+      resetEditorLayout,
+      populateFunctionImplementation, 
+      isSavedFunctionAction,
+      savedFunctionName,
     };
   },
   computed: {
@@ -1305,6 +1548,9 @@ export default defineComponent({
     },
     moveSplitter() {
       return this.searchObj.config.splitterModel;
+    },
+    toggleFunction() {
+      return this.searchObj.meta.toggleFunction;
     },
     // changeStream() {
     //   return this.searchObj.data.stream.selectedStream;
@@ -1406,6 +1652,23 @@ export default defineComponent({
         this.searchObj.meta.showFields =
           this.searchObj.config.splitterModel > 0;
       }
+    },
+    toggleFunction(newVal) {
+      if (newVal == false) {
+        this.searchObj.config.fnSplitterModel = 100;
+        this.resetFunctionContent();
+      } else {
+        this.searchObj.config.fnSplitterModel = 60;
+      }
+      this.resetEditorLayout();
+    },
+    resetFunction(newVal) {
+      if (newVal == "" && store.state.savedViewFlag == false) {
+        this.resetFunctionContent();
+      }
+    },
+    resetFunctionDefinition(newVal) {
+      if (newVal == "") this.resetFunctionContent();
     },
     // changeStream: {
     //   handler(stream, streamOld) {
