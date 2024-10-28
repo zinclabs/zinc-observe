@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="row query-editor-container"
                 >
-                  <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%">
+                  <div class="col" style="border-top: 1px solid #dbdbdb; height: 100%" :class="{ 'query-editor-container-focus': isFocused }">
                     <q-splitter
                       class="logs-search-splitter"
                       no-scroll
@@ -104,6 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           editor-id="logsQueryEditor"
                           ref="queryEditorRef"
                           class="monaco-editor"
+                          @focus="searchObj.meta.queryEditorPlaceholderFlag = false"
+                        @blur="searchObj.meta.queryEditorPlaceholderFlag = true"
                         />
                       </template>
                       <template #after>
@@ -117,6 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ref="fnEditorRef"
                             class="monaco-editor"
                             language="vrl"
+                             @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
+                @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
                           />
                         </div>
                       </template>
@@ -520,6 +524,7 @@ export default defineComponent({
 
     const expandedLogs = ref([]);
     const splitterModel = ref(10);
+    const isFocused = ref(false);
 
     const { showErrorNotification } = useNotifications();
 
@@ -699,6 +704,20 @@ export default defineComponent({
       //     showSearchHistory.value = true;
       //   }
       // }
+    );
+    watch(
+     [ () => searchObj.meta.functionEditorPlaceholderFlag, () => searchObj.meta.queryEditorPlaceholderFlag],
+      (values) => {
+        console.log(values,"val")
+        if(values[0] == true && values[1] == true){
+          //this is for non focus mode
+          isFocused.value = false;
+        }
+        else{
+          //this for focus mode
+          isFocused.value = true;
+        }
+      }
     );
     watch(
       () => router.currentRoute.value.query.type,
@@ -1270,7 +1289,8 @@ export default defineComponent({
       fnParsedSQL,
       isNonAggregatedQuery,
       queryEditorRef,
-      fnEditorRef
+      fnEditorRef,
+      isFocused,
     };
   },
   computed: {
@@ -1555,5 +1575,10 @@ $navbarHeight: 64px;
     background-image: url("../../assets/images/common/vrl-function.png");
     background-repeat: no-repeat;
     background-size: 170px;
+  }
+
+  .query-editor-container-focus{
+    height: 600px !important;
+    z-index: 20;
   }
 </style>
