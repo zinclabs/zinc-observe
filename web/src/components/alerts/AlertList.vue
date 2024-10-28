@@ -258,14 +258,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <q-card-section>
             <q-form @submit="submitForm">
-              <q-input v-model="toBeCloneAlertName" label="Alert Name" />
+              <q-input
+              data-test="to-be-clone-alert-name"
+               v-model="toBeCloneAlertName" label="Alert Name" />
               <q-select
+                data-test="to-be-clone-stream-type"
                 v-model="toBeClonestreamType"
                 label="Stream Type"
                 :options="streamTypes"
                 @update:model-value="updateStreams()"
               />
               <q-select
+                data-test="to-be-clone-stream-name"
                 v-model="toBeClonestreamName"
                 :loading="isFetchingStreams"
                 :disable="!toBeClonestreamType"
