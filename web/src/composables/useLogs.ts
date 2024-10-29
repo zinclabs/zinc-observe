@@ -1039,6 +1039,7 @@ const useLogs = () => {
   };
 
   const getQueryPartitions = async (queryReq: any) => {
+    console.log("this for testing purpose")
     try {
       // const queryReq = buildSearch();
       searchObj.data.queryResults.hits = [];
