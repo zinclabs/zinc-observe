@@ -26,9 +26,14 @@ export
         await this.homeIcon.hover();
         await this.page.waitForSelector('[data-test="menu-link-/settings/-item"]');
         await this.managementMenuItem.click({ force: true });
+        await this.page.waitForTimeout(5000);
+        //await this.page.goto(process.env["ZO_BASE_URL"]/web/settings/general);
+        await this.page.goto(process.env["ZO_BASE_URL"] + "/web/settings/general/");
+
     }
 
     async updateCustomLogoText(text) {
+        await this.page.waitForTimeout(5000);
         await this.page.waitForSelector("[data-test='settings_ent_logo_custom_text_edit_btn']");
         await this.submitButton.click({ force: true });
         await this.page.waitForSelector("[aria-label ='Custom Logo Text']");
@@ -50,6 +55,8 @@ export
             
         }
         //  await this.fileUploadInput.setInputFiles(filePath);
+        await this.page.waitForTimeout(5000);
+        await this.page.waitForSelector('[data-test="setting_ent_custom_logo_img_file_upload"]');
         await this.page.setInputFiles('input[ data-test="setting_ent_custom_logo_img_file_upload"]', filePath);
         await this.page.waitForTimeout(5000);
 
