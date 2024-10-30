@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-item>
       </template>
 
-      <template v-if="variableItem.multiSelect" v-slot:after-options>
+      <!-- <template v-if="variableItem.multiSelect" v-slot:after-options>
         <div class="q-pa-sm tw-text-end">
           <q-btn
             @click="applySelection"
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Apply
           </q-btn>
         </div>
-      </template>
+      </template> -->
     </q-select>
   </div>
 </template>

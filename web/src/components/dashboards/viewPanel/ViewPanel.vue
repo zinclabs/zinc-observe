@@ -121,7 +121,7 @@
                   :dashboard-id="dashboardId"
                   :folder-id="folderId"
                   :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                  :variablesData="variablesData"
+                  :variablesData="refreshVariableDataRef"
                   :width="6"
                   :searchType="searchType"
                   @error="handleChartApiError"
@@ -220,10 +220,13 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+
+    const refreshVariableDataRef: any = reactive({});
+    
     let parser: any;
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
     const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
@@ -236,6 +239,16 @@ export default defineComponent({
     let variablesData: any = reactive({});
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
+
+      // when this is called 1st time, we need to set the data for the updated variables data as well
+      // from the second time, it will only be updated after the apply button is clicked
+      if (
+        !refreshVariableDataRef?.values?.length && // Previous value of variables is empty
+        variablesData?.values?.length > 0 // new values of variables is NOT empty
+      ) {
+        // assign the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
+        Object.assign(refreshVariableDataRef, variablesData);
+      }
 
       // resize the chart when variables data is updated
       // because if variable requires some more space then need to resize chart
@@ -301,7 +314,7 @@ export default defineComponent({
                 if (!histogramInterval.value.value) {
                   histogramExpr.args.value = histogramExpr.args.value.slice(
                     0,
-                    1
+                    1,
                   );
                 }
 
@@ -334,7 +347,7 @@ export default defineComponent({
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-      }
+      },
     );
 
     const onDataZoom = (event: any) => {
@@ -371,11 +384,11 @@ export default defineComponent({
           route.query.dashboard,
           props.panelId,
           route.query.folder,
-          route.query.tab ?? dashboardPanelData.data.panels[0]?.tabId
+          route.query.tab ?? dashboardPanelData.data.panels[0]?.tabId,
         );
         Object.assign(
           dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData))
+          JSON.parse(JSON.stringify(panelData)),
         );
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -388,8 +401,8 @@ export default defineComponent({
           : dashboardPanelData.data.queries
               .map((q: any) =>
                 [...q.fields.x, ...q.fields.y, ...q.fields.z].find(
-                  (f: any) => f.aggregationFunction == "histogram"
-                )
+                  (f: any) => f.aggregationFunction == "histogram",
+                ),
               )
               .filter((field: any) => field != undefined);
 
@@ -424,6 +437,10 @@ export default defineComponent({
     const refreshData = () => {
       if (!disable.value) {
         dateTimePickerRef.value.refresh();
+      Object.assign(
+        refreshVariableDataRef,
+        JSON.parse(JSON.stringify(variablesData))
+      );
       }
     };
 
@@ -435,9 +452,9 @@ export default defineComponent({
           await getDashboard(
             store,
             route.query.dashboard,
-            route.query.folder ?? "default"
-          )
-        )
+            route.query.folder ?? "default",
+          ),
+        ),
       );
       currentDashboardData.data = data;
 
@@ -478,7 +495,7 @@ export default defineComponent({
       props?.initialVariableValues?.values?.forEach((variable: any) => {
         if (variable.type === "dynamic_filters") {
           const filters = (variable.value || []).filter(
-            (item: any) => item.name && item.operator && item.value
+            (item: any) => item.name && item.operator && item.value,
           );
           const encodedFilters = filters.map((item: any) => ({
             name: item.name,
@@ -486,7 +503,7 @@ export default defineComponent({
             value: item.value,
           }));
           variableObj[`${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters)
+            JSON.stringify(encodedFilters),
           );
         } else {
           variableObj[`${variable.name}`] = variable.value;
@@ -512,12 +529,12 @@ export default defineComponent({
     // provide variablesAndPanelsDataLoadingState to share data between components
     provide(
       "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState
+      variablesAndPanelsDataLoadingState,
     );
 
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
-        variablesAndPanelsDataLoadingState.searchRequestTraceIds
+        variablesAndPanelsDataLoadingState.searchRequestTraceIds,
       ).filter((item: any) => item.length > 0);
       return searchIds.flat() as string[];
     });
@@ -533,7 +550,7 @@ export default defineComponent({
 
     watch(variablesAndPanelsDataLoadingState, () => {
       const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels
+        variablesAndPanelsDataLoadingState.panels,
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });
@@ -568,6 +585,7 @@ export default defineComponent({
       cancelViewPanelQuery,
       disable,
       config,
+      refreshVariableDataRef,
     };
   },
 });
