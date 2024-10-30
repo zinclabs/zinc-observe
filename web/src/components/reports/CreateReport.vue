@@ -125,7 +125,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
             </q-icon>
           </div>
-
           <q-stepper
             v-model="step"
             vertical

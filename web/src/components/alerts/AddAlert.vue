@@ -41,6 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    
+
     <q-separator />
     <div
       ref="addAlertFormRef"
@@ -169,7 +171,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ml-none"
               />
             </div>
-            <div
+          
+
+            <!-- here form submission -->
+            
+            <!-- from here new alert design starts -->
+            <div >
+      <q-stepper
+            v-model="step"
+            vertical
+            color="primary"
+            animated
+            class="q-mt-md"
+            header-nav
+          >
+            <q-step
+              data-test="add-report-select-dashboard-step"
+              :name="1"
+              title="Query and Configurations"
+              :icon="outlinedInfo"
+              :done="step > 1"
+            >
+              <div
               v-if="formData.is_real_time === 'true'"
               class="q-py-sm showLabelOnTop text-bold text-h7"
               data-test="add-alert-query-input-title"
@@ -214,91 +237,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-mt-sm"
               />
             </div>
+              <q-stepper-navigation>
+                <q-btn
+                  data-test="add-report-step1-continue-btn"
+                  @click="step = 2"
+                  color="secondary"
+                  label="Continue"
+                  no-caps
+                />
+              </q-stepper-navigation>
+            </q-step>
 
-            <div class="col-12 flex justify-start items-center q-mt-xs">
-              <div
-                class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md flex items-center"
-                data-test="add-alert-delay-title"
-                style="width: 190px"
-              >
-                {{ t("alerts.silenceNotification") + " *" }}
-                <q-icon
-                  :name="outlinedInfo"
-                  size="17px"
-                  class="q-ml-xs cursor-pointer"
-                  :class="
-                    store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
-                  "
-                >
-                  <q-tooltip
-                    anchor="center right"
-                    self="center left"
-                    max-width="300px"
-                  >
-                    <span style="font-size: 14px">
-                      If the alert triggers then how long should it wait before
-                      sending another notification.
-                      <br />
-                      e.g. if the alert triggers at 4:00 PM and the silence
-                      notification is set to 10 minutes then it will not send
-                      another notification until 4:10 PM even if the alert is
-                      still after 1 minute. This is to avoid spamming the user
-                      with notifications.</span
-                    >
-                  </q-tooltip>
-                </q-icon>
-              </div>
-              <div style="min-height: 58px">
-                <div class="col-8 row justify-left align-center q-gutter-sm">
-                  <div
-                    class="flex items-center"
-                    style="border: 1px solid rgba(0, 0, 0, 0.05)"
-                  >
-                    <div
-                      data-test="add-alert-delay-input"
-                      style="width: 87px; margin-left: 0 !important"
-                      class="silence-notification-input"
-                    >
-                      <q-input
-                        v-model="formData.trigger_condition.silence"
-                        type="number"
-                        dense
-                        filled
-                        min="0"
-                        style="background: none"
-                      />
-                    </div>
-                    <div
-                      data-test="add-alert-delay-unit"
-                      style="
-                        min-width: 90px;
-                        margin-left: 0 !important;
-                        background: #f2f2f2;
-                        height: 40px;
-                      "
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'bg-grey-10'
-                          : 'bg-grey-2'
-                      "
-                      class="flex justify-center items-center"
-                    >
-                      {{ t("alerts.minutes") }}
-                    </div>
-                  </div>
-                </div>
-                <div
-                  data-test="add-alert-delay-error"
-                  v-if="formData.trigger_condition.silence < 0"
-                  class="text-red-8 q-pt-xs"
-                  style="font-size: 11px; line-height: 12px"
-                >
-                  Field is required!
-                </div>
-              </div>
-            </div>
+            <q-step
+              data-test="add-report-select-dashboard-step"
+              :name="2"
+              title="Destination and additional details"
+              :icon="outlinedInfo"
+              :done="step > 2"
+            >
 
-            <div class="o2-input flex justify-start items-center">
+            <div>
+              <div data-test="add-alert-description-input">
+                <q-input
+                  v-model="formData.description"
+                  :label="t('alerts.description')"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop q-mb-sm"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  tabindex="0"
+                  style="width: 550px"
+                />
+              </div>
+              <div class="o2-input flex justify-start items-center">
               <div
                 data-test="add-alert-destination-title"
                 class="text-bold q-pb-sm"
@@ -348,8 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-select>
               </div>
             </div>
-
-            <div class="q-mt-md">
+            <div >
               <div class="text-bold">{{ t("alerts.additionalVariables") }}</div>
               <variables-input
                 class="o2-input"
@@ -358,24 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @remove:variable="removeVariable"
               />
             </div>
-
-            <div class="o2-input">
-              <div data-test="add-alert-description-input">
-                <q-input
-                  v-model="formData.description"
-                  :label="t('alerts.description')"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="showLabelOnTop q-mb-sm"
-                  stack-label
-                  outlined
-                  filled
-                  dense
-                  tabindex="0"
-                  style="width: 550px"
-                />
-              </div>
-              <div data-test="add-alert-row-input">
+            <div data-test="add-alert-row-input">
                 <q-input
                   v-model="formData.row_template"
                   :label="t('alerts.row')"
@@ -390,9 +346,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   style="width: 550px"
                 />
               </div>
-            </div>
 
-            <div class="flex justify-start q-mt-lg">
+            </div>
+            <q-stepper-navigation>
+                <q-btn
+                  data-test="add-report-step1-continue-btn"
+                  @click="step = 2"
+                  color="secondary"
+                  label="Continue"
+                  no-caps
+                />
+              </q-stepper-navigation>
+          </q-step>
+
+            
+
+          </q-stepper>
+
+    </div>
+    <div class="flex justify-start q-mt-lg w-full">
               <q-btn
                 data-test="add-alert-cancel-btn"
                 v-close-popup="true"
@@ -415,6 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </q-form>
         </div>
+        
         <div
           style="width: 400px; height: 200px; position: sticky; top: 0"
           class="q-mb-lg q-px-md"
@@ -430,8 +403,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
+      
     </div>
+  
   </div>
+
+
 </template>
 
 <script lang="ts">
@@ -573,6 +550,7 @@ export default defineComponent({
     const selectedDestinations = ref("slack");
     const originalStreamFields: any = ref([]);
     const isAggregationEnabled = ref(false);
+    const step = ref(1);
     var triggerOperators: any = ref([
       "=",
       "!=",
@@ -1258,6 +1236,7 @@ export default defineComponent({
       getTimezonesByOffset,
       showTimezoneWarning,
       updateMultiTimeRange,
+      step,
     };
   },
 

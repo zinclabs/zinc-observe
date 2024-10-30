@@ -540,6 +540,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </div>
       </div>
+
+  <!-- expansion -->
+  <q-expansion-item
+    class="field-expansion-item"
+    dense
+    switch-toggle-side
+    label="Advanced Configurations"
+    expand-icon-class="field-expansion-icon"
+    expand-icon="expand_more"
+    header-class="text-primary"
+    >
+  <div>
       <div class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-alert-period-title"
@@ -897,6 +909,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+     </div>
+</q-expansion-item>
+   
     </div>
   </div>
 </template>
