@@ -349,9 +349,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             </div>
             <q-stepper-navigation>
+              <q-btn
+                  data-test="add-report-step2-back-btn"
+                  flat
+                  @click="step = 1"
+                  color="primary"
+                  label="Back"
+                  class="q-ml-sm"
+                  no-caps
+                />
                 <q-btn
                   data-test="add-report-step1-continue-btn"
-                  @click="step = 2"
+                  @click="step = 3"
                   color="secondary"
                   label="Continue"
                   no-caps
