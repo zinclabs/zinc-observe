@@ -6,13 +6,19 @@ use config::{
         sql::resolve_stream_names,
         stream::StreamType,
     },
+    utils::{base64, sql::is_aggregate_query},
 };
 use futures::StreamExt;
+use infra::errors::Error;
+use proto::cluster_rpc::SearchQuery;
 use tracing::Instrument;
 
 use crate::{
     handler::http::request::websocket::utils::{sessions_cache_utils, WSClientMessage},
-    service::search as SearchService,
+    service::{
+        search as SearchService,
+        search::{cache::cacher::get_ts_col_order_by, sql::Sql, RESULT_ARRAY},
+    },
 };
 
 pub struct SessionHandler {
@@ -105,7 +111,16 @@ impl SessionHandler {
                 );
                 match client_msg {
                     WSClientMessage::Search { query } => {
-                        self.handle_search_request(query).await;
+                        match self.handle_search_request(query).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::error!(
+                                    "[WEBSOCKET]: Failed to get search result for request_id: {}, error: {:?}",
+                                    self.request_id,
+                                    e
+                                );
+                            }
+                        };
                     }
                     WSClientMessage::Cancel { .. } => {
                         // TODO
@@ -132,44 +147,127 @@ impl SessionHandler {
         );
     }
 
-    async fn handle_search_request(&mut self, query: config::meta::search::Request) {
+    async fn handle_search_request(
+        &mut self,
+        req: config::meta::search::Request,
+    ) -> Result<(), Error> {
+        let mut response = vec![];
+
         // create the parent trace_id
         let trace_id = config::ider::uuid();
 
-        // TODO: check if the search query needs partitions
-        if self.is_partition_request(&query).await {
-            // TODO: call search partition and get the partitions
+        if self.is_partition_request(&req).await {
+            let partitions = self.get_partitions(&req, &trace_id).await;
+
+            if partitions.is_empty() {
+                return Ok(());
+            }
+
+            for [start_time, end_time] in partitions {
+                let mut req = req.clone();
+                req.query.start_time = start_time;
+                req.query.end_time = end_time;
+                let search_res = self.do_search(req, trace_id.clone()).await?;
+                response.push(search_res);
+            }
+        } else {
+            // call search directly
+            let search_res = self.do_search(req, trace_id).await?;
+            response.push(search_res);
         }
 
-        // call search directly
-        let search_res = self.do_search(query, trace_id).await;
         // send the search result for every response
-        match search_res {
-            Ok(res) => {
-                let response = serde_json::json!({
-                    "search_res": res,
-                });
+        let response = serde_json::json!({
+            "payload": response,
+        });
+        if self.session.text(response.to_string()).await.is_err() {
+            log::error!(
+                "[WEBSOCKET]: Failed to send search response for request_id: {}",
+                self.request_id
+            );
+        }
 
-                if self.session.text(response.to_string()).await.is_err() {
-                    log::error!(
-                        "[WEBSOCKET]: Failed to send search response for request_id: {}",
-                        self.request_id
-                    );
+        Ok(())
+    }
+
+    async fn is_partition_request(&self, req: &config::meta::search::Request) -> bool {
+        let cfg = get_config();
+
+        let query = SearchQuery {
+            start_time: req.query.start_time,
+            end_time: req.query.end_time,
+            sql: req.query.sql.clone(),
+            ..Default::default()
+        };
+
+        let sql = match Sql::new(&query, &self.org_id, self.stream_type).await {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("[WEBSOCKET] Failed to create SQL query: {:?}", e);
+                return false;
+            }
+        };
+
+        // check for vrl
+        let apply_over_hits = match req.query.query_fn.as_ref() {
+            None => false,
+            Some(v) => {
+                if v.is_empty() {
+                    false
+                } else {
+                    let v = base64::decode_url(v).unwrap_or(v.to_string());
+                    RESULT_ARRAY.is_match(&v)
                 }
             }
+        };
+
+        // if there is no _timestamp field in the query, return single partition
+        let is_aggregate = is_aggregate_query(&req.query.sql).unwrap_or_default();
+        let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
+        let ts_column = res_ts_column.map(|(v, _)| v);
+        let skip_get_file_list = ts_column.is_none() || apply_over_hits;
+
+        skip_get_file_list
+    }
+
+    async fn get_partitions(
+        &self,
+        req: &config::meta::search::Request,
+        trace_id: &str,
+    ) -> Vec<[i64; 2]> {
+        let search_partition_req = SearchPartitionRequest {
+            sql: req.query.sql.clone(),
+            start_time: req.query.start_time,
+            end_time: req.query.end_time,
+            encoding: req.encoding.clone(),
+            regions: req.regions.clone(),
+            clusters: req.clusters.clone(),
+            query_fn: req.query.query_fn.clone(),
+        };
+
+        let res = SearchService::search_partition(
+            &trace_id,
+            &self.org_id,
+            self.stream_type,
+            &search_partition_req,
+        )
+        .instrument(tracing::info_span!("search_partition"))
+        .await;
+
+        // get the list of partitions
+        let partitions = match res {
+            Ok(res) => res.partitions,
             Err(e) => {
                 log::error!(
-                    "[WEBSOCKET]: Failed to get search result for request_id: {}, error: {:?}",
+                    "[WEBSOCKET]: Failed to get partitions for request_id: {}, error: {:?}",
                     self.request_id,
                     e
                 );
+                return vec![];
             }
-        }
-    }
+        };
 
-    async fn is_partition_request(&self, query: &config::meta::search::Request) -> bool {
-        // TODO: check if the query needs partitions, return true
-        false
+        partitions
     }
 
     async fn do_search(
