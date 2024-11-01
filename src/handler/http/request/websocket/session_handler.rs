@@ -188,6 +188,7 @@ impl SessionHandler {
                                     config::meta::search::Request {
                                         query: query.clone(),
                                         search_type: Some(SearchEventType::UI),
+                                        search_event_context: None,
                                         index_type: cfg
                                             .common
                                             .inverted_index_search_format
