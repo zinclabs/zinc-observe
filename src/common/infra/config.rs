@@ -86,3 +86,4 @@ pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, Executable
     Lazy::new(Default::default);
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
+pub static WS_SESSIONS: Lazy<RwHashMap<String, actix_ws::Session>> = Lazy::new(DashMap::default);
