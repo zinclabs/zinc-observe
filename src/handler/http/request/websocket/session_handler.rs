@@ -2,7 +2,7 @@ use actix_ws::{MessageStream, Session};
 use config::{
     get_config,
     meta::{
-        search::{RequestEncoding, SearchEventType, SearchPartitionRequest},
+        search::{RequestEncoding, Response, SearchEventType, SearchPartitionRequest},
         sql::resolve_stream_names,
         stream::StreamType,
     },
@@ -22,6 +22,8 @@ pub struct SessionHandler {
     request_id: String,
     org_id: String,
     stream_type: StreamType,
+    use_cache: bool,
+    search_type: String,
 }
 
 impl SessionHandler {
@@ -32,6 +34,8 @@ impl SessionHandler {
         request_id: &str,
         org_id: &str,
         stream_type: StreamType,
+        use_cache: bool,
+        search_type: &str,
     ) -> Self {
         Self {
             session,
@@ -40,6 +44,8 @@ impl SessionHandler {
             request_id: request_id.to_string(),
             org_id: org_id.to_string(),
             stream_type,
+            use_cache,
+            search_type: search_type.to_string(),
         }
     }
 
@@ -98,7 +104,7 @@ impl SessionHandler {
                     client_msg
                 );
                 match client_msg {
-                    WSClientMessage::SearchPartition { query } => {
+                    WSClientMessage::Search { query } => {
                         self.handle_search_request(query).await;
                     }
                     WSClientMessage::Cancel { .. } => {
@@ -116,29 +122,6 @@ impl SessionHandler {
         }
     }
 
-    async fn process_search_request(&mut self, query: String) {
-        log::info!(
-            "[WEBSOCKET]: Processing search request for request_id: {} with query: {}",
-            self.request_id,
-            query
-        );
-    }
-
-    // Send search result and progress to the client
-    async fn send_search_result(&mut self, result: String, progress: f32) {
-        // TODO: Create a return message type, with Display trait
-        let message = format!(
-            "{{\"result\": \"{}\", \"progress\": {:.2}}}",
-            result, progress
-        );
-        if self.session.text(message).await.is_err() {
-            log::error!(
-                "[WEBSOCKET]: Failed to send search result for request_id: {}",
-                self.request_id
-            );
-        }
-    }
-
     // Cleanup the session when it ends
     async fn cleanup(&self) {
         sessions_cache_utils::remove_session(&self.request_id);
@@ -149,7 +132,65 @@ impl SessionHandler {
         );
     }
 
-    async fn handle_search_request(&mut self, query: SearchPartitionRequest) {
+    async fn handle_search_request(&mut self, query: config::meta::search::Request) {
+        // create the parent trace_id
+        let trace_id = config::ider::uuid();
+
+        // TODO: check if the search query needs partitions
+        if self.is_partition_request(&query).await {
+            // TODO: call search partition and get the partitions
+        }
+
+        // call search directly
+        let search_res = self.do_search(query, trace_id).await;
+        // send the search result for every response
+        match search_res {
+            Ok(res) => {
+                let response = serde_json::json!({
+                    "search_res": res,
+                });
+
+                if self.session.text(response.to_string()).await.is_err() {
+                    log::error!(
+                        "[WEBSOCKET]: Failed to send search response for request_id: {}",
+                        self.request_id
+                    );
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[WEBSOCKET]: Failed to get search result for request_id: {}, error: {:?}",
+                    self.request_id,
+                    e
+                );
+            }
+        }
+    }
+
+    async fn is_partition_request(&self, query: &config::meta::search::Request) -> bool {
+        // TODO: check if the query needs partitions, return true
+        false
+    }
+
+    async fn do_search(
+        &mut self,
+        query: config::meta::search::Request,
+        trace_id: String,
+    ) -> Result<Response, infra::errors::Error> {
+        SearchService::cache::search(
+            &trace_id,
+            &self.org_id,
+            self.stream_type,
+            Some("root@example.com".to_string()),
+            &query,
+            self.use_cache,
+        )
+        .instrument(tracing::info_span!("search"))
+        .await
+    }
+
+    // TODO: Remove this method
+    async fn _handle_search_request(&mut self, query: SearchPartitionRequest) {
         // create the parent trace_id
         let trace_id = config::ider::uuid();
         // call the search partition service

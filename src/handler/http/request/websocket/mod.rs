@@ -4,7 +4,6 @@ pub mod utils;
 use std::collections::HashMap;
 
 use actix_web::{get, web, Error, HttpRequest, HttpResponse};
-use actix_ws::Message;
 use config::meta::stream::StreamType;
 use serde::{Deserialize, Serialize};
 use session_handler::SessionHandler;
@@ -50,6 +49,11 @@ pub async fn websocket(
     };
     let request_id = query.get("request_id").map(|s| s.as_str()).unwrap_or("");
     let org_id = query.get("org_id").map(|s| s.as_str()).unwrap_or("");
+    let use_cache = query
+        .get("use_cache")
+        .map(|s| if s == "true" { true } else { false })
+        .unwrap_or_default();
+    let search_type = query.get("search_type").map(|s| s.as_str()).unwrap_or("");
 
     // Spawn the handler
     let session_handler = SessionHandler::new(
@@ -59,6 +63,8 @@ pub async fn websocket(
         request_id,
         org_id,
         stream_type,
+        use_cache,
+        search_type,
     );
     actix_web::rt::spawn(session_handler.run());
 

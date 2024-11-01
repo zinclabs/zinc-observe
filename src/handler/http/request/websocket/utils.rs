@@ -1,6 +1,4 @@
-use config::meta::search::SearchPartitionRequest;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 
 pub mod sessions_cache_utils {
     use crate::common::infra::config::WS_SESSIONS;
@@ -52,9 +50,8 @@ pub mod sessions_cache_utils {
     rename_all(serialize = "snake_case", deserialize = "snake_case")
 )]
 pub enum WSClientMessage {
-    SearchPartition {
-        query: SearchPartitionRequest,
-        // query: Request,
+    Search {
+        query: config::meta::search::Request,
     },
     Cancel {
         trace_id: String,
