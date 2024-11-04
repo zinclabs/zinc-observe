@@ -62,30 +62,35 @@ impl Actor for CustomWebSocketHandlers {
         let url_to_connect = self.url.clone();
 
         tokio::spawn(async move {
-            let (ws_stream, _) = connect_async(&url_to_connect)
-                .await
-                .expect("Failed to connect");
-            let (mut ws_sink, mut ws_stream) = ws_stream.split();
+            match connect_async(&url_to_connect).await {
+                Ok((ws_stream, _)) => {
+                    let (mut ws_sink, mut ws_stream) = ws_stream.split();
 
-            tokio::spawn(async move {
-                while let Some(msg) = rx.recv().await {
-                    log::info!(
+                    tokio::spawn(async move {
+                        while let Some(msg) = rx.recv().await {
+                            log::info!(
                         "[WebSocketProxy] Received message from the original websocket actor: {msg:?}"
                     );
-                    ws_sink
-                        .send(from_actix_message(msg))
-                        .await
-                        .expect("Failed to send message");
-                }
-            });
+                            ws_sink
+                                .send(from_actix_message(msg))
+                                .await
+                                .expect("Failed to send message");
+                        }
+                    });
 
-            while let Some(Ok(msg)) = ws_stream.next().await {
-                log::info!(
+                    while let Some(Ok(msg)) = ws_stream.next().await {
+                        log::info!(
                     "[WebSocketProxy] Should have sent to the original websocket actor to send back to client: {msg:?}"
                 );
-                addr.do_send(WebSocketMessageWrapper(from_tungstenite_msg_to_actix_msg(
-                    msg,
-                )));
+                        addr.do_send(WebSocketMessageWrapper(from_tungstenite_msg_to_actix_msg(
+                            msg,
+                        )));
+                    }
+                }
+                Err(e) => {
+                    log::error!("[WebSocketProxy] Failed to connect to backend WebSocket: {:?}", e);
+                    addr.do_send(WebSocketMessageWrapper(ws::Message::Close(None)));
+                }
             }
         });
     }
