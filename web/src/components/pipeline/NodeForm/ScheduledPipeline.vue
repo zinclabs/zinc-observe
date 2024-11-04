@@ -1176,7 +1176,19 @@ const onBlurQueryEditor = () => {
 };
 
 const validateInputs = (notify: boolean = true) => {
-  if (
+
+  if(cronJobError.value) {
+    notify &&
+      q.notify({
+        type: "negative",
+        message: "Invalid cron expression",
+        timeout: 1500,
+      });
+    return false;
+  }
+  
+    if (
+
     Number(triggerData.value.period) < 1 ||
     isNaN(Number(triggerData.value.period))
   ) {
