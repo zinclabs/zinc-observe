@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="add-stream-routing-section"
-    class="full-width full-height"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+    :style="computedStyleForFunction"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">
       {{ t("pipeline.associateFunction") }}
@@ -301,6 +301,10 @@ const nodeLink = ref({
   from: "",
   to: "",
 });
+
+const computedStyleForFunction = computed(() => {
+      return createNewFunction.value ? {  width: '100%' } : {width: '100%',height: '100%',};
+    });
 
 const dialog = ref({
   show: false,
