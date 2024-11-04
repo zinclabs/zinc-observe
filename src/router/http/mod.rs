@@ -24,8 +24,10 @@ use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use tokio::sync::mpsc;
 
-use crate::{common::infra::cluster, router::http::ws_proxy::CustomWebSocketHandlers};
-use crate::router::http::ws_proxy::convert_to_websocket_url;
+use crate::{
+    common::infra::cluster,
+    router::http::ws_proxy::{convert_to_websocket_url, CustomWebSocketHandlers},
+};
 
 const QUERIER_ROUTES: [&str; 19] = [
     "/config",
@@ -165,7 +167,7 @@ async fn dispatch(
 
     // check if the request is a websocket request
     if path.starts_with("/api/ws") {
-        // Convert the HTTP/HTTPS URL to a WebSocket URL
+        // Convert the HTTP/HTTPS URL to a WebSocket URL (WS/WSS)
         let ws_url = match convert_to_websocket_url(&new_url.value) {
             Ok(url) => url,
             Err(e) => {
@@ -183,7 +185,8 @@ async fn dispatch(
         let ws_res = ws::start(
             CustomWebSocketHandlers {
                 tx: mpsc::unbounded_channel().0,
-                url: ws_url.clone(),
+                url: ws_url,
+                req: req.clone(),
             },
             &req,
             payload,
