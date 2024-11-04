@@ -163,7 +163,7 @@ async fn dispatch(
     }
 
     // check if the request is a websocket request
-    if path.starts_with("/ws") {
+    if path.starts_with("/api/ws") {
         log::info!(
             "Websocket request received on dispatcher: {}",
             new_url.value.to_string()
