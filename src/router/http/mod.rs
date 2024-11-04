@@ -162,8 +162,10 @@ async fn dispatch(
         return Ok(HttpResponse::ServiceUnavailable().body(new_url.value));
     }
 
+    dbg!(&path);
+
     // check if the request is a websocket request
-    if path.starts_with("/api/ws") {
+    if path.starts_with("/ws") {
         log::info!(
             "Websocket request received on dispatcher: {}",
             new_url.value.to_string()
