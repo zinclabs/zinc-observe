@@ -17,12 +17,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div class="add-function-header row items-center no-wrap">
+      <div
+          data-test="add-function-back-btn"
+          class="flex justify-center items-center q-mr-md cursor-pointer"
+          style="
+            border: 1.5px solid;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+          "
+          title="Go Back"
+          @click="$emit('cancel:hideform')"
+        >
+        <q-icon name="arrow_back_ios_new" size="14px" />
+    </div>
       <div class="col">
+       
         <div v-if="beingUpdated" class="text-h6">
           {{ t("function.updateTitle") }}
         </div>
         <div v-else class="text-h6">{{ t("function.addTitle") }}</div>
       </div>
+      <div class="add-function-actions flex justify-center">
+          <q-btn
+            v-close-popup="true"
+            class="q-mb-md text-bold"
+            :label="t('function.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            no-caps
+            @click="$emit('cancel:hideform')"
+          />
+          <q-btn
+            :label="t('function.save')"
+            class="q-mb-md text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            type="submit"
+            no-caps
+          />
+        </div>
     </div>
 
     <q-separator />
@@ -36,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('function.name')"
             color="input-border"
             bg-color="input-bg"
-            class="col-4 q-py-md showLabelOnTop"
+            class="col-6 q-py-md showLabelOnTop"
             stack-label
             outlined
             filled
@@ -46,6 +80,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :rules="[(val: any) => !!val || 'Field is required!', isValidMethodName,]"
             tabindex="0"
           />
+          <q-input
+          v-if="formData.transType === '0'"
+          v-model="formData.params"
+          :label="t('function.params')"
+          :placeholder="t('function.paramsHint')"
+          color="input-border"
+          bg-color="input-bg"
+          class="col-6 q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          v-bind:readonly="beingUpdated"
+          v-bind:disable="beingUpdated"
+          :rules="[(val: any) => !!val || 'Field is required!', isValidParam,]"
+          tabindex="0"
+        />
         </div>
 
         <div v-if="store.state.zoConfig.lua_fn_enabled" class="q-gutter-sm">
@@ -70,27 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="updateEditorContent"
           />
         </div>
-
-        <q-input
-          v-if="formData.transType === '0'"
-          v-model="formData.params"
-          :label="t('function.params')"
-          :placeholder="t('function.paramsHint')"
-          color="input-border"
-          bg-color="input-bg"
-          class="col-4 q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
-          v-bind:readonly="beingUpdated"
-          v-bind:disable="beingUpdated"
-          :rules="[(val: any) => !!val || 'Field is required!', isValidParam,]"
-          tabindex="0"
-        />
-
         <div class="q-py-md showLabelOnTop text-bold text-h7">Function:</div>
-        <query-editor
+        <div :class="editorContainer">
+          <query-editor
           data-test="logs-vrl-function-editor"
           ref="editorRef"
           editor-id="add-function-editor"
@@ -98,31 +131,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:query="formData.function"
           language="vrl"
         />
+        </div>
 
         <!-- <q-input v-if="formData.ingest" v-model="formData.order" :label="t('function.order')" color="input-border"
                                                                                     bg-color="input-bg" class="q-py-md showLabelOnTop" stack-label outlined filled dense type="number" min="1" /> -->
         <pre class="q-py-md showLabelOnTop text-bold text-h7">{{
           compilationErr
         }}</pre>
-        <div class="add-function-actions flex justify-center q-mt-lg">
-          <q-btn
-            v-close-popup="true"
-            class="q-mb-md text-bold"
-            :label="t('function.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            no-caps
-            @click="$emit('cancel:hideform')"
-          />
-          <q-btn
-            :label="t('function.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            type="submit"
-            no-caps
-          />
-        </div>
+
       </q-form>
     </div>
   </div>
@@ -137,6 +153,7 @@ import { useStore } from "vuex";
 import { useQuasar } from "quasar";
 import segment from "../../services/segment_analytics";
 import QueryEditor from "@/components/QueryEditor.vue";
+
 
 const defaultValue: any = () => {
   return {
@@ -155,6 +172,10 @@ export default defineComponent({
     modelValue: {
       type: Object,
       default: () => defaultValue(),
+    },
+    inPipeline :{
+      type: Boolean,
+      default: false,
     },
     isUpdated: {
       type: Boolean,
@@ -179,9 +200,19 @@ export default defineComponent({
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
 
+
     let compilationErr = ref("");
 
     const beingUpdated = computed(() => props.isUpdated);
+    
+    const isInPipeline = computed(() => props.inPipeline);
+
+    const editorContainer = computed(() => {
+      return isInPipeline.value ? 'editor-container-pipeline' : 'editor-container';
+    });
+
+
+
 
     const streamTypes = ["logs", "metrics"];
 
@@ -307,6 +338,8 @@ end`;
       isValidParam,
       isValidMethodName,
       onSubmit,
+      isInPipeline,
+      editorContainer,
     };
   },
   created() {
@@ -327,10 +360,22 @@ end`;
 </script>
 
 <style scoped>
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 330px);
+}
+.editor-container-pipeline{
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 580px) !important;
+}
+
 .monaco-editor {
   width: 100%;
-  min-height: 15rem;
+  flex-grow: 1; /* Fills available space */
   border-radius: 5px;
+  overflow: hidden;
 }
 </style>
 <style>

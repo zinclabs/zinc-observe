@@ -139,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-if="createNewFunction" class="pipeline-add-function">
           <AddFunction
             ref="addFunctionRef"
+            :in-pipeline="true"
             :is-updated="isUpdating"
             @update:list="onFunctionCreation"
             @cancel:hideform="cancelFunctionCreation"
