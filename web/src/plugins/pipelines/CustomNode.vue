@@ -196,16 +196,23 @@ function getIcon(data, ioType) {
       <q-item clickable @click="(event) => onFunctionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+          <q-tooltip  anchor="right middle" self="bottom right">Function</q-tooltip>
+
         </q-item-section>
+
       </q-item>
       <q-item clickable @click="(event) => onConditionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="right middle" self="bottom right">Condition</q-tooltip>
+
         </q-item-section>
       </q-item>
       <q-item clickable @click="(event) => onStreamOutputClick(data, event,id)">
         <q-item-section avatar>
           <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="right middle" self="bottom right">Output</q-tooltip>
+
         </q-item-section>
       </q-item>
       <!-- Add more items similarly for other images -->
@@ -299,16 +306,23 @@ function getIcon(data, ioType) {
       <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+          <q-tooltip  anchor="right middle" self="bottom right">Function</q-tooltip>
         </q-item-section>
+      
+
       </q-item>
       <q-item clickable @click="(event) => onConditionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="right middle" self="bottom right">Condition</q-tooltip>
+
         </q-item-section>
       </q-item>
       <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
         <q-item-section avatar>
           <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="right middle" self="bottom right">Output</q-tooltip>
+
         </q-item-section>
       </q-item>
       <!-- Add more items similarly for other images -->
@@ -397,16 +411,23 @@ function getIcon(data, ioType) {
       <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+          <q-tooltip  anchor="right middle" self="bottom right">Function</q-tooltip>
+
         </q-item-section>
+
       </q-item>
       <q-item clickable @click="(event) => onConditionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="right middle" self="bottom right">Condition</q-tooltip>
+
         </q-item-section>
       </q-item>
       <q-item clickable  @click="(event) => onStreamOutputClick(data, event,id)">
         <q-item-section avatar>
           <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="right middle" self="bottom right">Output</q-tooltip>
+
         </q-item-section>
       </q-item>
       <!-- Add more items similarly for other images -->
@@ -493,16 +514,21 @@ function getIcon(data, ioType) {
       <q-item clickable  @click="(event) => onFunctionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="functionImage" alt="Function" style="width: 30px; height: 30px;">
+          <q-tooltip  anchor="right middle" self="bottom right">Function</q-tooltip>
         </q-item-section>
       </q-item>
       <q-item clickable @click="(event) => onConditionClick(data, event,id)">
         <q-item-section avatar>
           <img :src="conditionImage" alt="Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="right middle" self="bottom right">Condition</q-tooltip>
+
         </q-item-section>
       </q-item>
       <q-item class="q-item-output" clickable  @click="(event) => onStreamOutputClick(data, event,id)">
         <q-item-section avatar>
           <img :src="streamOutputImage" alt="Output Stream" style="width: 30px; height: 30px;">
+          <q-tooltip anchor="right middle" self="bottom right">Output</q-tooltip>
+
         </q-item-section>
       </q-item>
       <!-- Add more items similarly for other images -->
