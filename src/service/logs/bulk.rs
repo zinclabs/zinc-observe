@@ -34,6 +34,7 @@ use config::{
 
 use crate::{
     common::meta::ingestion::{BulkResponse, BulkResponseError, BulkResponseItem, IngestionStatus},
+    job::self_error_reporting::report_error,
     service::{
         format_stream_name,
         ingestion::check_ingestion_allowed,
@@ -253,6 +254,12 @@ pub async fn ingest(
                         Some(TS_PARSE_FAILED.to_string()),
                         failure_reason,
                     );
+                    report_error(
+                        org_id,
+                        &stream_name,
+                        TS_PARSE_FAILED,
+                        format!("too old timestamp"),
+                    );
                     continue;
                 }
                 local_val.insert(
@@ -381,6 +388,12 @@ pub async fn ingest(
                                     &mut bulk_res,
                                     Some(TS_PARSE_FAILED.to_string()),
                                     failure_reason,
+                                );
+                                report_error(
+                                    org_id,
+                                    &stream_name,
+                                    TS_PARSE_FAILED,
+                                    format!("too old timestamp"),
                                 );
                                 continue;
                             }

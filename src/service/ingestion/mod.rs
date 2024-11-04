@@ -53,7 +53,8 @@ use crate::{
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
         utils::functions::get_vrl_compiler_config,
     },
-    service::{alerts::alert::AlertExt, db},
+    job::self_error_reporting::report_error,
+    service::{alerts::alert::AlertExt, db, logs::bulk::TRANSFORM_FAILED},
 };
 
 pub mod grpc;
@@ -126,11 +127,14 @@ pub fn apply_vrl_fn(
             }
         },
         Err(err) => {
-            log::error!(
-                "{}/{:?} vrl runtime failed at getting result {:?}. Returning original row.",
+            report_error(
                 org_id,
-                stream_name,
-                err,
+                &stream_name[0],
+                TRANSFORM_FAILED,
+                format!(
+                    "{}/{:?} vrl runtime failed at getting result {:?}. Returning original row.",
+                    org_id, stream_name, err,
+                ),
             );
             row
         }

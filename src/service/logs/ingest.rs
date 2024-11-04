@@ -40,12 +40,14 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::json;
 
+use super::bulk::TS_PARSE_FAILED;
 use crate::{
     common::meta::ingestion::{
         AWSRecordType, GCPIngestionResponse, IngestionData, IngestionDataIter, IngestionError,
         IngestionRequest, IngestionResponse, IngestionStatus, KinesisFHIngestionResponse,
         StreamStatus,
     },
+    job::self_error_reporting::report_error,
     service::{
         format_stream_name, get_formatted_stream_name, ingestion::check_ingestion_allowed,
         schema::get_upto_discard_error,
@@ -230,6 +232,12 @@ pub async fn ingest(
                 Err(e) => {
                     stream_status.status.failed += 1;
                     stream_status.status.error = e.to_string();
+                    report_error(
+                        org_id,
+                        &stream_name,
+                        TS_PARSE_FAILED,
+                        format!("too old timestamp"),
+                    );
                     continue;
                 }
             };
@@ -301,6 +309,12 @@ pub async fn ingest(
                             Err(e) => {
                                 stream_status.status.failed += 1;
                                 stream_status.status.error = e.to_string();
+                                report_error(
+                                    org_id,
+                                    &stream_name,
+                                    TS_PARSE_FAILED,
+                                    format!("too old timestamp"),
+                                );
                                 continue;
                             }
                         };

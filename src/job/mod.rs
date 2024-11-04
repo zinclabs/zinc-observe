@@ -36,6 +36,7 @@ pub mod metrics;
 mod mmdb_downloader;
 mod prom;
 mod prom_self_consume;
+pub(crate) mod self_error_reporting;
 mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
@@ -91,6 +92,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { usage::run_audit_publish().await });
 
     tokio::task::spawn(async move { prom_self_consume::run().await });
+    tokio::task::spawn(async move { self_error_reporting::run().await });
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() {
         return Ok(());
