@@ -55,6 +55,7 @@ const onFunctionClick = (data,event,id) =>{
   console.log(data,"data")
   console.log(id,"id")
   console.log(event,"event")
+  pipelineObj.userSelectedNode = data;
   const dataToOpen  =   {
     label: "Function",
     subtype: "function",
@@ -70,7 +71,10 @@ const onFunctionClick = (data,event,id) =>{
 }
 
 const onConditionClick = (data,event,id) =>{
+  data.label = id;
   console.log(data,"data")
+  pipelineObj.userSelectedNode = data;
+
   const dataToOpen  =   {
     label: "Condition",
     subtype: "condition",
@@ -88,6 +92,8 @@ const onConditionClick = (data,event,id) =>{
 const onStreamOutputClick = (data,event,id) =>{
   console.log(data,"data")
   console.log(id,"id")
+  pipelineObj.userSelectedNode = data;
+
   if(!id){
     pipelineObj.userClickedNode = data.label;
   }

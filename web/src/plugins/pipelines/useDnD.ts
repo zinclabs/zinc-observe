@@ -336,6 +336,7 @@ export default function useDragAndDrop() {
   }
 
   function addNode(newNode:any) {
+    console.log(pipelineObj.userClickedNode,"pipelineObj.userClickedNode")
     if(pipelineObj.userClickedNode && pipelineObj.currentSelectedNodeData.id && !pipelineObj.userSelectedNode?.id ){
 
 
@@ -375,6 +376,7 @@ export default function useDragAndDrop() {
         newEdge,
       ];
       pipelineObj.userClickedNode = {};
+      pipelineObj.userSelectedNode = {};
     }
 
 if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
@@ -461,6 +463,7 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
     
     pipelineObj.isEditNode = false;
     // pipelineObj.currentSelectedNodeData = dialogObj;
+    pipelineObj.userClickedNode = {};
     pipelineObj.userSelectedNode = {};
     console.log(pipelineObj.currentSelectedNodeData,"pipelineObj.currentSelectedPipeline")
   }

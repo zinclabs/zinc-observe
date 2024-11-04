@@ -293,6 +293,7 @@ const functionExists = ref(false);
 const selected = ref(null);
 
 watch(selected, (newValue:any) => {
+  console.log(pipelineObj.userSelectedNode,"user seelcted node")
       pipelineObj.userSelectedNode = newValue; 
 });
 
@@ -329,8 +330,19 @@ onMounted(()=>{
     }
   }
   else{
-    pipelineObj.userSelectedNode = {};
-    selected.value = null;
+    if(pipelineObj.userSelectedNode){
+      const currentSelectedNode = formattedOptions.value.find(
+        (node)=> node?.id === pipelineObj.userSelectedNode.label
+      )
+      if(currentSelectedNode.node_type){
+        selected.value = currentSelectedNode;
+
+      }
+    }
+    else{
+      selected.value = null;
+      pipelineObj.userSelectedNode = {};
+    }
   }
 })
 

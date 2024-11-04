@@ -297,8 +297,19 @@ onMounted(async () => {
     }
   }
   else{
-    pipelineObj.userSelectedNode = {};
-    selected.value = null;
+    if(pipelineObj.userSelectedNode){
+      const currentSelectedNode = formattedOptions.value.find(
+        (node)=> node?.id === pipelineObj.userSelectedNode.label
+      )
+      if(currentSelectedNode.node_type){
+        selected.value = currentSelectedNode;
+
+      }
+    }
+    else{
+      selected.value = null;
+      pipelineObj.userSelectedNode = {};
+    }
   }
 });
 
