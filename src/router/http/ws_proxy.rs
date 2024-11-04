@@ -3,6 +3,7 @@ use actix_web_actors::ws;
 use futures::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite};
+use url::Url;
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -148,4 +149,28 @@ impl actix::StreamHandler<Result<ws::Message, ws::ProtocolError>> for CustomWebS
             _ => (),
         }
     }
+}
+
+pub fn convert_to_websocket_url(url_str: &str) -> Result<String, String> {
+    let mut parsed_url = match Url::parse(url_str) {
+        Ok(url) => url,
+        Err(e) => {
+            return Err(format!("Failed to parse URL: {}", e));
+        }
+    };
+
+    // Check the scheme and update it accordingly
+    match parsed_url.scheme() {
+        "http" => {
+            parsed_url.set_scheme("ws").map_err(|_| "Failed to set scheme to ws")?;
+        }
+        "https" => {
+            parsed_url.set_scheme("wss").map_err(|_| "Failed to set scheme to wss")?;
+        }
+        _ => {
+            return Err(format!("Unsupported URL scheme: {}", parsed_url.scheme()));
+        }
+    }
+
+    Ok(parsed_url.to_string())
 }

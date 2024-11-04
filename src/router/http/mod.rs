@@ -25,6 +25,7 @@ use actix_web_actors::ws;
 use tokio::sync::mpsc;
 
 use crate::{common::infra::cluster, router::http::ws_proxy::CustomWebSocketHandlers};
+use crate::router::http::ws_proxy::convert_to_websocket_url;
 
 const QUERIER_ROUTES: [&str; 19] = [
     "/config",
@@ -164,20 +165,30 @@ async fn dispatch(
 
     // check if the request is a websocket request
     if path.starts_with("/api/ws") {
+        // Convert the HTTP/HTTPS URL to a WebSocket URL
+        let ws_url = match convert_to_websocket_url(&new_url.value) {
+            Ok(url) => url,
+            Err(e) => {
+                log::error!("Error converting URL to WebSocket: {}", e);
+                return Ok(HttpResponse::BadRequest().body(e));
+            }
+        };
+
         log::info!(
             "Websocket request received on dispatcher: {}",
-            new_url.value.to_string()
+            ws_url.to_string()
         );
 
         // Upgrade to a websocket connection
         let ws_res = ws::start(
             CustomWebSocketHandlers {
                 tx: mpsc::unbounded_channel().0,
-                url: new_url.value.clone(),
+                url: ws_url.clone(),
             },
             &req,
             payload,
         );
+
         let res = match ws_res {
             Ok(res) => Ok(res),
             Err(e) => {
