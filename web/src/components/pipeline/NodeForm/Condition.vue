@@ -301,7 +301,7 @@ onMounted(async () => {
       const currentSelectedNode = formattedOptions.value.find(
         (node)=> node?.id === pipelineObj.userSelectedNode.label
       )
-      if(currentSelectedNode.node_type){
+      if(currentSelectedNode?.node_type){
         selected.value = currentSelectedNode;
 
       }

@@ -479,7 +479,7 @@ const validateSqlQuery = () => {
         resolve("");
       })
       .catch((err: any) => {
-        if (err.response.data.code === 500) {
+        if (  err) {
           isValidSqlQuery.value = false;
           q.notify({
             type: "negative",
