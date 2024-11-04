@@ -541,20 +541,6 @@ function getIcon(data, ioType) {
     </q-list>
   </q-menu>
 
-    <q-tooltip>
-      <div v-for="(condition, index) in data.conditions" :key="index">
-        <div>
-          <strong>Column:</strong> {{ condition.column }}
-        </div>
-        <div>
-          <strong>Operator:</strong> {{ condition.operator }}
-        </div>
-        <div>
-          <strong>Value:</strong> {{ condition.value }}
-        </div>
-        <q-separator v-if="index < data.conditions.length - 1" />
-      </div>
-    </q-tooltip>
       <div class="icon-container" style="display: flex; align-items: center">
         <!-- Icon -->
         <q-icon
@@ -570,16 +556,17 @@ function getIcon(data, ioType) {
       <!-- Label -->
       <div class="container">
         <div
-          class="row"
-          style="
-            text-align: left;
-            text-wrap: wrap;
-            width: auto;
-            text-overflow: ellipsis;
-          "
-        >
-          Condition - {{ data.condition }}
-        </div>
+    style="
+      text-align: left;
+      text-wrap: wrap;
+      width: auto;
+      text-overflow: ellipsis;
+    "
+  >
+    <div class="column" v-for="(condition, index) in data.conditions" :key="index" style="margin-bottom: 5px;">
+      {{ condition.column }} {{ condition.operator }} {{ condition.value }}
+    </div>
+  </div>
       </div>
 
       <div class="float-right">
