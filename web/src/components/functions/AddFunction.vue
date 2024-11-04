@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             color="secondary"
             padding="sm xl"
             type="submit"
+            @click="onSubmit"
             no-caps
           />
         </div>
@@ -247,6 +248,7 @@ end`;
     };
 
     const onSubmit = () => {
+      console.log("this")
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait...",
