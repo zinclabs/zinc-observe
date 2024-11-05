@@ -31,8 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <q-route-tab
               v-if="
-                !store.state.zoConfig?.custom_hide_menus
-                  .split(',')
+                !store.state.zoConfig?.custom_hide_menus?.split(',')
                   .includes('pipelines')
               "
               data-test="stream-pipelines-tab"
