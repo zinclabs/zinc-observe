@@ -633,10 +633,17 @@ const savePipeline = async () => {
 
 
 const openCancelDialog = () => {
-  confirmDialogMeta.value.show = true;
-  confirmDialogMeta.value.title = t("common.cancelChanges");
-  confirmDialogMeta.value.message = "Are you sure you want to cancel changes?";
-  confirmDialogMeta.value.onConfirm = () => router.back();
+ 
+  if(pipelineObj.dirtyFlag){
+    confirmDialogMeta.value.show = true;
+    confirmDialogMeta.value.title = t("common.cancelChanges");
+    confirmDialogMeta.value.message = "Are you sure you want to cancel changes?";
+    confirmDialogMeta.value.onConfirm = () => router.back();
+  }
+  else{
+    router.back();
+  }
+
 };
 
 const resetConfirmDialog = () => {

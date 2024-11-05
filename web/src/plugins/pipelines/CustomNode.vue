@@ -623,7 +623,7 @@ function getIcon(data, ioType) {
 }
 .menu-list{
   margin: 0px 10px;
-  background-color: var(--vf-node-bg);
+  background-color: white;
 }
 
 </style>
