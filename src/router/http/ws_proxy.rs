@@ -217,6 +217,16 @@ pub fn convert_actix_to_tungstenite_request(
         headers.insert(key, value);
     }
 
+    // insert headers for websockets, connection upgrade and upgrade to websocket
+    headers.insert(
+        HeaderName::from_static("connection"),
+        HeaderValue::from_static("upgrade"),
+    );
+    headers.insert(
+        HeaderName::from_static("upgrade"),
+        HeaderValue::from_static("websocket"),
+    );
+
     // Build the WebSocket request using the extracted method, URI, and headers
     let mut request_builder = tungstenite::http::Request::builder()
         .method(method)
