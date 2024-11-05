@@ -72,6 +72,7 @@ const queryImage = getImageURL("images/pipeline/query.svg");
       });
 
       onMounted(async () => {
+
         
         pipelineObj.nodeTypes = [
   {

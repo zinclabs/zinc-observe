@@ -179,7 +179,8 @@ function getIcon(data, ioType) {
       id="input"
       type="target"
       :position="'top'"
-      :style="{ filter: 'invert(100%)' }"
+      class="node_handle_custom"
+     
     />
     <div
       v-if="data.node_type == 'function'"
@@ -594,7 +595,7 @@ function getIcon(data, ioType) {
       id="output"
       type="source"
       :position="'bottom'"
-      :style="{ filter: 'invert(100%)' }"
+      class="node_handle_custom"
       
     />
   </div>
@@ -609,6 +610,13 @@ function getIcon(data, ioType) {
 </template>
 
 <style lang="scss">
+.node_handle_custom{
+  background-color:#9a9698;
+    height:8px;
+    width:24px;
+    border-radius:4px;
+  filter: invert(100%);
+}
 .vue-flow__node-custom {
   padding: 10px;
   border-radius: 3px;

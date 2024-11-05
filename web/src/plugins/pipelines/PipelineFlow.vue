@@ -96,11 +96,6 @@ import useDragAndDrop from "./useDnD";
 import EdgeWithButton from "./EdgeWithButton.vue";
 
 /* import the required styles */
-import "@vue-flow/core/dist/style.css";
-/* import the default theme (optional) */
-import "@vue-flow/core/dist/theme-default.css";
-
-import '@vue-flow/controls/dist/style.css'
 
 import { useStore } from "vuex";
 const { onInit } = useVueFlow();
@@ -248,6 +243,8 @@ q-btn {
   pointer-events: none;
   z-index: 10;
 }
+
+
 
 
 </style>
