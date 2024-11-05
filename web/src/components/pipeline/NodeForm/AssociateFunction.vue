@@ -364,6 +364,9 @@ const openCancelDialog = () => {
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel changes?";
   dialog.value.okCallback = () => emit("cancel:hideform");
+  pipelineObj.userClickedNode = {};
+  pipelineObj.userSelectedNode = {};
+
 };
 
 const openDeleteDialog = () => {
