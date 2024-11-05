@@ -563,7 +563,7 @@ function getIcon(data, ioType) {
       text-overflow: ellipsis;
     "
   >
-    <div class="column" v-for="(condition, index) in data.conditions" :key="index" style="margin-bottom: 5px;">
+    <div class="column" v-for="(condition, index) in data.conditions" :key="index" style="margin-bottom: 1px;">
       {{ condition.column }} {{ condition.operator }} {{ condition.value }}
     </div>
   </div>

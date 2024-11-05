@@ -245,6 +245,7 @@ q-btn {
   font-size: 1.5em;
   text-align: center;
   pointer-events: none;
+  z-index: 10;
 }
 
 
