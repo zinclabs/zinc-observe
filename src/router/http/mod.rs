@@ -183,6 +183,8 @@ async fn dispatch(
             ws_url.to_string()
         );
 
+        dbg!(&req);
+
         return match ws_proxy(req, payload, ws_url).await {
             Ok(res) => Ok(res),
             Err(e) => {
