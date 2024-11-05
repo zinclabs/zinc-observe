@@ -3,16 +3,16 @@ description = "OpenObserve is an observability platform that allows you to captu
 edition = "2021"
 homepage = "https://openobserve.ai/"
 keywords = [
-    "search",
-    "log",
-    "metrics",
-    "traces",
-    "analytics",
-    "openobserve",
-    "observability",
-    "open source",
-    "open-source",
-    "opensource",
+  "search",
+  "log",
+  "metrics",
+  "traces",
+  "analytics",
+  "openobserve",
+  "observability",
+  "open source",
+  "open-source",
+  "opensource",
 ]
 license = "AGPL-3.0-only"
 name = "openobserve"
@@ -54,8 +54,8 @@ actix-web-lab = "0.20"
 actix-web-opentelemetry = { version = "0.17", features = ["metrics"] }
 actix-web-prometheus.workspace = true
 actix-web-rust-embed-responder = { version = "2.2", default-features = false, features = [
-    "support-rust-embed-for-web",
-    "base64",
+  "support-rust-embed-for-web",
+  "base64",
 ] }
 actix-ws = "0.2.5"
 actix = "0.13.5"
@@ -74,11 +74,11 @@ blake3 = { version = "1.4", features = ["rayon"] }
 bytes.workspace = true
 chrono.workspace = true
 clap = { version = "4.1", default-features = false, features = [
-    "std",
-    "help",
-    "usage",
-    "suggestions",
-    "cargo",
+  "std",
+  "help",
+  "usage",
+  "suggestions",
+  "cargo",
 ] }
 cloudevents-sdk = { version = "0.7.0", features = ["actix"] }
 cron = "0.12.1"
@@ -112,23 +112,23 @@ mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
 opentelemetry = "0.25"
 opentelemetry_sdk = { version = "0.25", features = [
-    "rt-tokio",
-    "trace",
-    "metrics",
+  "rt-tokio",
+  "trace",
+  "metrics",
 ] }
 opentelemetry-otlp = { version = "0.25", features = [
-    "http-proto",
-    "serialize",
-    "serde",
-    "trace",
-    "reqwest-client",
+  "http-proto",
+  "serialize",
+  "serde",
+  "trace",
+  "reqwest-client",
 ] }
 opentelemetry-proto = { version = "0.25", features = [
-    "gen-tonic",
-    "with-serde",
-    "logs",
-    "metrics",
-    "trace",
+  "gen-tonic",
+  "with-serde",
+  "logs",
+  "metrics",
+  "trace",
 ] }
 parking_lot.workspace = true
 prometheus.workspace = true
@@ -179,6 +179,7 @@ report_server.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 tantivy.workspace = true
+futures-util = "0.3.31"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -190,12 +191,12 @@ float-cmp = "0.9"
 
 [workspace]
 members = [
-    "src/config",
-    "src/infra",
-    "src/ingester",
-    "src/wal",
-    "src/proto",
-    "src/report_server",
+  "src/config",
+  "src/infra",
+  "src/ingester",
+  "src/wal",
+  "src/proto",
+  "src/report_server",
 ]
 resolver = "2"
 
@@ -205,6 +206,10 @@ edition = "2021"
 license = "AGPL-3.0"
 
 [workspace.dependencies]
+chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
+  "tokio-runtime",
+  "_fetcher-rusttls-tokio",
+], default-features = false, rev = "6f2392f78ae851e2acf33df8e9764cc299d837db" }
 config = { path = "src/config" }
 infra = { path = "src/infra" }
 ingester = { path = "src/ingester" }
@@ -226,10 +231,6 @@ base64 = "0.21"
 bitvec = "1.0"
 bytes = "1.4"
 byteorder = "1.4.3"
-chromiumoxide = { git = "https://github.com/mattsse/chromiumoxide", features = [
-    "tokio-runtime",
-    "_fetcher-rusttls-tokio",
-], default-features = false, rev = "6f2392f78ae851e2acf33df8e9764cc299d837db" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 cityhasher = { version = "0.1", default-features = false }
 collapse = "0.1.2"
@@ -261,12 +262,12 @@ indexmap = { version = "2.0", features = ["serde"] }
 ipnetwork = "0.20"
 itertools = "0.12"
 lettre = { version = "0.11", default-features = false, features = [
-    "builder",
-    "hostname",
-    "smtp-transport",
-    "pool",
-    "tokio1",
-    "tokio1-rustls-tls",
+  "builder",
+  "hostname",
+  "smtp-transport",
+  "pool",
+  "tokio1",
+  "tokio1-rustls-tls",
 ] }
 log = "0.4"
 md5 = "0.7.0"
@@ -282,19 +283,19 @@ rayon = "1.10"
 regex = "1.7"
 regex-syntax = "0.8"
 reqwest = { version = "0.12", default-features = false, features = [
-    "rustls-tls-native-roots",
-    "stream",
+  "rustls-tls-native-roots",
+  "stream",
 ] }
 sea-orm = { version = "1.1.0", features = [
-    "sqlx-all",
-    "runtime-tokio-rustls",
-    "macros",
+  "sqlx-all",
+  "runtime-tokio-rustls",
+  "macros",
 ] }
 sea-orm-migration = { version = "1.1.0", features = [
-    "sqlx-mysql",
-    "sqlx-postgres",
-    "sqlx-sqlite",
-    "runtime-tokio-rustls",
+  "sqlx-mysql",
+  "sqlx-postgres",
+  "sqlx-sqlite",
+  "runtime-tokio-rustls",
 ] }
 segment = "~0.2.4"
 serde = { version = "1", features = ["derive"] }
@@ -303,11 +304,11 @@ sha256 = "1.4.0"
 snafu = "0.7.5"
 snap = "1"
 sqlx = { version = "0.8.1", features = [
-    "runtime-tokio-rustls",
-    "postgres",
-    "mysql",
-    "sqlite",
-    "chrono",
+  "runtime-tokio-rustls",
+  "postgres",
+  "mysql",
+  "sqlite",
+  "chrono",
 ] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
 sysinfo = "0.29"
@@ -324,9 +325,9 @@ tracing-appender = "0.2.3"
 tracing-log = "0.2"
 tracing-opentelemetry = "0.26"
 tracing-subscriber = { version = "0.3.0", features = [
-    "registry",
-    "env-filter",
-    "json",
+  "registry",
+  "env-filter",
+  "json",
 ] }
 url = "2.2"
 urlencoding = "2.1"

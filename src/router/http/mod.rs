@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod ws_proxy;
+mod new_ws_proxy;
 
 use ::config::{
     get_config,
@@ -23,11 +24,12 @@ use ::config::{
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use tokio::sync::mpsc;
-
+use url::Url;
 use crate::{
     common::infra::cluster,
     router::http::ws_proxy::{convert_to_websocket_url, CustomWebSocketHandlers},
 };
+use crate::router::http::new_ws_proxy::ws_proxy;
 
 const QUERIER_ROUTES: [&str; 19] = [
     "/config",
@@ -181,25 +183,33 @@ async fn dispatch(
             ws_url.to_string()
         );
 
-        // Upgrade to a websocket connection
-        let ws_res = ws::start(
-            CustomWebSocketHandlers {
-                tx: mpsc::unbounded_channel().0,
-                url: ws_url,
-                req: req.clone(),
-            },
-            &req,
-            payload,
-        );
-
-        let res = match ws_res {
+        return match ws_proxy(req, payload, ws_url).await {
             Ok(res) => Ok(res),
             Err(e) => {
-                log::error!("WebSocket upgrade failed: {}", e);
+                log::error!("[WebSocketProxy] failed: {}", e);
                 Ok(HttpResponse::ServiceUnavailable().body(e.to_string()))
             }
         };
-        return res;
+
+        // // Upgrade to a websocket connection
+        // let ws_res = ws::start(
+        //     CustomWebSocketHandlers {
+        //         tx: mpsc::unbounded_channel().0,
+        //         url: ws_url,
+        //         req: req.clone(),
+        //     },
+        //     &req,
+        //     payload,
+        // );
+        //
+        // let res = match ws_res {
+        //     Ok(res) => Ok(res),
+        //     Err(e) => {
+        //         log::error!("WebSocket upgrade failed: {}", e);
+        //         Ok(HttpResponse::ServiceUnavailable().body(e.to_string()))
+        //     }
+        // };
+        // return res;
     }
 
     // send query
