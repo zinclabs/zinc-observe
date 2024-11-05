@@ -384,6 +384,9 @@ const saveQueryData = async () => {
   });
 
   const formData = streamRoute.value;
+  if(typeof formData.trigger_condition.period === 'string') {
+    formData.trigger_condition.period = parseInt(formData.trigger_condition.period);
+  }
   let queryPayload = {
     node_type: "query", // required
     stream_type: formData.stream_type, // required
