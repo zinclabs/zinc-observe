@@ -163,6 +163,8 @@ interface StreamRoute {
     frequency_type: string;
     frequency: string;
     cron: string;
+    timezone: any;
+
   };
   context_attributes: any;
   description: string;
@@ -407,6 +409,7 @@ const saveQueryData = async () => {
       cron: formData.trigger_condition.cron,
       frequency_type: formData.trigger_condition.frequency_type,
       silence: 0,
+      timezone: formData.trigger_condition.timezone,
     },
   };
   addNode(queryPayload);
