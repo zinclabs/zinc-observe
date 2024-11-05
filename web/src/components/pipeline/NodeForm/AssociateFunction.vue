@@ -382,6 +382,12 @@ const saveFunction = () => {
   
   if (createNewFunction.value) {
     if(addFunctionRef.value.formData.name == "" ){
+      q.notify({
+        message: "Function Name is required",
+        color: "negative",
+        position: "bottom",
+        timeout: 2000,
+      });
       return;
     }
     if(addFunctionRef.value.formData.function == ""){
