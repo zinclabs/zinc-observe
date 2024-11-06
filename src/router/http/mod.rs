@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod ws_proxy;
 mod new_ws_proxy;
+mod ws_proxy;
 
 use ::config::{
     get_config,
@@ -25,11 +25,14 @@ use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use tokio::sync::mpsc;
 use url::Url;
+
 use crate::{
     common::infra::cluster,
-    router::http::ws_proxy::{convert_to_websocket_url, CustomWebSocketHandlers},
+    router::http::{
+        new_ws_proxy::ws_proxy,
+        ws_proxy::{convert_to_websocket_url, CustomWebSocketHandlers},
+    },
 };
-use crate::router::http::new_ws_proxy::ws_proxy;
 
 const QUERIER_ROUTES: [&str; 19] = [
     "/config",

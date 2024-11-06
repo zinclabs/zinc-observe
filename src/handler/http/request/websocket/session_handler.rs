@@ -14,7 +14,9 @@ use proto::cluster_rpc::SearchQuery;
 use tracing::Instrument;
 
 use crate::{
-    handler::http::request::websocket::utils::{sessions_cache_utils, WSClientMessage},
+    handler::http::request::websocket::utils::{
+        sessions_cache_utils, SearchResponseType, WsClientMessage, WsServerMessage,
+    },
     service::{
         search as SearchService,
         search::{cache::cacher::get_ts_col_order_by, sql::Sql, RESULT_ARRAY},
@@ -103,15 +105,15 @@ impl SessionHandler {
     }
 
     async fn handle_text_message(&mut self, msg: String) {
-        match serde_json::from_str::<WSClientMessage>(&msg) {
+        match serde_json::from_str::<WsClientMessage>(&msg) {
             Ok(client_msg) => {
                 log::debug!(
                     "[WEBSOCKET]: Received trace registrations msg: {:?}",
                     client_msg
                 );
                 match client_msg {
-                    WSClientMessage::Search { query } => {
-                        match self.handle_search_request(query).await {
+                    WsClientMessage::Search { trace_id, payload } => {
+                        match self.handle_search_request(trace_id, payload).await {
                             Ok(_) => {}
                             Err(e) => {
                                 log::error!(
@@ -122,7 +124,7 @@ impl SessionHandler {
                             }
                         };
                     }
-                    WSClientMessage::Cancel { .. } => {
+                    WsClientMessage::Cancel { .. } => {
                         // TODO
                     }
                 }
@@ -149,40 +151,50 @@ impl SessionHandler {
 
     async fn handle_search_request(
         &mut self,
-        req: config::meta::search::Request,
+        trace_id: String,
+        payload: config::meta::search::Request,
     ) -> Result<(), Error> {
-        let mut response = vec![];
-
-        // create the parent trace_id
-        let trace_id = config::ider::uuid();
-
-        if self.is_partition_request(&req).await {
-            let partitions = self.get_partitions(&req, &trace_id).await;
+        // get partitions and call search for each
+        if self.is_partition_request(&payload).await {
+            let partitions = self.get_partitions(&payload, &trace_id).await;
 
             if partitions.is_empty() {
                 return Ok(());
             }
 
-            for [start_time, end_time] in partitions {
-                let mut req = req.clone();
+            for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
+                let mut req = payload.clone();
                 req.query.start_time = start_time;
                 req.query.end_time = end_time;
                 let search_res = self.do_search(req, trace_id.clone()).await?;
-                response.push(search_res);
+                let search_res = WsServerMessage::SearchResponse {
+                    trace_id: trace_id.clone(),
+                    results: search_res,
+                    response_type: SearchResponseType::Multi {
+                        current: idx as u64,
+                        total: partitions.len() as u64,
+                    },
+                };
+                let _ = self.send_message(search_res.to_json().to_string()).await;
             }
         } else {
             // call search directly
-            let search_res = self.do_search(req, trace_id).await?;
-            response.push(search_res);
+            let search_res = self.do_search(payload, trace_id.clone()).await?;
+            let search_res = WsServerMessage::SearchResponse {
+                trace_id: trace_id.clone(),
+                results: search_res,
+                response_type: SearchResponseType::Single,
+            };
+            let _ = self.send_message(search_res.to_json().to_string()).await;
         }
 
-        // send the search result for every response
-        let response = serde_json::json!({
-            "payload": response,
-        });
-        if self.session.text(response.to_string()).await.is_err() {
+        Ok(())
+    }
+
+    async fn send_message(&mut self, message: String) -> Result<(), Error> {
+        if self.session.text(message).await.is_err() {
             log::error!(
-                "[WEBSOCKET]: Failed to send search response for request_id: {}",
+                "[WEBSOCKET]: Failed to send message for request_id: {}",
                 self.request_id
             );
         }

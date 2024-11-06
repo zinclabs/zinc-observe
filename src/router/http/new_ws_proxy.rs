@@ -1,9 +1,9 @@
-use actix_web::{web, HttpRequest, HttpResponse, Error};
+use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_ws::{Message, Session};
-use futures_util::{StreamExt, SinkExt};
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
-use tokio_tungstenite::tungstenite;
+use futures_util::{SinkExt, StreamExt};
+use tokio_tungstenite::{connect_async, tungstenite, tungstenite::protocol::Message as WsMessage};
 use url::Url;
+
 use crate::router::http::ws_proxy::convert_actix_to_tungstenite_request;
 
 /// WebSocket proxy handler
@@ -21,18 +21,22 @@ pub async fn ws_proxy(
         Ok(req) => req,
         Err(e) => {
             log::error!(
-                    "[WebSocketProxy] Failed to convert Actix request to Tungstenite request: {:?}",
-                    e
-                );
-            return Err(actix_web::error::ErrorInternalServerError(format!("Failed to convert Actix request to Tungstenite request: {:?}", e)))?;
+                "[WebSocketProxy] Failed to convert Actix request to Tungstenite request: {:?}",
+                e
+            );
+            return Err(actix_web::error::ErrorInternalServerError(format!(
+                "Failed to convert Actix request to Tungstenite request: {:?}",
+                e
+            )))?;
         }
     };
 
     dbg!(&ws_req);
 
     // Connect to the backend WebSocket service
-    let (mut backend_ws_stream, _) = connect_async(ws_req).await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to connect to backend: {}", e)))?;
+    let (mut backend_ws_stream, _) = connect_async(ws_req).await.map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Failed to connect to backend: {}", e))
+    })?;
 
     // Split backend Websocket stream into sink and stream
     let (mut backend_ws_sink, mut backend_ws_stream) = backend_ws_stream.split();

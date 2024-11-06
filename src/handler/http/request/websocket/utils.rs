@@ -4,23 +4,23 @@ pub mod sessions_cache_utils {
     use crate::common::infra::config::WS_SESSIONS;
 
     /// Insert a new session into the cache
-    pub fn insert_session(request_id: &str, session: actix_ws::Session) {
-        WS_SESSIONS.insert(request_id.to_string(), session);
+    pub fn insert_session(session_id: &str, session: actix_ws::Session) {
+        WS_SESSIONS.insert(session_id.to_string(), session);
     }
 
     /// Remove a session from the cache
-    pub fn remove_session(request_id: &str) {
-        WS_SESSIONS.remove(request_id);
+    pub fn remove_session(session_id: &str) {
+        WS_SESSIONS.remove(session_id);
     }
 
     /// Get a session from the cache
-    pub fn get_session(request_id: &str) -> Option<actix_ws::Session> {
-        WS_SESSIONS.get(request_id).map(|entry| entry.clone())
+    pub fn get_session(session_id: &str) -> Option<actix_ws::Session> {
+        WS_SESSIONS.get(session_id).map(|entry| entry.clone())
     }
 
     /// Check if a session exists in the cache
-    pub fn contains_session(request_id: &str) -> bool {
-        WS_SESSIONS.contains_key(request_id)
+    pub fn contains_session(session_id: &str) -> bool {
+        WS_SESSIONS.contains_key(session_id)
     }
 
     /// Get the number of sessions in the cache
@@ -49,23 +49,42 @@ pub mod sessions_cache_utils {
     content = "content",
     rename_all(serialize = "snake_case", deserialize = "snake_case")
 )]
-pub enum WSClientMessage {
+pub enum WsClientMessage {
     Search {
-        query: config::meta::search::Request,
+        trace_id: String,
+        payload: config::meta::search::Request,
     },
     Cancel {
         trace_id: String,
     },
 }
 
-/// Represents the payload for a WebSocket query, containing the SQL query, start time, and end
-/// time.
-///
-/// This struct is used to encapsulate the details of a search query that can be sent from a
-/// WebSocket client to the server.
-#[derive(Serialize, Deserialize, Clone, Debug, Hash, Default)]
-pub struct WSQueryPayload {
-    pub sql: String,
-    pub start_time: i64,
-    pub end_time: i64,
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(
+    tag = "type",
+    content = "content",
+    rename_all(serialize = "snake_case", deserialize = "snake_case")
+)]
+pub enum WsServerMessage {
+    SearchResponse {
+        trace_id: String,
+        results: config::meta::search::Response,
+        response_type: SearchResponseType,
+    },
+    Cancel {
+        trace_id: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum SearchResponseType {
+    Single,
+    Multi { current: u64, total: u64 },
+}
+
+// impl serde json for WsServerMessage
+impl WsServerMessage {
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
 }

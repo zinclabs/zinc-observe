@@ -17,7 +17,7 @@ use crate::common::{
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WSQueryParams {
-    request_id: String,
+    session_id: String,
     org_id: Option<String>,
     #[serde(rename = "type")]
     stream_type: Option<String>,
@@ -28,26 +28,24 @@ pub async fn websocket(
     user_id: web::Path<String>,
     req: HttpRequest,
     stream: web::Payload,
-    query: web::Query<WSQueryParams>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let user_id = user_id.into_inner();
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
-    log::debug!(
-        "[WEBSOCKET]: Got websocket request for user_id: {} and request_id: {}",
-        user_id,
-        &query.request_id,
-    );
-
-    sessions_cache_utils::insert_session(&query.request_id, session.clone());
-
-    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+    let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string())?;
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
-    let request_id = query.get("request_id").map(|s| s.as_str()).unwrap_or("");
+    let session_id = query.get("session_id").map(|s| s.as_str()).unwrap_or("");
+    sessions_cache_utils::insert_session(&session_id, session.clone());
+    log::debug!(
+        "[WEBSOCKET]: Got websocket request for user_id: {} and session_id: {}",
+        user_id,
+        session_id,
+    );
+
     let org_id = query.get("org_id").map(|s| s.as_str()).unwrap_or("");
     let use_cache = query
         .get("use_cache")
@@ -60,7 +58,7 @@ pub async fn websocket(
         session,
         msg_stream,
         &user_id,
-        request_id,
+        session_id,
         org_id,
         stream_type,
         use_cache,
