@@ -422,6 +422,8 @@ const removeField = (field: any) => {
 };
 
 const closeDialog = () => {
+  pipelineObj.userClickedNode = {};
+  pipelineObj.userSelectedNode = {};  
   emit("cancel:hideform");
 };
 
@@ -438,8 +440,7 @@ const openCancelDialog = () => {
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel routing changes?";
   dialog.value.okCallback = closeDialog;
-  pipelineObj.userClickedNode = {};
-  pipelineObj.userSelectedNode = {};  
+
 
 };
 
