@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="add-stream-routing-section"
+    data-test="add-stream-input-stream-routing-section"
     class="full-width full-height"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div   class="stream-routing-container full-width q-pa-md">
 
-      <div v-if="selectedNodeType == 'output'" class="previous-drop-down">
+      <div data-test="previous-node-dropdown-input-stream-node" v-if="selectedNodeType == 'output'" class="previous-drop-down">
       <q-select
           color="input-border"
           class="q-py-sm showLabelOnTop no-case tw-w-full "
@@ -46,21 +46,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           clearable
         >
         <template v-slot:option="scope">
-  <q-item
-    v-bind="scope.itemProps"
-    v-if="!scope.opt.isGroup"
-    class="full-width"
-    :style="{ backgroundColor: scope.opt.color  }"
-    style="color: black;"
-  >              
-    <q-item-section avatar class="w-full">
-      <q-img
-        :src="scope.opt.icon"
-        style="width: 24px; height: 24px"
-      />
-    </q-item-section>
+        <q-item
+        data-test="previous-node-dropdown-input-stream-node-option"
+          v-bind="scope.itemProps"
+          v-if="!scope.opt.isGroup"
+          class="full-width"
+          :style="{ backgroundColor: scope.opt.color  }"
+          style="color: black;"
+        >              
+      <q-item-section avatar class="w-full">
+        <q-img
+          :src="scope.opt.icon"
+          style="width: 24px; height: 24px"
+        />
+      </q-item-section>
     
-    <div class="flex tw-justify-between tw-w-full"  >
+    <div :data-test="`previous-node-dropdown-item-${scope.opt.label}`" class="flex tw-justify-between tw-w-full"  >
       <q-item-section>
         <q-item-label v-html="scope.opt.label"></q-item-label>
       </q-item-section>
@@ -72,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Render non-selectable group headers -->
   <q-item v-else   :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
-    <q-item-section >
+    <q-item-section :data-test="`previous-node-dropdown-list-group-${scope.opt.label}`" >
       <q-item-label v-html="scope.opt.label" />
     </q-item-section>
   </q-item>
@@ -92,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="!createNewStream">
         <div class="flex justify-start items-center" style="padding-top: 0px">
           <div
-            data-test="add-alert-stream-type-select"
+            data-test="input-node-stream-type-select"
             class="alert-stream-type o2-input q-mr-sm full-width"
             style="padding-top: 0"
           >
@@ -114,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div
-            data-test="add-alert-stream-select"
+            data-test="input-node-stream-select"
             class="o2-input full-width"
             style="padding-top: 0"
           >
@@ -149,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
           <q-btn
-            data-test="associate-stream-cancel-btn"
+            data-test="input-node-stream-cancel-btn"
             class="text-bold"
             :label="t('alerts.cancel')"
             text-color="light-text"
@@ -158,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openCancelDialog"
           />
           <q-btn
-            data-test="associate-stream-save-btn"
+            data-test="input-node-stream-save-btn"
             :label="t('alerts.save')"
             class="text-bold no-border q-ml-md"
             color="secondary"
@@ -168,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             v-if="pipelineObj.isEditNode"
-            data-test="associate-stream-delete-btn"
+            data-test="input-node-stream-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
             color="negative"

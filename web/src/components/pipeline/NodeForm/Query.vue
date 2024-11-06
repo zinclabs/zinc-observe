@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="add-stream-routing-section"
+    data-test="add-stream-query-routing-section"
     class="full-width stream-routing-section"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       
           <q-btn
-            data-test="stream-routing-cancel-btn"
+            data-test="stream-routing-query-cancel-btn"
             class="text-bold"
             :label="t('alerts.cancel')"
             text-color="light-text"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openCancelDialog"
           />
           <q-btn
-            data-test="add-report-save-btn"
+            data-test="stream-routing-query-save-btn"
             :label="t('alerts.save')"
             class="text-bold no-border q-ml-md"
             color="secondary"
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
           v-if="pipelineObj.isEditNode"
-            data-test="stream-routing-delete-btn"
+            data-test="stream-routing-query-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
             color="negative"

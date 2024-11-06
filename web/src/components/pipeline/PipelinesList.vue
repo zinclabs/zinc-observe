@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       <template v-slot:body="props">
         <q-tr
-          :data-test="`stream-association-table-${props.row.pipeline_id}-row`"
+          :data-test="`pipeline-list-table-${props.row.pipeline_id}-row`"
           :props="props"
           style="cursor: pointer"
           @click="triggerExpand(props)"
@@ -102,17 +102,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       
         </q-tr>
-        <q-tr v-show="expandedRow === props.row.pipeline_id" :props="props" >
+        <q-tr data-test="scheduled-pipeline-row-expand" v-show="expandedRow === props.row.pipeline_id" :props="props" >
          
           <q-td v-if="props.row?.sql_query"  colspan="100%">
 
-            <div  class="text-left tw-px-2 q-mb-sm  expanded-content">
+            <div data-test="scheduled-pipeline-expanded-content" class="text-left tw-px-2 q-mb-sm  expanded-content">
             <div class="tw-flex tw-items-center q-py-sm  ">
               <strong >SQL Query : <span></span></strong>
             </div>
               <div class="tw-flex tw-items-start  tw-justify-center" >
             
-              <div class="scrollable-content  expanded-sql ">
+              <div data-test="scheduled-pipeline-expanded-sql" class="scrollable-content  expanded-sql ">
                 <pre style="text-wrap: wrap;">{{ props.row?.sql_query  }} </pre>
 
               </div>
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-function="props">
           <q-td :props="props">
             <q-tooltip>
-              <pre>{{ props.row.sql }}</pre>
+              <pre data-test="scheduled-pipeline-expanded-tooltip-sql">{{ props.row.sql }}</pre>
             </q-tooltip>
             <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
           </q-td>
@@ -144,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="tw-flex tw-items-center report-list-tabs q-ml-auto">
 
           <app-tabs
+                data-test="pipeline-list-tabs"
                 class="q-mr-md "
                 :tabs="tabs"
                 v-model:active-tab="activeTab"

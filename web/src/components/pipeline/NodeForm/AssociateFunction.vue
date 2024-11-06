@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="add-stream-routing-section"
+    data-test="add-function-node-routing-section"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
     :style="computedStyleForFunction"
   >
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("pipeline.associateFunction") }}
     </div>
     <q-separator />
-    <div class="q-px-md">
+    <div data-test="previous-node-associate-function" class="q-px-md">
       <q-select
           color="input-border"
           class="q-py-sm showLabelOnTop no-case tw-w-full "
@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <template v-slot:option="scope">
   <q-item
+   data-test="previous-node-dropdown-input-stream-node-option"
     v-bind="scope.itemProps"
     v-if="!scope.opt.isGroup"
     class="full-width"
@@ -57,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </q-item-section>
     
-    <div class="flex tw-justify-between tw-w-full"  >
+    <div :data-test="`previous-node-dropdown-item-${scope.opt.label}`" class="flex tw-justify-between tw-w-full"  >
       <q-item-section>
         <q-item-label v-html="scope.opt.label"></q-item-label>
       </q-item-section>
@@ -69,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Render non-selectable group headers -->
   <q-item v-else   :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
-    <q-item-section >
+    <q-item-section :data-test="`previous-node-dropdown-list-group-${scope.opt.label}`"  >
       <q-item-label v-html="scope.opt.label" />
     </q-item-section>
   </q-item>
@@ -147,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="o2-input full-width" style="padding-top: 12px" v-if="!createNewFunction">
           <q-toggle
-            data-test="pipeline-function-after-flattening-toggle"
+            data-test="associate-function-after-flattening-toggle"
             class="q-mb-sm"
             :label="t('pipeline.flatteningLbl')"
             v-model="afterFlattening"

@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- src/components/PipelineFlow.vue -->
 <template>
-  <div class="container">
-     <div v-show="pipelineObj.dirtyFlag" class="warning-text flex  items-center q-py-xs q-px-sm q-mr-md ">
+  <div data-test="pipeline-flow-container" class="container">
+     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="warning-text flex  items-center q-py-xs q-px-sm q-mr-md ">
       <q-icon name="info" class="q-mr-xs " size="16px" />
      Unsaved changes detected. Click "Save" to preserve your updates.
    </div>

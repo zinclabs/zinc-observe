@@ -16,9 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="scheduled-alerts">
-    <div v-if="!disableQueryTypeSelection" class="scheduled-alert-tabs q-mb-lg">
+    <div v-if="!disableQueryTypeSelection" class="scheduled-pipeline-tabs q-mb-lg">
       <q-tabs
-        data-test="scheduled-alert-tabs"
+        data-test="scheduled-pipeline-tabs"
         v-model="tab"
         no-caps
         outside-arrows
@@ -28,17 +28,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="updateTab"
       >
         <q-tab
-          data-test="scheduled-alert-custom-tab"
+          data-test="scheduled-pipeline-custom-tab"
           name="custom"
           :label="t('alerts.quick')"
         />
         <q-tab
-          data-test="scheduled-alert-sql-tab"
+          data-test="scheduled-pipeline-sql-tab"
           name="sql"
           :label="t('alerts.sql')"
         />
         <q-tab
-          data-test="scheduled-alert-metrics-tab"
+          data-test="scheduled-pipeline-metrics-tab"
           v-if="alertData.stream_type === 'metrics'"
           name="promql"
           :label="t('alerts.promql')"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="tab === 'sql'">
           <div>
             <query-editor
-              data-test="scheduled-alert-sql-editor"
+              data-test="scheduled-pipeline-sql-editor"
               ref="queryEditorRef"
               editor-id="alerts-query-editor"
               class="monaco-editor"
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-if="tab === 'promql'">
           <query-editor
-            data-test="scheduled-alert-promql-editor"
+            data-test="scheduled-pipeline-promql-editor"
             ref="queryEditorRef"
             editor-id="alerts-query-editor"
             class="monaco-editor q-mb-md"
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div style="width: 190px">Trigger if the value is</div>
         <div class="flex justify-start items-center">
-          <div data-test="scheduled-alert-promlq-condition-operator-select">
+          <div data-test="scheduled-pipeline-promlq-condition-operator-select">
             <q-select
               v-model="promqlCondition.operator"
               :options="triggerOperators"
@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div
-            data-test="scheduled-alert-promlq-condition-value"
+            data-test="scheduled-pipeline-promlq-condition-value"
             style="width: 160px; margin-left: 0 !important"
             class="silence-notification-input o2-input"
           >
@@ -207,11 +207,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="tab === 'custom'"
         class="flex justify-start items-center text-bold q-mb-lg"
       >
-        <div data-test="scheduled-alert-aggregation-title" style="width: 172px">
+        <div data-test="scheduled-pipeline-aggregation-title" style="width: 172px">
           Aggregation
         </div>
         <q-toggle
-          data-test="scheduled-alert-aggregation-toggle"
+          data-test="scheduled-pipeline-aggregation-toggle"
           v-model="_isAggregationEnabled"
           size="sm"
           color="primary"
@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex items-center no-wrap q-mr-sm q-mb-sm"
       >
         <div
-          data-test="scheduled-alert-group-by-title"
+          data-test="scheduled-pipeline-group-by-title"
           class="text-bold"
           style="width: 190px"
         >
@@ -240,10 +240,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="group"
           >
             <div
-              :data-test="`scheduled-alert-group-by-${index + 1}`"
+              :data-test="`scheduled-pipeline-group-by-${index + 1}`"
               class="flex justify-start items-center no-wrap o2-input"
             >
-              <div data-test="scheduled-alert-group-by-column-select">
+              <div data-test="scheduled-pipeline-group-by-column-select">
                 <q-select
                   v-model="aggregationData.group_by[index]"
                   :options="filteredFields"
@@ -266,7 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <q-btn
-                data-test="scheduled-alert-group-by-delete-btn"
+                data-test="scheduled-pipeline-group-by-delete-btn"
                 :icon="outlinedDelete"
                 class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
                 :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <q-btn
-            data-test="scheduled-alert-group-by-add-btn"
+            data-test="scheduled-pipeline-group-by-add-btn"
             icon="add"
             class="iconHoverBtn q-mb-sm q-ml-xs q-mr-sm"
             :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex justify-start items-center q-mb-xs no-wrap q-pb-md"
       >
         <div
-          data-test="scheduled-alert-threshold-title"
+          data-test="scheduled-pipeline-threshold-title"
           class="text-bold flex items-center"
           style="width: 190px"
         >
@@ -333,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="_isAggregationEnabled && aggregationData">
             <div class="flex justify-start items-center">
               <div
-                data-test="scheduled-alert-threshold-function-select"
+                data-test="scheduled-pipeline-threshold-function-select"
                 class="threshould-input q-mr-xs o2-input"
               >
                 <q-select
@@ -354,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 class="threshould-input q-mr-xs o2-input"
-                data-test="scheduled-alert-threshold-column-select"
+                data-test="scheduled-pipeline-threshold-column-select"
               >
                 <q-select
                   v-model="aggregationData.having.column"
@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div
-                data-test="scheduled-alert-threshold-operator-select"
+                data-test="scheduled-pipeline-threshold-operator-select"
                 class="threshould-input q-mr-xs o2-input q-mt-sm"
               >
                 <q-select
@@ -396,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex items-center q-mt-sm">
                 <div
-                  data-test="scheduled-alert-threshold-value-input"
+                  data-test="scheduled-pipeline-threshold-value-input"
                   style="width: 250px; margin-left: 0 !important"
                   class="silence-notification-input o2-input"
                 >
@@ -414,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              data-test="scheduled-alert-threshold-error-text"
+              data-test="scheduled-pipeline-threshold-error-text"
               v-if="
                 !aggregationData.function ||
                 !aggregationData.having.column ||
@@ -431,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex justify-start items-center">
               <div
                 class="threshould-input"
-                data-test="scheduled-alert-threshold-operator-select"
+                data-test="scheduled-pipeline-threshold-operator-select"
               >
                 <q-select
                   v-model="triggerData.operator"
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   style="width: 89px; margin-left: 0 !important"
                   class="silence-notification-input"
-                  data-test="scheduled-alert-threshold-value-input"
+                  data-test="scheduled-pipeline-threshold-value-input"
                 >
                   <q-input
                     v-model="triggerData.threshold"
@@ -470,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
                 <div
-                  data-test="scheduled-alert-threshold-unit"
+                  data-test="scheduled-pipeline-threshold-unit"
                   style="
                     min-width: 90px;
                     margin-left: 0 !important;
@@ -487,7 +487,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div
-              data-test="scheduled-alert-threshold-error-text"
+              data-test="scheduled-pipeline-threshold-error-text"
               v-if="!triggerData.operator || !Number(triggerData.threshold)"
               class="text-red-8 q-pt-xs absolute"
               style="font-size: 11px; line-height: 12px"
@@ -499,7 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex items-center q-mr-sm">
         <div
-          data-test="scheduled-alert-cron-toggle-title"
+          data-test="scheduled-pipeline-cron-toggle-title"
           class="text-bold flex items-center"
           style="width: 190px"
         >
@@ -526,12 +526,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="min-height: 58px">
           <div class="flex items-center q-mr-sm" style="width: fit-content">
             <div
-              data-test="scheduled-alert-cron-input"
+              data-test="scheduled-pipeline-cron-input"
               style="width: 87px; margin-left: 0 !important"
               class="silence-notification-input"
             >
               <q-toggle
-                data-test="scheduled-alert-cron-toggle-btn"
+                data-test="scheduled-pipeline-cron-toggle-btn"
                 class="q-mt-sm"
                 v-model="triggerData.frequency_type"
                 :true-value="'cron'"
@@ -543,7 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex items-center q-mr-sm">
         <div
-          data-test="scheduled-alert-frequency-title"
+          data-test="scheduled-pipeline-frequency-title"
           class="text-bold flex items-center"
           style="width: 190px"
         >
@@ -611,7 +611,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div style="min-height: 84px">
           <div class="flex items-center q-mr-sm" style="width: fit-content">
             <div
-              data-test="scheduled-alert-frequency-input"
+              data-test="scheduled-pipeline-frequency-input"
               :style="
                 triggerData.frequency_type == 'minutes'
                   ? 'width: 87px; margin-left: 0 !important'
@@ -620,7 +620,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="silence-notification-input"
             >
               <q-input
-                data-test="scheduled-alert-frequency-input-field"
+                data-test="scheduled-pipeline-frequency-input-field"
                 v-if="triggerData.frequency_type == 'minutes'"
                 v-model="triggerData.frequency"
                 type="number"
@@ -632,7 +632,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div v-else class="tw-flex tw-items-center o2-input">
                 <q-input
-                  data-test="scheduled-alert-cron-input-field"
+                  data-test="scheduled-pipeline-cron-input-field"
                   v-model="triggerData.cron"
                   dense
                   filled
@@ -674,7 +674,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="triggerData.frequency_type == 'minutes'"
-              data-test="scheduled-alert-frequency-unit"
+              data-test="scheduled-pipeline-frequency-unit"
               style="
                 min-width: 90px;
                 margin-left: 0 !important;
@@ -688,7 +688,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            data-test="scheduled-alert-frequency-error-text"
+            data-test="scheduled-pipeline-frequency-error-text"
             v-if="
               (!Number(triggerData.frequency) &&
                 triggerData.frequency_type == 'minutes') ||
@@ -705,7 +705,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex items-center q-mr-sm">
         <div
-          data-test="scheduled-alert-period-title"
+          data-test="scheduled-pipeline-period-title"
           class="text-bold flex items-center q-pb-sm"
           style="width: 190px"
         >
@@ -738,7 +738,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
           >
             <div
-              data-test="scheduled-alert-period-input"
+              data-test="scheduled-pipeline-period-input"
               style="width: 87px; margin-left: 0 !important"
               class="silence-notification-input"
             >
@@ -755,7 +755,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div
-              data-test="scheduled-alert-period-unit"
+              data-test="scheduled-pipeline-period-unit"
               style="
                 min-width: 90px;
                 margin-left: 0 !important;
@@ -769,7 +769,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            data-test="scheduled-alert-period-error-text"
+            data-test="scheduled-pipeline-period-error-text"
             v-if="!Number(triggerData.period)"
             class="text-red-8 q-pt-xs"
             style="font-size: 11px; line-height: 12px"
@@ -777,7 +777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             Field is required!
           </div>
           <div
-            data-test="scheduled-alert-period-warning-text"
+            data-test="scheduled-pipeline-period-warning-text"
             v-else
             class="text-primary q-pt-xs"
             style="font-size: 12px; line-height: 12px ;padding: 8px 0px;"
@@ -1246,7 +1246,7 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
-.scheduled-alert-tabs {
+.scheduled-pipeline-tabs {
   border: 1px solid $primary;
   width: 300px;
   border-radius: 4px;
@@ -1254,7 +1254,7 @@ defineExpose({
 }
 </style>
 <style lang="scss">
-.scheduled-alert-tabs {
+.scheduled-pipeline-tabs {
   .q-tab--active {
     background-color: $primary;
     color: $white;

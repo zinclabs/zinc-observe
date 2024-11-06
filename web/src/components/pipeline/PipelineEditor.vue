@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex justify-end">
       <q-btn
-        data-test="add-pipeline-save-btn"
+        data-test="add-pipeline-cancel-btn"
         label="Cancel"
         class="text-bold border q-ml-md"
         padding="sm xl"
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     full-height
     maximized
   >
-    <div class="stream-routing-dialog-container full-height">
+    <div data-test="pipeline-nodes-list-dragable" class="stream-routing-dialog-container full-height">
       <QueryForm
         v-if="pipelineObj.dialog.name === 'query'"
         :stream-name="pipeline.stream_name"

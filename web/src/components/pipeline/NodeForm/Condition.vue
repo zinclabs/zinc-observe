@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="add-condition-condition-section"
+    data-test="add-condition-section"
     class="full-width stream-routing-section"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
@@ -29,10 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-form ref="routeFormRef" @submit="saveCondition">
         <div
           class="q-py-sm showLabelOnTop text-bold text-h7"
-          data-test="add-alert-query-input-title"
+          data-test="add-condition-query-input-title"
         >
         <div>
-        <div class="previous-drop-down">
+        <div data-test="previous-node-associate-function" class="previous-drop-down">
       <q-select
           color="input-border"
           class="q-py-sm showLabelOnTop no-case tw-w-full "
@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <template v-slot:option="scope">
   <q-item
+  data-test="previous-node-dropdown-input-stream-node-option"
     v-bind="scope.itemProps"
     v-if="!scope.opt.isGroup"
     class="full-width"
@@ -65,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </q-item-section>
     
-    <div class="flex tw-justify-between tw-w-full"  >
+    <div :data-test="`previous-node-dropdown-item-${scope.opt.label}`" class="flex tw-justify-between tw-w-full"  >
       <q-item-section>
         <q-item-label v-html="scope.opt.label"></q-item-label>
       </q-item-section>
@@ -77,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Render non-selectable group headers -->
   <q-item v-else   :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
-    <q-item-section >
+    <q-item-section :data-test="`previous-node-dropdown-list-group-${scope.opt.label}`"  >
       <q-item-label v-html="scope.opt.label" />
     </q-item-section>
   </q-item>
@@ -102,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
           <q-btn
-            data-test="stream-routing-cancel-btn"
+            data-test="add-condition-cancel-btn"
             class="text-bold"
             :label="t('alerts.cancel')"
             text-color="light-text"
@@ -111,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openCancelDialog"
           />
           <q-btn
-            data-test="add-report-save-btn"
+            data-test="add-condition-save-btn"
             :label="t('alerts.save')"
             class="text-bold no-border q-ml-md"
             color="secondary"
@@ -121,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
           v-if="pipelineObj.isEditNode"
-            data-test="stream-routing-delete-btn"
+            data-test="add-condition-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
             color="negative"
