@@ -31,9 +31,12 @@ export class ReportsPage {
     await this.reportsMenu.click();
     await this.scheduledTab.click();
   }
-  async createReport(dashboardName) {
+  async clickAddReportButton() {
     await this.page.waitForSelector('[data-test="report-list-add-report-btn"]');
     await this.addReportButton.click();
+  }
+
+    async createReport(dashboardName) {
     await this.page.waitForSelector("[aria-label='Name *']");
     await this.reportNameInput.fill("rreport1");
     await this.page.waitForTimeout(5000);
@@ -49,12 +52,15 @@ export class ReportsPage {
     await this.page.waitForLoadState("networkidle");
     await this.dashboardTabInput.pressSequentially('de', { delay: 100 });
     await this.page.getByRole('option', { name: 'default' }).click();
+  }
+  async createReportSetting() {
     await this.continueButtonStep1.click();
     await this.continueButtonStep2.click();
     await this.titleInput.fill("reporterTest");
     await this.recipientsInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
     await this.saveButton.click();
   }
+
   async verifyReportSaved() {
     await expect(this.successAlert).toContainText('Report saved successfully.');
   }
@@ -69,7 +75,16 @@ export class ReportsPage {
     // Set the time filter to the last 30 seconds
     await this.page.locator(this.dateTimeButton).click();
     await this.relative30SecondsButton.click();
+    await this.page.waitForTimeout(5000);
   }
+
+  async changeTimeZone() {
+    // Set the time zone
+    await this.page.locator('label').filter({ hasText: 'Timezonearrow_drop_down' }).locator('i').click();
+    await this.page.getByRole('option', { name: 'Asia/Chita' }).locator('div').nth(2).click();
+    await this.page.waitForTimeout(5000);
+  }
+
   async verifyTimeSetTo30Seconds() {
     // Verify that the time filter displays "Past 30 Seconds"
     await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
