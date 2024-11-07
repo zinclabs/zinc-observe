@@ -28,11 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
       <q-form ref="queryFormRef" @submit="saveQueryData">
         <div>
-          <div
-            data-test="stream-route-stream-type-select"
-            class="stream-route-stream-type o2-input"
-            style="padding-top: 0"
-          >
+
             <q-select
               v-model="streamRoute.stream_type"
               :options="streamTypes"
@@ -50,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :rules="[(val: any) => !!val || 'Field is required!']"
               style="width: 400px"
             />
-          </div>
           <scheduled-pipeline
             ref="scheduledAlertRef"
             :columns="filteredColumns"
