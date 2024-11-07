@@ -413,7 +413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   hide-selected
                   fill-input
                   @filter="filterNumericColumns"
-                  style="width: 250px"
+                  style="width: 190px"
                   @update:model-value="updateAggregation"
                 />
               </div>
@@ -440,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-center q-mt-sm">
                 <div
                   data-test="scheduled-alert-threshold-value-input"
-                  style="width: 250px; margin-left: 0 !important"
+                  style="width: 190px; margin-left: 0 !important"
                   class="silence-notification-input o2-input"
                 >
                   <q-input
@@ -543,6 +543,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- expansion -->
   <q-expansion-item
+    v-model="isExpanded"
     class="field-expansion-item"
     dense
     switch-toggle-side
@@ -550,6 +551,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     expand-icon-class="field-expansion-icon"
     expand-icon="expand_more"
     header-class="text-primary"
+    @update:model-value="updateExpansion"
     >
   <div>
       <div class="flex items-center q-mr-sm">
@@ -625,6 +627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+
       <div v-if="tab == 'sql'">
         <div class="flex items-center q-mr-sm">
           <div
@@ -731,16 +734,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-icon>
         </div>
-        <div style="min-height: 58px">
-          <div class="flex items-center q-mr-sm" style="width: fit-content">
+        <div style="min-height: 83px">
+          <div class="flex items-start q-mr-sm" style="width: fit-content">
             <div
               data-test="scheduled-alert-cron-input"
               style="width: 87px; margin-left: 0 !important"
               class="silence-notification-input"
             >
               <q-toggle
-                data-test="scheduled-alert-cron-toggle-btn"
-                class="q-mt-sm"
+                data-test="scheduled-alert-cron-toggle-btn "
+                class="q-mt-md"
                 v-model="triggerData.frequency_type"
                 :true-value="'cron'"
                 :false-value="'minutes'"
@@ -749,11 +752,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="flex items-center q-mr-sm">
+      <div class="flex items-center q-mr-sm q-mb-xl">
         <div
           data-test="scheduled-alert-frequency-title"
           class="text-bold flex items-center"
           style="width: 190px"
+          
         >
           {{ t("alerts.frequency") + " *" }}
           <q-icon
@@ -816,7 +820,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </template>
         </div>
-        <div style="min-height: 78px">
+        <div style="height: 50px">
           <div class="flex items-center" style="width: fit-content">
             <div
               data-test="scheduled-alert-frequency-input"
@@ -845,7 +849,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   filled
                   :label="t('reports.cron') + ' *'"
-                  style="background: none; width: 180px"
+                  style="background: none; width: 100px"
                   class="showLabelOnTop"
                   stack-label
                   outlined
@@ -954,6 +958,7 @@ const props = defineProps([
   "vrlFunctionError",
   "showTimezoneWarning",
   "multi_time_range",
+  "itemExpansion",
 ]);
 
 const emits = defineEmits([
@@ -971,11 +976,13 @@ const emits = defineEmits([
   "update:showVrlFunction",
   "validate-sql",
   "update:multi_time_range",
+  "update:expansion",
 ]);
 
 const { t } = useI18n();
 
 const triggerData = ref(props.trigger);
+const isExpanded  = ref(props.itemExpansion)
 
 const query = ref(props.sql);
 
@@ -992,7 +999,7 @@ const functionEditorPlaceholderFlag = ref(true);
 const queryEditorPlaceholderFlag = ref(true);
 
 const isFunctionErrorExpanded = ref(false);
-
+const expanded  = ref(false);
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
 const regularFunctions = ["avg", "max", "min", "sum", "count"];
 
@@ -1087,6 +1094,10 @@ const updateQueryValue = (value: string) => {
 const updateTrigger = () => {
   emits("update:trigger", triggerData.value);
   emits("input:update", "period", triggerData.value);
+};
+
+const updateExpansion  = () => {
+  emits("update:expansion", isExpanded.value);
 };
 
 const updateTab = () => {
@@ -1281,6 +1292,7 @@ const validateInputs = (notify: boolean = true) => {
     Number(triggerData.value.period) < 1 ||
     isNaN(Number(triggerData.value.period))
   ) {
+    expanded.value = true
     notify &&
       q.notify({
         type: "negative",

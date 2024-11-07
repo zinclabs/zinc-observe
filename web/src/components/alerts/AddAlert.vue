@@ -203,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @field:add="addField"
                 @field:remove="removeField"
                 @input:update="onInputUpdate"
+                 v-model:trigger="formData.trigger_condition"
               />
             </div>
             <div v-else>
@@ -225,6 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:multi_time_range="
                   formData.query_condition.multi_time_range
                 "
+                :itemExpansion="isExpandItem"
                 v-model:vrl_function="formData.query_condition.vrl_function"
                 v-model:isAggregationEnabled="isAggregationEnabled"
                 v-model:showVrlFunction="showVrlFunction"
@@ -234,13 +236,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @validate-sql="validateSqlQuery"
                 @update:showVrlFunction="updateFunctionVisibility"
                 @update:multi_time_range="updateMultiTimeRange"
+                @update:expansion = "isExpandItem = !isExpandItem"
                 class="q-mt-sm"
               />
             </div>
+          
+            <div v-if="((isExpandItem && formData.is_real_time=='false') || formData.is_real_time == 'true')" class="col-12 flex justify-start items-center">
+              <div
+                class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md flex items-center"
+                data-test="add-alert-delay-title"
+                style="width: 190px"
+              >
+                {{ t("alerts.silenceNotification") + " *" }}
+                <q-icon
+                  :name="outlinedInfo"
+                  size="17px"
+                  class="q-ml-xs cursor-pointer"
+                  :class="
+                    store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+                  "
+                >
+                  <q-tooltip
+                    anchor="center right"
+                    self="center left"
+                    max-width="300px"
+                  >
+                    <span style="font-size: 14px">
+                      If the alert triggers then how long should it wait before
+                      sending another notification.
+                      <br />
+                      e.g. if the alert triggers at 4:00 PM and the silence
+                      notification is set to 10 minutes then it will not send
+                      another notification until 4:10 PM even if the alert is
+                      still after 1 minute. This is to avoid spamming the user
+                      with notifications.</span
+                    >
+                  </q-tooltip>
+                </q-icon>
+              </div>
+              <div style="min-height: 58px">
+                <div class="col-8 row justify-left align-center q-gutter-sm">
+                  <div
+                    class="flex items-center"
+                    style="border: 1px solid rgba(0, 0, 0, 0.05)"
+                  >
+                    <div
+                      data-test="add-alert-delay-input"
+                      style="width: 87px; margin-left: 0 !important"
+                      class="silence-notification-input"
+                    >
+                      <q-input
+                        v-model="formData.trigger_condition.silence"
+                        type="number"
+                        dense
+                        filled
+                        min="0"
+                        style="background: none"
+                      />
+                    </div>
+                    <div
+                      data-test="add-alert-delay-unit"
+                      style="
+                        min-width: 90px;
+                        margin-left: 0 !important;
+                        background: #f2f2f2;
+                        height: 40px;
+                      "
+                      :class="
+                        store.state.theme === 'dark'
+                          ? 'bg-grey-10'
+                          : 'bg-grey-2'
+                      "
+                      class="flex justify-center items-center"
+                    >
+                      {{ t("alerts.minutes") }}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  data-test="add-alert-delay-error"
+                  v-if="formData.trigger_condition.silence < 0"
+                  class="text-red-8 q-pt-xs"
+                  style="font-size: 11px; line-height: 12px"
+                >
+                  Field is required!
+                </div>
+              </div>
+            </div>
+
               <q-stepper-navigation>
                 <q-btn
                   data-test="add-report-step1-continue-btn"
-                  @click="step = 2"
+                  @click="handleStep1Continue"
                   color="secondary"
                   label="Continue"
                   no-caps
@@ -589,6 +676,7 @@ export default defineComponent({
     const validateSqlQueryPromise = ref<Promise<unknown>>();
 
     const addAlertFormRef = ref(null);
+    const isExpandItem = ref(false);
 
     const router = useRouter();
     const scheduledAlertRef: any = ref(null);
@@ -685,6 +773,93 @@ export default defineComponent({
         triggerCols.value.push(item.name);
       });
     };
+
+    const handleStep1Continue = async () =>{
+      console.log(formData.value)
+      let check = false;
+      if(formData.value.query_condition.type == 'custom'){
+      formData.value.query_condition.conditions.map((condition: any) => {
+        if (condition.column === "") {
+          q.notify({
+            message: "Column is required in conditions",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          check = true;
+          return;
+        }
+        if (condition.value === "") {
+          q.notify({
+            message: "Value is required in conditions",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          check = true;
+          return;
+        }
+      });
+     }
+
+if(formData.value.is_real_time == 'false'){
+
+
+    if(formData.value.query_condition.type == 'sql'){
+      if(formData.value.query_condition.type == 'sql'){
+      await validateSqlQuery();
+     }
+    }
+      if(check) return
+      
+
+      if( formData.value.trigger_condition.threshold == "" || formData.value.trigger_condition.threshold < 1 || isNaN( formData.value.trigger_condition.threshold)){
+        q.notify({
+          message: "Threshold should be greater than 0",
+          color: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
+        return;
+      }
+
+      if( formData.value.trigger_condition.period == "" || formData.value.trigger_condition.period < 1 || isNaN( formData.value.trigger_condition.period)){
+        q.notify({
+          message: "Period should be greater than 0",
+          color: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
+        return;
+      }
+      if(formData.value.trigger_condition.frequency == ""|| formData.value.trigger_condition.frequency < 1 || isNaN( formData.value.trigger_condition.frequency)){
+        q.notify({
+          message: "Frequency should be greater than 0",
+          color: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
+        return;
+      }
+}
+      if(formData.value.trigger_condition.silence == "" || formData.value.trigger_condition.silence < 1 || isNaN( formData.value.trigger_condition.silence )){
+        q.notify({
+          message: "Notification Silence should be greater than 0",
+          color: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
+        console.log("error")
+
+        return;
+      }
+      addAlertForm.value.validate().then((valid: any) => {
+        console.log(valid,"valid")
+        if (valid) {
+          step.value = 2;
+        }
+      });
+    }
 
     const updateStreamFields = async (stream_name: any) => {
       let streamCols: any = [];
@@ -1041,10 +1216,38 @@ export default defineComponent({
 
     const validateInputs = (input: any, notify: boolean = true) => {
       if (isNaN(Number(input.trigger_condition.silence))) {
+        step.value = 1;
+        isExpandItem.value = true;
         notify &&
           q.notify({
             type: "negative",
             message: "Silence Notification should not be empty",
+            timeout: 1500,
+          });
+        return false;
+      }
+      if (isNaN(Number(input.trigger_condition.period))) {
+        step.value = 1;
+        isExpandItem.value = true;
+        notify &&
+          q.notify({
+            type: "negative",
+            message: "Period should not be empty",
+            timeout: 1500,
+          });
+        return false;
+      }
+      
+      if (
+        Number(input.trigger_condition.silence) < 1 ||
+        isNaN(Number(input.trigger_condition.silence))
+      ) {
+        step.value = 1;
+        isExpandItem.value = true;
+        notify &&
+          q.notify({
+            type: "negative",
+            message: "Silence Notification should be greater than 0",
             timeout: 1500,
           });
         return false;
@@ -1056,6 +1259,8 @@ export default defineComponent({
         Number(input.trigger_condition.period) < 1 ||
         isNaN(Number(input.trigger_condition.period))
       ) {
+        step.value = 1;
+        isExpandItem.value = true;
         notify &&
           q.notify({
             type: "negative",
@@ -1073,6 +1278,7 @@ export default defineComponent({
           !input.query_condition.aggregation.having.column ||
           !input.query_condition.aggregation.having.operator
         ) {
+          step.value = 1;
           notify &&
             q.notify({
               type: "negative",
@@ -1090,6 +1296,7 @@ export default defineComponent({
         input.trigger_condition.threshold < 1 ||
         !input.trigger_condition.operator
       ) {
+        step.value = 1;
         notify &&
           q.notify({
             type: "negative",
@@ -1136,9 +1343,12 @@ export default defineComponent({
           })
           .then((res: any) => {
             sqlQueryErrorMsg.value = "";
+            console.log(res,"res")
 
             if (res.data?.function_error) {
+              console.log("function_error", res.data.function_error);
               vrlFunctionError.value = res.data.function_error;
+              step.value = 1;
               q.notify({
                 type: "negative",
                 message: "Invalid VRL Function",
@@ -1150,6 +1360,7 @@ export default defineComponent({
             resolve("");
           })
           .catch((err: any) => {
+            step.value = 1;
             sqlQueryErrorMsg.value = err.response?.data?.message
               ? err.response?.data?.message
               : "Invalid SQL Query";
@@ -1157,15 +1368,21 @@ export default defineComponent({
             // Show error only if it is not real time alert
             // This case happens when user enters invalid query and then switches to real time alert
             if (formData.value.query_condition.type === "sql")
+            {
+              step.value = 1;
               q.notify({
                 type: "negative",
                 message: "Invalid SQL Query : " + err.response?.data?.message,
                 timeout: 3000,
               });
+            }
+              
 
             reject("sql_error");
           });
       });
+
+      console.log("this is woring")
     };
 
     const updateFunctionVisibility = () => {
@@ -1246,6 +1463,8 @@ export default defineComponent({
       showTimezoneWarning,
       updateMultiTimeRange,
       step,
+      isExpandItem,
+      handleStep1Continue,
     };
   },
 
@@ -1333,6 +1552,7 @@ export default defineComponent({
         this.formData.query_condition.type == "sql" &&
         !this.getParser(this.formData.query_condition.sql)
       ) {
+        this.step = 1;
         this.q.notify({
           type: "negative",
           message: "Selecting all Columns in SQL query is not allowed.",
@@ -1430,12 +1650,14 @@ export default defineComponent({
               });
             })
             .catch((err: any) => {
+              console.log(err,"err")
               dismiss();
               this.q.notify({
                 type: "negative",
                 message:
                   err.response?.data?.error || err.response?.data?.message,
               });
+              this.step = 1;
             });
           segment.track("Button Click", {
             button: "Update Alert",
@@ -1466,12 +1688,25 @@ export default defineComponent({
               });
             })
             .catch((err: any) => {
+              if(err.response?.data?.message == "Invalid expression: Invalid cron expression."){
+                this.step = 1;
+                this.isExpandItem = true;
+              }
+              else if(err.response?.data?.message == "Alert destinations is required"){
+                this.step = 2;
+              }
+              else{
+                this.step = 1;
+              }
+              
+
               dismiss();
               this.q.notify({
                 type: "negative",
                 message:
                   err.response?.data?.error || err.response?.data?.message,
               });
+              
             });
           segment.track("Button Click", {
             button: "Save Alert",

@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 150px"
+            style="width: 140px"
             @update:model-value="emits('input:update', 'conditions', field)"
           />
         </div>
