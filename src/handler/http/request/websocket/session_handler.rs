@@ -9,6 +9,7 @@ use config::{
     utils::{base64, sql::is_aggregate_query},
 };
 use futures::StreamExt;
+use rand::prelude::SliceRandom;
 use infra::errors::Error;
 use proto::cluster_rpc::SearchQuery;
 use tracing::Instrument;
@@ -126,6 +127,29 @@ impl SessionHandler {
                     }
                     WsClientMessage::Cancel { .. } => {
                         // TODO
+                    }
+                    // TODO: Remove this post testing
+                    WsClientMessage::Benchmark { id} => {
+                        // simulate random delay for benchmarking by sleep for 10/20/30/60/90 seconds
+                        let delay: Vec<u64> = vec![10, 20, 30, 60, 90];
+                        let delay = delay.choose(&mut rand::thread_rng()).unwrap();
+                        log::info!(
+                            "[WEBSOCKET]: Sleeping for benchmark, id: {}, delay: {}",
+                            id,
+                            delay
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_secs(*delay)).await;
+                        // send a message in json with id and took
+                        let response = serde_json::json!({
+                            "id": id,
+                            "took": delay,
+                        });
+                        if self.session.text(response.to_string()).await.is_err() {
+                            log::error!(
+                                "[WEBSOCKET]: Failed to send benchmark response for request_id: {}",
+                                self.request_id
+                            );
+                        }
                     }
                 }
             }

@@ -57,6 +57,9 @@ pub enum WsClientMessage {
     Cancel {
         trace_id: String,
     },
+    Benchmark {
+        id: String,
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
