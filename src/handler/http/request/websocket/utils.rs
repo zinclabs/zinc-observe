@@ -79,7 +79,7 @@ pub enum WsServerMessage {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum SearchResponseType {
     Single,
-    Multi { current: u64, total: u64 },
+    Partition { current: u64, total: u64 },
 }
 
 // impl serde json for WsServerMessage

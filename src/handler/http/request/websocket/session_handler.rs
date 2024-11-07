@@ -170,7 +170,7 @@ impl SessionHandler {
                 let search_res = WsServerMessage::SearchResponse {
                     trace_id: trace_id.clone(),
                     results: search_res,
-                    response_type: SearchResponseType::Multi {
+                    response_type: SearchResponseType::Partition {
                         current: idx as u64,
                         total: partitions.len() as u64,
                     },
