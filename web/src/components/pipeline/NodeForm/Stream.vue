@@ -207,6 +207,8 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import pipelineService from "@/services/pipelines";
+import AddStream from "@/components/logstream/AddStream.vue";
+
 import { useQuasar } from "quasar";
 
 const emit = defineEmits(["cancel:hideform"]);
@@ -221,9 +223,6 @@ const store = useStore();
 const { addNode, pipelineObj , deletePipelineNode, formattedOptions,   filteredOptions, filterOptions,getParentNode ,currentSelectedParentNode} = useDragAndDrop();
 
 const { getStreams } = useStreams();
-const AddStream = defineAsyncComponent (
-  () => import("@/components/logstream/AddStream.vue"),
-);
 
 const filteredStreams: Ref<string[]> = ref([]);
 const addStreamRef = ref(null);
