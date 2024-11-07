@@ -775,10 +775,22 @@ export default defineComponent({
     };
 
     const handleStep1Continue = async () =>{
-      console.log(formData.value)
-      let check = false;
+
+        const isValid = await validateInputFields();
+        if(isValid){
+        step.value = 2;
+      }
+
+
+
+    }
+
+
+
+    const validateConditions = () => {
+      let check = true;
       if(formData.value.query_condition.type == 'custom'){
-      formData.value.query_condition.conditions.map((condition: any) => {
+       formData.value.query_condition.conditions.map((condition: any) => {
         if (condition.column === "") {
           q.notify({
             message: "Column is required in conditions",
@@ -786,8 +798,7 @@ export default defineComponent({
             position: "bottom",
             timeout: 2000,
           });
-          check = true;
-          return;
+          return check = false;
         }
         if (condition.value === "") {
           q.notify({
@@ -796,68 +807,75 @@ export default defineComponent({
             position: "bottom",
             timeout: 2000,
           });
-          check = true;
-          return;
+          return check = false;
         }
       });
      }
+     return check;
 
-if(formData.value.is_real_time == 'false'){
-
-
-    if(formData.value.query_condition.type == 'sql'){
-      if(formData.value.query_condition.type == 'sql'){
-      await validateSqlQuery();
-     }
     }
-      if(check) return
-      
 
-      if( formData.value.trigger_condition.threshold == "" || formData.value.trigger_condition.threshold < 1 || isNaN( formData.value.trigger_condition.threshold)){
-        q.notify({
-          message: "Threshold should be greater than 0",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
-        return;
-      }
 
-      if( formData.value.trigger_condition.period == "" || formData.value.trigger_condition.period < 1 || isNaN( formData.value.trigger_condition.period)){
-        q.notify({
-          message: "Period should be greater than 0",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
-        return;
-      }
-      if(formData.value.trigger_condition.frequency == ""|| formData.value.trigger_condition.frequency < 1 || isNaN( formData.value.trigger_condition.frequency)){
-        q.notify({
-          message: "Frequency should be greater than 0",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
-        return;
-      }
-}
-      if(formData.value.trigger_condition.silence == "" || formData.value.trigger_condition.silence < 1 || isNaN( formData.value.trigger_condition.silence )){
-        q.notify({
-          message: "Notification Silence should be greater than 0",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        });
-        console.log("error")
+    const validateInputFields = async () =>{
+ 
 
-        return;
-      }
-      addAlertForm.value.validate().then((valid: any) => {
-        console.log(valid,"valid")
-        if (valid) {
-          step.value = 2;
+      if(formData.value.is_real_time == 'false'){
+
+        if(validateConditions() == false){
+          console.log("thisis working")
+          return false;
         }
+        if(formData.value.query_condition.type == 'sql'){
+          if(formData.value.query_condition.type == 'sql'){
+          await validateSqlQuery();
+        }
+        }
+        
+
+        if( formData.value.trigger_condition.threshold == "" || formData.value.trigger_condition.threshold < 1 || isNaN( formData.value.trigger_condition.threshold)){
+          q.notify({
+            message: "Threshold should be greater than 0",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          return false;;
+        }
+
+        if( formData.value.trigger_condition.period == "" || formData.value.trigger_condition.period < 1 || isNaN( formData.value.trigger_condition.period)){
+          q.notify({
+            message: "Period should be greater than 0",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          return false;
+        }
+        if(formData.value.trigger_condition.frequency == ""|| formData.value.trigger_condition.frequency < 1 || isNaN( formData.value.trigger_condition.frequency)){
+          q.notify({
+            message: "Frequency should be greater than 0",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          return false;
+        }
+        }
+        if(formData.value.trigger_condition.silence == "" || formData.value.trigger_condition.silence < 1 || isNaN( formData.value.trigger_condition.silence )){
+          q.notify({
+            message: "Notification Silence should be greater than 0",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          console.log("error")
+
+          return false;
+        }
+        return addAlertForm.value.validate().then((valid: any) => {
+          if (valid) {
+            return true;
+          }
       });
     }
 
@@ -1335,6 +1353,7 @@ if(formData.value.is_real_time == 'false'){
         );
 
       validateSqlQueryPromise.value = new Promise((resolve, reject) => {
+        console.log("this is working")
         searchService
           .search({
             org_identifier: store.state.selectedOrganization.identifier,
@@ -1465,6 +1484,8 @@ if(formData.value.is_real_time == 'false'){
       step,
       isExpandItem,
       handleStep1Continue,
+      validateInputFields,
+      validateConditions,
     };
   },
 
@@ -1694,9 +1715,6 @@ if(formData.value.is_real_time == 'false'){
               }
               else if(err.response?.data?.message == "Alert destinations is required"){
                 this.step = 2;
-              }
-              else{
-                this.step = 1;
               }
               
 
