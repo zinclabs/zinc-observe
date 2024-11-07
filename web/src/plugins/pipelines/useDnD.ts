@@ -83,7 +83,7 @@ const pipelineObj = reactive(Object.assign({}, defaultObject));
 export default function useDragAndDrop() {
   const $q = useQuasar();
 
-  const { screenToFlowCoordinate, onNodesInitialized, updateNode, addEdges } =
+  const { screenToFlowCoordinate, onNodesInitialized, updateNode, addEdges  } =
     useVueFlow();
 
     watch(
@@ -336,7 +336,12 @@ export default function useDragAndDrop() {
   }
 
   function addNode(newNode:any) {
-    console.log(pipelineObj.userClickedNode,"pipelineObj.userClickedNode")
+
+    if(pipelineObj.isEditNode){
+      if(pipelineObj.userSelectedNode == null){
+        pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter((edge:any) => edge.targetNode.id !== pipelineObj.currentSelectedNodeData.id);
+      }
+    }
     if(pipelineObj.userClickedNode && pipelineObj.currentSelectedNodeData.id && !pipelineObj.userSelectedNode?.id ){
 
 
