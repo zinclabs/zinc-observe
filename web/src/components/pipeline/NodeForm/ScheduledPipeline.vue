@@ -1271,10 +1271,11 @@ defineExpose({
 }
 .scheduled-alerts {
   .monaco-editor {
+  width: calc(100vw - 850px) !important;
   min-width: 500px !important;
   min-height: calc(100vh - 500px) !important;
   border: 1px solid $border-color;
-  resize: both;
+  resize: vertical;
   overflow: auto;
 }
 
