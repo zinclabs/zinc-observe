@@ -315,7 +315,7 @@ impl SessionHandler {
             &trace_id,
             &self.org_id,
             self.stream_type,
-            Some("root@example.com".to_string()),
+            Some(self.user_id.clone()),
             &query,
             self.use_cache,
         )
