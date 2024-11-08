@@ -277,6 +277,13 @@ impl SessionHandler {
         let ts_column = res_ts_column.map(|(v, _)| v);
         let skip_get_file_list = ts_column.is_none() || apply_over_hits;
 
+        dbg!(
+            &ts_column,
+            &apply_over_hits,
+            &skip_get_file_list,
+            &is_aggregate,
+            &req.query.sql
+        );
         skip_get_file_list
     }
 
