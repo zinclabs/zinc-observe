@@ -7,12 +7,10 @@ use actix_web::{get, web, Error, HttpRequest, HttpResponse};
 use config::meta::stream::StreamType;
 use serde::{Deserialize, Serialize};
 use session_handler::SessionHandler;
-use tokio_stream::StreamExt;
 use utils::sessions_cache_utils;
 
 use crate::common::{
-    meta::{self, http::HttpResponse as MetaHttpResponse},
-    utils::http::get_stream_type_from_request,
+    meta::http::HttpResponse as MetaHttpResponse, utils::http::get_stream_type_from_request,
 };
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

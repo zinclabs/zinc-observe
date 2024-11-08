@@ -1,8 +1,7 @@
 use actix_web::{web, Error, HttpRequest, HttpResponse};
-use actix_ws::{Message, Session};
+use actix_ws::Message;
 use futures_util::{SinkExt, StreamExt};
-use tokio_tungstenite::{connect_async, tungstenite, tungstenite::protocol::Message as WsMessage};
-use url::Url;
+use tokio_tungstenite::{connect_async, tungstenite};
 
 use crate::router::http::ws_proxy::convert_actix_to_tungstenite_request;
 
@@ -34,7 +33,7 @@ pub async fn ws_proxy(
     dbg!(&ws_req);
 
     // Connect to the backend WebSocket service
-    let (mut backend_ws_stream, _) = connect_async(ws_req).await.map_err(|e| {
+    let (backend_ws_stream, _) = connect_async(ws_req).await.map_err(|e| {
         actix_web::error::ErrorInternalServerError(format!("Failed to connect to backend: {}", e))
     })?;
 

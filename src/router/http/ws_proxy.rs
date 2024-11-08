@@ -5,8 +5,8 @@ use actix_web::HttpRequest;
 use actix_web_actors::ws;
 use futures::{SinkExt, StreamExt};
 use tokio::sync::mpsc;
-use tokio_tungstenite::{connect_async, tungstenite, tungstenite::client::IntoClientRequest};
-use tungstenite::http::{HeaderName, HeaderValue, Request};
+use tokio_tungstenite::{connect_async, tungstenite};
+use tungstenite::http::{HeaderName, HeaderValue};
 use url::Url;
 
 #[derive(Message)]

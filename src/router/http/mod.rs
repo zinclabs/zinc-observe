@@ -22,16 +22,10 @@ use ::config::{
     utils::rand::get_rand_element,
 };
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
-use actix_web_actors::ws;
-use tokio::sync::mpsc;
-use url::Url;
 
 use crate::{
     common::infra::cluster,
-    router::http::{
-        new_ws_proxy::ws_proxy,
-        ws_proxy::{convert_to_websocket_url, CustomWebSocketHandlers},
-    },
+    router::http::{new_ws_proxy::ws_proxy, ws_proxy::convert_to_websocket_url},
 };
 
 const QUERIER_ROUTES: [&str; 19] = [

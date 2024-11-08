@@ -9,14 +9,14 @@ use config::{
     utils::{base64, sql::is_aggregate_query},
 };
 use futures::StreamExt;
-use rand::prelude::SliceRandom;
 use infra::errors::Error;
 use proto::cluster_rpc::SearchQuery;
+use rand::prelude::SliceRandom;
 use tracing::Instrument;
 
 use crate::{
     handler::http::request::websocket::utils::{
-        sessions_cache_utils, SearchResponseType, WsClientMessage, WsServerMessage,
+        sessions_cache_utils, SearchResponseType, WsClientEvents, WsServerEvents,
     },
     service::{
         search as SearchService,
@@ -106,31 +106,45 @@ impl SessionHandler {
     }
 
     async fn handle_text_message(&mut self, msg: String) {
-        match serde_json::from_str::<WsClientMessage>(&msg) {
+        match serde_json::from_str::<WsClientEvents>(&msg) {
             Ok(client_msg) => {
                 log::debug!(
                     "[WEBSOCKET]: Received trace registrations msg: {:?}",
                     client_msg
                 );
                 match client_msg {
-                    WsClientMessage::Search { trace_id, payload } => {
-                        match self.handle_search_request(trace_id, payload).await {
+                    WsClientEvents::Search { trace_id, payload } => {
+                        match self
+                            .handle_search_request(trace_id.to_string(), payload)
+                            .await
+                        {
                             Ok(_) => {}
                             Err(e) => {
                                 log::error!(
-                                    "[WEBSOCKET]: Failed to get search result for request_id: {}, error: {:?}",
-                                    self.request_id,
+                                    "[WEBSOCKET]: Failed to get search result for trace_id: {}, error: {:?}",
+                                    trace_id,
                                     e
                                 );
                             }
                         };
                     }
-                    WsClientMessage::Cancel { .. } => {
-                        // TODO
+                    #[cfg(feature = "enterprise")]
+                    WsClientEvents::Cancel { trace_id } => {
+                        match self.handle_cancel(&trace_id).await {
+                            Ok(_) => {}
+                            Err(e) => {
+                                log::error!(
+                                    "[WEBSOCKET]: Failed to get cancel search for trace_id: {}, error: {:?}",
+                                    trace_id,
+                                    e
+                                );
+                            }
+                        };
                     }
-                    // TODO: Remove this post testing
-                    WsClientMessage::Benchmark { id} => {
-                        // simulate random delay for benchmarking by sleep for 10/20/30/60/90 seconds
+                    // Benchmark message
+                    WsClientEvents::Benchmark { id } => {
+                        // simulate random delay for benchmarking by sleep for 10/20/30/60/90
+                        // seconds
                         let delay: Vec<u64> = vec![10, 20, 30, 60, 90];
                         let delay = delay.choose(&mut rand::thread_rng()).unwrap();
                         log::info!(
@@ -139,7 +153,7 @@ impl SessionHandler {
                             delay
                         );
                         tokio::time::sleep(tokio::time::Duration::from_secs(*delay)).await;
-                        // send a message in json with id and took
+
                         let response = serde_json::json!({
                             "id": id,
                             "took": delay,
@@ -191,7 +205,7 @@ impl SessionHandler {
                 req.query.start_time = start_time;
                 req.query.end_time = end_time;
                 let search_res = self.do_search(req, trace_id.clone()).await?;
-                let search_res = WsServerMessage::SearchResponse {
+                let search_res = WsServerEvents::SearchResponse {
                     trace_id: trace_id.clone(),
                     results: search_res,
                     response_type: SearchResponseType::Partition {
@@ -199,17 +213,17 @@ impl SessionHandler {
                         total: partitions.len() as u64,
                     },
                 };
-                let _ = self.send_message(search_res.to_json().to_string()).await;
+                self.send_message(search_res.to_json().to_string()).await?;
             }
         } else {
             // call search directly
             let search_res = self.do_search(payload, trace_id.clone()).await?;
-            let search_res = WsServerMessage::SearchResponse {
+            let search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
                 results: search_res,
                 response_type: SearchResponseType::Single,
             };
-            let _ = self.send_message(search_res.to_json().to_string()).await;
+            self.send_message(search_res.to_json().to_string()).await?;
         }
 
         Ok(())
@@ -321,6 +335,25 @@ impl SessionHandler {
         )
         .instrument(tracing::info_span!("search"))
         .await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn handle_cancel(&mut self, trace_id: &str) -> Result<(), Error> {
+        match crate::service::search::cancel_query(&self.org_id, &trace_id).await {
+            Ok(ret) => {
+                let res = serde_json::to_string(&ret)?;
+                self.send_message(res).await?;
+            }
+            Err(_) => {
+                let res = WsServerEvents::CancelResponse {
+                    trace_id: trace_id.to_string(),
+                    is_success: false,
+                };
+                self.send_message(res.to_json().to_string()).await?;
+            }
+        }
+
+        Ok(())
     }
 
     // TODO: Remove this method

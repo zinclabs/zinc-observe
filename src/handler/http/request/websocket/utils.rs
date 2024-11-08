@@ -49,17 +49,18 @@ pub mod sessions_cache_utils {
     content = "content",
     rename_all(serialize = "snake_case", deserialize = "snake_case")
 )]
-pub enum WsClientMessage {
+pub enum WsClientEvents {
     Search {
         trace_id: String,
         payload: config::meta::search::Request,
     },
+    #[cfg(feature = "enterprise")]
     Cancel {
         trace_id: String,
     },
     Benchmark {
         id: String,
-    }
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -68,14 +69,15 @@ pub enum WsClientMessage {
     content = "content",
     rename_all(serialize = "snake_case", deserialize = "snake_case")
 )]
-pub enum WsServerMessage {
+pub enum WsServerEvents {
     SearchResponse {
         trace_id: String,
         results: config::meta::search::Response,
         response_type: SearchResponseType,
     },
-    Cancel {
+    CancelResponse {
         trace_id: String,
+        is_success: bool,
     },
 }
 
@@ -85,9 +87,8 @@ pub enum SearchResponseType {
     Partition { current: u64, total: u64 },
 }
 
-// impl serde json for WsServerMessage
-impl WsServerMessage {
+impl WsServerEvents {
     pub fn to_json(&self) -> String {
-        serde_json::to_string(self).unwrap()
+        serde_json::to_string(self).expect("Failed to serialize WsServerEvents")
     }
 }
