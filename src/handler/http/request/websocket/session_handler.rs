@@ -6,7 +6,7 @@ use config::{
         sql::resolve_stream_names,
         stream::StreamType,
     },
-    utils::{base64, sql::is_aggregate_query},
+    utils::{sql::is_aggregate_query},
 };
 use futures::StreamExt;
 use infra::errors::Error;
@@ -20,7 +20,7 @@ use crate::{
     },
     service::{
         search as SearchService,
-        search::{cache::cacher::get_ts_col_order_by, sql::Sql, RESULT_ARRAY},
+        search::{cache::cacher::get_ts_col_order_by, sql::Sql},
     },
 };
 
@@ -209,7 +209,7 @@ impl SessionHandler {
                     trace_id: trace_id.clone(),
                     results: search_res,
                     response_type: SearchResponseType::Partition {
-                        current: idx as u64,
+                        current: idx as u64 + 1,
                         total: partitions.len() as u64,
                     },
                 };
@@ -258,33 +258,12 @@ impl SessionHandler {
             }
         };
 
-        // check for vrl
-        let apply_over_hits = match req.query.query_fn.as_ref() {
-            None => false,
-            Some(v) => {
-                if v.is_empty() {
-                    false
-                } else {
-                    let v = base64::decode_url(v).unwrap_or(v.to_string());
-                    RESULT_ARRAY.is_match(&v)
-                }
-            }
-        };
-
         // if there is no _timestamp field in the query, return single partition
         let is_aggregate = is_aggregate_query(&req.query.sql).unwrap_or_default();
         let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
         let ts_column = res_ts_column.map(|(v, _)| v);
-        let skip_get_file_list = ts_column.is_none() || apply_over_hits;
 
-        dbg!(
-            &ts_column,
-            &apply_over_hits,
-            &skip_get_file_list,
-            &is_aggregate,
-            &req.query.sql
-        );
-        skip_get_file_list
+        ts_column.is_some()
     }
 
     async fn get_partitions(
