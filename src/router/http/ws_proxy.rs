@@ -1,173 +1,131 @@
 use std::str::FromStr;
-
-use actix::prelude::*;
-use actix_web::HttpRequest;
-use actix_web_actors::ws;
-use futures::{SinkExt, StreamExt};
-use tokio::sync::mpsc;
+use actix_web::{web, Error, HttpRequest, HttpResponse};
+use actix_ws::Message;
+use futures_util::{SinkExt, StreamExt};
+use reqwest::header::{HeaderName, HeaderValue};
 use tokio_tungstenite::{connect_async, tungstenite};
-use tungstenite::http::{HeaderName, HeaderValue};
 use url::Url;
 
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct WebSocketMessageWrapper(ws::Message);
+/// WebSocket proxy handler
+pub async fn ws_proxy(
+    req: HttpRequest,
+    payload: web::Payload,
+    ws_base_url: String,
+) -> Result<HttpResponse, Error> {
+    // Upgrade the client connection to a WebSocket
+    let (response, mut session, mut client_msg_stream) = actix_ws::handle(&req, payload)?;
 
-// Define your WebSocket actor
-pub struct CustomWebSocketHandlers {
-    pub url: String,
-    pub req: HttpRequest,
-    pub tx: mpsc::UnboundedSender<ws::Message>,
+    dbg!(&response);
+
+    let ws_req = match convert_actix_to_tungstenite_request(&req, &ws_base_url) {
+        Ok(req) => req,
+        Err(e) => {
+            log::error!(
+                "[WebSocketProxy] Failed to convert Actix request to Tungstenite request: {:?}",
+                e
+            );
+            return Err(actix_web::error::ErrorInternalServerError(format!(
+                "Failed to convert Actix request to Tungstenite request: {:?}",
+                e
+            )))?;
+        }
+    };
+
+    dbg!(&ws_req);
+
+    // Connect to the backend WebSocket service
+    let (backend_ws_stream, _) = connect_async(ws_req).await.map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Failed to connect to backend: {}", e))
+    })?;
+
+    // Split backend Websocket stream into sink and stream
+    let (mut backend_ws_sink, mut backend_ws_stream) = backend_ws_stream.split();
+
+    // Spawn tasks to forward messages between client and backend WebSocket
+    let client_to_backend = async move {
+        while let Some(Ok(msg)) = client_msg_stream.next().await {
+            if backend_ws_sink.send(from_actix_message(msg)).await.is_err() {
+                return;
+            }
+        }
+    };
+
+    let backend_to_client = async move {
+        while let Some(Ok(msg)) = backend_ws_stream.next().await {
+            match from_tungstenite_msg_to_actix_msg(msg) {
+                Message::Text(text) => {
+                    if session.text(text).await.is_err() {
+                        return;
+                    }
+                }
+                Message::Binary(bin) => {
+                    if session.binary(bin).await.is_err() {
+                        return;
+                    }
+                }
+                Message::Ping(ping) => {
+                    if session.ping(&ping).await.is_err() {
+                        return;
+                    }
+                }
+                Message::Pong(pong) => {
+                    if session.pong(&pong).await.is_err() {
+                        return;
+                    }
+                }
+                Message::Close(reason) => {
+                    let _ = session.close(reason).await;
+                    break;
+                }
+                _ => {
+                    log::warn!("Unsupported message type from backend");
+                }
+            }
+        }
+    };
+
+    // Spawn both tasks
+    actix_web::rt::spawn(client_to_backend);
+    actix_web::rt::spawn(backend_to_client);
+
+    // Return the WebSocket handshake response
+    Ok(response)
 }
 
-fn from_actix_message(msg: ws::Message) -> tungstenite::Message {
+fn from_actix_message(msg: Message) -> tungstenite::protocol::Message {
     match msg {
-        ws::Message::Text(text) => tungstenite::Message::Text(text.to_string()),
-        ws::Message::Binary(bin) => tungstenite::Message::Binary(bin.to_vec()),
-        ws::Message::Ping(msg) => tungstenite::Message::Ping(msg.to_vec()),
-        ws::Message::Pong(msg) => tungstenite::Message::Pong(msg.to_vec()),
-        ws::Message::Close(None) => {
+        Message::Text(text) => tungstenite::protocol::Message::Text(text.to_string()),
+        Message::Binary(bin) => tungstenite::protocol::Message::Binary(bin.to_vec()),
+        Message::Ping(msg) => tungstenite::protocol::Message::Ping(msg.to_vec()),
+        Message::Pong(msg) => tungstenite::protocol::Message::Pong(msg.to_vec()),
+        Message::Close(None) => {
             log::info!(
                 "[WebSocketProxy] Received a Message::Close from internal client, closing connection to proxied server"
             );
-            tungstenite::Message::Close(None)
+            tungstenite::protocol::Message::Close(None)
         }
         _ => {
             log::info!("[WebSocketProxy] Unsupported message type");
-            tungstenite::Message::Close(None)
+            tungstenite::protocol::Message::Close(None)
         }
     }
 }
 
-fn from_tungstenite_msg_to_actix_msg(msg: tungstenite::Message) -> ws::Message {
+fn from_tungstenite_msg_to_actix_msg(msg: tungstenite::protocol::Message) -> Message {
     match msg {
-        tungstenite::Message::Text(text) => ws::Message::Text(text.into()),
-        tungstenite::Message::Binary(bin) => ws::Message::Binary(bin.into()),
-        tungstenite::Message::Ping(msg) => ws::Message::Ping(msg.into()),
-        tungstenite::Message::Pong(msg) => ws::Message::Pong(msg.into()),
-        tungstenite::Message::Close(None) => ws::Message::Close(None),
+        tungstenite::protocol::Message::Text(text) => Message::Text(text.into()),
+        tungstenite::protocol::Message::Binary(bin) => Message::Binary(bin.into()),
+        tungstenite::protocol::Message::Ping(msg) => Message::Ping(msg.into()),
+        tungstenite::protocol::Message::Pong(msg) => Message::Pong(msg.into()),
+        tungstenite::protocol::Message::Close(None) => Message::Close(None),
         _ => {
             log::info!("[WebSocketProxy] Unsupported message type");
-            ws::Message::Close(None)
+            Message::Close(None)
         }
     }
 }
 
-impl Actor for CustomWebSocketHandlers {
-    type Context = ws::WebsocketContext<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        log::info!(
-            "[WebSocketProxy] Started WebSocket connection to {}",
-            self.url
-        );
-
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        self.tx = tx;
-        let addr = ctx.address();
-        let ws_req = match convert_actix_to_tungstenite_request(&self.req, &self.url) {
-            Ok(req) => req,
-            Err(e) => {
-                log::error!(
-                    "[WebSocketProxy] Failed to convert Actix request to Tungstenite request: {:?}",
-                    e
-                );
-                return;
-            }
-        };
-
-        tokio::spawn(async move {
-            match connect_async(ws_req).await {
-                Ok((ws_stream, _)) => {
-                    let (mut ws_sink, mut ws_stream) = ws_stream.split();
-
-                    tokio::spawn(async move {
-                        while let Some(msg) = rx.recv().await {
-                            log::info!(
-                                "[WebSocketProxy] Received message from the original websocket actor: {msg:?}"
-                            );
-                            ws_sink
-                                .send(from_actix_message(msg))
-                                .await
-                                .expect("Failed to send message");
-                        }
-                    });
-
-                    while let Some(Ok(msg)) = ws_stream.next().await {
-                        log::info!(
-                            "[WebSocketProxy] Should have sent to the original websocket actor to send back to client: {msg:?}"
-                        );
-                        addr.do_send(WebSocketMessageWrapper(from_tungstenite_msg_to_actix_msg(
-                            msg,
-                        )));
-                    }
-                }
-                Err(e) => {
-                    log::error!(
-                        "[WebSocketProxy] Failed to connect to backend WebSocket: {:?}",
-                        e
-                    );
-                    addr.do_send(WebSocketMessageWrapper(ws::Message::Close(None)));
-                }
-            }
-        });
-    }
-}
-
-impl Handler<WebSocketMessageWrapper> for CustomWebSocketHandlers {
-    type Result = ();
-
-    fn handle(&mut self, msg: WebSocketMessageWrapper, ctx: &mut Self::Context) {
-        log::info!(
-            "[WebSocketProxy] Received message from the client: {:?}",
-            &msg.0
-        );
-        match msg.0 {
-            ws::Message::Text(text) => {
-                log::info!("[WebSocketProxy] Text message received: {}", text);
-                ctx.text(text);
-            }
-            ws::Message::Binary(bin) => {
-                log::info!("[WebSocketProxy] Binary message received: {:?}", bin);
-                ctx.binary(bin);
-            }
-            ws::Message::Ping(msg) => {
-                log::info!("[WebSocketProxy] Ping message received: {:?}", msg);
-                ctx.ping(&msg);
-            }
-            ws::Message::Pong(msg) => {
-                log::info!("[WebSocketProxy] Pong message received: {:?}", msg);
-                ctx.pong(&msg);
-            }
-            ws::Message::Close(reason) => {
-                log::info!("[WebSocketProxy] Close message received: {:?}", reason);
-                ctx.close(reason);
-            }
-            _ => {
-                log::error!("Unsupported message type");
-            }
-        }
-    }
-}
-
-impl actix::StreamHandler<Result<ws::Message, ws::ProtocolError>> for CustomWebSocketHandlers {
-    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, _ctx: &mut Self::Context) {
-        match msg {
-            Ok(ws::Message::Text(text)) => {
-                self.tx
-                    .send(ws::Message::Text(text))
-                    .expect("Failed to forward message");
-            }
-            Ok(ws::Message::Binary(bin)) => {
-                self.tx
-                    .send(ws::Message::Binary(bin))
-                    .expect("Failed to forward message");
-            }
-            _ => (),
-        }
-    }
-}
-
+/// Helper function to convert an HTTP/HTTPS URL to a WebSocket URL
 pub fn convert_to_websocket_url(url_str: &str) -> Result<String, String> {
     let mut parsed_url = match Url::parse(url_str) {
         Ok(url) => url,

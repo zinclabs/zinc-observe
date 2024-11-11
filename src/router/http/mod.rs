@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod new_ws_proxy;
 mod ws_proxy;
 
 use ::config::{
@@ -25,7 +24,7 @@ use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
 use crate::{
     common::infra::cluster,
-    router::http::{new_ws_proxy::ws_proxy, ws_proxy::convert_to_websocket_url},
+    router::http::{ws_proxy::{ws_proxy, convert_to_websocket_url}},
 };
 
 const QUERIER_ROUTES: [&str; 19] = [
