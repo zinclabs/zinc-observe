@@ -113,7 +113,11 @@ impl SessionHandler {
                     client_msg
                 );
                 match client_msg {
-                    WsClientEvents::Search { trace_id, payload, time_offset } => {
+                    WsClientEvents::Search {
+                        trace_id,
+                        payload,
+                        time_offset,
+                    } => {
                         match self
                             .handle_search_request(trace_id.to_string(), payload, time_offset)
                             .await
@@ -209,7 +213,11 @@ impl SessionHandler {
             // handle search result size
             let mut curr_res_size = 0;
 
-            log::info!("[WS_SEARCH] Found {} partitions for trace_id: {}", partitions.len(), trace_id);
+            log::info!(
+                "[WS_SEARCH] Found {} partitions for trace_id: {}",
+                partitions.len(),
+                trace_id
+            );
 
             // handle websocket pagination
             // skip the partitions until the end_time matches the offset
@@ -217,7 +225,6 @@ impl SessionHandler {
                 let mut req = payload.clone();
                 req.query.start_time = start_time;
                 req.query.end_time = end_time;
-
 
                 let search_res = self.do_search(req, trace_id.clone()).await?;
                 curr_res_size += search_res.size;
@@ -235,7 +242,10 @@ impl SessionHandler {
 
                 // handle search result size
                 if curr_res_size >= req_size {
-                    log::info!("[WS_SEARCH]: Reached requested result size ({}), stopping search", req_size);
+                    log::info!(
+                        "[WS_SEARCH]: Reached requested result size ({}), stopping search",
+                        req_size
+                    );
                     break;
                 }
             }
@@ -248,7 +258,7 @@ impl SessionHandler {
                 trace_id: trace_id.clone(),
                 results: search_res,
                 response_type: SearchResponseType::Single,
-                time_offset: end_time
+                time_offset: end_time,
             };
             self.send_message(search_res.to_json().to_string()).await?;
         }
@@ -373,7 +383,11 @@ impl SessionHandler {
         if let Some(offset) = time_offset {
             for (idx, [_, end_time]) in partitions.iter().enumerate() {
                 if *end_time == offset {
-                    log::info!("[WS_SEARCH]: Found matching partition for time_offset: {} at index: {}", offset, idx);
+                    log::info!(
+                        "[WS_SEARCH]: Found matching partition for time_offset: {} at index: {}",
+                        offset,
+                        idx
+                    );
                     return idx;
                 }
             }

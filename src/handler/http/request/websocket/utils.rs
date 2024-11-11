@@ -75,7 +75,7 @@ pub enum WsServerEvents {
         trace_id: String,
         results: config::meta::search::Response,
         response_type: SearchResponseType,
-        time_offset: i64
+        time_offset: i64,
     },
     CancelResponse {
         trace_id: String,
