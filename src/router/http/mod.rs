@@ -165,7 +165,8 @@ async fn dispatch(
     }
 
     // check if the request is a websocket request
-    if path.starts_with("/api/ws") {
+    let split_path: Vec<&str> = path.split('/').collect();
+    if split_path.get(3).unwrap_or(&"").to_string() == "ws".to_string() {
         // Convert the HTTP/HTTPS URL to a WebSocket URL (WS/WSS)
         let ws_url = match convert_to_websocket_url(&new_url.value) {
             Ok(url) => url,

@@ -6,7 +6,7 @@ use config::{
         sql::resolve_stream_names,
         stream::StreamType,
     },
-    utils::{sql::is_aggregate_query},
+    utils::sql::is_aggregate_query,
 };
 use futures::StreamExt;
 use infra::errors::Error;

@@ -4,9 +4,8 @@ pub mod utils;
 use std::collections::HashMap;
 
 use actix_web::{get, web, Error, HttpRequest, HttpResponse};
-use config::meta::stream::StreamType;
+use config::{get_config, meta::stream::StreamType};
 use serde::{Deserialize, Serialize};
-use config::get_config;
 use session_handler::SessionHandler;
 use utils::sessions_cache_utils;
 
@@ -22,16 +21,16 @@ pub struct WSQueryParams {
     stream_type: Option<String>,
 }
 
-#[get("/ws/{session_id}")]
+#[get("{org_id}/ws/{session_id}")]
 pub async fn websocket(
-    session_id: web::Path<String>,
+    path: web::Path<(String, String)>,
     req: HttpRequest,
     stream: web::Payload,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let cfg = get_config();
+    let (org_id, session_id) = path.into_inner();
 
-    let session_id = session_id.into_inner();
     let user_id = in_req
         .headers()
         .get("user_id")
@@ -52,7 +51,6 @@ pub async fn websocket(
         session_id,
     );
 
-    let org_id = query.get("org_id").map(|s| s.as_str()).unwrap_or("");
     let use_cache = query
         .get("use_cache")
         .map(|s| if s == "true" { true } else { false })
@@ -66,7 +64,7 @@ pub async fn websocket(
         msg_stream,
         &user_id,
         &session_id,
-        org_id,
+        &org_id,
         stream_type,
         use_cache,
         search_type,
