@@ -21,7 +21,7 @@ pub struct WSQueryParams {
     stream_type: Option<String>,
 }
 
-#[get("{org_id}/ws/{session_id}")]
+#[get("{org_id}/ws/{request_id}")]
 pub async fn websocket(
     path: web::Path<(String, String)>,
     req: HttpRequest,
@@ -29,7 +29,7 @@ pub async fn websocket(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let cfg = get_config();
-    let (org_id, session_id) = path.into_inner();
+    let (org_id, request_id) = path.into_inner();
 
     let user_id = in_req
         .headers()
@@ -45,10 +45,10 @@ pub async fn websocket(
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
-    sessions_cache_utils::insert_session(&session_id, session.clone());
+    sessions_cache_utils::insert_session(&request_id, session.clone());
     log::info!(
-        "[WEBSOCKET]: Got websocket request for session_id: {}",
-        session_id,
+        "[WEBSOCKET]: Got websocket request for request_id: {}",
+        request_id,
     );
 
     let use_cache = query
@@ -63,7 +63,7 @@ pub async fn websocket(
         session,
         msg_stream,
         &user_id,
-        &session_id,
+        &request_id,
         &org_id,
         stream_type,
         use_cache,
