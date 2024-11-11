@@ -204,27 +204,16 @@ impl SessionHandler {
                 return Ok(());
             }
 
+            let start_idx = self.find_start_partition_idx(&partitions, time_offset);
+
             // handle search result size
             let mut curr_res_size = 0;
-            let mut start_search = time_offset.is_none();
-            let mut found_time_offset = false;
 
-            for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
-                // handle websocket pagination
-                if let Some(offset) = time_offset {
-                    // skip partitions until end_time matches the offset
-                    if !start_search {
-                        if end_time == offset {
-                            start_search = true;
-                            found_time_offset = true;
-                            log::info!("[WS_SEARCH] Found matching partition for time_offset: {}", offset);
-                        } else {
-                            log::info!("[WS_SEARCH]: Skipping partition {} with end_time: {} (time_offset: {})", idx, end_time, offset);
-                            continue;
-                        }
-                    }
-                }
+            log::info!("[WS_SEARCH] Found {} partitions for trace_id: {}", partitions.len(), trace_id);
 
+            // handle websocket pagination
+            // skip the partitions until the end_time matches the offset
+            for (idx, &[start_time, end_time]) in partitions.iter().enumerate().skip(start_idx) {
                 let mut req = payload.clone();
                 req.query.start_time = start_time;
                 req.query.end_time = end_time;
@@ -249,16 +238,10 @@ impl SessionHandler {
                     log::info!("[WS_SEARCH]: Reached requested result size ({}), stopping search", req_size);
                     break;
                 }
-
-                // If time_offset was provided but no matching partition was found
-                if let Some(offset) = time_offset {
-                    if !found_time_offset {
-                        log::info!("[WS_SEARCH]: No partition found with end_time matching the provided time_offset: {}", offset);
-                    }
-                }
             }
         } else {
             // call search directly
+            log::info!("[WS_SEARCH]: Single search for trace_id: {}", trace_id);
             let end_time = payload.query.end_time;
             let search_res = self.do_search(payload, trace_id.clone()).await?;
             let search_res = WsServerEvents::SearchResponse {
@@ -384,6 +367,19 @@ impl SessionHandler {
         }
 
         Ok(())
+    }
+
+    fn find_start_partition_idx(&self, partitions: &[[i64; 2]], time_offset: Option<i64>) -> usize {
+        if let Some(offset) = time_offset {
+            for (idx, [_, end_time]) in partitions.iter().enumerate() {
+                if *end_time == offset {
+                    log::info!("[WS_SEARCH]: Found matching partition for time_offset: {} at index: {}", offset, idx);
+                    return idx;
+                }
+            }
+        }
+
+        0
     }
 
     // TODO: Remove this method
