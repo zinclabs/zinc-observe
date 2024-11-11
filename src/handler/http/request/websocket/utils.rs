@@ -53,6 +53,7 @@ pub enum WsClientEvents {
     Search {
         trace_id: String,
         payload: config::meta::search::Request,
+        time_offset: Option<i64>,
     },
     #[cfg(feature = "enterprise")]
     Cancel {
@@ -74,6 +75,7 @@ pub enum WsServerEvents {
         trace_id: String,
         results: config::meta::search::Response,
         response_type: SearchResponseType,
+        time_offset: i64
     },
     CancelResponse {
         trace_id: String,

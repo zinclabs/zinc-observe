@@ -113,9 +113,9 @@ impl SessionHandler {
                     client_msg
                 );
                 match client_msg {
-                    WsClientEvents::Search { trace_id, payload } => {
+                    WsClientEvents::Search { trace_id, payload, time_offset } => {
                         match self
-                            .handle_search_request(trace_id.to_string(), payload)
+                            .handle_search_request(trace_id.to_string(), payload, time_offset)
                             .await
                         {
                             Ok(_) => {}
@@ -191,6 +191,7 @@ impl SessionHandler {
         &mut self,
         trace_id: String,
         payload: config::meta::search::Request,
+        time_offset: Option<i64>,
     ) -> Result<(), Error> {
         // handle search result size
         let req_size = payload.query.size;
@@ -205,11 +206,30 @@ impl SessionHandler {
 
             // handle search result size
             let mut curr_res_size = 0;
+            let mut start_search = time_offset.is_none();
+            let mut found_time_offset = false;
 
             for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
+                // handle websocket pagination
+                if let Some(offset) = time_offset {
+                    // skip partitions until end_time matches the offset
+                    if !start_search {
+                        if end_time == offset {
+                            start_search = true;
+                            found_time_offset = true;
+                            log::info!("[WS_SEARCH] Found matching partition for time_offset: {}", offset);
+                        } else {
+                            log::info!("[WS_SEARCH]: Skipping partition {} with end_time: {} (time_offset: {})", idx, end_time, offset);
+                            continue;
+                        }
+                    }
+                }
+
                 let mut req = payload.clone();
                 req.query.start_time = start_time;
                 req.query.end_time = end_time;
+
+
                 let search_res = self.do_search(req, trace_id.clone()).await?;
                 curr_res_size += search_res.size;
 
@@ -220,21 +240,32 @@ impl SessionHandler {
                         current: idx as u64 + 1,
                         total: partitions.len() as u64,
                     },
+                    time_offset: end_time,
                 };
                 self.send_message(search_res.to_json().to_string()).await?;
 
                 // handle search result size
                 if curr_res_size >= req_size {
+                    log::info!("[WS_SEARCH]: Reached requested result size ({}), stopping search", req_size);
                     break;
+                }
+
+                // If time_offset was provided but no matching partition was found
+                if let Some(offset) = time_offset {
+                    if !found_time_offset {
+                        log::info!("[WS_SEARCH]: No partition found with end_time matching the provided time_offset: {}", offset);
+                    }
                 }
             }
         } else {
             // call search directly
+            let end_time = payload.query.end_time;
             let search_res = self.do_search(payload, trace_id.clone()).await?;
             let search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
                 results: search_res,
                 response_type: SearchResponseType::Single,
+                time_offset: end_time
             };
             self.send_message(search_res.to_json().to_string()).await?;
         }
