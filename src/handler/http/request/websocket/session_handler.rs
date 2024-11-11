@@ -192,6 +192,9 @@ impl SessionHandler {
         trace_id: String,
         payload: config::meta::search::Request,
     ) -> Result<(), Error> {
+        // handle search result size
+        let req_size = payload.query.size;
+
         // get partitions and call search for each
         if self.is_partition_request(&payload).await {
             let partitions = self.get_partitions(&payload, &trace_id).await;
@@ -200,11 +203,16 @@ impl SessionHandler {
                 return Ok(());
             }
 
+            // handle search result size
+            let mut curr_res_size = 0;
+
             for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
                 let mut req = payload.clone();
                 req.query.start_time = start_time;
                 req.query.end_time = end_time;
                 let search_res = self.do_search(req, trace_id.clone()).await?;
+                curr_res_size += search_res.size;
+
                 let search_res = WsServerEvents::SearchResponse {
                     trace_id: trace_id.clone(),
                     results: search_res,
@@ -214,6 +222,11 @@ impl SessionHandler {
                     },
                 };
                 self.send_message(search_res.to_json().to_string()).await?;
+
+                // handle search result size
+                if curr_res_size >= req_size {
+                    break;
+                }
             }
         } else {
             // call search directly
