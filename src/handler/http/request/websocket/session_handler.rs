@@ -60,8 +60,6 @@ impl SessionHandler {
 
     // Main handler method to run the session
     pub async fn run(mut self) {
-        let mut close_reason: Option<actix_ws::CloseReason> = None;
-
         loop {
             tokio::select! {
                 Some(msg) = self.msg_stream.next() => {
@@ -77,12 +75,10 @@ impl SessionHandler {
                             self.handle_text_message(msg.into()).await;
                         }
                         Ok(actix_ws::Message::Close(reason)) => {
-                            close_reason = reason;
-                            log::info!("[WEBSOCKET]: Session closed for request_id: {}", self.request_id);
+                            log::info!("[WEBSOCKET]: Session closed for request_id: {}, reason: {:?}", self.request_id, reason);
                             break;
                         }
                         Ok(actix_ws::Message::Continuation(_)) => {
-                            close_reason = None;
                             log::info!("[WEBSOCKET]: Continuation message received, closing session for request_id: {}", self.request_id);
                             break;
                         }
@@ -90,18 +86,6 @@ impl SessionHandler {
                     }
                 }
             }
-        }
-
-        // Clean up the session when the loop breaks
-        self.cleanup().await;
-
-        // Close the session once, after the loop ends
-        if let Err(e) = self.session.close(close_reason).await {
-            log::error!(
-                "[WEBSOCKET]: Error closing session for request_id {}: {:?}",
-                self.request_id,
-                e
-            );
         }
     }
 
@@ -122,7 +106,10 @@ impl SessionHandler {
                             .handle_search_request(trace_id.to_string(), payload, time_offset)
                             .await
                         {
-                            Ok(_) => {}
+                            Ok(_) => {
+                                // force close the session once search is complete
+                                self.cleanup().await;
+                            }
                             Err(e) => {
                                 log::error!(
                                     "[WEBSOCKET]: Failed to get search result for trace_id: {}, error: {:?}",
@@ -168,6 +155,8 @@ impl SessionHandler {
                                 self.request_id
                             );
                         }
+                        // force close session after benchmark
+                        self.cleanup().await;
                     }
                 }
             }
@@ -182,10 +171,22 @@ impl SessionHandler {
     }
 
     // Cleanup the session when it ends
-    async fn cleanup(&self) {
-        sessions_cache_utils::remove_session(&self.request_id);
+    async fn cleanup(&mut self) {
+        let req_id = self.request_id.clone();
+        sessions_cache_utils::remove_session(&req_id);
+
+        // close the ws session
+        let session = self.session.clone();
+        if let Err(e) = session.close(None).await {
+            log::error!(
+                "[WEBSOCKET]: Error closing session for request_id {}: {:?}",
+                self.request_id,
+                e
+            );
+        }
+
         log::info!(
-            "[WEBSOCKET]: Cleaning up session for request_id: {}, session_cache_len: {}",
+            "[WEBSOCKET]: Session closed for request_id: {}, session_cache_len: {}",
             self.request_id,
             sessions_cache_utils::len_sessions()
         );
