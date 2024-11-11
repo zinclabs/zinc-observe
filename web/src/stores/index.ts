@@ -75,6 +75,8 @@ export default createStore({
     savedFunctionDialog: false,
     regionInfo: [],
     hiddenMenus: [],
+    sessionId: "",
+    webSocketUrl: "",
   },
   mutations: {
     login(state, payload) {
@@ -189,6 +191,12 @@ export default createStore({
     setHiddenMenus(state, payload) {
       state.hiddenMenus = payload;
     },
+    setSessionId(state, payload) {
+      state.sessionId = payload;
+    },
+    setWebSocketUrl(state, payload) {
+      state.webSocketUrl = payload;
+    },
   },
   actions: {
     login(context, payload) {
@@ -298,6 +306,12 @@ export default createStore({
     },
     setHiddenMenus(context, payload) {
       context.commit("setHiddenMenus", payload);
+    },
+    setSessionId(context, payload) {
+      context.commit("setSessionId", payload);
+    },
+    setWebSocketUrl(context, payload) {
+      context.commit("setWebSocketUrl", payload);
     },
   },
   modules: {},
