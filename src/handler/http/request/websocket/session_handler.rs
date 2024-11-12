@@ -197,8 +197,13 @@ impl SessionHandler {
         payload: config::meta::search::Request,
         time_offset: Option<i64>,
     ) -> Result<(), Error> {
+        let cfg = config::get_config();
         // handle search result size
-        let req_size = payload.query.size;
+        let req_size = if payload.query.size == 0 {
+            cfg.limit.query_default_limit
+        } else {
+            payload.query.size
+        };
 
         // get partitions and call search for each
         if self.is_partition_request(&payload).await {
@@ -226,6 +231,9 @@ impl SessionHandler {
                 req.query.start_time = start_time;
                 req.query.end_time = end_time;
 
+                if req_size != -1 {
+                    req.query.size -= curr_res_size;
+                }
                 let search_res = self.do_search(req, trace_id.clone()).await?;
                 curr_res_size += search_res.size;
 
