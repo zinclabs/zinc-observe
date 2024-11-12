@@ -189,26 +189,6 @@ async fn dispatch(
                 Ok(HttpResponse::ServiceUnavailable().body(e.to_string()))
             }
         };
-
-        // // Upgrade to a websocket connection
-        // let ws_res = ws::start(
-        //     CustomWebSocketHandlers {
-        //         tx: mpsc::unbounded_channel().0,
-        //         url: ws_url,
-        //         req: req.clone(),
-        //     },
-        //     &req,
-        //     payload,
-        // );
-        //
-        // let res = match ws_res {
-        //     Ok(res) => Ok(res),
-        //     Err(e) => {
-        //         log::error!("WebSocket upgrade failed: {}", e);
-        //         Ok(HttpResponse::ServiceUnavailable().body(e.to_string()))
-        //     }
-        // };
-        // return res;
     }
 
     // send query
