@@ -242,7 +242,7 @@ impl SessionHandler {
                 self.send_message(search_res.to_json().to_string()).await?;
 
                 // handle search result size
-                if curr_res_size >= req_size {
+                if req_size != -1 && curr_res_size >= req_size {
                     log::info!(
                         "[WS_SEARCH]: Reached requested result size ({}), stopping search",
                         req_size
