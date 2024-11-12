@@ -3,6 +3,7 @@ use config::{
     get_config,
     meta::{
         search::{Response, SearchPartitionRequest},
+        sql::resolve_stream_names,
         stream::StreamType,
     },
     utils::sql::is_aggregate_query,
@@ -14,6 +15,7 @@ use rand::prelude::SliceRandom;
 use tracing::Instrument;
 
 use crate::{
+    common::meta::{self},
     handler::http::request::websocket::utils::{
         sessions_cache_utils, SearchResponseType, WsClientEvents, WsServerEvents,
     },
@@ -194,10 +196,99 @@ impl SessionHandler {
     async fn handle_search_request(
         &mut self,
         trace_id: String,
-        payload: config::meta::search::Request,
+        mut payload: config::meta::search::Request,
         time_offset: Option<i64>,
     ) -> Result<(), Error> {
         let cfg = config::get_config();
+        let user_id = self.user_id.clone();
+        let org_id = self.org_id.clone();
+        let stream_type = self.stream_type;
+
+        // get stream name
+        let stream_names = match resolve_stream_names(&payload.query.sql) {
+            Ok(v) => v.clone(),
+            Err(e) => {
+                let err_res = WsServerEvents::SearchError {
+                    trace_id: trace_id.clone(),
+                    error: e.to_string(),
+                };
+                self.send_message(err_res.to_json().to_string()).await?;
+                return Ok(());
+            }
+        };
+
+        // get stream settings
+        for stream_name in stream_names {
+            if let Some(settings) =
+                infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+            {
+                let max_query_range = settings.max_query_range;
+                if max_query_range > 0
+                    && (payload.query.end_time - payload.query.start_time)
+                        > max_query_range * 3600 * 1_000_000
+                {
+                    payload.query.start_time =
+                        payload.query.end_time - max_query_range * 3600 * 1_000_000;
+                    // range_error = format!(
+                    //     "Query duration is modified due to query range restriction of {} hours",
+                    //     max_query_range
+                    // );
+                    log::info!(
+                        "[WS_SEARCH]: Query duration is modified due to query range restriction of {} hours",
+                        max_query_range
+                    );
+                }
+            }
+
+            // Check permissions on stream
+            #[cfg(feature = "enterprise")]
+            {
+                use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
+                use crate::common::{
+                    infra::config::USERS,
+                    utils::auth::{is_root_user, AuthExtractor},
+                };
+
+                if !is_root_user(&user_id) {
+                    let user: meta::user::User =
+                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
+                    let stream_type_str = stream_type.to_string();
+
+                    if user.is_external
+                        && !crate::handler::http::auth::validator::check_permissions(
+                            &user_id,
+                            AuthExtractor {
+                                auth: "".to_string(),
+                                method: "GET".to_string(),
+                                o2_type: format!(
+                                    "{}:{}",
+                                    OFGA_MODELS
+                                        .get(stream_type_str.as_str())
+                                        .map_or(stream_type_str.as_str(), |model| model.key),
+                                    stream_name
+                                ),
+                                org_id: org_id.clone(),
+                                bypass_check: false,
+                                parent_id: "".to_string(),
+                            },
+                            Some(user.role),
+                        )
+                        .await
+                    {
+                        // return forbidden on websockets
+                        let err_res = WsServerEvents::SearchError {
+                            trace_id: trace_id.clone(),
+                            error: "Unauthorized Access".to_string(),
+                        };
+                        self.send_message(err_res.to_json().to_string()).await?;
+                        return Ok(());
+                    }
+                    // Check permissions on stream ends
+                }
+            }
+        }
+
         // handle search result size
         let req_size = if payload.query.size == 0 {
             cfg.limit.query_default_limit

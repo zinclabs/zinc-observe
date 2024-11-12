@@ -81,6 +81,10 @@ pub enum WsServerEvents {
         trace_id: String,
         is_success: bool,
     },
+    SearchError {
+        trace_id: String,
+        error: String,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
