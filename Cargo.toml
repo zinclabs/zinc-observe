@@ -180,6 +180,7 @@ chromiumoxide.workspace = true
 lettre.workspace = true
 tantivy.workspace = true
 futures-util = "0.3.31"
+tokio-tungstenite = "0.24.0"
 
 [build-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
