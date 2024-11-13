@@ -822,13 +822,22 @@ export default defineComponent({
       if(formData.value.is_real_time == 'false'){
 
         if(validateConditions() == false){
-          console.log("thisis working")
           return false;
         }
-        if(formData.value.query_condition.type == 'sql'){
-          if(formData.value.query_condition.type == 'sql'){
-          await validateSqlQuery();
+          if (
+          formData.value.query_condition.type == "sql" &&
+          !getParser(formData.value.query_condition.sql)
+        ) {
+          step.value = 1;
+          q.notify({
+            type: "negative",
+            message: "Selecting all Columns in SQL query is not allowed.",
+            timeout: 1500,
+          });
+          return false;
         }
+          if(formData.value.query_condition.type == 'sql' && formData.value.query_condition && formData.value.query_condition.sql == ""){
+          await validateSqlQuery();
         }
         
 
@@ -1328,6 +1337,7 @@ export default defineComponent({
     };
 
     const validateSqlQuery = async () => {
+
       // Delaying the validation by 300ms, as editor has debounce of 300ms. Else old value will be used for validation
       await new Promise((resolve) => setTimeout(resolve, 300));
 
@@ -1353,7 +1363,6 @@ export default defineComponent({
         );
 
       validateSqlQueryPromise.value = new Promise((resolve, reject) => {
-        console.log("this is working")
         searchService
           .search({
             org_identifier: store.state.selectedOrganization.identifier,
@@ -1388,10 +1397,12 @@ export default defineComponent({
             // This case happens when user enters invalid query and then switches to real time alert
             if (formData.value.query_condition.type === "sql")
             {
-              step.value = 1;
+              const message = err.response?.data?.message 
+              ? `Invalid SQL Query : ${err.response.data.message}`
+              : "Invalid SQL Query";              step.value = 1;
               q.notify({
                 type: "negative",
-                message: "Invalid SQL Query : " + err.response?.data?.message,
+                message: message,
                 timeout: 3000,
               });
             }

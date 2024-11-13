@@ -554,7 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:model-value="updateExpansion"
     >
   <div>
-      <div class="flex items-center q-mr-sm">
+      <div class="flex items-center q-mr-sm q-mb-md">
         <div
           data-test="scheduled-alert-period-title"
           class="text-bold flex items-center"
