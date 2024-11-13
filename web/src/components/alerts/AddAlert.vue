@@ -743,7 +743,7 @@ export default defineComponent({
     const prefixCode = ref("");
     const suffixCode = ref("");
 
-    onMounted(async () => {});
+
 
     const updateEditorContent = async (stream_name: string) => {
       triggerCols.value = [];
@@ -776,7 +776,7 @@ export default defineComponent({
 
     const handleStep1Continue = async () =>{
 
-        const isValid = await validateInputFields();
+        const isValid = await validateInputs(formData.value);
         if(isValid){
         step.value = 2;
       }
@@ -789,7 +789,8 @@ export default defineComponent({
 
     const validateConditions = () => {
       let check = true;
-      if(formData.value.query_condition.type == 'custom'){
+      if(formData.value.query_condition.type == 'custom' && formData.value.query_condition.conditions.length > 0 ){
+        
        formData.value.query_condition.conditions.map((condition: any) => {
         if (condition.column === "") {
           q.notify({
@@ -817,6 +818,9 @@ export default defineComponent({
 
 
     const validateInputFields = async () =>{
+
+
+
  
 
       if(formData.value.is_real_time == 'false'){
@@ -917,6 +921,12 @@ export default defineComponent({
       },
       { immediate: true }
     );
+    watch(scheduledAlertRef, (newVal) => {
+  if (newVal) {
+    console.log("ScheduledAlert component loaded:", getSelectedTab.value);
+  }
+});
+
     const filterColumns = (options: any[], val: String, update: Function) => {
       let filteredOptions: any[] = [];
       if (val === "") {
@@ -1206,6 +1216,9 @@ export default defineComponent({
 
       payload.description = formData.value.description.trim();
 
+
+
+
       if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
         payload.query_condition.aggregation = null;
       }
@@ -1241,65 +1254,61 @@ export default defineComponent({
       return payload;
     };
 
-    const validateInputs = (input: any, notify: boolean = true) => {
-      if (isNaN(Number(input.trigger_condition.silence))) {
-        step.value = 1;
-        isExpandItem.value = true;
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Silence Notification should not be empty",
-            timeout: 1500,
-          });
-        return false;
-      }
-      if (isNaN(Number(input.trigger_condition.period))) {
-        step.value = 1;
-        isExpandItem.value = true;
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Period should not be empty",
-            timeout: 1500,
-          });
-        return false;
-      }
-      
-      if (
-        Number(input.trigger_condition.silence) < 1 ||
-        isNaN(Number(input.trigger_condition.silence))
-      ) {
-        step.value = 1;
-        isExpandItem.value = true;
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Silence Notification should be greater than 0",
-            timeout: 1500,
-          });
-        return false;
-      }
+    const validateInputs = async (input: any, notify: boolean = true) => {
 
-      if (input.is_real_time) return true;
 
-      if (
-        Number(input.trigger_condition.period) < 1 ||
-        isNaN(Number(input.trigger_condition.period))
-      ) {
-        step.value = 1;
-        isExpandItem.value = true;
-        notify &&
-          q.notify({
-            type: "negative",
-            message: "Period should be greater than 0",
-            timeout: 1500,
-          });
+
+      if(input.is_real_time == 'false'){
+
+      if(validateConditions() == false){
         return false;
       }
-
-      if (input.query_condition.aggregation) {
         if (
-          isNaN(input.trigger_condition.threshold) ||
+          input.query_condition.type == "sql" &&
+          !getParser(input.query_condition.sql)
+        ) {
+          step.value = 1;
+          q.notify({
+            type: "negative",
+            message: "Selecting all Columns in SQL query is not allowed.",
+            timeout: 1500,
+          });
+          return false;
+        }
+        if(input.query_condition.type == 'sql' && input.query_condition && input.query_condition.sql == ""){
+          await validateSqlQuery();
+        }
+
+        if(input.trigger_condition.threshold == ""){
+          q.notify({
+            message: "Threshold should not be empty",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          return false;
+        }
+        if(input.trigger_condition.threshold < 1){
+          q.notify({
+            message: "Threshold should be greater than 0",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          return false;;
+        }
+        if (isAggregationEnabled.value) {
+        if(input.query_condition.aggregation.group_by[0] == ''){
+          step.value = 1;
+          notify &&
+            q.notify({
+              type: "negative",
+              message: "Group By should not be empty",
+              timeout: 1500,
+            });
+          return false;
+        }
+        if (
           !input.query_condition.aggregation.having.value.toString().trim()
             .length ||
           !input.query_condition.aggregation.having.column ||
@@ -1318,20 +1327,92 @@ export default defineComponent({
         return true;
       }
 
-      if (
-        isNaN(input.trigger_condition.threshold) ||
-        input.trigger_condition.threshold < 1 ||
-        !input.trigger_condition.operator
-      ) {
-        step.value = 1;
+        if (input.trigger_condition.period == "") {
         notify &&
           q.notify({
             type: "negative",
-            message: "Threshold should not be empty",
+            message: "Period should not be empty",
             timeout: 1500,
           });
         return false;
       }
+
+        if(input.trigger_condition.period < 1 || isNaN( input.trigger_condition.period)){
+          q.notify({
+            message: "Period should be greater than 0",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          return false;
+        }
+        if (input.trigger_condition.frequency == "") {
+        notify &&
+          q.notify({
+            type: "negative",
+            message: "Frequency should not be empty",
+            timeout: 1500,
+          });
+        return false;
+      }
+        if(input.trigger_condition.frequency < 1 || isNaN( input.trigger_condition.frequency)){
+          q.notify({
+            message: "Frequency should be greater than 0",
+            color: "negative",
+            position: "bottom",
+            timeout: 2000,
+          });
+          return false;
+        }
+      }
+      if (input.trigger_condition.silence == "") {
+        notify &&
+          q.notify({
+            type: "negative",
+            message: "Notification Interval should not be empty",
+            timeout: 1500,
+          });
+        return false;
+      }
+      if (
+        Number(input.trigger_condition.silence) < 1 ||
+        isNaN(Number(input.trigger_condition.silence))
+      ) {
+        step.value = 1;
+        isExpandItem.value = true;
+        notify &&
+          q.notify({
+            type: "negative",
+            message: "Notification Interval should be greater than 0",
+            timeout: 1500,
+          });
+        return false;
+      }
+      return addAlertForm.value.validate().then((valid: any) => {
+        if (valid) {
+          return true;
+        }
+      });
+
+      if (
+        Number(input.trigger_condition.period) < 1 ||
+        isNaN(Number(input.trigger_condition.period))
+      ) {
+        step.value = 1;
+        isExpandItem.value = true;
+        notify &&
+          q.notify({
+            type: "negative",
+            message: "Period should be greater than 0",
+            timeout: 1500,
+          });
+        return false;
+      }
+
+    
+
+
+      if (input.is_real_time) return true;
 
       return true;
     };
@@ -1575,6 +1656,8 @@ export default defineComponent({
     },
 
     async onSubmit() {
+
+      console.log(this.formData,"formdata")
       // Delaying submission by 500ms to allow the form to validate, as query is validated in validateSqlQuery method
       // When user updated query and click on save
       await new Promise((resolve) => setTimeout(resolve, 500));
