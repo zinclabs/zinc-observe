@@ -115,18 +115,11 @@ pub async fn update_dashboard(
 }
 
 #[tracing::instrument]
-pub async fn list_dashboards(org_id: &str, folder_id: &str) -> Result<HttpResponse, io::Error> {
-    Ok(HttpResponse::Ok().json(Dashboards {
-        dashboards: dashboards::list(org_id, folder_id).await.unwrap(),
-    }))
-}
-
-#[tracing::instrument]
-pub async fn search_dashboards(org_id: &str, title_pat: Option<&str>) -> HttpResponse {
-    match dashboards::search(org_id, title_pat).await {
-            Ok(dashboards) => HttpResponse::Ok().json(Dashboards { dashboards }),
-            Err(err) => {
-                Response::InternalServerError(err).into()
+pub async fn list_dashboards(org_id: &str, folder_id: Option<&str>, title_pat: Option<&str>) -> HttpResponse {
+    match dashboards::list(org_id, folder_id, title_pat).await {
+        Ok(dashboards) => HttpResponse::Ok().json(Dashboards { dashboards }),
+        Err(err) => {
+            Response::InternalServerError(err).into()
         }
     }
 }

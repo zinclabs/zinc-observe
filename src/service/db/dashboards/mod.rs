@@ -171,25 +171,14 @@ pub(crate) async fn put(
 }
 
 #[tracing::instrument]
-pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
-    let db_key = format!("/dashboard/{org_id}/{folder}/");
-    db::list(&db_key)
-        .await?
-        .into_values()
-        .map(|val| {
-            let dash = from_json(&val)?;
-            Ok(dash)
-        })
-        .collect()
-}
+pub(crate) async fn list(org_id: &str, folder: Option<&str>, title_pat: Option<&str>) -> Result<Vec<Dashboard>, anyhow::Error> {
+    // The DB query will filter on folder if the parameter is given.
+    let db_key = if let Some(folder) = folder {
+        format!("/dashboard/{org_id}/{folder}/")
+    } else {
+        format!("/dashboard/{org_id}/")
+    };
 
-
-/// Searches for dashboards whose titles contain the given pattern.
-#[tracing::instrument]
-pub(crate) async fn search(org_id: &str, title_pat: Option<&str>) -> Result<Vec<Dashboard>, anyhow::Error> {
-    let title_pat = title_pat.map(|t| t.to_lowercase());
-
-    let db_key = format!("/dashboard/{org_id}/");
     let ds = db::list(&db_key)
         .await?
         .into_values()

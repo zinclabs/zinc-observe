@@ -407,7 +407,6 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             .service(dashboards::create_dashboard)
             .service(dashboards::update_dashboard)
             .service(dashboards::list_dashboards)
-            .service(dashboards::search_dashboards)
             .service(dashboards::get_dashboard)
             .service(dashboards::delete_dashboard)
             .service(dashboards::move_dashboard)

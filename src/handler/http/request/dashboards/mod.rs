@@ -105,6 +105,8 @@ async fn update_dashboard(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("folder" = Option<String>, Query, description = "Folder in which to search"),
+        ("title" = Option<String>, Query, description = "Title to search for (case insensitive)"),
     ),
     responses(
         (status = StatusCode::OK, body = Dashboards),
@@ -112,30 +114,10 @@ async fn update_dashboard(
 )]
 #[get("/{org_id}/dashboards")]
 async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let folder = get_folder(req);
-    dashboards::list_dashboards(&org_id.into_inner(), &folder).await
-}
-
-/// SearchDashboards
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Dashboards",
-    operation_id = "SearchDashboards",
-    security(
-        ("Authorization" = [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("title" = Option<String>, Query, description = "Title to search for (case insensitive)"),
-    ),
-    responses(
-        (status = StatusCode::OK, body = Dashboards),
-    ),
-)]
-#[get("/{org_id}/search/dashboards")]
-async fn search_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let title_pat = get_title_pattern(req);
-    dashboards::search_dashboards(&org_id.into_inner(), title_pat.as_deref()).await
+    let query = get_query_params(req);
+    let folder = query.get("folder").map(String::to_string);
+    let title_pat = query.get("title").map(String::to_string);
+    dashboards::list_dashboards(&org_id.into_inner(), folder.as_deref(), title_pat.as_deref()).await
 }
 
 /// GetDashboard
@@ -237,9 +219,4 @@ fn get_query_params(req: HttpRequest) -> Query<HashMap<String, String>> {
 fn get_folder(req: HttpRequest) -> String {
     let query = get_query_params(req);
     crate::common::utils::http::get_folder(&query)
-}
-
-fn get_title_pattern(req: HttpRequest) -> Option<String> {
-    let query = get_query_params(req);
-    query.get("title").map(String::to_string)
 }
