@@ -126,6 +126,7 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ("title" = Option<String>, Query, description = "Title to search for (case insensitive)"),
     ),
     responses(
         (status = StatusCode::OK, body = Dashboards),

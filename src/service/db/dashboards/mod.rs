@@ -187,6 +187,8 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
 /// Searches for dashboards whose titles contain the given pattern.
 #[tracing::instrument]
 pub(crate) async fn search(org_id: &str, title_pat: Option<&str>) -> Result<Vec<Dashboard>, anyhow::Error> {
+    let title_pat = title_pat.map(|t| t.to_lowercase());
+
     let db_key = format!("/dashboard/{org_id}/");
     let ds = db::list(&db_key)
         .await?
@@ -196,10 +198,10 @@ pub(crate) async fn search(org_id: &str, title_pat: Option<&str>) -> Result<Vec<
             Some(dash)
         })
         .filter(|dash| {
-            if let Some(title_pat) = title_pat {
+            if let Some(title_pat) = &title_pat {
                 // Only include the dashboard if it has a title and the title
                 // contains the given title pattern.
-                dash.title().filter(|t| t.contains(title_pat)).is_some()
+                dash.title().filter(|t| t.to_lowercase().contains(title_pat)).is_some()
             } else {
                 // Don't apply the filter if no title pattern is given.
                 true
