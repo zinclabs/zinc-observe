@@ -326,7 +326,7 @@ impl SessionHandler {
                     req.query.size -= curr_res_size;
                 }
                 let search_res = self.do_search(req, trace_id.clone()).await?;
-                curr_res_size += search_res.size;
+                curr_res_size += search_res.hits.len() as i64;
 
                 let search_res = WsServerEvents::SearchResponse {
                     trace_id: trace_id.clone(),
