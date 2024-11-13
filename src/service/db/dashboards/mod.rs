@@ -229,13 +229,13 @@ pub async fn reset() -> Result<(), anyhow::Error> {
 
 /// Parses a [Dashboard] from JSON.
 pub fn from_json(bytes: &Bytes) -> Result<Dashboard, anyhow::Error> {
-    let dash_str = std::str::from_utf8(&bytes)?;
+    let dash_str = std::str::from_utf8(bytes)?;
     let hash = config::utils::hash::gxhash::new()
         .sum64(dash_str)
         .to_string();
-    let d_version: DashboardVersion = json::from_slice(&bytes)?;
+    let d_version: DashboardVersion = json::from_slice(bytes)?;
     let d = if d_version.version == 1 {
-        let dash: v1::Dashboard = json::from_slice(&bytes)?;
+        let dash: v1::Dashboard = json::from_slice(bytes)?;
         Dashboard {
             v1: Some(dash),
             version: 1,
@@ -243,7 +243,7 @@ pub fn from_json(bytes: &Bytes) -> Result<Dashboard, anyhow::Error> {
             ..Default::default()
         }
     } else if d_version.version == 2 {
-        let dash: v2::Dashboard = json::from_slice(&bytes)?;
+        let dash: v2::Dashboard = json::from_slice(bytes)?;
         Dashboard {
             v2: Some(dash),
             version: 2,
@@ -251,7 +251,7 @@ pub fn from_json(bytes: &Bytes) -> Result<Dashboard, anyhow::Error> {
             ..Default::default()
         }
     } else if d_version.version == 3 {
-        let dash: v3::Dashboard = json::from_slice(&bytes)?;
+        let dash: v3::Dashboard = json::from_slice(bytes)?;
         Dashboard {
             v3: Some(dash),
             version: 3,
@@ -259,7 +259,7 @@ pub fn from_json(bytes: &Bytes) -> Result<Dashboard, anyhow::Error> {
             ..Default::default()
         }
     } else if d_version.version == 4 {
-        let dash: v4::Dashboard = json::from_slice(&bytes)?;
+        let dash: v4::Dashboard = json::from_slice(bytes)?;
         Dashboard {
             v4: Some(dash),
             version: 4,
@@ -267,7 +267,7 @@ pub fn from_json(bytes: &Bytes) -> Result<Dashboard, anyhow::Error> {
             ..Default::default()
         }
     } else {
-        let dash: v5::Dashboard = json::from_slice(&bytes)?;
+        let dash: v5::Dashboard = json::from_slice(bytes)?;
         Dashboard {
             v5: Some(dash),
             version: 5,
