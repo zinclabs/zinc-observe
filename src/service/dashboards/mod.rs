@@ -122,6 +122,13 @@ pub async fn list_dashboards(org_id: &str, folder_id: &str) -> Result<HttpRespon
 }
 
 #[tracing::instrument]
+pub async fn search_dashboards(org_id: &str, title_pat: Option<&str>) -> Result<HttpResponse, io::Error> {
+    Ok(HttpResponse::Ok().json(Dashboards {
+        dashboards: dashboards::search(org_id, title_pat).await.unwrap(),
+    }))
+}
+
+#[tracing::instrument]
 pub async fn get_dashboard(
     org_id: &str,
     dashboard_id: &str,

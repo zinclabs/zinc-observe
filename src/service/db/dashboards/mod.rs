@@ -14,7 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::web;
+use bytes::Bytes;
 use config::utils::{hash::Sum64, json};
+use itertools::Itertools;
 
 use crate::{
     common::meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
@@ -32,52 +34,7 @@ pub(crate) async fn get(
 ) -> Result<Dashboard, anyhow::Error> {
     let key = format!("/dashboard/{org_id}/{folder}/{dashboard_id}");
     let bytes = db::get(&key).await?;
-    let dash_str = std::str::from_utf8(&bytes)?;
-    let hash = config::utils::hash::gxhash::new()
-        .sum64(dash_str)
-        .to_string();
-    let d_version: DashboardVersion = json::from_slice(&bytes)?;
-    if d_version.version == 1 {
-        let dash: v1::Dashboard = json::from_slice(&bytes)?;
-        Ok(Dashboard {
-            v1: Some(dash),
-            version: 1,
-            hash,
-            ..Default::default()
-        })
-    } else if d_version.version == 2 {
-        let dash: v2::Dashboard = json::from_slice(&bytes)?;
-        Ok(Dashboard {
-            v2: Some(dash),
-            version: 2,
-            hash,
-            ..Default::default()
-        })
-    } else if d_version.version == 3 {
-        let dash: v3::Dashboard = json::from_slice(&bytes)?;
-        Ok(Dashboard {
-            v3: Some(dash),
-            version: 3,
-            hash,
-            ..Default::default()
-        })
-    } else if d_version.version == 4 {
-        let dash: v4::Dashboard = json::from_slice(&bytes)?;
-        Ok(Dashboard {
-            v4: Some(dash),
-            version: 4,
-            hash,
-            ..Default::default()
-        })
-    } else {
-        let dash: v5::Dashboard = json::from_slice(&bytes)?;
-        Ok(Dashboard {
-            v5: Some(dash),
-            version: 5,
-            hash,
-            ..Default::default()
-        })
-    }
+    from_json(&bytes)
 }
 
 #[tracing::instrument(skip(body))]
@@ -220,54 +177,36 @@ pub(crate) async fn list(org_id: &str, folder: &str) -> Result<Vec<Dashboard>, a
         .await?
         .into_values()
         .map(|val| {
-            let dash_str = std::str::from_utf8(&val)?;
-            let hash = config::utils::hash::gxhash::new()
-                .sum64(dash_str)
-                .to_string();
-            let d_version: DashboardVersion = json::from_slice(&val).unwrap();
-            if d_version.version == 1 {
-                let dash: v1::Dashboard = json::from_slice(&val).unwrap();
-                Ok(Dashboard {
-                    v1: Some(dash),
-                    version: 1,
-                    hash,
-                    ..Default::default()
-                })
-            } else if d_version.version == 2 {
-                let dash: v2::Dashboard = json::from_slice(&val).unwrap();
-                Ok(Dashboard {
-                    v2: Some(dash),
-                    version: 2,
-                    hash,
-                    ..Default::default()
-                })
-            } else if d_version.version == 3 {
-                let dash: v3::Dashboard = json::from_slice(&val).unwrap();
-                Ok(Dashboard {
-                    v3: Some(dash),
-                    version: 3,
-                    hash,
-                    ..Default::default()
-                })
-            } else if d_version.version == 4 {
-                let dash: v4::Dashboard = json::from_slice(&val).unwrap();
-                Ok(Dashboard {
-                    v4: Some(dash),
-                    version: 4,
-                    hash,
-                    ..Default::default()
-                })
-            } else {
-                let dash: v5::Dashboard = json::from_slice(&val).unwrap();
-                Ok(Dashboard {
-                    v5: Some(dash),
-                    version: 5,
-                    hash,
-                    ..Default::default()
-                })
-            }
+            let dash = from_json(&val)?;
+            Ok(dash)
         })
         .collect()
+}
+
+
+/// Searches for dashboards whose titles contain the given pattern.
+#[tracing::instrument]
+pub(crate) async fn search(org_id: &str, title_pat: Option<&str>) -> Result<Vec<Dashboard>, anyhow::Error> {
+    let db_key = format!("/dashboard/{org_id}/");
+    let ds = db::list(&db_key)
+        .await?
+        .into_values()
+        .filter_map(|val| {
+            let dash = from_json(&val).ok()?;
+            Some(dash)
+        })
+        .filter(|dash| {
+            if let Some(title_pat) = title_pat {
+                // Only include the dashboard if it has a title and the title
+                // contains the given title pattern.
+                dash.title().filter(|t| t.contains(title_pat)).is_some()
+            } else {
+                // Don't apply the filter if no title pattern is given.
+                true
+            }
+        })
+        .collect_vec();
+    Ok(ds)
 }
 
 #[tracing::instrument]
@@ -284,4 +223,55 @@ pub(crate) async fn delete(
 pub async fn reset() -> Result<(), anyhow::Error> {
     let key = "/dashboard/";
     Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
+}
+
+/// Parses a [Dashboard] from JSON.
+pub fn from_json(bytes: &Bytes) -> Result<Dashboard, anyhow::Error> {
+    let dash_str = std::str::from_utf8(&bytes)?;
+    let hash = config::utils::hash::gxhash::new()
+        .sum64(dash_str)
+        .to_string();
+    let d_version: DashboardVersion = json::from_slice(&bytes)?;
+    let d = if d_version.version == 1 {
+        let dash: v1::Dashboard = json::from_slice(&bytes)?;
+        Dashboard {
+            v1: Some(dash),
+            version: 1,
+            hash,
+            ..Default::default()
+        }
+    } else if d_version.version == 2 {
+        let dash: v2::Dashboard = json::from_slice(&bytes)?;
+        Dashboard {
+            v2: Some(dash),
+            version: 2,
+            hash,
+            ..Default::default()
+        }
+    } else if d_version.version == 3 {
+        let dash: v3::Dashboard = json::from_slice(&bytes)?;
+        Dashboard {
+            v3: Some(dash),
+            version: 3,
+            hash,
+            ..Default::default()
+        }
+    } else if d_version.version == 4 {
+        let dash: v4::Dashboard = json::from_slice(&bytes)?;
+        Dashboard {
+            v4: Some(dash),
+            version: 4,
+            hash,
+            ..Default::default()
+        }
+    } else {
+        let dash: v5::Dashboard = json::from_slice(&bytes)?;
+        Dashboard {
+            v5: Some(dash),
+            version: 5,
+            hash,
+            ..Default::default()
+        }
+    };
+    Ok(d)
 }

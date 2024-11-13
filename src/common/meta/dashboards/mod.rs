@@ -38,6 +38,24 @@ pub struct Dashboard {
     pub hash: String,
 }
 
+impl Dashboard {
+    pub fn title(&self) -> Option<&str> {
+        if let Some(d) = &self.v5 {
+            Some(&d.title)
+        } else if let Some(d) = &self.v4 {
+            Some(&d.title)
+        } else if let Some(d) = &self.v3 {
+            Some(&d.title) 
+        } else if let Some(d) = &self.v2 {
+            Some(&d.title)
+        } else if let Some(d) = &self.v1 {
+            Some(&d.title)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Dashboards {
     pub dashboards: Vec<Dashboard>,

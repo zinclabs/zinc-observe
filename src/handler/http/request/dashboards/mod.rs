@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, io::Error};
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{delete, get, http, post, put, web::{self, Query}, HttpRequest, HttpResponse, Responder};
 
 use crate::{
     common::meta::{dashboards::MoveDashboard, http::HttpResponse as MetaHttpResponse},
@@ -116,6 +116,27 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
     dashboards::list_dashboards(&org_id.into_inner(), &folder).await
 }
 
+/// SearchDashboards
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Dashboards",
+    operation_id = "SearchDashboards",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+    ),
+    responses(
+        (status = StatusCode::OK, body = Dashboards),
+    ),
+)]
+#[get("/{org_id}/search/dashboards")]
+async fn search_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
+    let title_pat = get_title_pattern(req);
+    dashboards::search_dashboards(&org_id.into_inner(), title_pat.as_deref()).await
+}
+
 /// GetDashboard
 #[utoipa::path(
     context_path = "/api",
@@ -208,7 +229,16 @@ async fn move_dashboard(
     dashboards::move_dashboard(&org_id, &dashboard_id, &folder.from, &folder.to).await
 }
 
+fn get_query_params(req: HttpRequest) -> Query<HashMap<String, String>> {
+    web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap()
+}
+
 fn get_folder(req: HttpRequest) -> String {
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let query = get_query_params(req);
     crate::common::utils::http::get_folder(&query)
+}
+
+fn get_title_pattern(req: HttpRequest) -> Option<String> {
+    let query = get_query_params(req);
+    query.get("title").map(String::to_string)
 }
