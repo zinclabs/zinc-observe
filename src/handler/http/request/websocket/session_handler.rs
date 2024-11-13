@@ -67,20 +67,20 @@ impl SessionHandler {
                     match msg {
                         Ok(actix_ws::Message::Ping(bytes)) => {
                             if self.session.pong(&bytes).await.is_err() {
-                                log::info!("[WEBSOCKET]: Failed to send pong, closing session for request_id: {}", self.request_id);
+                                log::info!("[WS_HANDLER]: Failed to send pong, closing session for request_id: {}", self.request_id);
                                 break;
                             }
                         }
                         Ok(actix_ws::Message::Text(msg)) => {
-                            log::info!("[WEBSOCKET]: Got text message for request_id: {}: {}", self.request_id, msg);
+                            log::info!("[WS_HANDLER]: Got text message for request_id: {}: {}", self.request_id, msg);
                             self.handle_text_message(msg.into()).await;
                         }
                         Ok(actix_ws::Message::Close(reason)) => {
-                            log::info!("[WEBSOCKET]: Session closed for request_id: {}, reason: {:?}", self.request_id, reason);
+                            log::info!("[WS_HANDLER]: Session closed for request_id: {}, reason: {:?}", self.request_id, reason);
                             break;
                         }
                         Ok(actix_ws::Message::Continuation(_)) => {
-                            log::info!("[WEBSOCKET]: Continuation message received, closing session for request_id: {}", self.request_id);
+                            log::info!("[WS_HANDLER]: Continuation message received, closing session for request_id: {}", self.request_id);
                             break;
                         }
                         _ => (),
@@ -94,7 +94,7 @@ impl SessionHandler {
         match serde_json::from_str::<WsClientEvents>(&msg) {
             Ok(client_msg) => {
                 log::debug!(
-                    "[WEBSOCKET]: Received trace registrations msg: {:?}",
+                    "[WS_HANDLER]: Received trace registrations msg: {:?}",
                     client_msg
                 );
                 match client_msg {
@@ -113,7 +113,7 @@ impl SessionHandler {
                             }
                             Err(e) => {
                                 log::error!(
-                                    "[WEBSOCKET]: Failed to get search result for trace_id: {}, error: {:?}",
+                                    "[WS_HANDLER]: Failed to get search result for trace_id: {}, error: {:?}",
                                     trace_id,
                                     e
                                 );
@@ -126,7 +126,7 @@ impl SessionHandler {
                             Ok(_) => {}
                             Err(e) => {
                                 log::error!(
-                                    "[WEBSOCKET]: Failed to get cancel search for trace_id: {}, error: {:?}",
+                                    "[WS_HANDLER]: Failed to get cancel search for trace_id: {}, error: {:?}",
                                     trace_id,
                                     e
                                 );
@@ -140,7 +140,7 @@ impl SessionHandler {
                         let delay: Vec<u64> = vec![10, 20, 30, 60, 90];
                         let delay = delay.choose(&mut rand::thread_rng()).unwrap();
                         log::info!(
-                            "[WEBSOCKET]: Sleeping for benchmark, id: {}, delay: {}",
+                            "[WS_HANDLER]: Sleeping for benchmark, id: {}, delay: {}",
                             id,
                             delay
                         );
@@ -152,7 +152,7 @@ impl SessionHandler {
                         });
                         if self.session.text(response.to_string()).await.is_err() {
                             log::error!(
-                                "[WEBSOCKET]: Failed to send benchmark response for request_id: {}",
+                                "[WS_HANDLER]: Failed to send benchmark response for request_id: {}",
                                 self.request_id
                             );
                         }
@@ -180,14 +180,14 @@ impl SessionHandler {
         let session = self.session.clone();
         if let Err(e) = session.close(None).await {
             log::error!(
-                "[WEBSOCKET]: Error closing session for request_id {}: {:?}",
+                "[WS_HANDLER]: Error closing session for request_id {}: {:?}",
                 self.request_id,
                 e
             );
         }
 
         log::info!(
-            "[WEBSOCKET]: Session closed for request_id: {}, session_cache_len: {}",
+            "[WS_HANDLER]: Session closed for request_id: {}, session_cache_len: {}",
             self.request_id,
             sessions_cache_utils::len_sessions()
         );
@@ -368,7 +368,7 @@ impl SessionHandler {
     async fn send_message(&mut self, message: String) -> Result<(), Error> {
         if self.session.text(message).await.is_err() {
             log::error!(
-                "[WEBSOCKET]: Failed to send message for request_id: {}",
+                "[WS_HANDLER]: Failed to send message for request_id: {}",
                 self.request_id
             );
         }
@@ -389,7 +389,7 @@ impl SessionHandler {
         let sql = match Sql::new(&query, &self.org_id, self.stream_type).await {
             Ok(s) => s,
             Err(e) => {
-                log::error!("[WEBSOCKET] Failed to create SQL query: {:?}", e);
+                log::error!("[WS_HANDLER] Failed to create SQL query: {:?}", e);
                 return false;
             }
         };
@@ -431,7 +431,7 @@ impl SessionHandler {
             Ok(res) => res.partitions,
             Err(e) => {
                 log::error!(
-                    "[WEBSOCKET]: Failed to get partitions for request_id: {}, error: {:?}",
+                    "[WS_HANDLER]: Failed to get partitions for request_id: {}, error: {:?}",
                     self.request_id,
                     e
                 );

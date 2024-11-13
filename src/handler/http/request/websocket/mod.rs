@@ -47,7 +47,8 @@ pub async fn websocket(
     };
     sessions_cache_utils::insert_session(&request_id, session.clone());
     log::info!(
-        "[WEBSOCKET]: Got websocket request for request_id: {}",
+        "[WS_HANDLER]: Node Role: {} Got websocket request for request_id: {}",
+        cfg.common.node_role,
         request_id,
     );
 

@@ -19,10 +19,10 @@ pub async fn ws_proxy(
     let node_role = cfg.common.node_role.clone();
 
     log::info!(
-        "[WS_PROXY] Proxying WebSocket connection from {} to {}, node role: {}",
+        "[WS_PROXY] Node Role: {}, Proxying WebSocket connection from {} to {}",
+        node_role,
         req.uri(),
         ws_base_url,
-        node_role
     );
 
     // Upgrade the client connection to a WebSocket
@@ -48,13 +48,17 @@ pub async fn ws_proxy(
     };
 
     log::info!(
-        "[WS_PROXY] Connecting to backend WebSocket service with request: {:?}, node role: {}",
+        "[WS_PROXY] Node Role: {} Connecting to backend WebSocket service with request: {:?}",
+        node_role,
         ws_req,
-        node_role
     );
 
     // Connect to the backend WebSocket service
     let (backend_ws_stream, _) = connect_async(ws_req).await.map_err(|e| {
+        log::info!(
+            "[WS_PROXY] Node Role: {} Failed to connect to backend WebSocket service",
+            node_role
+        );
         actix_web::error::ErrorInternalServerError(format!("Failed to connect to backend: {}", e))
     })?;
 
@@ -69,22 +73,22 @@ pub async fn ws_proxy(
     let c2b_node_role = node_role.clone();
     let client_to_backend = async move {
         log::info!(
-            "[WS_PROXY] Starting to forward messages from client to backend, node role: {}",
+            "[WS_PROXY] Node Role: {} Starting to forward messages from client to backend",
             c2b_node_role
         );
         while let Some(Ok(msg)) = client_msg_stream.next().await {
             let ws_msg = from_actix_message(msg);
             log::info!(
-                "[WS_PROXY] Forwarding message from client to backend: {:?}, node role: {}",
+                "[WS_PROXY] Node Role: {} Forwarding message from client to backend: {:?}",
+                c2b_node_role,
                 ws_msg,
-                c2b_node_role
             );
             if backend_ws_sink.send(ws_msg).await.is_err() {
                 return;
             }
         }
         log::info!(
-            "[WS_PROXY] Finished forwarding messages from client to backend, node role: {}",
+            "[WS_PROXY] Node Role: {} Finished forwarding messages from client to backend",
             c2b_node_role
         );
     };
@@ -92,16 +96,16 @@ pub async fn ws_proxy(
     let b2c_node_role = node_role.clone();
     let backend_to_client = async move {
         log::info!(
-            "[WS_PROXY] Starting to forward messages from backend to client, node role: {}",
+            "[WS_PROXY] Node Role: {} Starting to forward messages from backend to client",
             b2c_node_role
         );
         while let Some(Ok(msg)) = backend_ws_stream.next().await {
             let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
 
             log::info!(
-                "[WS_PROXY] Forwarding message from backend to client: {:?}, node role: {}",
+                "[WS_PROXY] Node Role: {} Forwarding message from backend to client: {:?}",
+                b2c_node_role,
                 ws_msg,
-                b2c_node_role
             );
 
             match ws_msg {
@@ -135,7 +139,7 @@ pub async fn ws_proxy(
             }
         }
         log::info!(
-            "[WS_PROXY] Finished forwarding messages from backend to client, node role: {}",
+            "[WS_PROXY] Node Role: {} Finished forwarding messages from backend to client",
             b2c_node_role
         );
     };
@@ -145,9 +149,9 @@ pub async fn ws_proxy(
     actix_web::rt::spawn(backend_to_client);
 
     log::info!(
-        "[WS_PROXY] WebSocket proxy setup complete, returning handshake response: {:?}, node role: {}",
+        "[WS_PROXY] Node Role: {} WebSocket proxy setup complete, returning handshake response: {:?}",
+        node_role,
         response,
-        node_role
     );
 
     // Return the WebSocket handshake response

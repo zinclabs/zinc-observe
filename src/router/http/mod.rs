@@ -189,11 +189,11 @@ async fn dispatch(
             node_role
         );
 
-        return match ws_proxy(req, payload, ws_url).await {
+        return match ws_proxy(req, payload, ws_url.clone()).await {
             Ok(res) => {
                 log::info!(
                     "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
-                    new_url.value,
+                    ws_url,
                     start.elapsed().as_millis()
                 );
                 Ok(res)
