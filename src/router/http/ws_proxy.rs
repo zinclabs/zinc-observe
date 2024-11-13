@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_ws::Message;
+use config::get_config;
 use futures_util::{SinkExt, StreamExt};
 use reqwest::header::{HeaderName, HeaderValue};
 use tokio_tungstenite::{connect_async, tungstenite};
@@ -13,16 +14,30 @@ pub async fn ws_proxy(
     payload: web::Payload,
     ws_base_url: String,
 ) -> Result<HttpResponse, Error> {
+    // log node role
+    let cfg = get_config();
+    let node_role = cfg.common.node_role.clone();
+
+    log::info!(
+        "[WS_PROXY] Proxying WebSocket connection from {} to {}, node role: {}",
+        req.uri(),
+        ws_base_url,
+        node_role
+    );
+
     // Upgrade the client connection to a WebSocket
     let (response, mut session, mut client_msg_stream) = actix_ws::handle(&req, payload)?;
 
-    dbg!(&response);
+    log::info!(
+        "[WS_PROXY] Upgraded connection to WebSocket, responding with handshake response: {:?}",
+        response
+    );
 
     let ws_req = match convert_actix_to_tungstenite_request(&req, &ws_base_url) {
         Ok(req) => req,
         Err(e) => {
             log::error!(
-                "[WebSocketProxy] Failed to convert Actix request to Tungstenite request: {:?}",
+                "[WS_PROXY] Failed to convert Actix request to Tungstenite request: {:?}",
                 e
             );
             return Err(actix_web::error::ErrorInternalServerError(format!(
@@ -32,28 +47,64 @@ pub async fn ws_proxy(
         }
     };
 
-    dbg!(&ws_req);
+    log::info!(
+        "[WS_PROXY] Connecting to backend WebSocket service with request: {:?}, node role: {}",
+        ws_req,
+        node_role
+    );
 
     // Connect to the backend WebSocket service
     let (backend_ws_stream, _) = connect_async(ws_req).await.map_err(|e| {
         actix_web::error::ErrorInternalServerError(format!("Failed to connect to backend: {}", e))
     })?;
 
+    log::info!("[WS_PROXY] Successfully connected to backend WebSocket service");
+
     // Split backend Websocket stream into sink and stream
     let (mut backend_ws_sink, mut backend_ws_stream) = backend_ws_stream.split();
 
+    log::info!("[WS_PROXY] Successfully split backend WebSocket stream into sink and stream");
+
     // Spawn tasks to forward messages between client and backend WebSocket
+    let c2b_node_role = node_role.clone();
     let client_to_backend = async move {
+        log::info!(
+            "[WS_PROXY] Starting to forward messages from client to backend, node role: {}",
+            c2b_node_role
+        );
         while let Some(Ok(msg)) = client_msg_stream.next().await {
-            if backend_ws_sink.send(from_actix_message(msg)).await.is_err() {
+            let ws_msg = from_actix_message(msg);
+            log::info!(
+                "[WS_PROXY] Forwarding message from client to backend: {:?}, node role: {}",
+                ws_msg,
+                c2b_node_role
+            );
+            if backend_ws_sink.send(ws_msg).await.is_err() {
                 return;
             }
         }
+        log::info!(
+            "[WS_PROXY] Finished forwarding messages from client to backend, node role: {}",
+            c2b_node_role
+        );
     };
 
+    let b2c_node_role = node_role.clone();
     let backend_to_client = async move {
+        log::info!(
+            "[WS_PROXY] Starting to forward messages from backend to client, node role: {}",
+            b2c_node_role
+        );
         while let Some(Ok(msg)) = backend_ws_stream.next().await {
-            match from_tungstenite_msg_to_actix_msg(msg) {
+            let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
+
+            log::info!(
+                "[WS_PROXY] Forwarding message from backend to client: {:?}, node role: {}",
+                ws_msg,
+                b2c_node_role
+            );
+
+            match ws_msg {
                 Message::Text(text) => {
                     if session.text(text).await.is_err() {
                         return;
@@ -79,15 +130,25 @@ pub async fn ws_proxy(
                     break;
                 }
                 _ => {
-                    log::warn!("Unsupported message type from backend");
+                    log::warn!("[WS_PROXY] Unsupported message type from backend");
                 }
             }
         }
+        log::info!(
+            "[WS_PROXY] Finished forwarding messages from backend to client, node role: {}",
+            b2c_node_role
+        );
     };
 
-    // Spawn both tasks
+    // Spawn async tasks for client to backend and backend to client message forwarding
     actix_web::rt::spawn(client_to_backend);
     actix_web::rt::spawn(backend_to_client);
+
+    log::info!(
+        "[WS_PROXY] WebSocket proxy setup complete, returning handshake response: {:?}, node role: {}",
+        response,
+        node_role
+    );
 
     // Return the WebSocket handshake response
     Ok(response)
@@ -101,12 +162,12 @@ fn from_actix_message(msg: Message) -> tungstenite::protocol::Message {
         Message::Pong(msg) => tungstenite::protocol::Message::Pong(msg.to_vec()),
         Message::Close(None) => {
             log::info!(
-                "[WebSocketProxy] Received a Message::Close from internal client, closing connection to proxied server"
+                "[WS_PROXY] Received a Message::Close from internal client, closing connection to proxied server"
             );
             tungstenite::protocol::Message::Close(None)
         }
         _ => {
-            log::info!("[WebSocketProxy] Unsupported message type");
+            log::info!("[WS_PROXY] Unsupported message type");
             tungstenite::protocol::Message::Close(None)
         }
     }
@@ -120,7 +181,7 @@ fn from_tungstenite_msg_to_actix_msg(msg: tungstenite::protocol::Message) -> Mes
         tungstenite::protocol::Message::Pong(msg) => Message::Pong(msg.into()),
         tungstenite::protocol::Message::Close(None) => Message::Close(None),
         _ => {
-            log::info!("[WebSocketProxy] Unsupported message type");
+            log::info!("[WS_PROXY] Unsupported message type");
             Message::Close(None)
         }
     }

@@ -154,6 +154,8 @@ async fn dispatch(
     payload: web::Payload,
     client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
+    let cfg = get_config();
+
     let start = std::time::Instant::now();
 
     // get online nodes
@@ -166,6 +168,12 @@ async fn dispatch(
     // check if the request is a websocket request
     let path_columns: Vec<&str> = path.split('/').collect();
     if path_columns.get(3).unwrap_or(&"").to_string() == "ws".to_string() {
+        let node_role = cfg.common.node_role.clone();
+        log::info!(
+            "[WS_ROUTER] Websocket request received on dispatcher: {}, node role: {}",
+            new_url.value,
+            node_role
+        );
         // Convert the HTTP/HTTPS URL to a WebSocket URL (WS/WSS)
         let ws_url = match convert_to_websocket_url(&new_url.value) {
             Ok(url) => url,
@@ -176,16 +184,22 @@ async fn dispatch(
         };
 
         log::info!(
-            "Websocket request received on dispatcher: {}",
-            ws_url.to_string()
+            "[WS_ROUTER] Converted websocket url: {}, node_role: {}",
+            ws_url,
+            node_role
         );
 
-        dbg!(&req);
-
         return match ws_proxy(req, payload, ws_url).await {
-            Ok(res) => Ok(res),
+            Ok(res) => {
+                log::info!(
+                    "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
+                    new_url.value,
+                    start.elapsed().as_millis()
+                );
+                Ok(res)
+            }
             Err(e) => {
-                log::error!("[WebSocketProxy] failed: {}", e);
+                log::error!("[WS_ROUTER] failed: {}", e);
                 Ok(HttpResponse::ServiceUnavailable().body(e.to_string()))
             }
         };
