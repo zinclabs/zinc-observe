@@ -36,7 +36,6 @@ use proto::cluster_rpc;
 use super::empty_exec::NewEmptyExec;
 
 /// A PhysicalExtensionCodec that can serialize and deserialize ChildExec
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct EmptyExecPhysicalExtensionCodec;
 
@@ -108,7 +107,6 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
 
 /// A PhysicalExtensionCodec that tries one of multiple inner codecs
 /// until one works
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct ComposedPhysicalExtensionCodec {
     pub codecs: Vec<Arc<dyn PhysicalExtensionCodec>>,

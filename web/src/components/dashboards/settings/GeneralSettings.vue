@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           data-test="dashboard-general-setting-description"
         />
-        <div v-if="dateTimeValue">
+        <div v-if="dateTimeValue" data-test="dashboard-general-setting-datetime-picker">
           <label>Default Duration</label>
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-toggle
           v-model="dashboardData.showDynamicFilters"
           label="Show Dynamic Filters"
+          data-test="dashboard-general-setting-dynamic-filter"
         ></q-toggle>
         <div class="flex justify-center q-mt-lg">
           <q-btn

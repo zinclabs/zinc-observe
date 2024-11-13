@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    io::{self, Write},
+    io::{self},
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
 };
@@ -26,12 +26,9 @@ use tantivy::{
     HasLen,
 };
 
-use crate::{
-    get_config,
-    meta::{
-        puffin::{writer::PuffinBytesWriter, BlobTypes},
-        puffin_directory::{ALLOWED_FILE_EXT, META_JSON},
-    },
+use crate::meta::{
+    puffin::{writer::PuffinBytesWriter, BlobTypes},
+    puffin_directory::{ALLOWED_FILE_EXT, META_JSON},
 };
 /// Puffin directory is a puffin file which contains all the tantivy files.
 /// Each tantivy file is stored as a blob in the puffin file, along with their file name.
@@ -54,48 +51,6 @@ impl Clone for PuffinDirWriter {
             ram_directory: self.ram_directory.clone(),
             file_paths: self.file_paths.clone(),
         }
-    }
-}
-
-pub fn convert_puffin_dir_to_tantivy_dir(
-    mut puffin_dir_path: PathBuf,
-    puffin_dir: PuffinDirWriter,
-) {
-    // create directory
-    let cfg = get_config();
-    let file_name = puffin_dir_path.file_name().unwrap();
-    let mut file_name = file_name.to_os_string();
-    file_name.push(".folder");
-    puffin_dir_path.set_file_name(file_name);
-    let mut tantivy_folder_path = PathBuf::from(&cfg.common.data_stream_dir);
-    tantivy_folder_path.push(PathBuf::from(&puffin_dir_path));
-
-    // Check if the folder already exists
-    if !tantivy_folder_path.exists() {
-        std::fs::create_dir_all(&tantivy_folder_path).unwrap();
-        log::info!(
-            "Created folder for index at {}",
-            tantivy_folder_path.to_str().unwrap()
-        );
-    } else {
-        log::warn!(
-            "Folder already exists for index at {}",
-            tantivy_folder_path.to_str().unwrap()
-        );
-    }
-
-    for file in puffin_dir.list_files() {
-        let file_data = puffin_dir.open_read(&file.clone()).unwrap();
-        let mut file_handle = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(tantivy_folder_path.join(&file))
-            .unwrap();
-        file_handle
-            .write_all(&file_data.read_bytes().unwrap())
-            .unwrap();
-        file_handle.flush().unwrap();
     }
 }
 

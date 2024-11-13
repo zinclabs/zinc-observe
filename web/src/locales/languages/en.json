@@ -129,7 +129,8 @@
     "flattened": "Flattened",
     "unflattened": "Unflattened",
     "original": "Original",
-    "resetFilters": "Reset Filters"
+    "resetFilters": "Reset Filters",
+    "redirect_to_logs_page":"Go Back to Logs page"
   },
   "menu": {
     "home": "Home",

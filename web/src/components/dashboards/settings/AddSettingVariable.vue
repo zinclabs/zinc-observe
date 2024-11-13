@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 option-value="value"
                 map-options
                 emit-value
+                data-test="dashboard-variable-type-select"
               ></q-select>
             </div>
             <div class="text-body1 text-bold q-mt-lg">
@@ -58,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       /^[a-zA-Z0-9_-]*$/.test(val) ||
                       'Only letters, numbers, hyphens (-), and underscores (_) are allowed.',
                   ]"
+                  data-test="dashboard-variable-name"
                 ></q-input>
               </div>
               <div class="textbox col">
@@ -69,6 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   filled
                   outlined
                   stack-label
+                  data-test="dashboard-variable-label"
                 ></q-input>
               </div>
             </div>
@@ -96,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="textbox showLabelOnTop col no-case q-mr-sm"
                   @update:model-value="streamTypeUpdated"
                   :rules="[(val: any) => !!val || 'Field is required!']"
+                  data-test="dashboard-variable-stream-type-select"
                 ></q-select>
                 <q-select
                   v-model="variableData.query_data.stream"
@@ -115,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   emit-value
                   class="textbox showLabelOnTop col no-case"
                   :rules="[(val: any) => !!val || 'Field is required!']"
+                  data-test="dashboard-variable-stream-select"
                 >
                 </q-select>
               </div>
@@ -137,6 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 option-label="name"
                 emit-value
                 :rules="[(val: any) => !!val || 'Field is required!']"
+                data-test="dashboard-variable-field-select"
               >
               </q-select>
               <div>
@@ -149,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   filled
                   outlined
                   stack-label
+                  data-test="dashboard-variable-max-record-size"
                 >
                   <q-btn
                     padding="xs"
@@ -157,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="q-ml-sm"
                     no-caps
                     icon="info"
+                    data-test="dashboard-variable-max-record-size-info"
                   >
                     <q-tooltip>{{ t("dashboard.maxRecordSize") }}</q-tooltip>
                   </q-btn>
@@ -504,6 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="variableData.customMultiSelectValue[index]"
                     name="value"
                     placeholder="Enter value"
+                    :data-test="`dashboard-variable-custom-value-${index}`"
                   />
                   <q-btn
                     v-if="variableData.multiSelect"
@@ -552,6 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               padding="sm md"
               no-caps
               @click="close"
+              data-test="dashboard-variable-cancel-btn"
             />
             <div>
               <q-btn
@@ -561,6 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 color="secondary"
                 padding="sm xl"
                 no-caps
+                data-test="dashboard-variable-save-btn"
                 >Save</q-btn
               >
             </div>

@@ -30,7 +30,6 @@ use datafusion::{
 /// Optimization rule that add sort and limit to table scan
 #[derive(Default)]
 pub struct AddSortAndLimitRule {
-    #[allow(dead_code)]
     limit: usize,
     offset: usize,
 }
@@ -204,11 +203,9 @@ fn generate_limit_and_sort_plan(
     )
 }
 
-#[allow(dead_code)]
 struct ChangeTableScanSchema {}
 
 impl ChangeTableScanSchema {
-    #[allow(dead_code)]
     fn new() -> Self {
         Self {}
     }

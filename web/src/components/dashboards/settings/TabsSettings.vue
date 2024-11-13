@@ -52,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(tab, index) in currentDashboardData.data.tabs"
           :key="index"
           class="draggable-row"
+          data-test="dashboard-tab-settings-draggable-row"
         >
           <div class="draggable-handle">
             <q-icon
@@ -131,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- add tab dialog -->
-    <q-dialog v-model="showAddTabDialog" position="right" full-height maximized>
+    <q-dialog v-model="showAddTabDialog" position="right" full-height maximized data-test="dashboard-tab-settings-add-tab-dialog">
       <AddTab
         :edit-mode="isTabEditMode"
         :tabId="selectedTabIdToEdit"

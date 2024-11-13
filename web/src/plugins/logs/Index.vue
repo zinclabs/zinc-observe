@@ -273,13 +273,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-splitter>
     </div>
-    <div v-show="showSearchHistory">
+    <div   v-show="showSearchHistory">
       <search-history
+        v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
         @closeSearchHistory="closeSearchHistoryfn"
         :isClicked="showSearchHistory"
       />
+      <div v-else style="height: 200px;" >
+        <div style="height: 80vh"
+      class=" text-center q-pa-md flex flex-center"
+     >
+    <div>
+      <div>
+        <q-icon
+          name="history"
+          size="100px"
+          color="gray"
+          class="q-mb-md"
+          style="opacity: 0.1;"
+  
+        />
+      </div>
+      <div class="text-h4" style="opacity: 0.8">Search history is not enabled. </div>
+      <div  style="opacity: 0.8" class="q-mt-sm flex items-center justify-center">
+        <q-icon name="info" class="q-mr-xs " size="20px" style="opacity: 0.5;" />
+        <span class="text-h6 text-center ">
+          Set ZO_USAGE_REPORTING_ENABLED to true to enable usage reporting.</span>
+      </div>
+
+      <q-btn
+        class="q-mt-xl"
+        color="secondary"
+      
+        unelevated
+        :label="t('search.redirect_to_logs_page')"
+        no-caps
+        @click="redirectBackToLogs"
+      />
     </div>
+  </div>
+      </div>
+    </div>
+
   </q-page>
 </template>
 
@@ -865,7 +901,7 @@ export default defineComponent({
       }
     };
     const showSearchHistoryfn = () => {
-      router.push({
+        router.push({
         name: "logs",
         query: {
           action: "history",
@@ -874,7 +910,17 @@ export default defineComponent({
         },
       });
       showSearchHistory.value = true;
+
     };
+
+    const redirectBackToLogs = () =>{
+      router.push({
+        name: "logs",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    }
 
     function removeFieldByName(data, fieldName) {
       return data.filter((item: any) => {
@@ -1220,6 +1266,7 @@ export default defineComponent({
       onAutoIntervalTrigger,
       showSearchHistory,
       showSearchHistoryfn,
+      redirectBackToLogs,
       handleRunQuery,
       refreshTimezone,
       resetSearchObj,

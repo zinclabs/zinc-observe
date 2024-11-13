@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="primary"
               label="Show Dependencies"
               @click="showVariablesDependenciesGraphPopUp = true"
+              data-test="dashboard-variable-dependencies-btn"
             />
             <q-btn
               class="text-bold no-border q-ml-md"
@@ -47,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               color="secondary"
               :label="t(`dashboard.newVariable`)"
               @click="addVariables"
+              data-test="dashboard-variable-add-btn"
             />
           </div>
         </template>
@@ -75,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 flat
                 :title="t('dashboard.edit')"
                 @click="editVariableFn(props.row.name)"
+                data-test="dashboard-edit-variable"
               ></q-btn>
               <q-btn
                 :icon="outlinedDelete"
@@ -86,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 round
                 flat
                 @click.stop="showDeleteDialogFn(props)"
+                data-test="dashboard-delete-variable"
               ></q-btn>
             </q-td>
           </template>

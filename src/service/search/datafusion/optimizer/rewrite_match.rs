@@ -32,7 +32,6 @@ use crate::service::search::datafusion::udf::match_all_udf::{
 /// Optimization rule that rewrite match_all() to str_match()
 #[derive(Default)]
 pub struct RewriteMatch {
-    #[allow(dead_code)]
     fields: Vec<String>,
 }
 
@@ -102,7 +101,6 @@ fn is_match_all(expr: &Expr) -> bool {
 // Rewriter for match_all() to str_match()
 #[derive(Debug, Clone)]
 pub struct MatchToFullTextMatch {
-    #[allow(dead_code)]
     fields: Vec<String>,
 }
 

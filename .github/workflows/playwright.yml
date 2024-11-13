@@ -62,11 +62,14 @@ jobs:
           node-version: 18
 
       - name: Build frontend code
+        env:
+          VITE_COVERAGE: "true"
+          COVERAGE: "true"
         run: cd web && npm install && npm run build
 
       - name: Build and run binary
         run: cargo build --release --target x86_64-unknown-linux-gnu
-
+        
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -94,13 +97,16 @@ jobs:
             "logsqueries.spec.js",
             "logsquickmode.spec.js",
             "multiselect-stream.spec.js",
-            "pipeline.spec.js",
-            "dashboardtype.spec.js",
-            "dashboard.spec.js",
-            "visualize.spec.js",
+            "pipelines.spec.js",
+            "dashboards/dashboardtype.spec.js",
+            "dashboards/dashboard.spec.js",
+            "dashboards/visualize.spec.js",
             "unflattened.spec.js",
             "secondsPrecisionAdded.spec.js",
-            "dashboard-transpose.spec.js",
+            "dashboards/dashboard-transpose.spec.js",
+            "dashboards/dashboard-general-setting.spec.js",
+            "dashboards/dashboard-variables-setting.spec.js",
+            "dashboards/dashboard-tabs-setting.spec.js",
             "reportsUpdated.spec.js",
           ]
 
@@ -111,9 +117,6 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
-      - name: Display structure of downloaded files
-        run: ls -la .
-
       - name: Start OpenObserve
         run: chmod +x ./debug-binary/openobserve && ./debug-binary/openobserve > o2.log 2>&1 &
 
@@ -122,6 +125,9 @@ jobs:
 
       - name: Ensure we are getting a reply from the server
         run: curl http://localhost:5080/web/login
+
+      - name: Create coverage json folder
+        run: mkdir -p tests/ui-testing/.nyc_output
 
       - uses: actions/setup-node@v4
         with:
@@ -141,9 +147,64 @@ jobs:
       #   if: always()
       #   run: cat o2.log
 
+      - name: Sanitize Test Filename
+        shell: bash 
+        run: |
+          # Assign the matrix variable to a Bash variable
+          SANITIZED_FILENAME="${{ matrix.testfilename }}"
+          # Replace all '/' characters with '_'
+          SANITIZED_FILENAME="${SANITIZED_FILENAME//\//_}"
+          # Export as a GitHub Actions environment variable
+          echo "SANITIZED_FILENAME=$SANITIZED_FILENAME" >> $GITHUB_ENV
+
+      - name: Upload Coverage Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-coverage-${{ env.SANITIZED_FILENAME }}
+          path: tests/ui-testing/.nyc_output
+          include-hidden-files: true
+
+      - name: Generate Coverage Report
+        run: cd tests/ui-testing && npx nyc report
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
           path: playwright-report/
+          retention-days: 30
+
+  generate_coverage_report:
+    name: Generate Coverage Report
+    needs: [build_binary, ui_integration_tests]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v4
+
+      - name: Download Playwright Coverage Data
+        uses: actions/download-artifact@v4
+        with:
+          pattern: playwright-coverage-*  # Match all artifacts with this prefix
+          path: merged-coverage
+          merge-multiple: true 
+
+      - name: Verify Downloaded Files
+        run: ls -R merged-coverage # Check the structure and contents
+
+      - name: Move Coverage Files to .nyc_output
+        run: |
+          mkdir -p tests/ui-testing/.nyc_output
+          mv merged-coverage/* tests/ui-testing/.nyc_output/ || echo "No files to move"
+
+      - name: Generate Coverage Report
+        run: cd tests/ui-testing && npm ci && npx nyc report
+
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: tests/ui-testing/coverage-report
           retention-days: 30

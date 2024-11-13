@@ -61,13 +61,11 @@ impl<'n> TreeNodeVisitor<'n> for NewEmptyExecVisitor {
     }
 }
 
-#[allow(dead_code)]
 pub struct ReplaceTableScanExec {
     input: Arc<dyn ExecutionPlan>,
 }
 
 impl ReplaceTableScanExec {
-    #[allow(dead_code)]
     pub fn new(input: Arc<dyn ExecutionPlan>) -> Self {
         Self { input }
     }

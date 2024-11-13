@@ -38,9 +38,7 @@ use crate::service::search::{
 /// Optimization rule that rewrite histogram to date_bin()
 #[derive(Default)]
 pub struct RewriteHistogram {
-    #[allow(dead_code)]
     start_time: i64,
-    #[allow(dead_code)]
     end_time: i64,
 }
 

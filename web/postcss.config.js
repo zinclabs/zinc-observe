@@ -1,5 +1,5 @@
 /* eslint-disable no-undef */
-module.exports = {
+export default {
   plugins: {
     tailwindcss: {},
     autoprefixer: {},

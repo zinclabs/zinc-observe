@@ -36,8 +36,7 @@ use config::{
     cluster, get_config,
     meta::{
         bitvec::BitVec,
-        inverted_index::{writer::ColumnIndexer, InvertedIndexFormat},
-        puffin::{writer::PuffinBytesWriter, BlobTypes},
+        inverted_index::InvertedIndexFormat,
         puffin_directory::writer::PuffinDirWriter,
         search::StorageType,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
@@ -47,10 +46,7 @@ use config::{
         arrow::record_batches_to_json_rows,
         asynchronism::file::get_file_meta,
         file::scan_files_with_channel,
-        inverted_index::{
-            convert_parquet_idx_file_name, convert_parquet_idx_file_name_to_tantivy_file,
-            split_token,
-        },
+        inverted_index::{convert_parquet_idx_file_name_to_tantivy_file, split_token},
         json,
         parquet::{
             get_recordbatch_reader_from_bytes, read_metadata_from_file, read_schema_from_file,
@@ -1327,80 +1323,6 @@ async fn prepare_index_record_batches(
     Ok(indexed_record_batches_to_merge)
 }
 
-/// Creates fst inverted index bytes and writes to storage.
-/// Called by both ingester and compactor. Compactor needs to provide `file_list_to_invalidate`
-/// to delete previously created small index files
-#[allow(dead_code)]
-pub(crate) async fn generate_fst_inverted_index(
-    parquet_file_name: &str,
-    file_list_to_invalidate: Option<&[FileKey]>,
-    full_text_search_fields: &[String],
-    index_fields: &[String],
-    schema: Arc<Schema>,
-    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
-) -> Result<(), anyhow::Error> {
-    let start = std::time::Instant::now();
-    let caller = if file_list_to_invalidate.is_some() {
-        "[COMPACTOR:JOB]"
-    } else {
-        "[INGESTER:JOB]"
-    };
-
-    if full_text_search_fields.is_empty() && index_fields.is_empty() {
-        return Ok(());
-    }
-
-    let Some((compressed_bytes, file_meta)) =
-        prepare_fst_index_bytes(schema, reader, full_text_search_fields, index_fields).await?
-    else {
-        log::info!("generate_fst_index_on_compactor creates empty index. skip");
-        return Ok(());
-    };
-
-    // delete corresponding small .puffin files
-    if let Some(file_list) = file_list_to_invalidate {
-        for old_parquet_file in file_list {
-            let Some(old_idx_file) = convert_parquet_idx_file_name(&old_parquet_file.key) else {
-                continue;
-            };
-            if let Err(e) = storage::del(&[&old_idx_file]).await {
-                log::info!(
-                    "[COMPACTOR:JOB] Failed to remove merged fst idx file from disk: {}, {}",
-                    old_idx_file,
-                    e
-                );
-            }
-        }
-    }
-
-    // write fst bytes into disk
-    let Some(idx_file_name) = convert_parquet_idx_file_name(parquet_file_name) else {
-        return Ok(());
-    };
-    match storage::put(&idx_file_name, Bytes::from(compressed_bytes)).await {
-        Ok(_) => {
-            log::info!(
-                "{} Written fst index file successfully: {}, compressed size {}, original size {}, took: {} ms",
-                caller,
-                idx_file_name,
-                file_meta.compressed_size,
-                file_meta.original_size,
-                start.elapsed().as_millis()
-            );
-            Ok(())
-        }
-        Err(e) => {
-            log::error!(
-                "{} Written fst index file: {}, error: {}",
-                caller,
-                idx_file_name,
-                e.to_string()
-            );
-            Err(e)
-        }
-    }
-}
-
 pub(crate) async fn create_tantivy_index(
     caller: &str,
     parquet_file_name: &str,
@@ -1535,14 +1457,17 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
 
         // process full text search fields
         for column_name in tantivy_fields.iter() {
-            // get column
-            let Some(column_data) = inverted_idx_batch
+            let column_data = match inverted_idx_batch
                 .column_by_name(column_name)
                 .unwrap()
                 .as_any()
                 .downcast_ref::<StringArray>()
-            else {
-                continue;
+            {
+                Some(column_data) => column_data,
+                None => {
+                    // generate empty array to ensure the tantivy and parquet have same rows
+                    &StringArray::from(vec![""; num_rows])
+                }
             };
 
             // get field
@@ -1559,13 +1484,12 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
         }
     }
 
-    // TODO: Check if 50MB is enough for the tantivy index for >1GB parquet file
     let mut index_writer = tantivy::IndexBuilder::new()
         .schema(tantivy_schema)
         .single_segment_index_writer(tantivy_dir, 50_000_000)
         .context("failed to create index builder")?;
 
-    for (_rowid, doc) in docs.into_iter() {
+    for (_, doc) in docs.into_iter() {
         if let Err(e) = index_writer.add_document(doc) {
             log::error!(
                 "generate_tantivy_index: Failed to add document to index: {}",
@@ -1584,161 +1508,4 @@ pub(crate) async fn generate_tantivy_index<D: tantivy::Directory>(
     })?;
 
     Ok(Some(index))
-}
-
-/// Create and compressed inverted index bytes using FST solution for the given RecordBatch
-pub(crate) async fn prepare_fst_index_bytes(
-    schema: Arc<Schema>,
-    reader: &mut ParquetRecordBatchStream<std::io::Cursor<Bytes>>,
-    full_text_search_fields: &[String],
-    index_fields: &[String],
-) -> Result<Option<(Vec<u8>, FileMeta)>, anyhow::Error> {
-    let cfg = get_config();
-    let schema_fields = schema
-        .fields()
-        .iter()
-        .map(|f| (f.name(), f))
-        .collect::<HashMap<_, _>>();
-
-    let mut total_num_rows = 0;
-    let mut uniq_terms: HashMap<String, BTreeMap<String, _>> = HashMap::new();
-    loop {
-        let batch = reader.try_next().await?;
-        let Some(inverted_idx_batch) = batch else {
-            break;
-        };
-        let num_rows = inverted_idx_batch.num_rows();
-        if num_rows == 0 {
-            continue;
-        }
-
-        // update total_num_rows
-        let prev_total_num_rows = total_num_rows;
-        total_num_rows += num_rows;
-
-        // process full text search fields
-        for column_name in full_text_search_fields.iter() {
-            if !schema_fields.contains_key(column_name) {
-                continue;
-            }
-            if schema_fields.get(column_name).unwrap().data_type() != &DataType::Utf8 {
-                continue;
-            }
-
-            // get full text search column
-            let Some(column_data) = inverted_idx_batch
-                .column_by_name(column_name)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-            else {
-                continue;
-            };
-
-            // split the column into terms
-            let terms = (0..num_rows)
-                .flat_map(|i| {
-                    split_token(column_data.value(i), &cfg.common.inverted_index_split_chars)
-                        .into_iter()
-                        .map(|s| (s, i))
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>();
-            if terms.is_empty() {
-                continue;
-            }
-
-            // unique terms and get the min & max _timestamp
-            let column_uniq_terms = uniq_terms
-                .entry(INDEX_FIELD_NAME_FOR_ALL.to_string())
-                .or_insert(BTreeMap::new());
-            for (term, idx) in terms {
-                let ids = column_uniq_terms
-                    .entry(term.to_string())
-                    .or_insert(Vec::new());
-                ids.push(idx + prev_total_num_rows);
-            }
-        }
-
-        // process index fields
-        for column_name in index_fields.iter() {
-            if !schema_fields.contains_key(column_name) {
-                continue;
-            }
-            if schema_fields.get(column_name).unwrap().data_type() != &DataType::Utf8 {
-                continue;
-            }
-
-            // get index column
-            let Some(column_data) = inverted_idx_batch
-                .column_by_name(column_name)
-                .unwrap()
-                .as_any()
-                .downcast_ref::<StringArray>()
-            else {
-                continue;
-            };
-
-            // collect terms
-            let terms = (0..num_rows)
-                .map(|i| (column_data.value(i), i))
-                .collect::<Vec<_>>();
-            if terms.is_empty() {
-                continue;
-            }
-
-            // unique terms
-            let column_uniq_terms = uniq_terms
-                .entry(column_name.to_string())
-                .or_insert(BTreeMap::new());
-            for (term, idx) in terms {
-                let ids = column_uniq_terms
-                    .entry(term.to_string())
-                    .or_insert(Vec::new());
-                ids.push(idx + prev_total_num_rows);
-            }
-        }
-    }
-
-    // Process fst writer
-    let mut indexers = HashMap::new();
-    for (column_name, terms) in uniq_terms {
-        let indexer = indexers
-            .entry(column_name)
-            .or_insert_with(ColumnIndexer::new);
-        for (term, ids) in terms {
-            for row_id in ids {
-                let segment_id = row_id / INDEX_SEGMENT_LENGTH;
-                indexer.push(term.as_bytes(), segment_id, term.len());
-            }
-        }
-    }
-
-    // create puffin file
-    let mut puffin_buf: Vec<u8> = Vec::new();
-    let mut puffin_writer = PuffinBytesWriter::new(&mut puffin_buf);
-    let mut original_size = 0;
-    for (column_name, indexer) in indexers {
-        if indexer.is_empty() {
-            continue;
-        }
-        let mut buf = Vec::new();
-        let _index_meta = indexer.write(&mut buf).context(format!(
-            "Error constructing FST ColumnIndex for field {}",
-            column_name
-        ))?;
-        original_size += buf.len();
-        puffin_writer.add_blob(&buf, BlobTypes::O2FstV1, column_name, true)?;
-    }
-
-    puffin_writer.finish()?;
-
-    // index size
-    let file_meta = FileMeta {
-        original_size: original_size as i64,
-        compressed_size: puffin_buf.len() as i64,
-        ..Default::default()
-    };
-
-    Ok(Some((puffin_buf, file_meta)))
 }
