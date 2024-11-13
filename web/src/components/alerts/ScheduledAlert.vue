@@ -583,7 +583,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-icon>
         </div>
-        <div style="min-height: 58px">
+        <div >
           <div
             class="flex items-center q-mr-sm"
             style="border: 1px solid rgba(0, 0, 0, 0.05); width: fit-content"
@@ -708,7 +708,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div class="flex items-center q-mr-sm">
+      <div style="height: 50px;" class="flex items-center q-mr-sm">
         <div
           data-test="scheduled-alert-cron-toggle-title"
           class="text-bold flex items-center"
@@ -734,16 +734,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-tooltip>
           </q-icon>
         </div>
-        <div style="min-height: 83px">
-          <div class="flex items-start q-mr-sm" style="width: fit-content">
+        <div >
+          <div class="flex items-center  q-mr-sm" style="width: fit-content;">
             <div
               data-test="scheduled-alert-cron-input"
               style="width: 87px; margin-left: 0 !important"
-              class="silence-notification-input"
+              class="flex items-center "
             >
               <q-toggle
                 data-test="scheduled-alert-cron-toggle-btn "
-                class="q-mt-md"
+  
                 v-model="triggerData.frequency_type"
                 :true-value="'cron'"
                 :false-value="'minutes'"
@@ -752,11 +752,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="flex items-center q-mr-sm q-mb-xl">
+      <div  class="flex items-center q-mr-sm ">
         <div
           data-test="scheduled-alert-frequency-title"
           class="text-bold flex items-center"
-          style="width: 190px"
+          style="width: 190px;height: 87px;"
           
         >
           {{ t("alerts.frequency") + " *" }}
@@ -820,7 +820,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </template>
         </div>
-        <div style="height: 50px">
+        <div >
           <div class="flex items-center" style="width: fit-content">
             <div
               data-test="scheduled-alert-frequency-input"

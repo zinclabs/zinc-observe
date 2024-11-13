@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           
             <div v-if="((isExpandItem && formData.is_real_time=='false') || formData.is_real_time == 'true')" class="col-12 flex justify-start items-center">
               <div
-                class="q-py-sm showLabelOnTop text-bold text-h7 q-pb-md flex items-center"
+                class=" showLabelOnTop text-bold text-h7 q-pb-md flex items-center"
                 data-test="add-alert-delay-title"
                 style="width: 190px"
               >
