@@ -78,6 +78,7 @@ use crate::{common::meta, handler::http::request};
         request::dashboards::create_dashboard,
         request::dashboards::update_dashboard,
         request::dashboards::list_dashboards,
+        request::dashboards::search_dashboards,
         request::dashboards::get_dashboard,
         request::dashboards::delete_dashboard,
         request::dashboards::folders::delete_folder,
