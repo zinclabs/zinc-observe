@@ -17,6 +17,9 @@ let openHandlers: OpenHandler[] = [];
 let closeHandlers: CloseHandler[] = [];
 let errorHandlers: ErrorHandler[] = [];
 
+let pingInterval: any = null;
+const pingTimeout: any = 5000;
+
 const connect = (url: string, interval: number, maxAttempts: number) => {
   if (socket) return;
 
@@ -24,7 +27,6 @@ const connect = (url: string, interval: number, maxAttempts: number) => {
   maxReconnectAttempts = maxAttempts;
 
   socket = new WebSocket(url);
-  console.log("WebSocket is connecting now.", socket);
   socket.addEventListener("open", onOpen);
   socket.addEventListener("message", onMessage);
   socket.addEventListener("close", onClose);
@@ -32,9 +34,14 @@ const connect = (url: string, interval: number, maxAttempts: number) => {
 };
 
 const onOpen = (event: Event) => {
-  console.log("WebSocket is open now.");
   reconnectAttempts = 0;
   openHandlers.forEach((handler) => handler(event));
+
+  pingInterval = setInterval(() => {
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: "ping", message: "ping" }));
+    }
+  }, pingTimeout);
 };
 
 const onMessage = (event: MessageEvent) => {
@@ -43,9 +50,9 @@ const onMessage = (event: MessageEvent) => {
 };
 
 const onClose = (event: CloseEvent) => {
-  console.log("WebSocket is closed now.");
   socket?.close();
   socket = null;
+  pingInterval && clearInterval(pingInterval);
   closeHandlers.forEach((handler) => handler(event));
   openHandlers = [];
   errorHandlers = [];
@@ -60,13 +67,10 @@ const onClose = (event: CloseEvent) => {
 };
 
 const onError = (event: Event) => {
-  console.error("WebSocket error observed:", event);
   errorHandlers.forEach((handler) => handler(event));
 };
 
 const sendMessage = (message: string) => {
-  console.log("Sending message to server:", message);
-  console.log("WebSocket ready state:", socket, socket?.readyState);
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(message);
   } else {
@@ -132,6 +136,8 @@ const useWebSocket = (
       socket.close();
       socket = null;
     }
+
+    pingInterval && clearInterval(pingInterval);
   });
 
   return {

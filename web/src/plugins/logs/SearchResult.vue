@@ -300,7 +300,9 @@ export default defineComponent({
       } else if (actionType == "recordsPerPage") {
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
-        this.refreshPartitionPagination(true);
+        this.searchObj.communicationMethod === "ws"
+          ? this.refreshPagination()
+          : this.refreshPartitionPagination(true);
         this.$emit("update:recordsPerPage");
         this.scrollTableToTop(0);
       } else if (actionType == "pageChange") {
@@ -372,6 +374,7 @@ export default defineComponent({
       filterHitsColumns,
       reorderSelectedFields,
       getFilterExpressionByFieldType,
+      refreshPagination,
     } = useLogs();
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
@@ -589,6 +592,7 @@ export default defineComponent({
       getColumns,
       reorderSelectedFields,
       getPaginations,
+      refreshPagination,
     };
   },
   computed: {

@@ -15,7 +15,15 @@
 
 import { date, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
+import {
+  reactive,
+  ref,
+  type Ref,
+  toRaw,
+  nextTick,
+  onBeforeMount,
+  watch,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, startCase } from "lodash-es";
@@ -251,6 +259,8 @@ const searchAggData = reactive({
   hasAggregation: false,
 });
 
+const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
+
 let histogramResults: any = [];
 let histogramMappedData: any = [];
 const intervalMap: any = {
@@ -274,7 +284,7 @@ const useLogs = () => {
   const router = useRouter();
   let parser: any;
   const fieldValues = ref();
-  const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
+
   const notificationMsg = ref("");
 
   const webSocket = useWebSocket();
@@ -3240,17 +3250,17 @@ const useLogs = () => {
         totalCount = searchObj.data.queryResults.hits.length;
       } else {
         endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
-        // if (
-        //   currentPage >=
-        //   searchObj.data.queryResults?.partitionDetail?.paginations?.length - 1
-        // ) {
-        //   endCount = Math.min(
-        //     startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
-        //     totalCount,
-        //   );
-        // } else {
-        //   endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
-        // }
+        if (
+          currentPage >=
+          searchObj.data.queryResults?.partitionDetail?.paginations?.length - 1
+        ) {
+          endCount = Math.min(
+            startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
+            totalCount,
+          );
+        } else {
+          endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
+        }
       }
 
       if (searchObj.meta.sqlMode && searchAggData.hasAggregation) {
@@ -4385,6 +4395,14 @@ const useLogs = () => {
 
       const queryReq: SearchRequestPayload = buildSearch();
 
+      if (queryReq === null) {
+        searchObj.loading = false;
+        if (!notificationMsg.value) {
+          notificationMsg.value = "Search query is empty or invalid.";
+        }
+        return;
+      }
+
       if (!queryReq) {
         searchObj.loading = false;
         throw new Error(
@@ -4393,8 +4411,8 @@ const useLogs = () => {
         );
       }
 
-      if (searchObj.data.datetime.type === "relative") {
-        if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
+      if (searchObj.data.datetime.type === "relative" && !isPagination) {
+        initialQueryPayload.value = cloneDeep(queryReq);
       } else {
         if (
           searchObj.meta.refreshInterval == 0 &&
@@ -4446,7 +4464,7 @@ const useLogs = () => {
 
   const fetchSearchData = (
     queryReq: SearchRequestPayload,
-    type: "search" | "histogram",
+    type: "search" | "histogram" | "pageCount",
     isPagination: boolean,
   ) => {
     try {
@@ -4454,18 +4472,14 @@ const useLogs = () => {
       addTraceId(traceId);
 
       const requestId = getUUID();
-      console.log("Web socket request");
-      const url =
-        getWebSocketUrl(requestId, searchObj.organizationIdentifier) +
-        `?type=${searchObj.data.stream.streamType}&search_type=UI&use_cache=true`;
+      const url = getWebSocketUrl(requestId, searchObj.organizationIdentifier);
 
       webSocket.connect(url, 2000, 5);
 
       webSocket.addMessageHandler(
-        handleSearchResponse.bind(null, queryReq, isPagination, type),
+        handleSearchResponse.bind(null, queryReq, isPagination, type, traceId),
       );
 
-      console.log("Web socket close handler added", type, isPagination);
       webSocket.addCloseHandler(
         handleSearchClose.bind(null, queryReq, type, isPagination),
       );
@@ -4484,7 +4498,7 @@ const useLogs = () => {
 
   const sendSearchMessage = (
     queryReq: SearchRequestPayload,
-    type: "search" | "histogram",
+    type: "search" | "histogram" | "pageCount",
     trace_id: string,
   ) => {
     try {
@@ -4496,6 +4510,9 @@ const useLogs = () => {
             payload: {
               query: queryReq.query,
             },
+            type: searchObj.data.stream.streamType,
+            search_type: "UI",
+            use_cache: (window as any).use_cache ?? true,
           },
         }),
       );
@@ -4518,24 +4535,32 @@ const useLogs = () => {
   const handleSearchResponse = async (
     queryReq: SearchRequestPayload,
     isPagination: boolean,
-    type: "search" | "histogram",
+    type: "search" | "histogram" | "pageCount",
+    traceId: string,
     response: any,
   ) => {
     if (type === "search") {
-      handleLogsResponse(queryReq, isPagination, response);
+      handleLogsResponse(queryReq, isPagination, traceId, response);
     }
 
     if (type === "histogram") {
-      handleHistogramResponse(queryReq, response);
+      handleHistogramResponse(queryReq, traceId, response);
+    }
+
+    if (type === "pageCount") {
+      handlePageCountResponse(queryReq, traceId, response);
     }
   };
 
   const handleLogsResponse = async (
     queryReq: SearchRequestPayload,
     isPagination: boolean,
+    traceId: string,
     response: any,
   ) => {
     try {
+      removeTraceId(traceId);
+
       const parsedSQL = fnParsedSQL();
 
       // When using limit
@@ -4588,9 +4613,9 @@ const useLogs = () => {
         searchObj.data.queryResults.pagination = [];
       }
 
-      processPostPaginationData();
+      if (isPagination) refreshPagination(true); // check whats this
 
-      if (!isPagination) refreshPagination(true); // check whats this
+      processPostPaginationData();
 
       searchObj.loading = false;
 
@@ -4604,10 +4629,41 @@ const useLogs = () => {
     }
   };
 
-  const handleHistogramResponse = (
+  const handlePageCountResponse = (
     queryReq: SearchRequestPayload,
+    traceId: string,
     response: any,
   ) => {
+    removeTraceId(traceId);
+    // check for total records update for the partition and update pagination accordingly
+    // searchObj.data.queryResults.partitionDetail.partitions.forEach(
+    //   (item: any, index: number) => {
+    searchObj.data.queryResults.scan_size = response.content.results.scan_size;
+    searchObj.data.queryResults.took += response.content.results.took;
+
+    let regeratePaginationFlag = false;
+    if (
+      response.content.results.hits.length !=
+      searchObj.meta.resultGrid.rowsPerPage
+    ) {
+      regeratePaginationFlag = true;
+    }
+
+    searchObj.data.queryResults.aggs = response.content.results.hits;
+    // if total records in partition is greater than recordsPerPage then we need to update pagination
+    // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
+    refreshPagination(regeratePaginationFlag);
+
+    searchObj.data.histogram.chartParams.title = getHistogramTitle();
+  };
+
+  const handleHistogramResponse = (
+    queryReq: SearchRequestPayload,
+    traceId: string,
+    response: any,
+  ) => {
+    removeTraceId(traceId);
+
     searchObjDebug["histogramProcessingStartTime"] = performance.now();
     searchObj.loading = false;
     if (searchObj.data.queryResults.aggs == null) {
@@ -4618,8 +4674,8 @@ const useLogs = () => {
       searchObj.data.queryResults.aggs.length == 0 &&
       response.content.results.hits.length > 0
     ) {
-      histogramResults = [];
       let date = new Date();
+
       const startDateTime =
         searchObj.data.customDownloadQueryObj.query.start_time / 1000;
 
@@ -4739,9 +4795,9 @@ const useLogs = () => {
 
         await generateHistogramSkeleton();
 
-        fetchSearchData(searchObj.data.histogramQuery, "histogram", false);
+        histogramResults = [];
 
-        searchObj.loadingHistogram = false;
+        fetchSearchData(searchObj.data.histogramQuery, "histogram", false);
       }
     } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
       resetHistogramWithError("Histogram is not available for limit queries.");
@@ -4758,7 +4814,7 @@ const useLogs = () => {
         setTimeout(async () => {
           searchObjDebug["pagecountStartTime"] = performance.now();
           // TODO : check the page count request
-          await getPageCount(queryReq);
+          getPageCountThroughSocket(queryReq);
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
       }
@@ -4787,32 +4843,31 @@ const useLogs = () => {
 
   const handleSearchClose = (
     queryReq: SearchRequestPayload,
-    type: "search" | "histogram",
+    type: "search" | "histogram" | "pageCount",
     isPagination: boolean,
     response: any,
   ) => {
-    console.log("handleSearchClose", type, isPagination);
     searchObj.loading = false;
     if (type === "search" && !isPagination) processHistogramRequest(queryReq);
+
+    if (type === "histogram") {
+      searchObj.loadingHistogram = false;
+    }
   };
 
   const handleSearchError = (response: any) => {
-    console.log("handleSearchError", response);
+    searchObj.loading = false;
+    searchObj.loadingHistogram = false;
+    //handlePageCountError
   };
 
   const refreshPagination = (regenrateFlag: boolean = false) => {
     try {
       const { rowsPerPage } = searchObj.meta.resultGrid;
       const { currentPage } = searchObj.data.resultGrid;
-      const lastPartitionSize = 0;
 
-      const pageNumber = 0;
-      const partitionFrom = 0;
       let total = 0;
       let totalPages = 0;
-      const recordSize = 0;
-      const from = 0;
-      const lastPage = 0;
 
       total = (searchObj.data.queryResults.aggs || []).reduce(
         (
@@ -4844,6 +4899,52 @@ const useLogs = () => {
       console.log("Error while refreshing partition pagination", e);
       notificationMsg.value = "Error while refreshing partition pagination.";
       return false;
+    }
+  };
+
+  const getPageCountThroughSocket = async (queryReq: any) => {
+    searchObj.data.countErrorMsg = "";
+    queryReq.query.size = 0;
+    delete queryReq.query.from;
+    delete queryReq.query.quick_mode;
+    queryReq.query["sql_mode"] = "full";
+
+    queryReq.query.track_total_hits = true;
+
+    const { traceparent, traceId } = generateTraceContext();
+    addTraceId(traceId);
+
+    fetchSearchData(queryReq, "pageCount", false);
+  };
+
+  const handlePageCountError = (err: any) => {
+    searchObj.loading = false;
+    let trace_id = "";
+    searchObj.data.countErrorMsg = "Error while retrieving total events: ";
+    if (err.response != undefined) {
+      if (err.response.data.hasOwnProperty("trace_id")) {
+        trace_id = err.response.data?.trace_id;
+      }
+    } else {
+      if (err.hasOwnProperty("trace_id")) {
+        trace_id = err?.trace_id;
+      }
+    }
+
+    const customMessage = logsErrorMessage(err?.response?.data.code);
+    searchObj.data.errorCode = err?.response?.data.code;
+
+    notificationMsg.value = searchObj.data.countErrorMsg;
+
+    if (err?.request?.status >= 429) {
+      notificationMsg.value = err?.response?.data?.message;
+      searchObj.data.countErrorMsg += err?.response?.data?.message;
+    }
+
+    if (trace_id) {
+      searchObj.data.countErrorMsg += " TraceID:" + trace_id;
+      notificationMsg.value += " TraceID:" + trace_id;
+      trace_id = "";
     }
   };
 
@@ -4891,6 +4992,8 @@ const useLogs = () => {
     getFilterExpressionByFieldType,
     setSelectedStreams,
     extractValueQuery,
+    initialQueryPayload,
+    refreshPagination,
   };
 };
 
