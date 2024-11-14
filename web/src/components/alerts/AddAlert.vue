@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-btn
                   data-test="add-report-step1-continue-btn"
-                  @click="step = 3"
+                  @click="handleStep2Continue"
                   color="secondary"
                   label="Continue"
                   no-caps
@@ -788,36 +788,57 @@ export default defineComponent({
 
     }
 
+    const handleStep2Continue = async () => {
+      console.log(formData.value.destinations.length,"form")
+      if(formData.value.destinations.length == 0){
+        q.notify({
+          message: "Please select atleast one destination",
+          color: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
+        return;
+      }
+      step.value = 3;
+    }
+
 
 
     const validateConditions = () => {
       let check = true;
-      if(formData.value.query_condition.type == 'custom' && formData.value.query_condition.conditions.length > 0 ){
-        
-       formData.value.query_condition.conditions.map((condition: any) => {
-        if (condition.column === "") {
-          q.notify({
-            message: "Column is required in conditions",
-            color: "negative",
-            position: "bottom",
-            timeout: 2000,
-          });
-          return check = false;
-        }
-        if (condition.value === "") {
-          q.notify({
-            message: "Value is required in conditions",
-            color: "negative",
-            position: "bottom",
-            timeout: 2000,
-          });
-          return check = false;
-        }
-      });
-     }
-     return check;
 
-    }
+      if (
+        formData.value.query_condition.type === "custom" &&
+        formData.value.query_condition.hasOwnProperty("conditions") &&
+        formData.value.query_condition.conditions.length > 0
+      ) {
+        for (const condition of formData.value.query_condition.conditions) {
+          if (condition.column === "") {
+            q.notify({
+              message: "Column is required in conditions",
+              color: "negative",
+              position: "bottom",
+              timeout: 2000,
+            });
+            check = false;
+            break; // Exit the loop to avoid multiple notifications
+          }
+          if (condition.value === "") {
+            q.notify({
+              message: "Value is required in conditions",
+              color: "negative",
+              position: "bottom",
+              timeout: 2000,
+            });
+            check = false;
+            break; // Exit the loop to avoid multiple notifications
+          }
+        }
+      }
+
+      return check;
+    };
+
 
 
     const validateInputFields = async () =>{
@@ -867,15 +888,7 @@ export default defineComponent({
           });
           return false;
         }
-        if(formData.value.trigger_condition.frequency == ""|| formData.value.trigger_condition.frequency < 1 || isNaN( formData.value.trigger_condition.frequency)){
-          q.notify({
-            message: "Frequency should be greater than 0",
-            color: "negative",
-            position: "bottom",
-            timeout: 2000,
-          });
-          return false;
-        }
+
         }
         if(formData.value.trigger_condition.silence == "" || formData.value.trigger_condition.silence < 1 || isNaN( formData.value.trigger_condition.silence )){
           q.notify({
@@ -924,11 +937,6 @@ export default defineComponent({
       },
       { immediate: true }
     );
-    watch(scheduledAlertRef, (newVal) => {
-  if (newVal) {
-    console.log("ScheduledAlert component loaded:", getSelectedTab.value);
-  }
-});
 
     const filterColumns = (options: any[], val: String, update: Function) => {
       let filteredOptions: any[] = [];
@@ -1257,8 +1265,6 @@ export default defineComponent({
 
     const validateInputs = async (input: any, notify: boolean = true) => {
 
-      console.log(input,'input')
-
       if(input.name == ""){
         q.notify({
           message: "Alert Name should not be empty",
@@ -1289,16 +1295,16 @@ export default defineComponent({
         return false;
       }
 
-
-      if(sqlQueryErrorMsg.value !== ""){
-
-        return false;
-      }
       if(validateConditions() == false){
         return false;
       }
-      if((input.is_real_time == 'false' || input.is_real_time == false)){
 
+
+      if(sqlQueryErrorMsg.value !== "" && ((input.is_real_time == 'false' || input.is_real_time == false) && input.query_condition.type == 'sql' ) ){
+        return false;
+      }
+
+      if((input.is_real_time == 'false' || input.is_real_time == false)){
 
         if (
           input.query_condition.type == "sql" &&
@@ -1334,10 +1340,10 @@ export default defineComponent({
           });
           return false;;
         }
+
         if (isAggregationEnabled.value && input.query_condition.type == "custom") {
           console.log(input.query_condition,"condition")
         if(input.query_condition.aggregation.group_by[0] == ''){
-          step.value = 1;
           notify &&
             q.notify({
               type: "negative",
@@ -1347,7 +1353,6 @@ export default defineComponent({
           return false;
         }
         if(input.query_condition.aggregation.having.column == ''){
-          step.value = 1;
           notify &&
             q.notify({
               type: "negative",
@@ -1371,9 +1376,8 @@ export default defineComponent({
             });
           return false;
         }
+        }
 
-        return true;
-      }
 
         if (input.trigger_condition.period == "") {
         notify &&
@@ -1394,7 +1398,7 @@ export default defineComponent({
           });
           return false;
         }
-        if (input.trigger_condition.frequency == "") {
+        if ((input.trigger_condition.frequency == "" || isNaN(input.trigger_condition.frequency))  && input.trigger_condition.frequency_type == "minutes") {
         notify &&
           q.notify({
             type: "negative",
@@ -1403,7 +1407,7 @@ export default defineComponent({
           });
         return false;
       }
-        if(input.trigger_condition.frequency < 1 || isNaN( input.trigger_condition.frequency)){
+        if(input.trigger_condition.frequency < 1 ){
           q.notify({
             message: "Frequency should be greater than 0",
             color: "negative",
@@ -1412,6 +1416,18 @@ export default defineComponent({
           });
           return false;
         }
+        if (input.trigger_condition.cron == "" && input.trigger_condition.frequency_type == "cron") {
+        notify &&
+          q.notify({
+            type: "negative",
+            message: "Cron should not be empty",
+            timeout: 1500,
+          });
+        return false;
+      }
+        
+
+
       }
       if (input.trigger_condition.silence == "") {
         notify &&
@@ -1628,6 +1644,7 @@ export default defineComponent({
       step,
       isExpandItem,
       handleStep1Continue,
+      handleStep2Continue,
       validateInputFields,
       validateConditions,
       updateQueryType,
@@ -1726,14 +1743,7 @@ export default defineComponent({
         });
         return false;
       }
-      if (this.formData.stream_name == "") {
-        this.q.notify({
-          type: "negative",
-          message: "Please select stream name.",
-          timeout: 1500,
-        });
-        return false;
-      }
+      
 
       if (
         this.formData.is_real_time == "false" &&
@@ -1770,20 +1780,22 @@ export default defineComponent({
           return false;
         }
 
+
         const payload = this.getAlertPayload();
         const isValid = await this.validateInputs(payload);
-        console.log(isValid,"is valid")
         if (!isValid) {
           this.step = 1;
           this.isExpandItem = true;
           return ;
         }
 
-        const dismiss = this.q.notify({
+        const dismiss = () =>  {
+          this.q.notify({
           spinner: true,
           message: "Please wait...",
           timeout: 2000,
         });
+        }
 
         if (
           this.formData.is_real_time == "false" &&
@@ -1814,7 +1826,6 @@ export default defineComponent({
               this.formData = { ...defaultValue };
               this.$emit("update:list");
               this.addAlertForm.resetValidation();
-              dismiss();
               this.q.notify({
                 type: "positive",
                 message: `Alert updated successfully.`,
@@ -1831,15 +1842,13 @@ export default defineComponent({
                 
               }
               else{
-                dismiss();
+              dismiss();
                this.q.notify({
                 type: "negative",
                 message:
                   err.response?.data?.error || err.response?.data?.message,
               });
               this.step = 1;
-
-
               }
 
             });
@@ -1872,11 +1881,20 @@ export default defineComponent({
               });
             })
             .catch((err: any) => {
+              console.log(err,"err")
               if(err.response?.data?.message == "Invalid expression: Invalid cron expression."){
+                this.q.notify({
+                type: "negative",
+                message: err.response?.data?.message,
+                });
                 this.step = 1;
                 this.isExpandItem = true;
               }
               else if(err.response?.data?.message == "Alert destinations is required"){
+                this.q.notify({
+                type: "negative",
+                message: err.response?.data?.message,
+                });
                 this.step = 2;
               }
               else{
