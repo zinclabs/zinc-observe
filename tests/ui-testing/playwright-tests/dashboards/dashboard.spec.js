@@ -1677,7 +1677,6 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-name"]').fill("Dashboard");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
-    // Delete the panel and confirm
     await page
       .locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]')
       .click();
@@ -1728,7 +1727,6 @@ test.describe("dashboard UI testcases", () => {
     });
     await page.locator('[data-test="dashboard-panel-discard"]').click();
 
-    // await expect(page.getByText('Start by adding your first')).toBeVisible();
   });
 
   test('should plot the data when adding a "Sort by" filter, a breakdown, and other required fields', async ({
@@ -1800,7 +1798,6 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-name"]').fill("Dashboard");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
-    // Delete the panel and confirm
     await page
       .locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]')
       .click();
@@ -1862,7 +1859,6 @@ test.describe("dashboard UI testcases", () => {
     await page.locator('[data-test="dashboard-panel-name"]').fill("Dashboard");
     await page.locator('[data-test="dashboard-panel-save"]').click();
 
-    // Delete the panel and confirm
     await page
       .locator('[data-test="dashboard-edit-panel-Dashboard-dropdown"]')
       .click();
@@ -1872,4 +1868,6 @@ test.describe("dashboard UI testcases", () => {
     );
     await page.locator('[data-test="confirm-button"]').click();
   });
-});
+})
+
+
