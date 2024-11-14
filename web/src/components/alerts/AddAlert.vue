@@ -1257,6 +1257,39 @@ export default defineComponent({
 
     const validateInputs = async (input: any, notify: boolean = true) => {
 
+      console.log(input,'input')
+
+      if(input.name == ""){
+        q.notify({
+          message: "Alert Name should not be empty",
+          color: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
+        return false;
+      }
+
+
+      if(input.stream_type == ""){
+        q.notify({
+          message: "Stream Type should not be empty",
+          color: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
+        return false;
+      }
+      if(input.stream_name == ""){
+        q.notify({
+          message: "Stream Name should not be empty",
+          color: "negative",
+          position: "bottom",
+          timeout: 2000,
+        });
+        return false;
+      }
+
+
       if(sqlQueryErrorMsg.value !== ""){
 
         return false;
