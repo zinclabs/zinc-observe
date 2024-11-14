@@ -4510,8 +4510,8 @@ const useLogs = () => {
             payload: {
               query: queryReq.query,
             },
-            type: searchObj.data.stream.streamType,
-            search_type: "UI",
+            stream_type: searchObj.data.stream.streamType,
+            search_type: "ui",
             use_cache: (window as any).use_cache ?? true,
           },
         }),
