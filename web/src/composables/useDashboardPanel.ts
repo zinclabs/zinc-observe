@@ -551,6 +551,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
+    // HERE NEED CHANGES
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -603,6 +604,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
     const isDerived = checkIsDerivedField(row.name) ?? false;
 
+    // HERE NEED CHANGES
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -637,6 +639,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const addLatitude = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
+    // HERE NEED CHANGES
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -657,6 +660,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const addLongitude = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
+    // HERE NEED CHANGES
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -677,6 +681,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const addWeight = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
+    // HERE NEED CHANGES
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -733,6 +738,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const addSource = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
+    // HERE NEED CHANGES
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -753,6 +759,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const addTarget = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
+    // HERE NEED CHANGES
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -773,6 +780,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const addValue = (row: any) => {
     const isDerived = checkIsDerivedField(row.name) ?? false;
+    // HERE NEED CHANGES
     if (
       !dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -1094,6 +1102,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const removeXAxisItem = (name: string) => {
+    // HERE NEED CHANGES
     const index = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.x.findIndex((it: any) => it.column == name);
@@ -1105,6 +1114,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const removeBreakdownItem = (name: string) => {
+    // HERE NEED CHANGES
     const index = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.breakdown.findIndex((it: any) => it.column == name);
@@ -1116,6 +1126,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const removeYAxisItem = (name: string) => {
+    // HERE NEED CHANGES
     const index = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.y.findIndex((it: any) => it.column == name);
@@ -1127,6 +1138,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   const removeZAxisItem = (name: string) => {
+    // HERE NEED CHANGES
     const index = dashboardPanelData.data.queries[
       dashboardPanelData.layout.currentQueryIndex
     ].fields.z.findIndex((it: any) => it.column == name);
@@ -1875,6 +1887,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           const newName = newArray[changedIndex[0]]?.name;
 
           // Update the field alias and column to the new name
+          // HERE NEED CHANGES
           field.alias = newName;
           field.column = newName;
         }
