@@ -37,7 +37,6 @@ use config::{
     meta::{
         bitvec::BitVec,
         inverted_index::InvertedIndexFormat,
-        puffin_directory::writer::PuffinDirWriter,
         search::StorageType,
         stream::{FileKey, FileMeta, PartitionTimeLevel, StreamSettings, StreamType},
     },
@@ -81,8 +80,9 @@ use crate::{
     service::{
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::datafusion::exec::{
-            self, merge_parquet_files as merge_parquet_files_by_datafusion,
+        search::{
+            datafusion::exec::{self, merge_parquet_files as merge_parquet_files_by_datafusion},
+            tantivy::puffin_directory::writer::PuffinDirWriter,
         },
     },
 };

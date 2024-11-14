@@ -21,14 +21,13 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        puffin_directory::reader::RamDirectoryReader,
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
-    utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
+    utils::{inverted_index::convert_parquet_idx_file_name_to_tantivy_file, time::BASE_TIME},
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
-use futures::{future::try_join_all, io::Cursor};
+use futures::future::try_join_all;
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
@@ -46,7 +45,11 @@ use tracing::Instrument;
 
 use crate::service::{
     db, file_list,
-    search::{datafusion::exec, generate_filter_from_equal_items, generate_search_schema_diff},
+    search::{
+        datafusion::exec,
+        generate_filter_from_equal_items, generate_search_schema_diff,
+        tantivy::puffin_directory::reader::{warm_up_terms, PuffinDirReader},
+    },
 };
 
 type CachedFiles = (usize, usize);
@@ -483,6 +486,7 @@ async fn filter_file_list_by_tantivy_index(
 
     for (parquet_file, _ttv_file) in index_file_names {
         let file = parquet_file;
+        let file_size = file_list_map.get(&file).unwrap().meta.index_size as usize;
         let full_text_term_clone = full_text_terms.clone();
         let index_terms_clone = index_terms.clone();
         let trace_id = query.trace_id.to_string();
@@ -490,9 +494,14 @@ async fn filter_file_list_by_tantivy_index(
         // Spawn a task for each file, wherein full text search and
         // secondary index search queries are executed
         let task = tokio::task::spawn(async move {
-            let res =
-                search_tantivy_index(&trace_id, &file, full_text_term_clone, index_terms_clone)
-                    .await;
+            let res = search_tantivy_index(
+                &trace_id,
+                &file,
+                file_size,
+                full_text_term_clone,
+                index_terms_clone,
+            )
+            .await;
             drop(permit);
             res
         });
@@ -537,7 +546,7 @@ async fn filter_file_list_by_tantivy_index(
             }
             Err(e) => {
                 log::warn!(
-                    "[trace_id {}] search->storage: error filtering file via FST index. Keep file to search. error: {}",
+                    "[trace_id {}] search->storage: error filtering file via tantivy index. Keep file to search. error: {}",
                     query.trace_id,
                     e.to_string()
                 );
@@ -556,7 +565,7 @@ async fn filter_file_list_by_tantivy_index(
     Ok(start.elapsed().as_millis() as usize)
 }
 
-fn search_tantivy_index_with_field(
+async fn search_tantivy_index_with_field(
     query_parser: QueryParser,
     field: tantivy::schema::Field,
     tantivy_searcher: tantivy::Searcher,
@@ -584,7 +593,19 @@ fn search_tantivy_index_with_field(
         )])),
     };
 
-    let docs = tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)?;
+    let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
+        HashMap::new();
+    query.query_terms(&mut |term, need_position| {
+        let field = term.field();
+        let entry = warm_terms.entry(field).or_default();
+        entry.insert(term.clone(), need_position);
+    });
+    warm_up_terms(&tantivy_searcher, &warm_terms).await?;
+
+    let docs = tokio::task::spawn_blocking(move || {
+        tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)
+    })
+    .await??;
     for doc in docs {
         max_doc_id = cmp::max(doc.doc_id, max_doc_id);
         matched_docs.insert(doc);
@@ -594,17 +615,25 @@ fn search_tantivy_index_with_field(
 }
 
 pub async fn get_tantivy_directory(
-    trace_id: &str,
+    _trace_id: &str,
     file_name: &str,
+    file_size: usize,
 ) -> anyhow::Result<Box<dyn Directory>> {
-    let index_file_bytes = infra::cache::file_data::get(trace_id, file_name, None).await?;
-    let puffin_dir = RamDirectoryReader::from_bytes(Cursor::new(index_file_bytes)).await?;
+    let source = object_store::ObjectMeta {
+        location: file_name.into(),
+        last_modified: *BASE_TIME,
+        size: file_size,
+        e_tag: None,
+        version: None,
+    };
+    let puffin_dir = PuffinDirReader::from_path(source).await?;
     Ok(Box::new(puffin_dir))
 }
 
 async fn search_tantivy_index(
     trace_id: &str,
     parquet_file_name: &str,
+    file_size: usize,
     fts_terms: Arc<Vec<String>>,
     index_terms: Arc<Vec<(String, Vec<String>)>>,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
@@ -616,7 +645,7 @@ async fn search_tantivy_index(
         ));
     };
 
-    let puffin_dir = get_tantivy_directory(trace_id, &ttv_file_name).await?;
+    let puffin_dir = get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?;
     let tantivy_index = tantivy::Index::open(puffin_dir)?;
     let tantivy_schema = tantivy_index.schema();
     let tantivy_reader = tantivy_index.reader()?;
@@ -628,15 +657,13 @@ async fn search_tantivy_index(
         let fts_field = tantivy_schema.get_field("_all").unwrap();
         let query_parser = QueryParser::for_index(&tantivy_index, vec![fts_field]);
         let tantivy_searcher_clone = tantivy_searcher.clone();
-        if let Ok((docs, max_row)) = tokio::task::spawn_blocking(move || {
-            search_tantivy_index_with_field(
-                query_parser,
-                fts_field,
-                tantivy_searcher_clone,
-                &fts_terms,
-            )
-        })
-        .await?
+        if let Ok((docs, max_row)) = search_tantivy_index_with_field(
+            query_parser,
+            fts_field,
+            tantivy_searcher_clone,
+            &fts_terms,
+        )
+        .await
         {
             matched_docs.extend(docs);
             max_doc_id = max_row;
@@ -653,10 +680,9 @@ async fn search_tantivy_index(
         let tantivy_searcher_clone = tantivy_searcher.clone();
         let terms = terms.clone();
 
-        if let Ok((docs, max_row)) = tokio::task::spawn_blocking(move || {
+        if let Ok((docs, max_row)) =
             search_tantivy_index_with_field(query_parser, field, tantivy_searcher_clone, &terms)
-        })
-        .await?
+                .await
         {
             matched_docs.extend(docs);
             max_doc_id = max_row;

@@ -13,17 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    collections::HashMap,
-    io::{self, Write},
-    mem,
-};
+use std::{collections::HashMap, io, mem};
 
 use anyhow::{Context, Result};
 
 use super::{
-    BlobMetadata, BlobMetadataBuilder, BlobTypes, CompressionCodec, PuffinFooterFlags, PuffinMeta,
-    MAGIC, MAGIC_SIZE, MIN_FOOTER_SIZE,
+    BlobMetadata, BlobMetadataBuilder, BlobTypes, PuffinFooterFlags, PuffinMeta, MAGIC, MAGIC_SIZE,
+    MIN_FOOTER_SIZE,
 };
 
 pub struct PuffinBytesWriter<W> {
@@ -53,13 +49,11 @@ impl<W> PuffinBytesWriter<W> {
     fn build_blob_metadata(
         &self,
         blob_type: BlobTypes,
-        compression_codec: Option<CompressionCodec>,
         properties: HashMap<String, String>,
         size: u64,
     ) -> BlobMetadata {
         BlobMetadataBuilder::default()
             .blob_type(blob_type)
-            .compression_codec(compression_codec)
             .properties(properties)
             .offset(self.written_bytes as _)
             .length(size)
@@ -71,35 +65,15 @@ impl<W> PuffinBytesWriter<W> {
 impl<W: io::Write> PuffinBytesWriter<W> {
     pub fn add_blob(
         &mut self,
-        raw_data: &Vec<u8>,
+        raw_data: &[u8],
         blob_type: BlobTypes,
-        // blob_tag will be added in the puffin footer, with its respective offset
         blob_tag: String,
-        compress: bool,
     ) -> Result<()> {
         self.add_header_if_needed()
             .context("Error writing puffin header")?;
 
-        let (final_data, final_size, compression_codec) = if compress {
-            // compress blob raw data
-            let mut encoder = zstd::Encoder::new(vec![], 3)?;
-            encoder
-                .write_all(raw_data)
-                .context("Error encoding blob raw data")?;
-            let compressed_bytes = encoder.finish()?;
-            let compressed_bytes_len = compressed_bytes.len() as u64;
-            (
-                compressed_bytes,
-                compressed_bytes_len,
-                Some(CompressionCodec::Zstd),
-            )
-        } else {
-            let raw_data_len = raw_data.len() as u64;
-            // use raw data directly
-            (raw_data.to_owned(), raw_data_len, None)
-        };
-
-        self.writer.write_all(&final_data)?;
+        let data_size = raw_data.len() as u64;
+        self.writer.write_all(raw_data)?;
         let properties = {
             let mut properties = HashMap::new();
             properties.insert("blob_tag".to_string(), blob_tag);
@@ -107,10 +81,9 @@ impl<W: io::Write> PuffinBytesWriter<W> {
         };
 
         // add metadata for this blob
-        let blob_metadata =
-            self.build_blob_metadata(blob_type, compression_codec, properties, final_size);
+        let blob_metadata = self.build_blob_metadata(blob_type, properties, data_size);
         self.blobs_metadata.push(blob_metadata);
-        self.written_bytes += final_size;
+        self.written_bytes += data_size;
         Ok(())
     }
 

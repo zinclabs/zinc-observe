@@ -68,6 +68,7 @@ async-recursion.workspace = true
 awc = "3.5"
 aws-sdk-sns.workspace = true
 base64.workspace = true
+bitflags = "2.6.0"
 bitvec.workspace = true
 blake3 = { version = "1.4", features = ["rayon"] }
 bytes.workspace = true

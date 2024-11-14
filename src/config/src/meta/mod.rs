@@ -21,8 +21,6 @@ pub mod inverted_index;
 pub mod logger;
 pub mod meta_store;
 pub mod pipeline;
-pub mod puffin;
-pub mod puffin_directory;
 pub mod search;
 pub mod short_url;
 pub mod sql;

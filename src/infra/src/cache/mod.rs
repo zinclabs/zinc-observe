@@ -16,6 +16,7 @@
 pub mod file_data;
 pub mod meta;
 pub mod stats;
+pub mod storage;
 pub mod tmpfs;
 
 pub async fn init() -> Result<(), anyhow::Error> {

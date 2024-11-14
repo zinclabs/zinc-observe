@@ -13,52 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod reader;
-pub mod search;
-pub mod writer;
-
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
-
-const INDEX_FILE_METAS_SIZE_SIZE: u64 = 4;
-
-type Bytes = Vec<u8>;
-type BytesRef<'a> = &'a [u8];
-
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct ColumnIndexMeta {
-    // total byte size of this column index date
-    #[serde(default)]
-    pub index_size: u64,
-    // fst bytes offset relative to the `base_offset`
-    #[serde(default)]
-    pub relative_fst_offset: u32,
-    // total byte size of fst bytes
-    #[serde(default)]
-    pub fst_size: u32,
-    // the minimum term length indexed in this column
-    #[serde(default = "default_min_len")]
-    pub min_len: usize,
-    // the maximum term length indexed in this column
-    #[serde(default)]
-    pub max_len: usize,
-    // the minimum value (alphabetically) indexed in this column.
-    #[serde(default)]
-    pub min_val: Bytes,
-    // the maximum value (alphabetically) indexed in this column.
-    #[serde(default)]
-    pub max_val: Bytes,
-}
-
-const fn default_min_len() -> usize {
-    usize::MAX
-}
-
 /// Supported inverted index formats:
 ///  - Parquet (v2): Index is stored in parquet format
 ///  - Tantivy (v3): Index is stored in custom puffin format files
 ///  - both: Use both Parquet and Tantivy. Note that this will generate two inverted index files.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Default)]
 pub enum InvertedIndexFormat {
     #[default]
     Parquet,

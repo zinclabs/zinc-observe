@@ -26,7 +26,7 @@ use tantivy::{
     HasLen,
 };
 
-use crate::meta::{
+use crate::service::search::tantivy::{
     puffin::{writer::PuffinBytesWriter, BlobTypes},
     puffin_directory::{ALLOWED_FILE_EXT, META_JSON},
 };
@@ -105,13 +105,9 @@ impl PuffinDirWriter {
             );
             puffin_writer
                 .add_blob(
-                    &file_data
-                        .read_bytes()
-                        .expect("failed to read file")
-                        .to_vec(),
+                    &file_data.read_bytes().expect("failed to read file"),
                     BlobTypes::O2TtvV1,
-                    path.to_str().unwrap().to_owned(),
-                    false,
+                    path.to_string_lossy().to_string(),
                 )
                 .context("Failed to add blob")?;
         }

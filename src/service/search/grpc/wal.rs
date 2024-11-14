@@ -23,7 +23,7 @@ use config::{
         stream::{FileKey, StreamParams, StreamPartition},
     },
     utils::{
-        file::scan_files,
+        file::{is_exists, scan_files},
         parquet::{parse_time_range_from_filename, read_metadata_from_file},
     },
 };
@@ -85,6 +85,10 @@ pub async fn search_parquet(
             if let Some(meta) = r.get(file.key.as_str()) {
                 let mut file = file;
                 file.meta = meta.clone();
+                // reset file meta if it already removed
+                if !is_exists(file.key.as_str()) {
+                    file.meta = Default::default();
+                }
                 return file;
             }
             drop(r);
@@ -104,12 +108,12 @@ pub async fn search_parquet(
         .collect::<Vec<FileKey>>()
         .await;
     for file in files_metadata {
+        if file.meta.is_empty() {
+            wal::release_files(&[file.key.clone()]);
+            lock_files.retain(|f| f != &file.key);
+            continue;
+        }
         if let Some((min_ts, max_ts)) = query.time_range {
-            if file.meta.is_empty() {
-                wal::release_files(&[file.key.clone()]);
-                lock_files.retain(|f| f != &file.key);
-                continue;
-            }
             if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
                 log::debug!(
                     "[trace_id {}] skip wal parquet file: {} time_range: [{},{}]",

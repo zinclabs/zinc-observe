@@ -13,53 +13,48 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::{Read, SeekFrom};
+use std::sync::Arc;
 
 use anyhow::{anyhow, ensure, Result};
-use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
+use bytes::Buf;
 
-use super::{
-    BlobMetadata, PuffinFooterFlags, PuffinMeta, FLAGS_SIZE, FOOTER_PAYLOAD_SIZE_SIZE, MAGIC,
-    MAGIC_SIZE,
-};
-use crate::meta::puffin::{CompressionCodec, MIN_FILE_SIZE};
+use super::*;
 
 #[derive(Debug)]
-pub struct PuffinBytesReader<R> {
-    source: R,
+pub struct PuffinBytesReader {
+    source: Arc<object_store::ObjectMeta>,
     metadata: Option<PuffinMeta>,
 }
 
-impl<R> PuffinBytesReader<R> {
-    pub fn new(source: R) -> Self {
+impl PuffinBytesReader {
+    pub fn new(source: object_store::ObjectMeta) -> Self {
         Self {
-            source,
+            source: Arc::new(source),
             metadata: None,
         }
     }
 }
 
-impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
-    pub async fn read_blob_bytes(&mut self, blob_metadata: &BlobMetadata) -> Result<Vec<u8>> {
-        // Seek to the start of the blob
-        self.source
-            .seek(SeekFrom::Start(blob_metadata.offset as _))
-            .await?;
-
-        let mut compressed = vec![0u8; blob_metadata.length as usize];
-        self.source.read_exact(&mut compressed).await?;
+impl PuffinBytesReader {
+    pub async fn read_blob_bytes(
+        &self,
+        blob_metadata: &BlobMetadata,
+        range: Option<core::ops::Range<usize>>,
+    ) -> Result<bytes::Bytes> {
+        let raw_data = infra::cache::storage::get_range(
+            &self.source.location,
+            blob_metadata.get_offset(range),
+        )
+        .await?;
 
         let decompressed = match blob_metadata.compression_codec {
             Some(CompressionCodec::Lz4) => {
                 return Err(anyhow!("Lz4 compression is not supported"));
             }
             Some(CompressionCodec::Zstd) => {
-                let mut decompressed = Vec::new();
-                let mut decoder = zstd::Decoder::new(&compressed[..])?;
-                decoder.read_to_end(&mut decompressed)?;
-                decompressed
+                return Err(anyhow!("Zstd compression is not supported"));
             }
-            None => compressed,
+            None => raw_data,
         };
 
         Ok(decompressed)
@@ -87,22 +82,20 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
             return Ok(());
         }
 
-        // check MAGIC
-        let mut magic = [0u8; MAGIC_SIZE as usize];
-        self.source.read_exact(&mut magic).await?;
-        ensure!(magic == MAGIC, anyhow!("Header MAGIC mismatch"));
-
-        let end_offset = self.source.seek(SeekFrom::End(0)).await?;
-        ensure!(
-            end_offset >= MIN_FILE_SIZE,
-            anyhow!(
+        if (self.source.size as u64) < MIN_FILE_SIZE {
+            return Err(anyhow!(
                 "Unexpected bytes size: minimal size {} vs actual size {}",
                 MIN_FILE_SIZE,
-                end_offset
-            )
-        );
+                self.source.size
+            ));
+        }
 
-        let puffin_meta = PuffinFooterBytesReader::new(&mut self.source, end_offset)
+        // check MAGIC
+        let magic =
+            infra::cache::storage::get_range(&self.source.location, 0..MAGIC_SIZE as usize).await?;
+        ensure!(magic.to_vec() == MAGIC, anyhow!("Header MAGIC mismatch"));
+
+        let puffin_meta = PuffinFooterBytesReader::new(self.source.clone())
             .parse()
             .await?;
         self.metadata = Some(puffin_meta);
@@ -112,19 +105,17 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinBytesReader<R> {
 
 /// Footer layout: HeadMagic Payload PayloadSize Flags FootMagic
 ///                [4]       [?]     [4]         [4]   [4]
-struct PuffinFooterBytesReader<R> {
-    source: R,
-    file_size: u64,
+struct PuffinFooterBytesReader {
+    source: Arc<object_store::ObjectMeta>,
     flags: PuffinFooterFlags,
     payload_size: u64,
     metadata: Option<PuffinMeta>,
 }
 
-impl<R> PuffinFooterBytesReader<R> {
-    fn new(source: R, file_size: u64) -> Self {
+impl PuffinFooterBytesReader {
+    fn new(source: Arc<object_store::ObjectMeta>) -> Self {
         Self {
             source,
-            file_size,
             flags: PuffinFooterFlags::empty(),
             payload_size: 0,
             metadata: None,
@@ -132,44 +123,60 @@ impl<R> PuffinFooterBytesReader<R> {
     }
 }
 
-impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinFooterBytesReader<R> {
+impl PuffinFooterBytesReader {
     async fn parse(mut self) -> Result<PuffinMeta> {
-        // read the footer magic and
-        self.source
-            .seek(SeekFrom::Start(self.footer_magic_offset()))
-            .await?;
-        let mut magic = [0u8; MAGIC_SIZE as usize];
-        self.source.read_exact(&mut magic).await?;
-        ensure!(magic == MAGIC, anyhow!("Footer MAGIC mismatch"));
+        // read footer
+        let footer = infra::cache::storage::get_range(
+            &self.source.location,
+            (self.source.size - FOOTER_SIZE as usize)..self.source.size,
+        )
+        .await?;
 
-        self.source
-            .seek(SeekFrom::Start(self.flags_offset()))
-            .await?;
-        let mut flags = [0u8; FLAGS_SIZE as usize];
-        self.source.read_exact(&mut flags).await?;
+        // check the footer magic
+        ensure!(
+            footer
+                .slice((FOOTER_SIZE - MAGIC_SIZE) as usize..FOOTER_SIZE as usize)
+                .to_vec()
+                == MAGIC,
+            anyhow!("Footer MAGIC mismatch")
+        );
+
+        // check the flags
+        let mut flags = [0u8; 4];
+        footer
+            .slice(
+                (FOOTER_SIZE - MAGIC_SIZE - FLAGS_SIZE) as usize
+                    ..(FOOTER_SIZE - MAGIC_SIZE) as usize,
+            )
+            .copy_to_slice(&mut flags);
         self.flags = PuffinFooterFlags::from_bits(u32::from_le_bytes(flags))
             .ok_or_else(|| anyhow!("Error parsing Puffin flags from bytes"))?;
 
-        self.source
-            .seek(SeekFrom::Start(self.payload_size_offset()))
-            .await?;
-        let mut payload_size = [0u8; FOOTER_PAYLOAD_SIZE_SIZE as usize];
-        self.source.read_exact(&mut payload_size).await?;
+        // check the payload size
+        let mut payload_size = [0u8; 4];
+        footer
+            .slice(0..FOOTER_PAYLOAD_SIZE_SIZE as usize)
+            .copy_to_slice(&mut payload_size);
         self.payload_size = i32::from_le_bytes(payload_size) as u64;
 
-        self.source
-            .seek(SeekFrom::Start(self.payload_offset()))
-            .await?;
-        let mut payload: Vec<u8> = vec![0; self.payload_size as usize];
-        self.source.read_exact(&mut payload).await?;
-        self.metadata = Some(self.parse_payload(&payload)?);
-        self.validate_payload()?;
+        // read the payload
+        let payload = infra::cache::storage::get_range(
+            &self.source.location,
+            (self.source.size
+                - FOOTER_SIZE as usize
+                - self.payload_size as usize
+                - MAGIC_SIZE as usize)..(self.source.size - FOOTER_SIZE as usize),
+        )
+        .await?;
 
-        self.source
-            .seek(SeekFrom::Start(self.head_magic_offset()))
-            .await?;
-        self.source.read_exact(&mut magic).await?;
-        ensure!(magic == MAGIC, anyhow!("Footer MAGIC mismatch"));
+        // check the footer magic
+        ensure!(
+            payload.slice(0..MAGIC_SIZE as usize).to_vec() == MAGIC,
+            anyhow!("Footer MAGIC mismatch")
+        );
+
+        self.metadata = Some(self.parse_payload(&payload.slice(MAGIC_SIZE as usize..))?);
+        self.validate_payload()?;
 
         Ok(self.metadata.unwrap())
     }
@@ -201,31 +208,11 @@ impl<R: AsyncRead + AsyncSeek + Unpin + Send> PuffinFooterBytesReader<R> {
             .blobs
             .last()
             .map_or(MAGIC_SIZE, |blob| blob.offset + blob.length);
-
+        let footer_size = MAGIC_SIZE + self.payload_size + FOOTER_SIZE;
         ensure!(
-            payload_ends_at == self.head_magic_offset(),
+            payload_ends_at == (self.source.size as u64 - footer_size),
             anyhow!("Payload chunk offset mismatch")
         );
         Ok(())
-    }
-
-    fn footer_magic_offset(&self) -> u64 {
-        self.file_size - MAGIC_SIZE
-    }
-
-    fn flags_offset(&self) -> u64 {
-        self.footer_magic_offset() - FLAGS_SIZE
-    }
-
-    fn payload_size_offset(&self) -> u64 {
-        self.flags_offset() - FOOTER_PAYLOAD_SIZE_SIZE
-    }
-
-    fn payload_offset(&self) -> u64 {
-        self.payload_size_offset() - self.payload_size
-    }
-
-    fn head_magic_offset(&self) -> u64 {
-        self.payload_offset() - MAGIC_SIZE
     }
 }

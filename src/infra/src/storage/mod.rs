@@ -18,7 +18,7 @@ use std::ops::Range;
 use config::{get_config, is_local_disk_storage, metrics};
 use datafusion::parquet::data_type::AsBytes;
 use futures::{StreamExt, TryStreamExt};
-use object_store::{path::Path, ObjectStore, WriteMultipart};
+use object_store::{path::Path, GetRange, ObjectStore, WriteMultipart};
 use once_cell::sync::Lazy;
 
 pub mod local;
@@ -158,4 +158,109 @@ pub fn format_key(key: &str, with_prefix: bool) -> String {
 
 fn bytes_size_in_mb(b: &bytes::Bytes) -> f64 {
     b.len() as f64 / (1024.0 * 1024.0)
+}
+
+#[derive(Debug)]
+pub(crate) enum Error {
+    OutOfRange(String),
+    BadRange(String),
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::OutOfRange(s) => write!(f, "Out of range: {}", s),
+            Self::BadRange(s) => write!(f, "Bad range: {}", s),
+        }
+    }
+}
+
+impl From<Error> for object_store::Error {
+    fn from(source: Error) -> Self {
+        Self::Generic {
+            store: "storage",
+            source: Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                source.to_string(),
+            )),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum InvalidGetRange {
+    StartTooLarge { requested: usize, length: usize },
+    Inconsistent { start: usize, end: usize },
+}
+
+impl std::fmt::Display for InvalidGetRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::StartTooLarge { requested, length } => {
+                write!(
+                    f,
+                    "Start too large: requested {} but length is {}",
+                    requested, length
+                )
+            }
+            Self::Inconsistent { start, end } => {
+                write!(
+                    f,
+                    "Inconsistent range: start {} is greater than end {}",
+                    start, end
+                )
+            }
+        }
+    }
+}
+
+pub(crate) trait GetRangeExt {
+    fn is_valid(&self) -> Result<(), InvalidGetRange>;
+    /// Convert to a [`Range`] if valid.
+    fn as_range(&self, len: usize) -> Result<Range<usize>, InvalidGetRange>;
+}
+
+impl GetRangeExt for GetRange {
+    fn is_valid(&self) -> Result<(), InvalidGetRange> {
+        match self {
+            Self::Bounded(r) if r.end <= r.start => {
+                return Err(InvalidGetRange::Inconsistent {
+                    start: r.start,
+                    end: r.end,
+                });
+            }
+            _ => (),
+        };
+        Ok(())
+    }
+
+    /// Convert to a [`Range`] if valid.
+    fn as_range(&self, len: usize) -> Result<Range<usize>, InvalidGetRange> {
+        self.is_valid()?;
+        match self {
+            Self::Bounded(r) => {
+                if r.start >= len {
+                    Err(InvalidGetRange::StartTooLarge {
+                        requested: r.start,
+                        length: len,
+                    })
+                } else if r.end > len {
+                    Ok(r.start..len)
+                } else {
+                    Ok(r.clone())
+                }
+            }
+            Self::Offset(o) => {
+                if *o >= len {
+                    Err(InvalidGetRange::StartTooLarge {
+                        requested: *o,
+                        length: len,
+                    })
+                } else {
+                    Ok(*o..len)
+                }
+            }
+            Self::Suffix(n) => Ok(len.saturating_sub(*n)..len),
+        }
+    }
 }

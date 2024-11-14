@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+config.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 crc32fast = "1.2.0"

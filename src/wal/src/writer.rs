@@ -74,7 +74,7 @@ impl Writer {
             f: BufWriter::with_capacity(buffer_size, f),
             bytes_written,
             uncompressed_bytes_written: bytes_written,
-            buffer: Vec::with_capacity(8 * 1204),
+            buffer: Vec::with_capacity(buffer_size),
         })
     }
 
@@ -154,9 +154,11 @@ impl Writer {
         self.f.flush().context(FileSyncSnafu {
             path: self.path.clone(),
         })?;
-        self.f.get_ref().sync_data().context(FileSyncSnafu {
-            path: self.path.clone(),
-        })?;
+        if !config::get_config().limit.wal_fsync_disabled {
+            self.f.get_ref().sync_data().context(FileSyncSnafu {
+                path: self.path.clone(),
+            })?;
+        }
         Ok(())
     }
 

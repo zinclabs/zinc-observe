@@ -27,6 +27,7 @@ pub const MAGIC_SIZE: u64 = MAGIC.len() as u64;
 pub const MIN_FILE_SIZE: u64 = MAGIC_SIZE + MIN_FOOTER_SIZE;
 pub const FLAGS_SIZE: u64 = 4;
 pub const FOOTER_PAYLOAD_SIZE_SIZE: u64 = 4;
+pub const FOOTER_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + FOOTER_PAYLOAD_SIZE_SIZE;
 pub const MIN_FOOTER_SIZE: u64 = MAGIC_SIZE + FLAGS_SIZE + FOOTER_PAYLOAD_SIZE_SIZE + MAGIC_SIZE; // without any blobs
 
 bitflags! {
@@ -82,6 +83,15 @@ pub struct BlobMetadata {
     /// Additional meta information of the file.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub properties: HashMap<String, String>,
+}
+
+impl BlobMetadata {
+    pub fn get_offset(&self, range: Option<core::ops::Range<usize>>) -> core::ops::Range<usize> {
+        match range {
+            None => self.offset as usize..(self.offset + self.length) as usize,
+            Some(v) => self.offset as usize + v.start..(self.offset as usize + v.start + v.len()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

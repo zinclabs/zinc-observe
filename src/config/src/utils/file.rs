@@ -28,6 +28,11 @@ pub fn get_file_meta(file: &str) -> Result<Metadata, std::io::Error> {
 }
 
 #[inline(always)]
+pub fn is_exists(file: &str) -> bool {
+    std::fs::metadata(file).is_ok()
+}
+
+#[inline(always)]
 pub fn get_file_contents(file: &str) -> Result<Vec<u8>, std::io::Error> {
     let mut file = File::open(file)?;
     let mut contents: Vec<u8> = Vec::new();
