@@ -20,6 +20,11 @@ export interface Query {
   sql_mode: string;
 }
 
+export interface SearchRequestPayload {
+  query: QueryPayload;
+  aggs?: HistogramQueryPayload;
+}
+
 export interface QueryPayload {
   sql: string;
   start_time: number;
@@ -27,12 +32,6 @@ export interface QueryPayload {
   from: number;
   size: number;
 }
-
-export interface histogramQueryPayload {
+export interface HistogramQueryPayload {
   histogram: string;
-}
-
-export interface LogsQueryPayload {
-  query: QueryPayload;
-  aggs?: histogramQueryPayload;
 }

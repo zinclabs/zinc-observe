@@ -46,13 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               '-' +
               searchObj.data.resultGrid.currentPage
             "
-            :max="
-              Math.max(
-                1,
-                searchObj.data.queryResults?.partitionDetail?.paginations
-                  ?.length || 0
-              )
-            "
+            :max="Math.max(1, getPaginations.length || 0)"
             :input="false"
             direction-links
             :boundary-numbers="false"
@@ -191,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             redirectToTraces(
               searchObj.data.queryResults.hits[
                 searchObj.meta.resultGrid.navigation.currentRowIndex
-              ]
+              ],
             )
           "
         />
@@ -208,6 +202,7 @@ import {
   onMounted,
   onUpdated,
   defineAsyncComponent,
+  watch,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -227,7 +222,7 @@ export default defineComponent({
   components: {
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
-      () => import("@/components/dashboards/panels/ChartRenderer.vue")
+      () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     SanitizedHtmlRenderer,
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
@@ -293,7 +288,7 @@ export default defineComponent({
           this.searchObj.data.resultGrid.currentPage <=
           Math.round(
             this.searchObj.data.queryResults.total /
-              this.searchObj.meta.resultGrid.rowsPerPage
+              this.searchObj.meta.resultGrid.rowsPerPage,
           )
         ) {
           this.searchObj.data.resultGrid.currentPage =
@@ -309,12 +304,7 @@ export default defineComponent({
         this.$emit("update:recordsPerPage");
         this.scrollTableToTop(0);
       } else if (actionType == "pageChange") {
-        if (
-          this.pageNumberInput >
-          Math.ceil(
-            this.searchObj.data.queryResults.partitionDetail.paginations.length
-          )
-        ) {
+        if (this.pageNumberInput > Math.ceil(this.getPaginations.length)) {
           this.$q.notify({
             type: "negative",
             message:
@@ -410,7 +400,7 @@ export default defineComponent({
         plotChart.value = convertLogData(
           searchObj.data.histogram.xData,
           searchObj.data.histogram.yData,
-          searchObj.data.histogram.chartParams
+          searchObj.data.histogram.chartParams,
         );
         // plotChart.value.forceReLayout();
       }
@@ -437,7 +427,7 @@ export default defineComponent({
       const newIndex = getRowIndex(
         isNext,
         isPrev,
-        Number(searchObj.meta.resultGrid.navigation.currentRowIndex)
+        Number(searchObj.meta.resultGrid.navigation.currentRowIndex),
       );
       searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
     };
@@ -472,7 +462,7 @@ export default defineComponent({
       if (searchObj.data.stream.selectedFields.includes(fieldName)) {
         searchObj.data.stream.selectedFields =
           searchObj.data.stream.selectedFields.filter(
-            (v: any) => v !== fieldName
+            (v: any) => v !== fieldName,
           );
       } else {
         searchObj.data.stream.selectedFields.push(fieldName);
@@ -490,7 +480,7 @@ export default defineComponent({
           type: "positive",
           message: "Content Copied Successfully!",
           timeout: 1000,
-        })
+        }),
       );
     };
 
@@ -539,8 +529,28 @@ export default defineComponent({
 
     const getColumns = computed(() => {
       return searchObj.data?.resultGrid?.columns?.filter(
-        (col: any) => !!col.id
+        (col: any) => !!col.id,
       );
+    });
+
+    const getPartitionPaginations = computed(() => {
+      return searchObj.data.queryResults?.partitionDetail?.paginations || [];
+    });
+
+    const getSocketPaginations = computed(() => {
+      return searchObj.data.queryResults.pagination || [];
+    });
+
+    const getPaginations = computed(() => {
+      try {
+        if (searchObj.communicationMethod === "http") {
+          return getPartitionPaginations.value || [];
+        } else {
+          return getSocketPaginations.value || [];
+        }
+      } catch (e) {
+        return [];
+      }
     });
 
     return {
@@ -578,6 +588,7 @@ export default defineComponent({
       scrollTableToTop,
       getColumns,
       reorderSelectedFields,
+      getPaginations,
     };
   },
   computed: {

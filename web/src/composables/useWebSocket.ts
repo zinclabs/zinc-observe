@@ -12,10 +12,10 @@ let reconnectInterval: number;
 let maxReconnectAttempts: number;
 let reconnectAttempts = 0;
 
-const messageHandlers: MessageHandler[] = [];
-const openHandlers: OpenHandler[] = [];
-const closeHandlers: CloseHandler[] = [];
-const errorHandlers: ErrorHandler[] = [];
+let messageHandlers: MessageHandler[] = [];
+let openHandlers: OpenHandler[] = [];
+let closeHandlers: CloseHandler[] = [];
+let errorHandlers: ErrorHandler[] = [];
 
 const connect = (url: string, interval: number, maxAttempts: number) => {
   if (socket) return;
@@ -39,19 +39,24 @@ const onOpen = (event: Event) => {
 
 const onMessage = (event: MessageEvent) => {
   // ws_types.rs refer for the MessageEvent type
-  console.log("Message from server:", event.data);
-  messageHandlers.forEach((handler) => handler(event));
+  messageHandlers.forEach((handler) => handler(JSON.parse(event.data)));
 };
 
 const onClose = (event: CloseEvent) => {
   console.log("WebSocket is closed now.");
+  socket?.close();
+  socket = null;
   closeHandlers.forEach((handler) => handler(event));
-  if (reconnectAttempts < maxReconnectAttempts) {
-    setTimeout(() => {
-      reconnectAttempts++;
-      connect(socket!.url, reconnectInterval, maxReconnectAttempts);
-    }, reconnectInterval);
-  }
+  openHandlers = [];
+  errorHandlers = [];
+  messageHandlers = [];
+  closeHandlers = [];
+  // if (reconnectAttempts < maxReconnectAttempts) {
+  //   setTimeout(() => {
+  //     reconnectAttempts++;
+  //     connect(socket!.url, reconnectInterval, maxReconnectAttempts);
+  //   }, reconnectInterval);
+  // }
 };
 
 const onError = (event: Event) => {
@@ -114,11 +119,11 @@ const removeErrorHandler = (handler: ErrorHandler) => {
 };
 
 const useWebSocket = (
-  url: string,
+  url?: string,
   interval: number = 5000,
-  maxAttempts: number = 10
+  maxAttempts: number = 10,
 ) => {
-  if (!socket) {
+  if (!socket && url) {
     connect(url, interval, maxAttempts);
   }
 
@@ -139,6 +144,7 @@ const useWebSocket = (
     removeCloseHandler,
     addErrorHandler,
     removeErrorHandler,
+    connect,
   };
 };
 

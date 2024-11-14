@@ -22,6 +22,7 @@ import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
 import { DateTime as _DateTime } from "luxon";
+import store from "../stores";
 
 let moment: any;
 let momentInitialized = false;
@@ -246,10 +247,7 @@ export const getSessionStorageVal = (key: string) => {
   }
 };
 
-export const useLocalOrganization = (
-  val:any = {},
-  isDelete = false,
-) => {
+export const useLocalOrganization = (val: any = {}, isDelete = false) => {
   try {
     if (typeof val === "object") {
       if (Object.keys(val).length > 0) {
@@ -962,4 +960,8 @@ export const arraysMatch = (arr1: Array<any>, arr2: Array<any>) => {
   }
 
   return true;
+};
+
+export const getWebSocketUrl = (request_id: string, org_identifier: string) => {
+  return `ws://${store.state.API_ENDPOINT.split("//")[1]}/api/${org_identifier}/ws/${request_id}`;
 };
