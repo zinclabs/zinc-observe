@@ -50,11 +50,7 @@ pub mod sessions_cache_utils {
     rename_all(serialize = "snake_case", deserialize = "snake_case")
 )]
 pub enum WsClientEvents {
-    Search {
-        trace_id: String,
-        payload: config::meta::search::Request,
-        time_offset: Option<i64>,
-    },
+    Search(SearchEventReq),
     #[cfg(feature = "enterprise")]
     Cancel {
         trace_id: String,
@@ -62,6 +58,16 @@ pub enum WsClientEvents {
     Benchmark {
         id: String,
     },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SearchEventReq {
+    pub trace_id: String,
+    pub payload: config::meta::search::Request,
+    pub time_offset: Option<i64>,
+    pub stream_type: config::meta::stream::StreamType,
+    pub use_cache: bool,
+    pub search_type: config::meta::search::SearchEventType,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -83,6 +89,10 @@ pub enum WsServerEvents {
     },
     SearchError {
         trace_id: String,
+        error: String,
+    },
+    RequestError {
+        request_id: String,
         error: String,
     },
 }

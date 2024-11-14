@@ -200,7 +200,7 @@ async fn dispatch(
             }
             Err(e) => {
                 log::error!("[WS_ROUTER] failed: {}", e);
-                Ok(HttpResponse::ServiceUnavailable().body(e.to_string()))
+                Ok(HttpResponse::InternalServerError().body(e.to_string()))
             }
         };
     }

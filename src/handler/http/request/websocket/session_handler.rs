@@ -17,7 +17,7 @@ use tracing::Instrument;
 use crate::{
     common::meta::{self},
     handler::http::request::websocket::utils::{
-        sessions_cache_utils, SearchResponseType, WsClientEvents, WsServerEvents,
+        sessions_cache_utils, SearchEventReq, SearchResponseType, WsClientEvents, WsServerEvents,
     },
     service::{
         search as SearchService,
@@ -31,9 +31,6 @@ pub struct SessionHandler {
     user_id: String,
     request_id: String,
     org_id: String,
-    stream_type: StreamType,
-    use_cache: bool,
-    search_type: String,
 }
 
 impl SessionHandler {
@@ -43,9 +40,6 @@ impl SessionHandler {
         user_id: &str,
         request_id: &str,
         org_id: &str,
-        stream_type: StreamType,
-        use_cache: bool,
-        search_type: &str,
     ) -> Self {
         Self {
             session,
@@ -53,9 +47,6 @@ impl SessionHandler {
             user_id: user_id.to_string(),
             request_id: request_id.to_string(),
             org_id: org_id.to_string(),
-            stream_type,
-            use_cache,
-            search_type: search_type.to_string(),
         }
     }
 
@@ -98,15 +89,8 @@ impl SessionHandler {
                     client_msg
                 );
                 match client_msg {
-                    WsClientEvents::Search {
-                        trace_id,
-                        payload,
-                        time_offset,
-                    } => {
-                        match self
-                            .handle_search_request(trace_id.to_string(), payload, time_offset)
-                            .await
-                        {
+                    WsClientEvents::Search(search_req) => {
+                        match self.handle_search_request(search_req.clone()).await {
                             Ok(_) => {
                                 // force close the session once search is complete
                                 self.cleanup().await;
@@ -114,7 +98,7 @@ impl SessionHandler {
                             Err(e) => {
                                 log::error!(
                                     "[WS_HANDLER]: Failed to get search result for trace_id: {}, error: {:?}",
-                                    trace_id,
+                                    search_req.trace_id,
                                     e
                                 );
                             }
@@ -167,6 +151,14 @@ impl SessionHandler {
                     msg,
                     e
                 );
+                let err_res = WsServerEvents::RequestError {
+                    request_id: self.request_id.clone(),
+                    error: format!("{e}"),
+                };
+                self.send_message(err_res.to_json().to_string())
+                    .await
+                    .unwrap();
+                self.cleanup().await;
             }
         }
     }
@@ -193,19 +185,20 @@ impl SessionHandler {
         );
     }
 
-    async fn handle_search_request(
-        &mut self,
-        trace_id: String,
-        mut payload: config::meta::search::Request,
-        time_offset: Option<i64>,
-    ) -> Result<(), Error> {
+    async fn handle_search_request(&mut self, mut req: SearchEventReq) -> Result<(), Error> {
         let cfg = config::get_config();
         let user_id = self.user_id.clone();
         let org_id = self.org_id.clone();
-        let stream_type = self.stream_type;
+        let trace_id = req.trace_id.clone();
+        let stream_type = req.stream_type;
+
+        // check and append search event type
+        if req.payload.search_type.is_none() {
+            req.payload.search_type = Some(req.search_type);
+        }
 
         // get stream name
-        let stream_names = match resolve_stream_names(&payload.query.sql) {
+        let stream_names = match resolve_stream_names(&req.payload.query.sql) {
             Ok(v) => v.clone(),
             Err(e) => {
                 let err_res = WsServerEvents::SearchError {
@@ -224,11 +217,11 @@ impl SessionHandler {
             {
                 let max_query_range = settings.max_query_range;
                 if max_query_range > 0
-                    && (payload.query.end_time - payload.query.start_time)
+                    && (req.payload.query.end_time - req.payload.query.start_time)
                         > max_query_range * 3600 * 1_000_000
                 {
-                    payload.query.start_time =
-                        payload.query.end_time - max_query_range * 3600 * 1_000_000;
+                    req.payload.query.start_time =
+                        req.payload.query.end_time - max_query_range * 3600 * 1_000_000;
                     // range_error = format!(
                     //     "Query duration is modified due to query range restriction of {} hours",
                     //     max_query_range
@@ -290,20 +283,23 @@ impl SessionHandler {
         }
 
         // handle search result size
-        let req_size = if payload.query.size == 0 {
+        let req_size = if req.payload.query.size == 0 {
             cfg.limit.query_default_limit
         } else {
-            payload.query.size
+            req.payload.query.size
         };
 
         // get partitions and call search for each
-        if self.is_partition_request(&payload).await {
+        if self
+            .is_partition_request(&req.payload, req.stream_type)
+            .await
+        {
             let c_resp = crate::service::search::cache::check_cache_v2(
                 &trace_id,
                 &org_id,
                 stream_type,
-                &payload,
-                self.use_cache,
+                &req.payload,
+                req.use_cache,
             )
             .await;
             if let Ok(c_resp) = c_resp {
@@ -326,14 +322,15 @@ impl SessionHandler {
                             // partitions
 
                             if delta.delta_end_time < cached.response_end_time {
-                                let partitions = self.get_partitions(&payload, &trace_id).await;
+                                let partitions = self.get_partitions(&req).await;
 
                                 if partitions.is_empty() {
                                     return Ok(());
                                 }
 
+                                // get start_index for pagination
                                 let start_idx =
-                                    self.find_start_partition_idx(&partitions, time_offset);
+                                    self.find_start_partition_idx(&partitions, req.time_offset);
                                 let mut curr_res_size = 0;
 
                                 log::info!(
@@ -342,18 +339,19 @@ impl SessionHandler {
                                     trace_id
                                 );
 
+                                // search by handling pagination
                                 for (idx, &[start_time, end_time]) in
                                     partitions.iter().enumerate().skip(start_idx)
                                 {
-                                    let mut req = payload.clone();
-                                    req.query.start_time = start_time;
-                                    req.query.end_time = end_time;
+                                    let mut req = req.clone();
+                                    req.payload.query.start_time = start_time;
+                                    req.payload.query.end_time = end_time;
 
                                     if req_size != -1 {
-                                        req.query.size -= curr_res_size;
+                                        req.payload.query.size -= curr_res_size;
                                     }
 
-                                    let search_res = self.do_search(req, trace_id.clone()).await?;
+                                    let search_res = self.do_search(&req).await?;
                                     curr_res_size += search_res.hits.len() as i64;
 
                                     if !search_res.hits.is_empty() {
@@ -398,13 +396,14 @@ impl SessionHandler {
                             }
                         } else if let Some(&delta) = delta_iter.peek() {
                             // Process remaining deltas if no more cached responses
-                            let partitions = self.get_partitions(&payload, &trace_id).await;
+                            let partitions = self.get_partitions(&req).await;
 
                             if partitions.is_empty() {
                                 return Ok(());
                             }
 
-                            let start_idx = self.find_start_partition_idx(&partitions, time_offset);
+                            let start_idx =
+                                self.find_start_partition_idx(&partitions, req.time_offset);
                             let mut curr_res_size = 0;
 
                             log::info!(
@@ -416,18 +415,28 @@ impl SessionHandler {
                             for (idx, &[start_time, end_time]) in
                                 partitions.iter().enumerate().skip(start_idx)
                             {
-                                let mut req = payload.clone();
-                                req.query.start_time = start_time;
-                                req.query.end_time = end_time;
+                                let mut req = req.clone();
+                                req.payload.query.start_time = start_time;
+                                req.payload.query.end_time = end_time;
 
                                 if req_size != -1 {
-                                    req.query.size -= curr_res_size;
+                                    req.payload.query.size -= curr_res_size;
                                 }
 
-                                let search_res = self.do_search(req, trace_id.clone()).await?;
+                                let search_res = self.do_search(&req).await?;
                                 curr_res_size += search_res.hits.len() as i64;
 
+                                log::info!(
+                                    "[WS_SEARCH]: Found {} hits for trace_id: {}",
+                                    search_res.hits.len(),
+                                    trace_id
+                                );
+
                                 if !search_res.hits.is_empty() {
+                                    log::info!(
+                                        "[WS_SEARCH]: Sending search response for trace_id: {}",
+                                        trace_id
+                                    );
                                     let search_res = WsServerEvents::SearchResponse {
                                         trace_id: trace_id.clone(),
                                         results: search_res,
@@ -465,13 +474,13 @@ impl SessionHandler {
                         }
                     }
                 } else {
-                    let partitions = self.get_partitions(&payload, &trace_id).await;
+                    let partitions = self.get_partitions(&req.clone()).await;
 
                     if partitions.is_empty() {
                         return Ok(());
                     }
 
-                    let start_idx = self.find_start_partition_idx(&partitions, time_offset);
+                    let start_idx = self.find_start_partition_idx(&partitions, req.time_offset);
                     let mut curr_res_size = 0;
 
                     log::info!(
@@ -483,15 +492,15 @@ impl SessionHandler {
                     for (idx, &[start_time, end_time]) in
                         partitions.iter().enumerate().skip(start_idx)
                     {
-                        let mut req = payload.clone();
-                        req.query.start_time = start_time;
-                        req.query.end_time = end_time;
+                        let mut req = req.clone();
+                        req.payload.query.start_time = start_time;
+                        req.payload.query.end_time = end_time;
 
                         if req_size != -1 {
-                            req.query.size -= curr_res_size;
+                            req.payload.query.size -= curr_res_size;
                         }
 
-                        let search_res = self.do_search(req, trace_id.clone()).await?;
+                        let search_res = self.do_search(&req).await?;
                         curr_res_size += search_res.hits.len() as i64;
 
                         if !search_res.hits.is_empty() {
@@ -521,8 +530,8 @@ impl SessionHandler {
         } else {
             // call search directly
             log::info!("[WS_SEARCH]: Single search for trace_id: {}", trace_id);
-            let end_time = payload.query.end_time;
-            let search_res = self.do_search(payload, trace_id.clone()).await?;
+            let end_time = req.payload.query.end_time;
+            let search_res = self.do_search(&req).await?;
             let search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
                 results: search_res,
@@ -546,7 +555,11 @@ impl SessionHandler {
         Ok(())
     }
 
-    async fn is_partition_request(&self, req: &config::meta::search::Request) -> bool {
+    async fn is_partition_request(
+        &self,
+        req: &config::meta::search::Request,
+        stream_type: StreamType,
+    ) -> bool {
         let cfg = get_config();
 
         let query = SearchQuery {
@@ -556,7 +569,7 @@ impl SessionHandler {
             ..Default::default()
         };
 
-        let sql = match Sql::new(&query, &self.org_id, self.stream_type).await {
+        let sql = match Sql::new(&query, &self.org_id, stream_type).await {
             Ok(s) => s,
             Err(e) => {
                 log::error!("[WS_HANDLER] Failed to create SQL query: {:?}", e);
@@ -572,25 +585,22 @@ impl SessionHandler {
         ts_column.is_some()
     }
 
-    async fn get_partitions(
-        &self,
-        req: &config::meta::search::Request,
-        trace_id: &str,
-    ) -> Vec<[i64; 2]> {
+    async fn get_partitions(&self, req: &SearchEventReq) -> Vec<[i64; 2]> {
+        let search_payload = req.payload.clone();
         let search_partition_req = SearchPartitionRequest {
-            sql: req.query.sql.clone(),
-            start_time: req.query.start_time,
-            end_time: req.query.end_time,
-            encoding: req.encoding.clone(),
-            regions: req.regions.clone(),
-            clusters: req.clusters.clone(),
-            query_fn: req.query.query_fn.clone(),
+            sql: search_payload.query.sql.clone(),
+            start_time: search_payload.query.start_time,
+            end_time: search_payload.query.end_time,
+            encoding: search_payload.encoding.clone(),
+            regions: search_payload.regions.clone(),
+            clusters: search_payload.clusters.clone(),
+            query_fn: search_payload.query.query_fn.clone(),
         };
 
         let res = SearchService::search_partition(
-            &trace_id,
+            &req.trace_id,
             &self.org_id,
-            self.stream_type,
+            req.stream_type,
             &search_partition_req,
         )
         .instrument(tracing::info_span!("search_partition"))
@@ -601,8 +611,8 @@ impl SessionHandler {
             Ok(res) => res.partitions,
             Err(e) => {
                 log::error!(
-                    "[WS_HANDLER]: Failed to get partitions for request_id: {}, error: {:?}",
-                    self.request_id,
+                    "[WS_HANDLER]: Failed to get partitions for trace_id: {}, error: {:?}",
+                    req.trace_id,
                     e
                 );
                 return vec![];
@@ -612,18 +622,14 @@ impl SessionHandler {
         partitions
     }
 
-    async fn do_search(
-        &mut self,
-        query: config::meta::search::Request,
-        trace_id: String,
-    ) -> Result<Response, infra::errors::Error> {
+    async fn do_search(&mut self, req: &SearchEventReq) -> Result<Response, infra::errors::Error> {
         SearchService::cache::search(
-            &trace_id,
+            &req.trace_id,
             &self.org_id,
-            self.stream_type,
+            req.stream_type,
             Some(self.user_id.clone()),
-            &query,
-            self.use_cache,
+            &req.payload,
+            req.use_cache,
         )
         .instrument(tracing::info_span!("search"))
         .await
