@@ -52,7 +52,7 @@ pub struct CacheQueryRequest {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
 pub struct MultiCachedQueryResponse {
-    pub cached_response: Vec<Response>,
+    pub cached_response: Vec<CachedQueryResponse>,
     pub deltas: Vec<QueryDelta>,
     pub has_cached_data: bool,
     pub cache_query_response: bool,

@@ -193,7 +193,7 @@ pub async fn check_cache(
         for res in cached_responses {
             if res.has_cached_data {
                 multi_resp.has_cached_data = true;
-                multi_resp.cached_response.push(res.cached_response);
+                multi_resp.cached_response.push(res);
             }
         }
 
@@ -278,11 +278,11 @@ pub async fn check_cache(
                 }
             }
         };
+        multi_resp.deltas = c_resp.deltas.clone();
         multi_resp.has_cached_data = c_resp.has_cached_data;
         multi_resp.is_descending = is_descending;
-        multi_resp.cached_response.push(c_resp.cached_response);
+        multi_resp.cached_response.push(c_resp);
         multi_resp.took = start.elapsed().as_millis() as usize;
-        multi_resp.deltas = c_resp.deltas;
         multi_resp.cache_query_response = true;
         multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
