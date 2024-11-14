@@ -1573,7 +1573,7 @@ export default defineComponent({
       }
     };
 
-    const updateQueryType = (tab) =>{
+    const updateQueryType = (tab : any) =>{
       getSelectedTab.value = tab;
     }
 
