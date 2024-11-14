@@ -237,6 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:showVrlFunction="updateFunctionVisibility"
                 @update:multi_time_range="updateMultiTimeRange"
                 @update:expansion = "isExpandItem = !isExpandItem"
+                @update:query_type="updateQueryType"
                 class="q-mt-sm"
               />
             </div>
@@ -776,6 +777,8 @@ export default defineComponent({
 
     const handleStep1Continue = async () =>{
 
+      formData.value.trigger_condition.frequency  = parseInt(formData.value.trigger_condition.frequency);
+
         const isValid = await validateInputs(formData.value);
         if(isValid){
         step.value = 2;
@@ -1009,9 +1012,7 @@ export default defineComponent({
         );
     };
 
-    const getSelectedTab = computed(() => {
-      return scheduledAlertRef.value?.tab || null;
-    });
+    const getSelectedTab = ref("custom");
 
     const previewAlert = async () => {
       if (getSelectedTab.value === "custom")
@@ -1256,13 +1257,16 @@ export default defineComponent({
 
     const validateInputs = async (input: any, notify: boolean = true) => {
 
+      if(sqlQueryErrorMsg.value !== ""){
 
-
-      if(input.is_real_time == 'false'){
-
+        return false;
+      }
       if(validateConditions() == false){
         return false;
       }
+      if((input.is_real_time == 'false' || input.is_real_time == false)){
+
+
         if (
           input.query_condition.type == "sql" &&
           !getParser(input.query_condition.sql)
@@ -1297,13 +1301,24 @@ export default defineComponent({
           });
           return false;;
         }
-        if (isAggregationEnabled.value) {
+        if (isAggregationEnabled.value && input.query_condition.type == "custom") {
+          console.log(input.query_condition,"condition")
         if(input.query_condition.aggregation.group_by[0] == ''){
           step.value = 1;
           notify &&
             q.notify({
               type: "negative",
               message: "Group By should not be empty",
+              timeout: 1500,
+            });
+          return false;
+        }
+        if(input.query_condition.aggregation.having.column == ''){
+          step.value = 1;
+          notify &&
+            q.notify({
+              type: "negative",
+              message: "Column in aggregation should not be empty",
               timeout: 1500,
             });
           return false;
@@ -1509,6 +1524,10 @@ export default defineComponent({
       }
     };
 
+    const updateQueryType = (tab) =>{
+      getSelectedTab.value = tab;
+    }
+
     return {
       t,
       q,
@@ -1578,6 +1597,7 @@ export default defineComponent({
       handleStep1Continue,
       validateInputFields,
       validateConditions,
+      updateQueryType,
     };
   },
 
@@ -1656,8 +1676,6 @@ export default defineComponent({
     },
 
     async onSubmit() {
-
-      console.log(this.formData,"formdata")
       // Delaying submission by 500ms to allow the form to validate, as query is validated in validateSqlQuery method
       // When user updated query and click on save
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -1675,7 +1693,6 @@ export default defineComponent({
         });
         return false;
       }
-
       if (this.formData.stream_name == "") {
         this.q.notify({
           type: "negative",
@@ -1721,7 +1738,13 @@ export default defineComponent({
         }
 
         const payload = this.getAlertPayload();
-        if (!this.validateInputs(payload)) return;
+        const isValid = await this.validateInputs(payload);
+        console.log(isValid,"is valid")
+        if (!isValid) {
+          this.step = 1;
+          this.isExpandItem = true;
+          return ;
+        }
 
         const dismiss = this.q.notify({
           spinner: true,
@@ -1765,14 +1788,27 @@ export default defineComponent({
               });
             })
             .catch((err: any) => {
-              console.log(err,"err")
-              dismiss();
-              this.q.notify({
+              if(err.response?.data?.message == "Invalid expression: Invalid cron expression."){
+                console.log("thisiis true")
+                this.step = 1;
+                this.isExpandItem = true;
+              }
+              else if(err.response?.data?.message == "Alert destinations is required"){
+                this.step = 2;
+                
+              }
+              else{
+                dismiss();
+               this.q.notify({
                 type: "negative",
                 message:
                   err.response?.data?.error || err.response?.data?.message,
               });
               this.step = 1;
+
+
+              }
+
             });
           segment.track("Button Click", {
             button: "Update Alert",
@@ -1810,14 +1846,15 @@ export default defineComponent({
               else if(err.response?.data?.message == "Alert destinations is required"){
                 this.step = 2;
               }
-              
-
-              dismiss();
-              this.q.notify({
+              else{
+                dismiss();
+                this.q.notify({
                 type: "negative",
                 message:
                   err.response?.data?.error || err.response?.data?.message,
               });
+              }
+
               
             });
           segment.track("Button Click", {
