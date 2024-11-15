@@ -275,7 +275,9 @@
     "apiKeyNotFound": "User API Key Not Found.",
     "allowedOrg": "Allowed Organization",
     "roles": "Roles",
-    "groups": "Groups"
+    "groups": "Groups",
+    "customRole": "Custom Roles"
+
   },
   "serviceAccounts": {
     "header": "Service Accounts",

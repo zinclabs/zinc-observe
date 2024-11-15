@@ -1,3 +1,4 @@
+//users 
 <!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
@@ -153,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :isUpdated="isUpdated"
         :userRole="currentUserRole"
         :roles="options"
+        :customRoles="customRoles"
         @updated="addMember"
         @cancel:hideform="hideForm"
       />
@@ -253,7 +255,11 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      if (isEnterprise.value) await getRoles();
+      if (isEnterprise.value) 
+      {
+        getCustomRoles();
+        await _getRoles();
+      }
 
       if (
         (isEnterprise.value && isCurrentUserInternal.value) ||
@@ -308,11 +314,12 @@ export default defineComponent({
     ]);
     const userEmail: any = ref("");
     const options = ref([{ label: "Admin", value: "admin" }]);
+    const customRoles = ref([{ label: "Admin", value: "admin" }]);
     const selectedRole = ref(options.value[0].value);
     const currentUserRole = ref("");
     let deleteUserEmail = "";
-
-    const getRoles = () => {
+    
+    const _getRoles = () => {
       return new Promise((resolve) => {
         usersService
           .getRoles(store.state.selectedOrganization.identifier)
@@ -321,6 +328,16 @@ export default defineComponent({
           })
           .finally(() => resolve(true));
       });
+    };
+    const getCustomRoles = async () => {
+      await getRoles(store.state.selectedOrganization.identifier)
+        .then((res) => {
+          customRoles.value = res.data;
+          console.warn(customRoles.value)
+        })
+        .catch((err) => {
+          console.log(err);
+        });
     };
 
     const getOrgMembers = () => {
@@ -745,6 +762,7 @@ export default defineComponent({
       userEmail,
       selectedRole,
       options,
+      customRoles,
       currentUserRole,
       updateUserRole,
       getImageURL,

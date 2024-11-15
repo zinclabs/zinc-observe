@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
+  <q-card class="add-user-dialog column full-height">
     <q-card-section class="q-px-md q-py-md">
       <div class="row items-center no-wrap">
         <div class="col">
@@ -45,14 +45,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-          <q-toggle
+          <!-- <q-toggle
             v-if="!beingUpdated && userRole == 'root'"
             v-model="existingUser"
             :label="t('user.isExistingUser')"
-          />
-
+          /> -->
+          <p class="q-pt-sm">Organization : <strong>{{formData.organization}}</strong></p>
+          <p  class="q-pt-sm" v-if="!existingUser">Email : <strong>{{formData.email}}</strong></p>
+          <p  class="q-pt-sm" v-if="!existingUser">Role : <strong>{{formData.role}}</strong></p>
+          <p  class="q-pt-sm" v-if="!existingUser">Custom Role : <strong>{{formData.custom_role}}</strong></p>
           <q-input
-            v-if="!beingUpdated"
+            v-if="existingUser && !beingUpdated"
             v-model="formData.email"
             :label="t('user.email') + ' *'"
             color="input-border"
@@ -122,13 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
           />
-
           <q-select
-            v-if="
+            v-if="existingUser && (
               (userRole !== 'member' &&
                 store.state.userInfo.email !== formData.email) ||
               !beingUpdated
-            "
+            )"
             v-model="formData.role"
             :label="t('user.role') + ' *'"
             :options="roles"
@@ -142,6 +144,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required']"
+          />
+         
+          <q-select
+            v-if="existingUser && (
+              (userRole !== 'member' &&
+                store.state.userInfo.email !== formData.email) ||
+              !beingUpdated
+            )"
+            v-model="formData.custom_role"
+            :label="t('user.customRole')"
+            :options="customRoles"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-pt-md q-pb-md showLabelOnTop"
+            emit-value
+            map-options
+            stack-label
+            outlined
+            filled
+            dense
           />
 
           <div v-if="beingUpdated">
@@ -217,8 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-input>
           </div>
-
-          <q-select
+          <!-- <q-select
             v-if="!beingUpdated && userRole != 'member'"
             v-model="formData.organization"
             :label="t('user.organization') + ' *'"
@@ -233,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required']"
-          />
+          /> -->
 
           <q-input
             v-if="
@@ -257,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           />
 
-          <div class="flex justify-center q-mt-lg">
+          <div class="flex justify-end q-mt-md">
             <q-btn
               v-close-popup="true"
               class="q-mb-md text-bold"
@@ -352,6 +373,15 @@ export default defineComponent({
         },
       ],
     },
+    customRoles: {
+      type: Array,
+      default: () => [
+        {
+          label: "Admin",
+          value: "admin",
+        },
+      ],
+    },
   },
   emits: ["update:modelValue", "updated", "cancel:hideform"],
   setup(props) {
@@ -360,7 +390,7 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const formData: any = ref(defaultValue());
-    const existingUser = ref(false);
+    const existingUser = ref(true);
     const beingUpdated: any = ref(false);
     const userForm: any = ref(null);
     const isPwd: any = ref(true);
@@ -372,6 +402,7 @@ export default defineComponent({
 
 
     onActivated(() => {
+      console.warn(props.customRoles)
       formData.value.organization = store.state.selectedOrganization.identifier;
     });
 
@@ -499,23 +530,48 @@ export default defineComponent({
 
           userServiece
             .updateexistinguser(
-              { role: this.formData.role },
+              { 
+                role: this.formData.role,
+                custom_role: this.formData.custom_role
+              },
               selectedOrg,
               userEmail
             )
             .then((res: any) => {
               dismiss();
               this.formData.email = userEmail;
-              this.$emit("updated", res.data, this.formData, "created");
+              // if(res.data.code === 422){
+              //   this.$q.notify({
+              //     color: "positive",
+              //     message: "User added successfully.",
+              //   });
+              //   this.existingUser = false;
+              // }
+              // else{
+                this.existingUser = true;
+                this.$emit("updated", res.data, this.formData, "created");
+              // }
             })
             .catch((err: any) => {
-              this.$q.notify({
-                color: "negative",
-                message: err.response.data.message,
-                timeout: 2000,
-              });
-              dismiss();
-              this.formData.email = userEmail;
+              if(err.response.data.code === 422){
+                this.$q.notify({
+                  color: "positive",
+                  type: 'positive',
+                  message: "User added successfully.",
+                });
+                dismiss();
+                this.existingUser = false;
+              }
+              else{
+                console.warn(err)
+                this.$q.notify({
+                  color: "negative",
+                  message: err.response.data.message,
+                  timeout: 2000,
+                });
+                dismiss();
+                this.formData.email = userEmail;
+              }
             });
         } else {
           userServiece
@@ -538,3 +594,8 @@ export default defineComponent({
   },
 });
 </script>
+<style scoped lang="scss">
+  .add-user-dialog{
+    width: 275px;
+  }
+</style>
