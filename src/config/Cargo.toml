@@ -16,7 +16,6 @@ arc-swap.workspace = true
 arrow.workspace = true
 arrow-json.workspace = true
 arrow-schema.workspace = true
-async-trait.workspace = true
 async-recursion.workspace = true
 async-walkdir.workspace = true
 aws-config.workspace = true

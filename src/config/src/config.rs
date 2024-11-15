@@ -733,7 +733,7 @@ pub struct Common {
     pub inverted_index_store_format: String,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
-        default = "parquet",
+        default = "",
         help = "InvertedIndex search format, parquet(default), tantivy."
     )]
     pub inverted_index_search_format: String,

@@ -740,7 +740,7 @@ pub async fn merge_files(
         };
 
         let diff_fields = generate_schema_diff(&schema, &schema_latest_fields)?;
-        let table = exec::create_parquet_table(
+        let table = match exec::create_parquet_table(
             &session,
             schema_latest.clone(),
             &files,
@@ -748,7 +748,19 @@ pub async fn merge_files(
             true,
             None,
         )
-        .await?;
+        .await
+        {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "create_parquet_table err: {}, files: {:?}, schema: {:?}",
+                    e,
+                    files,
+                    schema
+                );
+                return Err(DataFusionError::Plan(format!("create_parquet_table err: {e}")).into());
+            }
+        };
         tables.push(table);
     }
 
@@ -762,17 +774,27 @@ pub async fn merge_files(
         &new_file_meta,
     )
     .await;
-    let (_new_schema, buf) = merge_result.map_err(|e| {
-        let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
-        log::error!(
-            "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
-            e,
-            files,
-            schema_latest
-        );
 
-        DataFusionError::Plan(format!("merge_parquet_files err: {:?}", e))
-    })?;
+    // clear session data
+    crate::service::search::datafusion::storage::file_list::clear(&trace_id);
+    // clear cached data
+    let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
+    for file in files.iter() {
+        let _ = file_data::disk::remove(&trace_id, file).await;
+    }
+
+    let (_new_schema, buf) = match merge_result {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!(
+                "merge_parquet_files err: {}, files: {:?}, schema: {:?}",
+                e,
+                files,
+                schema_latest
+            );
+            return Err(DataFusionError::Plan(format!("merge_parquet_files err: {e}",)).into());
+        }
+    };
 
     new_file_meta.compressed_size = buf.len() as i64;
     if new_file_meta.compressed_size == 0 {
@@ -1043,7 +1065,7 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
     };
 
     let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     for file in files.iter() {
         let file_name = file.key.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
@@ -1061,13 +1083,15 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                     || e.to_string().to_lowercase().contains("data size is zero")
                 {
                     // delete file from file list
-                    log::warn!("found invalid file: {}", file_name);
+                    log::error!("found invalid file: {}", file_name);
                     if let Err(e) = file_list::delete_parquet_file(&file_name, true).await {
                         log::error!("[COMPACT] delete from file_list err: {}", e);
                     }
                     Some(file_name)
                 } else {
-                    log::warn!("[COMPACT] download file to cache err: {}", e);
+                    log::error!("[COMPACT] download file to cache err: {}", e);
+                    // remove downloaded file
+                    let _ = file_data::disk::remove("", &file_name).await;
                     None
                 }
             } else {

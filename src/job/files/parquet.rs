@@ -80,10 +80,7 @@ use crate::{
     service::{
         db,
         schema::generate_schema_for_defined_schema_fields,
-        search::{
-            datafusion::exec::{self, merge_parquet_files as merge_parquet_files_by_datafusion},
-            tantivy::puffin_directory::writer::PuffinDirWriter,
-        },
+        search::{datafusion::exec, tantivy::puffin_directory::writer::PuffinDirWriter},
     },
 };
 
@@ -682,8 +679,9 @@ async fn merge_files(
         .hash_key();
 
     // generate datafusion tables
+    let trace_id = config::ider::generate();
     let session = config::meta::search::Session {
-        id: format!("ingester-{schema_key}"),
+        id: format!("{trace_id}-{schema_key}"),
         storage_type: StorageType::Wal,
         work_group: None,
         target_partitions: 0,
@@ -695,7 +693,7 @@ async fn merge_files(
     let tables = vec![table];
 
     let start = std::time::Instant::now();
-    let merge_result = merge_parquet_files_by_datafusion(
+    let merge_result = exec::merge_parquet_files(
         stream_type,
         &stream_name,
         schema,
@@ -704,6 +702,10 @@ async fn merge_files(
         &new_file_meta,
     )
     .await;
+
+    // clear session data
+    crate::service::search::datafusion::storage::file_list::clear(&trace_id);
+
     let (_new_schema, buf) = match merge_result {
         Ok(v) => v,
         Err(e) => {

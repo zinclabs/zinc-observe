@@ -268,19 +268,19 @@ impl TableProvider for NewListingTable {
             })
             .flatten()
         {
-            Some(Err(e)) => log::info!("failed to split file groups by statistics: {e}"),
-            Some(Ok(groups)) => match self.options.target_partitions.cmp(&groups.len()) {
+            Some(Err(e)) => log::debug!("failed to split file groups by statistics: {e}"),
+            Some(Ok(new_groups)) => match self.options.target_partitions.cmp(&new_groups.len()) {
                 Ordering::Equal => {
-                    partitioned_file_lists = groups;
+                    partitioned_file_lists = new_groups;
                 }
                 Ordering::Greater => {
                     partitioned_file_lists =
-                        repartition_sorted_groups(groups, self.options.target_partitions);
+                        repartition_sorted_groups(new_groups, self.options.target_partitions);
                 }
                 Ordering::Less => {
-                    log::info!(
-                        "attempted to split file groups by statistics, but there were more file groups: {} than target_partitions: {}",
-                        groups.len(),
+                    log::debug!(
+                        "attempted to split file groups by statistics, but there were more file groups: {} than target_partitions: {}; falling back to unordered",
+                        new_groups.len(),
                         self.options.target_partitions
                     )
                 }

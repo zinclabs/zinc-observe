@@ -2466,7 +2466,6 @@ dependencies = [
  "arrow-json",
  "arrow-schema",
  "async-recursion",
- "async-trait",
  "async-walkdir",
  "aws-config",
  "aws-sdk-sns",
