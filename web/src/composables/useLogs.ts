@@ -4033,8 +4033,14 @@ const useLogs = () => {
   };
 
   const cancelQuery = () => {
+    if (searchObj.communicationMethod === "ws") {
+      sendCancelSearchMessage();
+      return;
+    }
+
     const tracesIds = [...searchObj.data.searchRequestTraceIds];
     searchObj.data.isOperationCancelled = true;
+
     searchService
       .delete_running_queries(
         store.state.selectedOrganization.identifier,
@@ -4535,7 +4541,7 @@ const useLogs = () => {
   const handleSearchResponse = async (
     queryReq: SearchRequestPayload,
     isPagination: boolean,
-    type: "search" | "histogram" | "pageCount",
+    type: "search" | "histogram" | "pageCount" | "cancel",
     traceId: string,
     response: any,
   ) => {
@@ -4549,6 +4555,10 @@ const useLogs = () => {
 
     if (type === "pageCount") {
       handlePageCountResponse(queryReq, traceId, response);
+    }
+
+    if (type === "cancel") {
+      handleCancelSearchResponse(traceId, response);
     }
   };
 
@@ -4843,7 +4853,7 @@ const useLogs = () => {
 
   const handleSearchClose = (
     queryReq: SearchRequestPayload,
-    type: "search" | "histogram" | "pageCount",
+    type: "search" | "histogram" | "pageCount" | "cancel",
     isPagination: boolean,
     response: any,
   ) => {
@@ -4852,6 +4862,10 @@ const useLogs = () => {
 
     if (type === "histogram") {
       searchObj.loadingHistogram = false;
+    }
+
+    if (type === "cancel") {
+      searchObj.data.isOperationCancelled = false;
     }
   };
 
@@ -4915,6 +4929,33 @@ const useLogs = () => {
     addTraceId(traceId);
 
     fetchSearchData(queryReq, "pageCount", false);
+  };
+
+  const sendCancelSearchMessage = () => {
+    console.log("send cancel message through ws");
+    webSocket.sendMessage(
+      JSON.stringify({
+        type: "cancel",
+        content: {
+          trace_id: searchObj.data.searchRequestTraceIds[0],
+        },
+      }),
+    );
+  };
+
+  const handleCancelSearchResponse = (traceId: string, response: any) => {
+    removeTraceId(traceId);
+
+    const isCancelled = response?.content?.some((item: any) => item.is_success);
+    if (isCancelled) {
+      searchObj.data.isOperationCancelled = false;
+      $q.notify({
+        message: "Running query cancelled successfully",
+        color: "positive",
+        position: "bottom",
+        timeout: 4000,
+      });
+    }
   };
 
   const handlePageCountError = (err: any) => {
