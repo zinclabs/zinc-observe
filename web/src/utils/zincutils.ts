@@ -963,5 +963,6 @@ export const arraysMatch = (arr1: Array<any>, arr2: Array<any>) => {
 };
 
 export const getWebSocketUrl = (request_id: string, org_identifier: string) => {
-  return `${import.meta.env.VITE_OPENOBSERVE_WS_ENDPOINT}/api/${org_identifier}/ws/${request_id}`;
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${store.state.API_ENDPOINT.split("//")[1]}/api/${org_identifier}/ws/${request_id}`;
 };
