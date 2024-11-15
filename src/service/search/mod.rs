@@ -59,7 +59,7 @@ use {
 
 use super::usage::report_request_usage_stats;
 use crate::{
-    common::{infra::cluster as infra_cluster, utils},
+    common::{self, infra::cluster as infra_cluster},
     handler::grpc::request::search::Searcher,
 };
 
@@ -67,12 +67,13 @@ pub(crate) mod cache;
 pub(crate) mod cluster;
 pub(crate) mod datafusion;
 pub(crate) mod grpc;
+pub(crate) mod index;
 pub(crate) mod request;
 pub(crate) mod sql;
 #[cfg(feature = "enterprise")]
 pub(crate) mod super_cluster;
 pub(crate) mod tantivy;
-pub(crate) mod utlis;
+pub(crate) mod utils;
 
 // Checks for #ResultArray#
 pub static RESULT_ARRAY: Lazy<Regex> =
@@ -167,7 +168,7 @@ pub async fn search_multi(
             req.query.query_fn = query_fn.clone();
         }
 
-        for fn_name in utils::functions::get_all_transform_keys(org_id).await {
+        for fn_name in common::utils::functions::get_all_transform_keys(org_id).await {
             if req.query.sql.contains(&format!("{}(", fn_name)) {
                 req.query.uses_zo_fn = true;
                 break;
@@ -232,7 +233,7 @@ pub async fn search_multi(
         if apply_over_hits {
             input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
         }
-        let mut runtime = utils::functions::init_vrl_runtime();
+        let mut runtime = common::utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, org_id) {
             Ok(program) => {
                 let registry = program

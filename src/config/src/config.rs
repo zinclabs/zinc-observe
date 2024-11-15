@@ -583,6 +583,8 @@ pub struct Common {
     pub feature_query_exclude_all: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_WITHOUT_INDEX", default = false)]
     pub feature_query_without_index: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = false)]
+    pub feature_query_remove_filter_with_index: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -739,7 +741,7 @@ pub struct Common {
     pub inverted_index_search_format: String,
     #[env_config(
         name = "ZO_FULL_TEXT_SEARCH_TYPE",
-        default = "prefix",
+        default = "eq",
         help = "Search through full text fields with either 'contains' , 'eq' or 'prefix' match."
     )]
     pub full_text_search_type: String,

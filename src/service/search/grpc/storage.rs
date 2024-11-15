@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Context;
 use arrow_schema::Schema;
@@ -24,22 +24,19 @@ use config::{
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
-    utils::{inverted_index::convert_parquet_idx_file_name_to_tantivy_file, time::BASE_TIME},
+    utils::{inverted_index::convert_parquet_idx_file_name_to_tantivy_file, json, time::BASE_TIME},
+    INDEX_FIELD_NAME_FOR_ALL,
 };
 use datafusion::execution::cache::cache_manager::FileStatisticsCache;
 use futures::future::try_join_all;
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 use infra::{
     cache::file_data,
     errors::{Error, ErrorCodes},
-    schema::get_stream_setting_index_fields,
 };
 use itertools::Itertools;
 use proto::cluster_rpc::KvItem;
-use tantivy::{
-    query::{PhrasePrefixQuery, Query, QueryParser, RegexQuery},
-    Directory, Term,
-};
+use tantivy::Directory;
 use tokio::sync::Semaphore;
 use tracing::Instrument;
 
@@ -47,7 +44,8 @@ use crate::service::{
     db, file_list,
     search::{
         datafusion::exec,
-        generate_filter_from_equal_items, generate_search_schema_diff,
+        generate_search_schema_diff,
+        index::IndexCondition,
         tantivy::puffin_directory::reader::{warm_up_terms, PuffinDirReader},
     },
 };
@@ -56,12 +54,14 @@ type CachedFiles = (usize, usize);
 
 /// search in remote object storage
 #[tracing::instrument(name = "service:search:grpc:storage", skip_all, fields(org_id = query.org_id, stream_name = query.stream_name))]
+#[allow(clippy::too_many_arguments)]
 pub async fn search(
     query: Arc<super::QueryParams>,
     schema: Arc<Schema>,
     file_list: &[FileKey],
-    req_equal_terms: &[KvItem],
-    req_match_terms: &[String],
+    _req_equal_terms: &[KvItem],
+    _req_match_terms: &[String],
+    index_condition: &str,
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
 ) -> super::SearchTable {
@@ -126,13 +126,8 @@ pub async fn search(
 
     let mut idx_took = 0;
     if use_inverted_index {
-        idx_took = filter_file_list_by_tantivy_index(
-            query.clone(),
-            &mut files,
-            req_equal_terms,
-            req_match_terms,
-        )
-        .await?;
+        idx_took =
+            filter_file_list_by_tantivy_index(query.clone(), &mut files, index_condition).await?;
         log::info!(
             "[trace_id {}] search->storage: stream {}/{}/{}, {} inverted index reduced file_list num to {} in {} ms",
             query.trace_id,
@@ -419,23 +414,10 @@ async fn cache_files(
 async fn filter_file_list_by_tantivy_index(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
-    equal_terms: &[KvItem],
-    match_terms: &[String],
+    index_condition: &str,
 ) -> Result<usize, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
-
-    // construct partition filters
-    let equal_terms: Vec<(String, String)> = equal_terms
-        .iter()
-        .map(|v| (v.key.to_string(), v.value.to_string()))
-        .collect::<Vec<_>>();
-    // filter equal_items with index_fields
-    let schema = infra::schema::get(&query.org_id, &query.stream_name, query.stream_type).await?;
-    let stream_settings = infra::schema::unwrap_stream_settings(&schema);
-    let index_fields = get_stream_setting_index_fields(&stream_settings);
-    let index_terms_orig = super::super::filter_index_fields(&equal_terms, &index_fields);
-    let index_terms = generate_filter_from_equal_items(&index_terms_orig);
 
     // Cache the corresponding Index files
     let mut scan_stats = ScanStats::new();
@@ -447,7 +429,8 @@ async fn filter_file_list_by_tantivy_index(
         .iter()
         .filter_map(|(_, f)| {
             if f.meta.index_size > 0 {
-                convert_parquet_idx_file_name_to_tantivy_file(&f.key).map(|v| (f.key.clone(), v))
+                convert_parquet_idx_file_name_to_tantivy_file(&f.key)
+                    .map(|v| (f.key.clone(), v, f.meta.records))
             } else {
                 None
             }
@@ -457,7 +440,7 @@ async fn filter_file_list_by_tantivy_index(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(_parquet_file, ttv_file)| ttv_file.as_str())
+            .map(|(_parquet_file, ttv_file, _)| ttv_file.as_str())
             .collect_vec(),
         &scan_stats,
     )
@@ -478,30 +461,20 @@ async fn filter_file_list_by_tantivy_index(
         start.elapsed().as_millis()
     );
 
-    let full_text_terms = Arc::new(match_terms.to_vec());
-    let index_terms = Arc::new(index_terms);
-
     let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
     let mut tasks = Vec::new();
 
-    for (parquet_file, _ttv_file) in index_file_names {
+    for (parquet_file, _ttv_file, records) in index_file_names {
         let file = parquet_file;
         let file_size = file_list_map.get(&file).unwrap().meta.index_size as usize;
-        let full_text_term_clone = full_text_terms.clone();
-        let index_terms_clone = index_terms.clone();
         let trace_id = query.trace_id.to_string();
         let permit = semaphore.clone().acquire_owned().await.unwrap();
         // Spawn a task for each file, wherein full text search and
         // secondary index search queries are executed
+        let index_condition = index_condition.to_string();
         let task = tokio::task::spawn(async move {
-            let res = search_tantivy_index(
-                &trace_id,
-                &file,
-                file_size,
-                full_text_term_clone,
-                index_terms_clone,
-            )
-            .await;
+            let res =
+                search_tantivy_index(&trace_id, &file, &index_condition, records, file_size).await;
             drop(permit);
             res
         });
@@ -527,10 +500,9 @@ async fn filter_file_list_by_tantivy_index(
                     total_hits += hits_per_file;
                     file.segment_ids = Some(res.into_vec());
                     log::debug!(
-                        "[trace_id {}] search->storage: hits for fts_terms {:?} and index_terms: {:?} found {} in {}",
+                        "[trace_id {}] search->storage: hits for index_condition: {:?} found {} in {}",
                         query.trace_id,
-                        *full_text_terms,
-                        index_terms,
+                        index_condition,
                         hits_per_file,
                         file_name
                     );
@@ -546,7 +518,7 @@ async fn filter_file_list_by_tantivy_index(
             }
             Err(e) => {
                 log::warn!(
-                    "[trace_id {}] search->storage: error filtering file via tantivy index. Keep file to search. error: {}",
+                    "[trace_id {}] search->storage: error filtering file via FST index. Keep file to search. error: {}",
                     query.trace_id,
                     e.to_string()
                 );
@@ -555,63 +527,13 @@ async fn filter_file_list_by_tantivy_index(
         }
     }
     log::info!(
-        "[trace_id {}] search->storage: Total hits for fts_terms {:?} and index_terms: {:?} found {}",
+        "[trace_id {}] search->storage: total hits for index_condition: {:?} found {}",
         query.trace_id,
-        *full_text_terms,
-        index_terms,
+        index_condition,
         total_hits
     );
     file_list.extend(file_list_map.into_values());
     Ok(start.elapsed().as_millis() as usize)
-}
-
-async fn search_tantivy_index_with_field(
-    query_parser: QueryParser,
-    field: tantivy::schema::Field,
-    tantivy_searcher: tantivy::Searcher,
-    fts_terms: &[String],
-) -> anyhow::Result<(HashSet<tantivy::DocAddress>, u32)> {
-    let cfg = get_config();
-    let mut max_doc_id = 0;
-    let mut matched_docs = HashSet::new();
-
-    // TODO: improve this logic
-    // The issue is joining the full text search terms
-    // Ideally there should be multiple queries for each term
-    // and their result should be intersected
-    let query: Box<dyn Query> = match cfg.common.full_text_search_type.as_str() {
-        "eq" => query_parser.parse_query(&fts_terms.join(" "))?,
-        "contains" => Box::new(RegexQuery::from_pattern(
-            &format!("*{}*", &fts_terms.join(" ")),
-            field,
-        )?),
-        // Default to prefix search
-        _ => Box::new(PhrasePrefixQuery::new(vec![Term::from_field_text(
-            field,
-            // we join all the fields that are full text searchable
-            &fts_terms.join(" "),
-        )])),
-    };
-
-    let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
-        HashMap::new();
-    query.query_terms(&mut |term, need_position| {
-        let field = term.field();
-        let entry = warm_terms.entry(field).or_default();
-        entry.insert(term.clone(), need_position);
-    });
-    warm_up_terms(&tantivy_searcher, &warm_terms).await?;
-
-    let docs = tokio::task::spawn_blocking(move || {
-        tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)
-    })
-    .await??;
-    for doc in docs {
-        max_doc_id = cmp::max(doc.doc_id, max_doc_id);
-        matched_docs.insert(doc);
-    }
-
-    Ok((matched_docs, max_doc_id))
 }
 
 pub async fn get_tantivy_directory(
@@ -633,9 +555,9 @@ pub async fn get_tantivy_directory(
 async fn search_tantivy_index(
     trace_id: &str,
     parquet_file_name: &str,
+    index_condition: &str,
+    records: i64,
     file_size: usize,
-    fts_terms: Arc<Vec<String>>,
-    index_terms: Arc<Vec<(String, Vec<String>)>>,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
     let Some(ttv_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
     else {
@@ -650,49 +572,34 @@ async fn search_tantivy_index(
     let tantivy_schema = tantivy_index.schema();
     let tantivy_reader = tantivy_index.reader()?;
     let tantivy_searcher = tantivy_reader.searcher();
+    let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).unwrap();
 
-    let mut matched_docs = HashSet::new();
-    let mut max_doc_id = 0u32;
-    if !fts_terms.is_empty() {
-        let fts_field = tantivy_schema.get_field("_all").unwrap();
-        let query_parser = QueryParser::for_index(&tantivy_index, vec![fts_field]);
-        let tantivy_searcher_clone = tantivy_searcher.clone();
-        if let Ok((docs, max_row)) = search_tantivy_index_with_field(
-            query_parser,
-            fts_field,
-            tantivy_searcher_clone,
-            &fts_terms,
-        )
-        .await
-        {
-            matched_docs.extend(docs);
-            max_doc_id = max_row;
-        } else {
-            return Err(anyhow::anyhow!(
-                "[trace_id {}] search->storage: search_full_text_index failed",
-                trace_id
-            ));
-        };
-    }
-    for (field_name, terms) in index_terms.iter() {
-        let field = tantivy_schema.get_field(field_name).unwrap();
-        let query_parser = QueryParser::for_index(&tantivy_index, vec![field]);
-        let tantivy_searcher_clone = tantivy_searcher.clone();
-        let terms = terms.clone();
+    // generate the tantivy query
+    let condition: IndexCondition = json::from_str(index_condition)?;
+    let query = condition.to_tantivy_query(tantivy_schema.clone(), fts_field);
 
-        if let Ok((docs, max_row)) =
-            search_tantivy_index_with_field(query_parser, field, tantivy_searcher_clone, &terms)
-                .await
-        {
-            matched_docs.extend(docs);
-            max_doc_id = max_row;
-        } else {
-            return Err(anyhow::anyhow!(
-                "[trace_id {}] search->storage: search_full_text_index failed",
-                trace_id
-            ));
-        };
+    // warm up the terms in the query
+    let mut warm_terms: HashMap<tantivy::schema::Field, HashMap<tantivy::Term, bool>> =
+        HashMap::new();
+    query.query_terms(&mut |term, need_position| {
+        let field = term.field();
+        let entry = warm_terms.entry(field).or_default();
+        entry.insert(term.clone(), need_position);
+    });
+    // if no terms are found in the query, warm up all fields
+    if warm_terms.is_empty() {
+        for field in condition.get_fields() {
+            let field = tantivy_schema.get_field(&field).unwrap();
+            warm_terms.insert(field, HashMap::new());
+        }
     }
+    warm_up_terms(&tantivy_searcher, &warm_terms).await?;
+
+    // search the index
+    let matched_docs = tokio::task::spawn_blocking(move || {
+        tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)
+    })
+    .await??;
 
     // return early if no matches in tantivy
     if matched_docs.is_empty() {
@@ -704,9 +611,9 @@ async fn search_tantivy_index(
     let seg_metas = tantivy_index
         .searchable_segment_metas()
         .context("Count segments")?;
-    let mut res = BitVec::with_capacity(max_doc_id as usize + 1);
+    let mut res = BitVec::with_capacity(records as usize + 1);
     // rewrite the empty bitvec
-    res.resize((max_doc_id + 1) as usize, false);
+    res.resize((records + 1) as usize, false);
     // Return early if there is only one segment
     if seg_metas.len() == 1 {
         for doc in matched_docs {

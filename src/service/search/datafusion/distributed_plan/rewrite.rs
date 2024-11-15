@@ -27,7 +27,7 @@ use hashbrown::HashMap;
 use proto::cluster_rpc::KvItem;
 
 use super::{empty_exec::NewEmptyExec, remote_scan::RemoteScanExec};
-use crate::service::search::request::Request;
+use crate::service::search::{index::IndexCondition, request::Request};
 
 // add remote scan to physical plan
 pub struct RemoteScanRewriter {
@@ -37,6 +37,7 @@ pub struct RemoteScanRewriter {
     pub idx_file_list: Vec<FileKey>,
     pub equal_keys: HashMap<String, Vec<KvItem>>,
     pub match_all_keys: Vec<String>,
+    pub index_condition: Option<IndexCondition>,
     pub is_leader: bool, // for super cluster
     pub is_changed: bool,
     pub context: opentelemetry::Context,
@@ -51,6 +52,7 @@ impl RemoteScanRewriter {
         idx_file_list: Vec<FileKey>,
         equal_keys: HashMap<String, Vec<KvItem>>,
         match_all_keys: Vec<String>,
+        index_condition: Option<IndexCondition>,
         is_leader: bool,
         context: opentelemetry::Context,
     ) -> Self {
@@ -61,6 +63,7 @@ impl RemoteScanRewriter {
             idx_file_list,
             equal_keys,
             match_all_keys,
+            index_condition,
             is_leader,
             is_changed: false,
             context,
@@ -92,6 +95,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         .unwrap_or(&empty_keys)
                         .clone(),
                     self.match_all_keys.clone(),
+                    self.index_condition.clone(),
                     self.is_leader,
                     self.req.clone(),
                     self.nodes.clone(),
@@ -124,6 +128,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         .unwrap_or(&empty_keys)
                         .clone(),
                     self.match_all_keys.clone(),
+                    self.index_condition.clone(),
                     self.is_leader,
                     self.req.clone(),
                     self.nodes.clone(),

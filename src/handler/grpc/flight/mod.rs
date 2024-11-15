@@ -47,7 +47,7 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::search::SEARCH_SERVER;
 use crate::{
     handler::grpc::MetadataMap,
-    service::search::{grpc::flight as grpcFlight, utlis::AsyncDefer},
+    service::search::{grpc::flight as grpcFlight, utils::AsyncDefer},
 };
 
 #[derive(Default)]

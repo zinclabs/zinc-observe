@@ -50,7 +50,11 @@ use sqlparser::{
     parser::Parser,
 };
 
-use super::request::Request;
+use super::{
+    index::{get_index_condition_from_expr, IndexCondition},
+    request::Request,
+    utils::{is_field, is_value, split_conjunction, trim_quotes},
+};
 
 pub static RE_ONLY_SELECT: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)select[ ]+\*").unwrap());
 pub static RE_SELECT_FROM: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)SELECT (.*) FROM").unwrap());
@@ -79,6 +83,7 @@ pub struct Sql {
     pub histogram_interval: Option<i64>,
     pub sorted_by_time: bool,     // if only order by _timestamp
     pub use_inverted_index: bool, // if can use inverted index
+    pub index_condition: Option<IndexCondition>, // use for tantivy index
 }
 
 impl Sql {
@@ -193,6 +198,22 @@ impl Sql {
             }
         }
 
+        // 10. generate tantivy query
+        let mut index_condition = None;
+        if get_config()
+            .common
+            .inverted_index_search_format
+            .eq("tantivy")
+            && stream_names.len() == 1
+            && get_config().common.inverted_index_enabled
+            && use_inverted_index
+        {
+            let is_remove_filter = get_config().common.feature_query_remove_filter_with_index;
+            let mut index_visitor = IndexVisitor::new(&used_schemas, is_remove_filter);
+            statement.visit(&mut index_visitor);
+            index_condition = index_visitor.index_condition;
+        }
+
         Ok(Sql {
             sql: statement.to_string(),
             org_id: org_id.to_string(),
@@ -212,15 +233,20 @@ impl Sql {
             histogram_interval: histogram_interval_visitor.interval,
             sorted_by_time: need_sort_by_time,
             use_inverted_index,
+            index_condition,
         })
     }
 }
 
 impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let index_condition = match &self.index_condition {
+            Some(query) => query.to_query(),
+            None => "".to_string(),
+        };
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, used_inverted_index: {}, index_condition: {}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -235,7 +261,9 @@ impl std::fmt::Display for Sql {
             self.group_by,
             self.order_by,
             self.histogram_interval,
-            self.sorted_by_time
+            self.sorted_by_time,
+            self.use_inverted_index,
+            index_condition,
         )
     }
 }
@@ -351,7 +379,6 @@ fn has_original_column(columns: &HashMap<String, HashSet<String>>) -> HashMap<St
 }
 
 /// visit a sql to get all columns
-/// TODO: handle subquery without (table.field_name) prefix
 struct ColumnVisitor<'a> {
     columns: HashMap<String, HashSet<String>>,
     columns_alias: HashSet<(String, String)>,
@@ -493,6 +520,56 @@ impl<'a> VisitorMut for ColumnVisitor<'a> {
     }
 }
 
+// generate tantivy from sql and remove filter when we can
+struct IndexVisitor {
+    index_fields: HashSet<String>,
+    is_remove_filter: bool,
+    index_condition: Option<IndexCondition>,
+}
+
+impl IndexVisitor {
+    fn new(schemas: &HashMap<String, Arc<SchemaCache>>, is_remove_filter: bool) -> Self {
+        let index_fields = if let Some((_, schema)) = schemas.iter().next() {
+            let stream_settings = unwrap_stream_settings(schema.schema());
+            let index_fields = get_stream_setting_index_fields(&stream_settings);
+            index_fields.into_iter().collect::<HashSet<_>>()
+        } else {
+            HashSet::new()
+        };
+        Self {
+            index_fields,
+            is_remove_filter,
+            index_condition: None,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn new_from_index_fields(index_fields: HashSet<String>, is_remove_filter: bool) -> Self {
+        Self {
+            index_fields,
+            is_remove_filter,
+            index_condition: None,
+        }
+    }
+}
+
+impl VisitorMut for IndexVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
+            if let Some(expr) = select.selection.as_mut() {
+                let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
+                self.index_condition = Some(index);
+                if self.is_remove_filter {
+                    select.selection = other_expr;
+                }
+            }
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 /// get all equal items from where clause
 struct PartitionColumnVisitor<'a> {
     equal_items: HashMap<String, Vec<(String, String)>>, // filed = value
@@ -522,18 +599,9 @@ impl<'a> VisitorMut for PartitionColumnVisitor<'a> {
                             op: BinaryOperator::Eq,
                             right,
                         } => {
-                            let (left, right) = if matches!(left.as_ref(), Expr::Value(_))
-                                && matches!(
-                                    right.as_ref(),
-                                    Expr::Identifier(_) | Expr::CompoundIdentifier(_)
-                                ) {
+                            let (left, right) = if is_value(left) && is_field(right) {
                                 (right, left)
-                            } else if matches!(right.as_ref(), Expr::Value(_))
-                                && matches!(
-                                    left.as_ref(),
-                                    Expr::Identifier(_) | Expr::CompoundIdentifier(_)
-                                )
-                            {
+                            } else if is_value(right) && is_field(left) {
                                 (left, right)
                             } else {
                                 continue;
@@ -1050,39 +1118,6 @@ impl VisitorMut for TrackTotalHitsVisitor {
     }
 }
 
-fn split_conjunction(expr: &Expr) -> Vec<&Expr> {
-    split_conjunction_inner(expr, Vec::new())
-}
-
-fn split_conjunction_inner<'a>(expr: &'a Expr, mut exprs: Vec<&'a Expr>) -> Vec<&'a Expr> {
-    match expr {
-        Expr::BinaryOp {
-            left,
-            op: BinaryOperator::And,
-            right,
-        } => {
-            let exprs = split_conjunction_inner(left, exprs);
-            split_conjunction_inner(right, exprs)
-        }
-        Expr::Nested(expr) => split_conjunction_inner(expr, exprs),
-        other => {
-            exprs.push(other);
-            exprs
-        }
-    }
-}
-
-fn trim_quotes(s: &str) -> String {
-    let s = s
-        .strip_prefix('"')
-        .and_then(|s| s.strip_suffix('"'))
-        .unwrap_or(s);
-    s.strip_prefix('\'')
-        .and_then(|s| s.strip_suffix('\''))
-        .unwrap_or(s)
-        .to_string()
-}
-
 fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -> bool {
     match expr {
         Expr::Identifier(Ident {
@@ -1204,4 +1239,100 @@ fn o2_id_is_needed(schemas: &HashMap<String, Arc<SchemaCache>>) -> bool {
         let stream_setting = unwrap_stream_settings(schema.schema());
         stream_setting.map_or(false, |setting| setting.store_original_data)
     })
+}
+
+#[cfg(test)]
+mod tests {
+
+    use sqlparser::dialect::GenericDialect;
+
+    use super::*;
+
+    #[test]
+    fn test_index_visitor1() {
+        let sql = "SELECT * FROM t WHERE name = 'a' AND age = 1 AND (name = 'b' OR (match_all('good') AND match_all('bar'))) AND (match_all('foo') OR age = 2)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
+        statement.visit(&mut index_visitor);
+        let expected = "name:a AND (name:b OR (good AND bar))";
+        let expected_sql = "SELECT * FROM t WHERE age = 1 AND (match_all('foo') OR age = 2)";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_index_visitor2() {
+        let sql = "SELECT * FROM t WHERE name is not null AND age > 1 AND (match_all('foo') OR abs(age) = 2)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
+        statement.visit(&mut index_visitor);
+        let expected = "";
+        let expected_sql = "SELECT * FROM t WHERE name IS NOT NULL AND (age > 1) AND (match_all('foo') OR abs(age) = 2)";
+        assert_eq!(
+            index_visitor
+                .index_condition
+                .clone()
+                .unwrap_or_default()
+                .to_query(),
+            expected
+        );
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_index_visitor3() {
+        let sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') OR age = 2)";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
+        statement.visit(&mut index_visitor);
+        let expected = "";
+        let expected_sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') OR age = 2)";
+        assert_eq!(
+            index_visitor
+                .index_condition
+                .clone()
+                .unwrap_or_default()
+                .to_query(),
+            expected
+        );
+        assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    #[test]
+    fn test_index_visitor4() {
+        let sql = "SELECT * FROM t WHERE (name = 'b' OR (match_all('good') AND match_all('bar'))) OR (match_all('foo') AND name = 'c')";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, &sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut index_fields = HashSet::new();
+        index_fields.insert("name".to_string());
+        let mut index_visitor = IndexVisitor::new_from_index_fields(index_fields, true);
+        statement.visit(&mut index_visitor);
+        let expected = "((name:b OR (good AND bar)) OR (foo AND name:c))";
+        let expected_sql = "SELECT * FROM t";
+        assert_eq!(
+            index_visitor.index_condition.clone().unwrap().to_query(),
+            expected
+        );
+        assert_eq!(statement.to_string(), expected_sql);
+    }
 }

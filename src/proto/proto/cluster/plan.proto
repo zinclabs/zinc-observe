@@ -41,6 +41,7 @@ message FlightSearchRequest {
     optional string           work_group = 16;
     optional string              user_id = 18;
     optional string    search_event_type = 19;
+    string               index_condition = 20;
 }
 
 message KvItem {
