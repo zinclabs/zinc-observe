@@ -963,5 +963,5 @@ export const arraysMatch = (arr1: Array<any>, arr2: Array<any>) => {
 };
 
 export const getWebSocketUrl = (request_id: string, org_identifier: string) => {
-  return `ws://${store.state.API_ENDPOINT.split("//")[1]}/api/${org_identifier}/ws/${request_id}`;
+  return `${import.meta.env.VITE_OPENOBSERVE_WS_ENDPOINT}/api/${org_identifier}/ws/${request_id}`;
 };
