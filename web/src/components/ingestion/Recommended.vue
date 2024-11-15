@@ -22,110 +22,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="min-height: calc(100vh - 130px)"
   >
     <template v-slot:before>
+      <q-input
+        data-test="alert-list-search-input"
+        v-model="tabsFilter"
+        borderless
+        filled
+        dense
+        class="no-border"
+        :placeholder="t('common.search')"
+      >
+        <template #prepend>
+          <q-icon name="search" class="cursor-pointer" />
+        </template>
+      </q-input>
       <q-tabs
         v-model="ingestTabType"
         indicator-color="transparent"
         inline-label
         vertical
+        class="data-sources-recommended-tabs !tw-mt-3"
       >
-        <q-route-tab
-          default
-          name="ingestFromKubernetes"
-          :to="{
-            name: 'ingestFromKubernetes',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/common/kubernetes.svg')"
-          label="Kubernetes"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          default
-          name="ingestFromWindows"
-          :to="{
-            name: 'ingestFromWindows',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/common/windows.svg')"
-          label="Windows"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="ingestFromLinux"
-          :to="{
-            name: 'ingestFromLinux',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/common/linux.svg')"
-          label="Linux"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="AWSConfig"
-          :to="{
-            name: 'AWSConfig',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/aws.svg')"
-          label="Amazon Web Services(AWS)"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="GCPConfig"
-          :to="{
-            name: 'GCPConfig',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/gcp.svg')"
-          label="Google Cloud Platform(GCP)"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="AzureConfig"
-          :to="{
-            name: 'AzureConfig',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/azure.png')"
-          label="Microsoft Azure"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="ingestFromTraces"
-          :to="{
-            name: 'ingestFromTraces',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-          label="Traces (OpenTelemetry)"
-          content-class="tab_content"
-        />
-        <q-route-tab
-          name="frontendMonitoring"
-          :to="{
-            name: 'frontendMonitoring',
-            query: {
-              org_identifier: store.state.selectedOrganization.identifier,
-            },
-          }"
-          :icon="'img:' + getImageURL('images/common/monitoring.svg')"
-          label="Real User Monitoring"
-          content-class="tab_content"
-        />
+        <template v-for="(tab, index) in filteredList" :key="tab.name">
+          <q-route-tab
+            :default="index === 0"
+            :name="tab.name"
+            :to="tab.to"
+            :icon="tab.icon"
+            :label="tab.label"
+            content-class="tab_content"
+          />
+        </template>
       </q-tabs>
     </template>
 
@@ -142,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
+import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -168,6 +94,8 @@ export default defineComponent({
     const currentOrgIdentifier: any = ref(
       store.state.selectedOrganization.identifier,
     );
+
+    const tabsFilter = ref("");
 
     const ingestTabType = ref("ingestFromKubernetes");
 
@@ -195,6 +123,112 @@ export default defineComponent({
       }
     });
 
+    const recommendedTabs = [
+      {
+        name: "ingestFromKubernetes",
+        to: {
+          name: "ingestFromKubernetes",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/common/kubernetes.svg"),
+        label: "Kubernetes",
+        contentClass: "tab_content",
+      },
+      {
+        name: "ingestFromWindows",
+        to: {
+          name: "ingestFromWindows",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/common/windows.svg"),
+        label: "Windows",
+        contentClass: "tab_content",
+      },
+      {
+        name: "ingestFromLinux",
+        to: {
+          name: "ingestFromLinux",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/common/linux.svg"),
+        label: "Linux",
+        contentClass: "tab_content",
+      },
+      {
+        name: "AWSConfig",
+        to: {
+          name: "AWSConfig",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/aws.svg"),
+        label: "Amazon Web Services(AWS)",
+        contentClass: "tab_content",
+      },
+      {
+        name: "GCPConfig",
+        to: {
+          name: "GCPConfig",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/gcp.svg"),
+        label: "Google Cloud Platform(GCP)",
+        contentClass: "tab_content",
+      },
+      {
+        name: "AzureConfig",
+        to: {
+          name: "AzureConfig",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/azure.png"),
+        label: "Microsoft Azure",
+        contentClass: "tab_content",
+      },
+      {
+        name: "ingestFromTraces",
+        to: {
+          name: "ingestFromTraces",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/ingestion/otlp.svg"),
+        label: "Traces (OpenTelemetry)",
+        contentClass: "tab_content",
+      },
+      {
+        name: "frontendMonitoring",
+        to: {
+          name: "frontendMonitoring",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/common/monitoring.svg"),
+        label: "Real User Monitoring",
+        contentClass: "tab_content",
+      },
+    ];
+
+    // create computed property to filter tabs
+    const filteredList = computed(() => {
+      return recommendedTabs.filter((tab) => {
+        return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
+      });
+    });
+
     return {
       t,
       store,
@@ -207,12 +241,19 @@ export default defineComponent({
       verifyOrganizationStatus,
       tabs,
       ingestTabType,
+      tabsFilter,
+      filteredList,
     };
   },
 });
 </script>
 
 <style scoped lang="scss">
+.data-sources-recommended-tabs {
+  :deep(.q-tab) {
+    min-height: 36px;
+  }
+}
 .ingestionPage {
   padding: 1.5rem 0 0;
   .head {

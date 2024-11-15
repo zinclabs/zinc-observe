@@ -13,23 +13,12 @@
     </div>
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">Update helm repo</div>
-    <ContentCopy
-      class="q-mt-sm"
-      content="helm repo add openobserve https://charts.openobserve.ai"
-    />
-    <ContentCopy class="q-mt-sm" content="helm repo update" />
+    <ContentCopy class="q-mt-sm" :content="helmUpdateCmd" />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">
       Install Prometheus operator CRDs(Required by Opentelemetry operator)
     </div>
-    <ContentCopy
-      class="q-mt-sm"
-      content="kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml"
-    />
-    <ContentCopy
-      class="q-mt-sm"
-      content="kubectl apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml"
-    />
+    <ContentCopy class="q-mt-sm" :content="crdCommand" />
 
     <div class="text-subtitle1 q-pl-xs q-mt-md">
       Install OpenTelemetry operator
@@ -216,6 +205,19 @@ const collectorCmdThisCluster = computed(() => {
   --set exporters."otlphttp/openobserve_k8s_events".endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}  \\
   --set exporters."otlphttp/openobserve_k8s_events".headers.Authorization="Basic [BASIC_PASSCODE]" \\
   --create-namespace`;
+});
+
+const crdCommand = computed(() => {
+  // Club kubectl create crd commands from template
+  return `kubectl create -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+kubectl create -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
+kubectl create -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/main/example/prometheus-operator-crd/monitoring.coreos.com_scrapeconfigs.yaml
+kubectl create -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/refs/heads/main/example/prometheus-operator-crd/monitoring.coreos.com_probes.yaml`;
+});
+
+const helmUpdateCmd = computed(() => {
+  return `helm repo add openobserve https://charts.openobserve.ai
+helm repo update`;
 });
 </script>
 
