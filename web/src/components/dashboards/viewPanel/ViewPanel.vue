@@ -240,10 +240,22 @@ export default defineComponent({
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
 
+      // Check if any value has changed before assigning to `refreshVariableDataRef`
+      const isValueChanged = refreshVariableDataRef?.values?.length > 0 &&
+        data.values.every((variable: any, index: number) => {
+          const prevValue = refreshVariableDataRef.values[index]?.value;
+          const newValue = variable.value;
+
+          // Compare current and previous values; handle both string and array cases
+          return Array.isArray(newValue)
+            ? JSON.stringify(prevValue) === JSON.stringify(newValue)
+            : prevValue === newValue;
+        });
+
       // when this is called 1st time, we need to set the data for the updated variables data as well
       // from the second time, it will only be updated after the apply button is clicked
       if (
-        !refreshVariableDataRef?.values?.length && // Previous value of variables is empty
+        (!refreshVariableDataRef?.values?.length || isValueChanged) && // Previous value of variables is empty
         variablesData?.values?.length > 0 // new values of variables is NOT empty
       ) {
         // assign the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
