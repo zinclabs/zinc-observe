@@ -15,14 +15,11 @@ use rand::prelude::SliceRandom;
 use tracing::Instrument;
 
 use crate::{
-    common::meta::{self},
+    common::meta::{self, search::MultiCachedQueryResponse},
     handler::http::request::websocket::utils::{
         sessions_cache_utils, SearchEventReq, SearchResponseType, WsClientEvents, WsServerEvents,
     },
-    service::{
-        search as SearchService,
-        search::{cache::cacher::get_ts_col_order_by, sql::Sql},
-    },
+    service::search::{self as SearchService, cache::cacher::get_ts_col_order_by, sql::Sql},
 };
 
 pub struct SessionHandler {
@@ -155,9 +152,10 @@ impl SessionHandler {
                     request_id: self.request_id.clone(),
                     error: format!("{e}"),
                 };
-                self.send_message(err_res.to_json().to_string())
+                self.send_message(err_res.to_json().to_string(), None, None, 0, 0)
                     .await
                     .unwrap();
+
                 self.cleanup().await;
             }
         }
@@ -191,6 +189,9 @@ impl SessionHandler {
         let org_id = self.org_id.clone();
         let trace_id = req.trace_id.clone();
         let stream_type = req.stream_type;
+        let start_time = req.payload.query.start_time;
+        let end_time = req.payload.query.end_time;
+        println!("start_time: {}, end_time: {}", start_time, end_time);
 
         // check and append search event type
         if req.payload.search_type.is_none() {
@@ -205,7 +206,14 @@ impl SessionHandler {
                     trace_id: trace_id.clone(),
                     error: e.to_string(),
                 };
-                self.send_message(err_res.to_json().to_string()).await?;
+                self.send_message(
+                    err_res.to_json().to_string(),
+                    None,
+                    None,
+                    start_time,
+                    end_time,
+                )
+                .await?;
                 return Ok(());
             }
         };
@@ -274,7 +282,14 @@ impl SessionHandler {
                             trace_id: trace_id.clone(),
                             error: "Unauthorized Access".to_string(),
                         };
-                        self.send_message(err_res.to_json().to_string()).await?;
+                        self.send_message(
+                            err_res.to_json().to_string(),
+                            None,
+                            None,
+                            start_time,
+                            end_time,
+                        )
+                        .await?;
                         return Ok(());
                     }
                     // Check permissions on stream ends
@@ -303,8 +318,9 @@ impl SessionHandler {
             )
             .await;
             if let Ok(c_resp) = c_resp {
-                let cached_resp = c_resp.cached_response;
-                let mut deltas = c_resp.deltas;
+                let local_c_resp = c_resp.clone();
+                let cached_resp = local_c_resp.cached_response;
+                let mut deltas = local_c_resp.deltas;
                 deltas.sort();
                 deltas.dedup();
 
@@ -355,16 +371,23 @@ impl SessionHandler {
                                     curr_res_size += search_res.hits.len() as i64;
 
                                     if !search_res.hits.is_empty() {
-                                        let search_res = WsServerEvents::SearchResponse {
+                                        let ws_search_res = WsServerEvents::SearchResponse {
                                             trace_id: trace_id.clone(),
-                                            results: search_res,
+                                            results: search_res.clone(),
                                             response_type: SearchResponseType::Partition {
                                                 current: idx as u64 + 1,
                                                 total: partitions.len() as u64,
                                             },
                                             time_offset: end_time,
                                         };
-                                        self.send_message(search_res.to_json().to_string()).await?;
+                                        self.send_message(
+                                            ws_search_res.to_json().to_string(),
+                                            Some(search_res),
+                                            Some(c_resp.clone()),
+                                            start_time,
+                                            end_time,
+                                        )
+                                        .await?;
                                     }
 
                                     // Stop if we've reached the requested result size
@@ -381,7 +404,7 @@ impl SessionHandler {
                                 // Send cached response if delta is not before the cached response
                                 // time
                                 if !cached.cached_response.hits.is_empty() {
-                                    let search_res = WsServerEvents::SearchResponse {
+                                    let ws_search_res = WsServerEvents::SearchResponse {
                                         trace_id: trace_id.clone(),
                                         results: cached.cached_response.clone(),
                                         response_type: SearchResponseType::Partition {
@@ -390,7 +413,14 @@ impl SessionHandler {
                                         },
                                         time_offset: cached.response_end_time,
                                     };
-                                    self.send_message(search_res.to_json().to_string()).await?;
+                                    self.send_message(
+                                        ws_search_res.to_json().to_string(),
+                                        Some(cached.cached_response.clone()),
+                                        Some(c_resp.clone()),
+                                        start_time,
+                                        end_time,
+                                    )
+                                    .await?;
                                 }
                                 cached_resp_iter.next(); // Move to the next cached response
                             }
@@ -437,16 +467,23 @@ impl SessionHandler {
                                         "[WS_SEARCH]: Sending search response for trace_id: {}",
                                         trace_id
                                     );
-                                    let search_res = WsServerEvents::SearchResponse {
+                                    let ws_search_res = WsServerEvents::SearchResponse {
                                         trace_id: trace_id.clone(),
-                                        results: search_res,
+                                        results: search_res.clone(),
                                         response_type: SearchResponseType::Partition {
                                             current: idx as u64 + 1,
                                             total: partitions.len() as u64,
                                         },
                                         time_offset: end_time,
                                     };
-                                    self.send_message(search_res.to_json().to_string()).await?;
+                                    self.send_message(
+                                        ws_search_res.to_json().to_string(),
+                                        Some(search_res),
+                                        Some(c_resp.clone()),
+                                        start_time,
+                                        end_time,
+                                    )
+                                    .await?;
                                 }
 
                                 // Stop if we've reached the requested result size
@@ -461,7 +498,7 @@ impl SessionHandler {
                             delta_iter.next(); // Move to the next delta after processing
                         } else if let Some(cached) = cached_resp_iter.next() {
                             // Process remaining cached responses if no more deltas
-                            let search_res = WsServerEvents::SearchResponse {
+                            let ws_search_res = WsServerEvents::SearchResponse {
                                 trace_id: trace_id.clone(),
                                 results: cached.cached_response.clone(),
                                 response_type: SearchResponseType::Partition {
@@ -470,7 +507,14 @@ impl SessionHandler {
                                 },
                                 time_offset: cached.response_end_time,
                             };
-                            self.send_message(search_res.to_json().to_string()).await?;
+                            self.send_message(
+                                ws_search_res.to_json().to_string(),
+                                Some(cached.cached_response.clone()),
+                                Some(c_resp.clone()),
+                                start_time,
+                                end_time,
+                            )
+                            .await?;
                         }
                     }
                 } else {
@@ -504,16 +548,23 @@ impl SessionHandler {
                         curr_res_size += search_res.hits.len() as i64;
 
                         if !search_res.hits.is_empty() {
-                            let search_res = WsServerEvents::SearchResponse {
+                            let ws_search_res = WsServerEvents::SearchResponse {
                                 trace_id: trace_id.clone(),
-                                results: search_res,
+                                results: search_res.clone(),
                                 response_type: SearchResponseType::Partition {
                                     current: idx as u64 + 1,
                                     total: partitions.len() as u64,
                                 },
                                 time_offset: end_time,
                             };
-                            self.send_message(search_res.to_json().to_string()).await?;
+                            self.send_message(
+                                ws_search_res.to_json().to_string(),
+                                Some(search_res),
+                                Some(c_resp.clone()),
+                                start_time,
+                                end_time,
+                            )
+                            .await?;
                         }
 
                         // Stop if we've reached the requested result size
@@ -532,24 +583,52 @@ impl SessionHandler {
             log::info!("[WS_SEARCH]: Single search for trace_id: {}", trace_id);
             let end_time = req.payload.query.end_time;
             let search_res = self.do_search(&req).await?;
-            let search_res = WsServerEvents::SearchResponse {
+            let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
-                results: search_res,
+                results: search_res.clone(),
                 response_type: SearchResponseType::Single,
                 time_offset: end_time,
             };
-            self.send_message(search_res.to_json().to_string()).await?;
+            self.send_message(
+                ws_search_res.to_json().to_string(),
+                None,
+                None,
+                start_time,
+                end_time,
+            )
+            .await?;
         }
 
         Ok(())
     }
 
-    async fn send_message(&mut self, message: String) -> Result<(), Error> {
+    async fn send_message(
+        &mut self,
+        message: String,
+        search_res: Option<Response>,
+        cached_resp: Option<MultiCachedQueryResponse>,
+        start_time: i64,
+        end_time: i64,
+    ) -> Result<(), Error> {
         if self.session.text(message).await.is_err() {
             log::error!(
                 "[WS_HANDLER]: Failed to send message for request_id: {}",
                 self.request_id
             );
+        }
+        if let Some(search_res) = search_res {
+            let c_resp = cached_resp.unwrap();
+            crate::service::search::cache::write_results_v2(
+                &c_resp.trace_id,
+                &c_resp.ts_column,
+                start_time,
+                end_time,
+                &search_res,
+                c_resp.file_path,
+                c_resp.is_aggregate,
+                c_resp.is_descending,
+            )
+            .await;
         }
 
         Ok(())

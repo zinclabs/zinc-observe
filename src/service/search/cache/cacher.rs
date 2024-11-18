@@ -124,9 +124,9 @@ pub async fn check_cache(
         req.query.sql = origin_sql.clone();
         discard_interval = interval * 1000 * 1000; //in microseconds
     }
-    if req.query.size >= 0 {
-        *file_path = format!("{}_{}_{}", file_path, req.query.from, req.query.size);
-    }
+    // if req.query.size >= 0 {
+    //     *file_path = format!("{}_{}_{}", file_path, req.query.from, req.query.size);
+    // }
     let query_key = file_path.replace('/', "_");
 
     let mut is_descending = true;
