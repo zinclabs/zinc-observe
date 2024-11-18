@@ -722,14 +722,15 @@ impl SessionHandler {
         match crate::service::search::cancel_query(&self.org_id, &trace_id).await {
             Ok(ret) => {
                 let res = serde_json::to_string(&ret)?;
-                self.send_message(res).await?;
+                self.send_message(res, None, None, 0, 0).await?;
             }
             Err(_) => {
                 let res = WsServerEvents::CancelResponse {
                     trace_id: trace_id.to_string(),
                     is_success: false,
                 };
-                self.send_message(res.to_json().to_string()).await?;
+                self.send_message(res.to_json().to_string(), None, None, 0, 0)
+                    .await?;
             }
         }
 

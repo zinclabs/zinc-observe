@@ -257,6 +257,7 @@ pub fn convert_actix_to_tungstenite_request(
         .uri(uri);
 
     for (key, value) in headers.iter() {
+        println!("{}: {:?}", key, value);
         request_builder = request_builder.header(key, value);
     }
 

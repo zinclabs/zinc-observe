@@ -25,6 +25,7 @@ use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 use crate::{
     common::infra::cluster,
     router::http::ws_proxy::{convert_to_websocket_url, ws_proxy},
+    service::promql::value,
 };
 
 const QUERIER_ROUTES: [&str; 19] = [
@@ -203,6 +204,10 @@ async fn dispatch(
                 Ok(HttpResponse::InternalServerError().body(e.to_string()))
             }
         };
+    }
+
+    for (key, value) in req.headers() {
+        log::info!("{}: {:?}", key, value);
     }
 
     // send query
