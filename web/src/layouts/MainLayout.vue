@@ -258,8 +258,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :mini="miniMode"
       bordered
       show-if-above
-      @mouseover="expandMenu"
-      @mouseout="miniMode = true"
+      @mouseover="handleMouseOver"
+      @mouseout="handleMouseOut"
       mini-to-overlay
     >
       <q-list class="leftNavList">
@@ -308,6 +308,7 @@ import {
   QIcon,
   QSelect,
   useQuasar,
+  debounce,
 } from "quasar";
 import MenuLink from "../components/MenuLink.vue";
 import { useI18n } from "vue-i18n";
@@ -329,6 +330,7 @@ import {
   watch,
   markRaw,
   nextTick,
+  onBeforeUnmount,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
@@ -443,6 +445,7 @@ export default defineComponent({
     const { t } = useI18n();
     const $q = useQuasar();
     const miniMode = ref(true);
+    const isHover = ref(false);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
     const { getStreams, resetStreams } = useStreams();
@@ -645,6 +648,38 @@ export default defineComponent({
         }
       }
     });
+
+    const expandMenu = () => {
+      if (isHover.value) {
+        miniMode.value = false;
+        if (!isMonacoEditorLoaded.value) prefetch();
+      }
+    };
+    //added 300ms 
+    const debouncedExpandMenu = debounce (expandMenu, 350); 
+
+
+    const handleMouseOver = () => {
+      isHover.value = true;
+      debouncedExpandMenu();
+    };
+
+    const handleMouseOut = (event) => {
+      const drawer = event.currentTarget;
+      const relatedTarget = event.relatedTarget;
+
+      if (!drawer.contains(relatedTarget)) {
+        isHover.value = false;
+        miniMode.value = true;
+        debouncedExpandMenu.cancel();
+      }
+    };
+
+    onBeforeUnmount (() => {
+      debouncedExpandMenu.cancel();
+    });
+
+
 
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
@@ -994,11 +1029,6 @@ export default defineComponent({
       }
     };
 
-    const expandMenu = () => {
-      miniMode.value = false;
-      if (!isMonacoEditorLoaded.value) prefetch();
-    };
-
     return {
       t,
       router,
@@ -1023,6 +1053,9 @@ export default defineComponent({
       triggerRefreshToken,
       prefetch,
       expandMenu,
+      isHover,
+      handleMouseOver,
+      handleMouseOut,
     };
   },
   computed: {
