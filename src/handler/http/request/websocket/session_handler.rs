@@ -337,7 +337,7 @@ impl SessionHandler {
                             // If the delta is before the current cached response time, fetch
                             // partitions
 
-                            if delta.delta_end_time < cached.response_end_time {
+                            if delta.delta_end_time < cached.response_start_time {
                                 let partitions = self.get_partitions(&req).await;
 
                                 if partitions.is_empty() {
@@ -616,7 +616,7 @@ impl SessionHandler {
                 self.request_id
             );
         }
-
+        // write it only after request completion
         if let Some(search_res) = search_res {
             let c_resp = cached_resp.unwrap();
             if c_resp.cache_query_response {
