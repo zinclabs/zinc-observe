@@ -21,7 +21,6 @@ use crate::{
     service::db,
 };
 
-pub mod folders;
 pub mod reports;
 
 #[tracing::instrument]

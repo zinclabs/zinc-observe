@@ -22,7 +22,6 @@ use crate::{
     service::dashboards,
 };
 
-pub mod folders;
 pub mod reports;
 
 /// CreateDashboard

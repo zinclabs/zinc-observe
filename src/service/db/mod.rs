@@ -27,6 +27,7 @@ pub mod compact;
 pub mod dashboards;
 pub mod enrichment_table;
 pub mod file_list;
+pub mod folders;
 pub mod functions;
 pub mod instance;
 pub mod kv;

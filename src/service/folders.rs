@@ -57,7 +57,7 @@ pub async fn save_folder(
         folder.folder_id = ider::generate();
     }
 
-    match db::dashboards::folders::put(org_id, folder).await {
+    match db::folders::put(org_id, folder).await {
         Ok(folder) => {
             set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
             Ok(HttpResponse::Ok().json(folder))
@@ -87,7 +87,7 @@ pub async fn update_folder(
     }
     folder.folder_id = folder_id.to_string();
 
-    if let Err(error) = db::dashboards::folders::put(org_id, folder).await {
+    if let Err(error) = db::folders::put(org_id, folder).await {
         return Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -107,7 +107,7 @@ pub async fn list_folders(
     org_id: &str,
     permitted_folders: Option<Vec<String>>,
 ) -> Result<HttpResponse, Error> {
-    if let Ok(folders) = db::dashboards::folders::list(org_id).await {
+    if let Ok(folders) = db::folders::list(org_id).await {
         let filtered = match permitted_folders {
             Some(permitted_folders) => {
                 if permitted_folders.contains(&format!("{}:_all_{}", "dfolder", org_id)) {
@@ -133,7 +133,7 @@ pub async fn list_folders(
 
 #[tracing::instrument()]
 pub async fn get_folder(org_id: &str, folder_id: &str) -> Result<HttpResponse, Error> {
-    let resp = if let Ok(folder) = db::dashboards::folders::get(org_id, folder_id).await {
+    let resp = if let Ok(folder) = db::folders::get(org_id, folder_id).await {
         HttpResponse::Ok().json(folder)
     } else {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
@@ -155,16 +155,13 @@ pub async fn delete_folder(org_id: &str, folder_id: &str) -> Result<HttpResponse
         )));
     }
 
-    if db::dashboards::folders::get(org_id, folder_id)
-        .await
-        .is_err()
-    {
+    if db::folders::get(org_id, folder_id).await.is_err() {
         return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
             "Dashboard folder not found".to_string(),
         )));
     }
-    match db::dashboards::folders::delete(org_id, folder_id).await {
+    match db::folders::delete(org_id, folder_id).await {
         Ok(_) => {
             remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
             Ok(HttpResponse::Ok().json(MetaHttpResponse::message(

@@ -18,6 +18,7 @@ pub mod authz;
 pub mod clusters;
 pub mod dashboards;
 pub mod enrichment_table;
+pub mod folders;
 pub mod functions;
 pub mod kv;
 pub mod logs;

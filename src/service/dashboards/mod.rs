@@ -22,15 +22,15 @@ use config::{
     utils::json,
 };
 
+use super::folders;
 use crate::{
     common::{
         meta::{authz::Authz, dashboards::Dashboards, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
     },
-    service::db::dashboards,
+    service::db,
 };
 
-pub mod folders;
 pub mod reports;
 
 #[tracing::instrument(skip(body))]
@@ -42,7 +42,7 @@ pub async fn create_dashboard(
     // NOTE: Overwrite whatever `dashboard_id` the client has sent us
     // If folder is default folder & doesn't exist then create it
 
-    match dashboards::folders::get(org_id, folder_id).await {
+    match db::folders::get(org_id, folder_id).await {
         Ok(_) => {
             let dashboard_id = ider::generate();
             match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
@@ -117,7 +117,7 @@ pub async fn update_dashboard(
 #[tracing::instrument]
 pub async fn list_dashboards(org_id: &str, folder_id: &str) -> Result<HttpResponse, io::Error> {
     Ok(HttpResponse::Ok().json(Dashboards {
-        dashboards: dashboards::list(org_id, folder_id).await.unwrap(),
+        dashboards: db::dashboards::list(org_id, folder_id).await.unwrap(),
     }))
 }
 
@@ -127,7 +127,7 @@ pub async fn get_dashboard(
     dashboard_id: &str,
     folder_id: &str,
 ) -> Result<HttpResponse, io::Error> {
-    let resp = if let Ok(dashboard) = dashboards::get(org_id, dashboard_id, folder_id).await {
+    let resp = if let Ok(dashboard) = db::dashboards::get(org_id, dashboard_id, folder_id).await {
         HttpResponse::Ok().json(dashboard)
     } else {
         return Ok(Response::NotFound("Dashboard".to_string()).into());
@@ -141,7 +141,7 @@ pub async fn delete_dashboard(
     dashboard_id: &str,
     folder_id: &str,
 ) -> Result<HttpResponse, io::Error> {
-    if dashboards::get(org_id, dashboard_id, folder_id)
+    if db::dashboards::get(org_id, dashboard_id, folder_id)
         .await
         .is_err()
     {
@@ -150,7 +150,7 @@ pub async fn delete_dashboard(
             "Dashboard not found".to_string(),
         )));
     }
-    match dashboards::delete(org_id, dashboard_id, folder_id).await {
+    match db::dashboards::delete(org_id, dashboard_id, folder_id).await {
         Ok(_) => {
             remove_ownership(
                 org_id,
@@ -183,7 +183,7 @@ async fn save_dashboard(
     body: web::Bytes,
     hash: Option<&str>,
 ) -> Result<HttpResponse, io::Error> {
-    match dashboards::put(org_id, dashboard_id, folder_id, body, hash).await {
+    match db::dashboards::put(org_id, dashboard_id, folder_id, body, hash).await {
         Ok(dashboard) => {
             tracing::info!(dashboard_id, "Dashboard updated");
             Ok(HttpResponse::Ok().json(dashboard))
@@ -206,9 +206,9 @@ pub async fn move_dashboard(
     from_folder: &str,
     to_folder: &str,
 ) -> Result<HttpResponse, io::Error> {
-    if let Ok(dashboard) = dashboards::get(org_id, dashboard_id, from_folder).await {
+    if let Ok(dashboard) = db::dashboards::get(org_id, dashboard_id, from_folder).await {
         // make sure the destination folder exists
-        if dashboards::folders::get(org_id, to_folder).await.is_err() {
+        if db::folders::get(org_id, to_folder).await.is_err() {
             return Ok(Response::NotFound("Destination Folder".to_string()).into());
         }
         let dash = if dashboard.version == 1 {
@@ -225,13 +225,13 @@ pub async fn move_dashboard(
 
         // add the dashboard to the destination folder
         if let Err(error) =
-            dashboards::put(org_id, dashboard_id, to_folder, dash.into(), None).await
+            db::dashboards::put(org_id, dashboard_id, to_folder, dash.into(), None).await
         {
             return Ok(Response::InternalServerError(error).into());
         }
 
         // delete the dashboard from the source folder
-        let _ = dashboards::delete(org_id, dashboard_id, from_folder).await;
+        let _ = db::dashboards::delete(org_id, dashboard_id, from_folder).await;
         Ok(Response::OkMessage("Dashboard moved successfully".to_string()).into())
     } else {
         Ok(Response::NotFound("Dashboard".to_string()).into())
