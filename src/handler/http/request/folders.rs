@@ -23,7 +23,7 @@ use crate::service::folders;
 /// CreateFolder
 #[utoipa::path(
     context_path = "/api",
-    tag = "Dashboards",
+    tag = "Folders",
     operation_id = "CreateFolder",
     security(
         ("Authorization" = [])
@@ -56,7 +56,7 @@ pub async fn create_folder(
 /// UpdateFolder
 #[utoipa::path(
     context_path = "/api",
-    tag = "Dashboards",
+    tag = "Folders",
     operation_id = "UpdateFolder",
     security(
         ("Authorization" = [])
@@ -90,7 +90,7 @@ pub async fn update_folder(
 /// ListFolders
 #[utoipa::path(
     context_path = "/api",
-    tag = "Dashboards",
+    tag = "Folders",
     operation_id = "ListFolders",
     security(
         ("Authorization" = [])
@@ -140,7 +140,7 @@ pub async fn list_folders(
 /// GetFolder
 #[utoipa::path(
     context_path = "/api",
-    tag = "Dashboards",
+    tag = "Folders",
     operation_id = "GetFolder",
     security(
         ("Authorization" = [])
@@ -157,13 +157,14 @@ pub async fn list_folders(
 #[get("/{org_id}/folders/{folder_id}")]
 pub async fn get_folder(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, folder_id) = path.into_inner();
-    folders::get_folder(&org_id, &folder_id).await
+    let resp = folders::get_folder(&org_id, &folder_id).await;
+    Ok(resp)
 }
 
 /// DeleteFolder
 #[utoipa::path(
     context_path = "/api",
-    tag = "Dashboards",
+    tag = "Folders",
     operation_id = "DeleteFolder",
     security(
         ("Authorization" = [])

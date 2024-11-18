@@ -31,3 +31,7 @@ tokio-stream.workspace = true
 zstd.workspace = true
 tracing.workspace = true
 sea-orm.workspace = true
+sea-orm-migration.workspace = true
+
+[dev-dependencies]
+collapse.workspace = true

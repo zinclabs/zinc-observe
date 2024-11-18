@@ -14,13 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::get_config;
+use migration::Migrator;
+use sea_orm_migration::MigratorTrait;
 
-use crate::db::{sqlite::CLIENT_RW, SQLITE_STORE};
+use crate::db::{connect_to_orm, sqlite::CLIENT_RW, ORM_CLIENT, SQLITE_STORE};
 
+#[allow(unused_imports)]
+mod entity;
+pub mod folders;
+mod migration;
 pub mod short_urls;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     short_urls::init().await?;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Migrator::up(client, None).await?;
+
     Ok(())
 }
 

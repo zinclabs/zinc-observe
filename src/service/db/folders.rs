@@ -13,37 +13,42 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::folder::Folder, utils::json};
+use anyhow::Ok;
+use config::meta::folder::Folder;
+use infra::table::folders;
 
-use crate::service::db;
-
+/// Gets the folder with the given `folder_id`.
 #[tracing::instrument]
-pub(crate) async fn get(org_id: &str, folder_id: &str) -> Result<Folder, anyhow::Error> {
-    let val = db::get(&format!("/folders/{org_id}/{folder_id}")).await?;
-    Ok(json::from_slice(&val).unwrap())
+pub(crate) async fn get(org_id: &str, folder_id: &str) -> Result<Option<Folder>, anyhow::Error> {
+    let folder = folders::get(org_id, folder_id).await?;
+    Ok(folder)
 }
 
+/// Checks if the folder with the given `folder_id` exists.
+#[tracing::instrument]
+pub(crate) async fn exists(org_id: &str, folder_id: &str) -> Result<bool, anyhow::Error> {
+    let folder = folders::get(org_id, folder_id).await?;
+    Ok(folder.is_some())
+}
+
+/// Creates a new folder or updates an existing folder with the given
+/// `folder_id`.
 #[tracing::instrument(skip(folder))]
 pub(crate) async fn put(org_id: &str, folder: Folder) -> Result<Folder, anyhow::Error> {
-    let key = format!("/folders/{org_id}/{}", folder.folder_id);
-    match db::put(&key, json::to_vec(&folder)?.into(), db::NO_NEED_WATCH, None).await {
-        Ok(_) => Ok(folder),
-        Err(_) => Err(anyhow::anyhow!("Failed to save folder")),
-    }
+    let folder = folders::put(org_id, folder).await?;
+    Ok(folder)
 }
 
+/// Lists all dashboard folders.
 #[tracing::instrument]
-pub(crate) async fn list(org_id: &str) -> Result<Vec<Folder>, anyhow::Error> {
-    let db_key = format!("/folders/{org_id}/");
-    db::list(&db_key)
-        .await?
-        .into_values()
-        .map(|val| json::from_slice(&val).map_err(|e| anyhow::anyhow!(e)))
-        .collect()
+pub(crate) async fn list_dashboard_folders(org_id: &str) -> Result<Vec<Folder>, anyhow::Error> {
+    let folders = folders::list_dashboard_folders(org_id).await?;
+    Ok(folders)
 }
 
+/// Deletes the folder with the given `folder_id`.
 #[tracing::instrument]
 pub(crate) async fn delete(org_id: &str, folder_id: &str) -> Result<(), anyhow::Error> {
-    let key = format!("/folders/{org_id}/{folder_id}");
-    Ok(db::delete(&key, false, db::NO_NEED_WATCH, None).await?)
+    let _ = folders::delete(org_id, folder_id).await?;
+    Ok(())
 }
