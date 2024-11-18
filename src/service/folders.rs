@@ -107,7 +107,7 @@ pub async fn list_folders(
     org_id: &str,
     permitted_folders: Option<Vec<String>>,
 ) -> Result<HttpResponse, Error> {
-    if let Ok(folders) = db::folders::list(org_id).await {
+    if let Ok(folders) = db::folders::list_dashboard_folders(org_id).await {
         let filtered = match permitted_folders {
             Some(permitted_folders) => {
                 if permitted_folders.contains(&format!("{}:_all_{}", "dfolder", org_id)) {
@@ -132,16 +132,15 @@ pub async fn list_folders(
 }
 
 #[tracing::instrument()]
-pub async fn get_folder(org_id: &str, folder_id: &str) -> Result<HttpResponse, Error> {
-    let resp = if let Ok(folder) = db::folders::get(org_id, folder_id).await {
-        HttpResponse::Ok().json(folder)
-    } else {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+pub async fn get_folder(org_id: &str, folder_id: &str) -> HttpResponse {
+    match db::folders::get(org_id, folder_id).await {
+        Ok(Some(folder)) => HttpResponse::Ok().json(folder),
+        Ok(None) => HttpResponse::NotFound().json(MetaHttpResponse::error(
             http::StatusCode::NOT_FOUND.into(),
             "Dashboard folder not found".to_string(),
-        )));
-    };
-    Ok(resp)
+        )),
+        Err(_) => HttpResponse::InternalServerError().into(),
+    }
 }
 
 #[tracing::instrument()]
@@ -155,12 +154,25 @@ pub async fn delete_folder(org_id: &str, folder_id: &str) -> Result<HttpResponse
         )));
     }
 
-    if db::folders::get(org_id, folder_id).await.is_err() {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            "Dashboard folder not found".to_string(),
-        )));
+    match db::folders::exists(org_id, folder_id).await {
+        Ok(true) => { // Continue with deleting the folder.
+        }
+        Ok(false) => {
+            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                http::StatusCode::NOT_FOUND.into(),
+                "Dashboard folder not found".to_string(),
+            )));
+        }
+        Err(e) => {
+            return Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::error(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    e.to_string(),
+                )),
+            );
+        }
     }
+
     match db::folders::delete(org_id, folder_id).await {
         Ok(_) => {
             remove_ownership(org_id, "folders", Authz::new(folder_id)).await;

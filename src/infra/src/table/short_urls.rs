@@ -84,10 +84,7 @@ pub async fn create_table() -> Result<(), errors::Error> {
         .if_not_exists()
         .take();
 
-    client
-        .execute(builder.build(&create_table_stmt))
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    client.execute(builder.build(&create_table_stmt)).await?;
 
     Ok(())
 }
@@ -131,10 +128,7 @@ pub async fn add(short_id: &str, original_url: &str) -> Result<(), errors::Error
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::insert(record)
-        .exec(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Entity::insert(record).exec(client).await?;
 
     Ok(())
 }
@@ -147,8 +141,7 @@ pub async fn remove(short_id: &str) -> Result<(), errors::Error> {
     Entity::delete_many()
         .filter(Column::ShortId.eq(short_id))
         .exec(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        .await?;
 
     Ok(())
 }
@@ -162,8 +155,7 @@ pub async fn get(short_id: &str) -> Result<ShortUrlRecord, errors::Error> {
         .filter(Column::ShortId.eq(short_id))
         .into_model::<ShortUrlRecord>()
         .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .await?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Short URL not found".to_string())))?;
 
     Ok(record)
@@ -179,11 +171,7 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<ShortUrlRecord>, errors::Err
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
-    let records = res
-        .into_model::<ShortUrlRecord>()
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let records = res.into_model::<ShortUrlRecord>().all(client).await?;
 
     Ok(records)
 }
@@ -194,8 +182,7 @@ pub async fn contains(short_id: &str) -> Result<bool, errors::Error> {
         .filter(Column::ShortId.eq(short_id))
         .into_model::<ShortUrlRecord>()
         .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        .await?;
 
     Ok(record.is_some())
 }
@@ -218,10 +205,7 @@ pub async fn clear() -> Result<(), errors::Error> {
     let _lock = get_lock().await;
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    Entity::delete_many()
-        .exec(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Entity::delete_many().exec(client).await?;
 
     Ok(())
 }
@@ -242,12 +226,8 @@ pub async fn get_expired(
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
     }
-    let res = res.into_model::<ShortId>().all(client).await;
-
-    match res {
-        Ok(records) => Ok(records.iter().map(|r| r.short_id.clone()).collect()),
-        Err(e) => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
-    }
+    let records = res.into_model::<ShortId>().all(client).await?;
+    Ok(records.iter().map(|r| r.short_id.clone()).collect())
 }
 
 pub async fn batch_remove(short_ids: Vec<String>) -> Result<(), errors::Error> {
@@ -258,8 +238,7 @@ pub async fn batch_remove(short_ids: Vec<String>) -> Result<(), errors::Error> {
     Entity::delete_many()
         .filter(Column::ShortId.is_in(short_ids))
         .exec(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        .await?;
 
     Ok(())
 }

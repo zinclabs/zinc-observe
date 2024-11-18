@@ -105,6 +105,12 @@ pub enum ErrorCodes {
     SearchTimeout(String),
 }
 
+impl From<sea_orm::DbErr> for Error {
+    fn from(value: sea_orm::DbErr) -> Self {
+        Error::DbError(DbError::SeaORMError(value.to_string()))
+    }
+}
+
 impl std::fmt::Display for ErrorCodes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
