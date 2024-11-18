@@ -775,6 +775,7 @@ pub async fn check_cache_v2(
                 MultiCachedQueryResponse {
                     ts_column,
                     is_descending,
+                    file_path,
                     ..Default::default()
                 }
             }

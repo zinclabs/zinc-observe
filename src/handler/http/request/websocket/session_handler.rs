@@ -616,19 +616,22 @@ impl SessionHandler {
                 self.request_id
             );
         }
+
         if let Some(search_res) = search_res {
             let c_resp = cached_resp.unwrap();
-            crate::service::search::cache::write_results_v2(
-                &c_resp.trace_id,
-                &c_resp.ts_column,
-                start_time,
-                end_time,
-                &search_res,
-                c_resp.file_path,
-                c_resp.is_aggregate,
-                c_resp.is_descending,
-            )
-            .await;
+            if c_resp.cache_query_response {
+                crate::service::search::cache::write_results_v2(
+                    &c_resp.trace_id,
+                    &c_resp.ts_column,
+                    start_time,
+                    end_time,
+                    &search_res,
+                    c_resp.file_path,
+                    c_resp.is_aggregate,
+                    c_resp.is_descending,
+                )
+                .await;
+            }
         }
 
         Ok(())

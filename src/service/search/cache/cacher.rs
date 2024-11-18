@@ -125,7 +125,7 @@ pub async fn check_cache(
         discard_interval = interval * 1000 * 1000; //in microseconds
     }
     // if req.query.size >= 0 {
-    //     *file_path = format!("{}_{}_{}", file_path, req.query.from, req.query.size);
+    //     *file_path = format!("{}", file_path, req.query.from, req.query.size);
     // }
     let query_key = file_path.replace('/', "_");
 
@@ -215,7 +215,7 @@ pub async fn check_cache(
         multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
         multi_resp.took = start.elapsed().as_millis() as usize;
-
+        multi_resp.file_path = file_path.to_string();
         multi_resp
     } else {
         let c_resp = match crate::service::search::cluster::cacher::get_cached_results(
@@ -286,6 +286,7 @@ pub async fn check_cache(
         multi_resp.cache_query_response = true;
         multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
+        multi_resp.file_path = file_path.to_string();
         multi_resp
     }
 }
