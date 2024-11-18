@@ -16,15 +16,15 @@
 use std::io;
 
 use actix_web::{http, web, HttpResponse};
-use config::{ider, utils::json};
+use config::{
+    ider,
+    meta::folder::{Folder, DEFAULT_FOLDER},
+    utils::json,
+};
 
 use crate::{
     common::{
-        meta::{
-            authz::Authz,
-            dashboards::{Dashboards, Folder, DEFAULT_FOLDER},
-            http::HttpResponse as MetaHttpResponse,
-        },
+        meta::{authz::Authz, dashboards::Dashboards, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
     },
     service::db::dashboards,

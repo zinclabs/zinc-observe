@@ -16,6 +16,7 @@
 pub mod alerts;
 pub mod bitvec;
 pub mod cluster;
+pub mod folder;
 pub mod function;
 pub mod inverted_index;
 pub mod logger;

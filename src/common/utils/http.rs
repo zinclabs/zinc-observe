@@ -113,7 +113,7 @@ pub(crate) fn get_use_cache_from_request(query: &Query<HashMap<String, String>>)
 pub(crate) fn get_folder(query: &Query<HashMap<String, String>>) -> String {
     match query.get("folder") {
         Some(s) => s.to_string(),
-        None => crate::common::meta::dashboards::DEFAULT_FOLDER.to_owned(),
+        None => config::meta::folder::DEFAULT_FOLDER.to_owned(),
     }
 }
 

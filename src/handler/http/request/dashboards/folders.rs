@@ -16,8 +16,9 @@
 use std::io::Error;
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use config::meta::folder::Folder;
 
-use crate::{common::meta::dashboards::Folder, service::dashboards::folders};
+use crate::service::dashboards::folders;
 
 /// CreateFolder
 #[utoipa::path(

@@ -16,15 +16,14 @@
 use std::io::Error;
 
 use actix_web::{http, HttpResponse};
-use config::ider;
+use config::{
+    ider,
+    meta::folder::{Folder, FolderList, DEFAULT_FOLDER},
+};
 
 use crate::{
     common::{
-        meta::{
-            authz::Authz,
-            dashboards::{Folder, FolderList, DEFAULT_FOLDER},
-            http::HttpResponse as MetaHttpResponse,
-        },
+        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
     },
     service::db,

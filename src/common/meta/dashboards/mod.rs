@@ -52,26 +52,10 @@ pub mod v5;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct Folder {
-    #[serde(default)]
-    pub folder_id: String,
-    pub name: String,
-    pub description: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct MoveDashboard {
     pub from: String,
     pub to: String,
 }
-
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct FolderList {
-    pub list: Vec<Folder>,
-}
-
-pub const DEFAULT_FOLDER: &str = "default";
 
 pub fn datetime_now() -> DateTime<FixedOffset> {
     Utc::now().with_timezone(&FixedOffset::east_opt(0).expect(

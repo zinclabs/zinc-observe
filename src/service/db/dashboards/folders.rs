@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::json;
+use config::{meta::folder::Folder, utils::json};
 
-use crate::{common::meta::dashboards::Folder, service::db};
+use crate::service::db;
 
 #[tracing::instrument]
 pub(crate) async fn get(org_id: &str, folder_id: &str) -> Result<Folder, anyhow::Error> {
