@@ -56,7 +56,11 @@ pub async fn create_dashboard(
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
     let folder = get_folder(req);
-    dashboards::create_dashboard(&org_id, &folder, body).await
+    let resp = match dashboards::create_dashboard(&org_id, &folder, body).await {
+        Ok(resp) => resp,
+        Err(_) => HttpResponse::InternalServerError().into(),
+    };
+    Ok(resp)
 }
 
 /// UpdateDashboard
@@ -204,7 +208,12 @@ async fn move_dashboard(
         );
     };
 
-    dashboards::move_dashboard(&org_id, &dashboard_id, &folder.from, &folder.to).await
+    let resp =
+        match dashboards::move_dashboard(&org_id, &dashboard_id, &folder.from, &folder.to).await {
+            Ok(resp) => resp,
+            Err(_) => HttpResponse::InternalServerError().into(),
+        };
+    Ok(resp)
 }
 
 fn get_folder(req: HttpRequest) -> String {
