@@ -114,7 +114,7 @@ mod tests {
             r#"
                 CREATE TABLE IF NOT EXISTS "folders" (
                 "id" bigserial NOT NULL PRIMARY KEY,
-                "folders_id" varchar(256) NOT NULL,
+                "folder_id" varchar(256) NOT NULL,
                 "org" varchar(100) NOT NULL,
                 "name" varchar(256) NOT NULL,
                 "description" text,
@@ -124,11 +124,11 @@ mod tests {
         );
         assert_eq!(
             &create_folders_org_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folder" ("org")"#
+            r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folders" ("org")"#
         );
         assert_eq!(
             &create_folders_folders_id_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_folders_id_idx" ON "folder" ("folders_id")"#
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_folder_id_idx" ON "folders" ("folder_id")"#
         );
     }
 
@@ -139,7 +139,7 @@ mod tests {
             r#"
                 CREATE TABLE IF NOT EXISTS `folders` (
                 `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                `folders_id` varchar(256) NOT NULL,
+                `folder_id` varchar(256) NOT NULL,
                 `org` varchar(100) NOT NULL,
                 `name` varchar(256) NOT NULL,
                 `description` text,
@@ -149,11 +149,11 @@ mod tests {
         );
         assert_eq!(
             &create_folders_org_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE INDEX `folders_org_idx` ON `folder` (`org`)"#
+            r#"CREATE INDEX `folders_org_idx` ON `folders` (`org`)"#
         );
         assert_eq!(
             &create_folders_folders_id_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `folders_folders_id_idx` ON `folder` (`folders_id`)"#
+            r#"CREATE UNIQUE INDEX `folders_folder_id_idx` ON `folders` (`folder_id`)"#
         );
     }
 
@@ -164,7 +164,7 @@ mod tests {
             r#"
                 CREATE TABLE IF NOT EXISTS "folders" (
                 "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
-                "folders_id" varchar(256) NOT NULL,
+                "folder_id" varchar(256) NOT NULL,
                 "org" varchar(100) NOT NULL,
                 "name" varchar(256) NOT NULL,
                 "description" text,
@@ -174,11 +174,11 @@ mod tests {
         );
         assert_eq!(
             &create_folders_org_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folder" ("org")"#
+            r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folders" ("org")"#
         );
         assert_eq!(
             &create_folders_folders_id_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_folders_id_idx" ON "folder" ("folders_id")"#
+            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_folder_id_idx" ON "folders" ("folder_id")"#
         );
     }
 }
