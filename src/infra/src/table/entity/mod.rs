@@ -2,4 +2,4 @@
 
 pub mod prelude;
 
-pub mod folder;
+pub mod folders;

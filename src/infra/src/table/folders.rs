@@ -4,7 +4,7 @@ use sea_orm::{
     QueryOrder, Set, TryIntoModel,
 };
 
-use super::entity::folder::{ActiveModel, Column, Entity, Model};
+use super::entity::folders::{ActiveModel, Column, Entity, Model};
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
     errors,
