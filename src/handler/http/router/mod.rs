@@ -75,6 +75,7 @@ async fn audit_middleware(
     let path_columns = path.split('/').collect::<Vec<&str>>();
     let path_len = path_columns.len();
     if get_o2_config().common.audit_enabled
+        && !("ws".eq(path_columns[1]))
         && !(method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1]))
     {
         let query_params = req.query_string().to_string();
