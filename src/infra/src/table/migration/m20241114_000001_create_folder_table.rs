@@ -4,7 +4,6 @@ use sea_orm_migration::prelude::*;
 pub struct Migration;
 
 const FOLDERS_ORG_IDX: &str = "folders_org_idx";
-const FOLDERS_FOLDER_ID_IDX: &str = "folders_folder_id_idx";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -13,16 +12,10 @@ impl MigrationTrait for Migration {
             .create_table(create_folders_table_statement())
             .await?;
         manager.create_index(create_folders_org_idx_stmnt()).await?;
-        manager
-            .create_index(create_folders_folders_id_idx_stmnt())
-            .await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_index(Index::drop().name(FOLDERS_FOLDER_ID_IDX).to_owned())
-            .await?;
         manager
             .drop_index(Index::drop().name(FOLDERS_ORG_IDX).to_owned())
             .await?;
@@ -38,18 +31,13 @@ fn create_folders_table_statement() -> TableCreateStatement {
     Table::create()
         .table(Folders::Table)
         .if_not_exists()
+        // "Snowflake" primary key.
         .col(
             ColumnDef::new(Folders::Id)
                 .big_integer()
                 .not_null()
-                .auto_increment()
                 .primary_key(),
         )
-        // Surrogate key for folders that at the time of writing is...
-        // - stored in meta.key2
-        // - set by the server in calls to CreateFolder
-        // - referenced by the client in calls to ListDashboards
-        .col(ColumnDef::new(Folders::FolderId).string_len(256).not_null())
         .col(ColumnDef::new(Folders::Org).string_len(100).not_null())
         .col(ColumnDef::new(Folders::Name).string_len(256).not_null())
         .col(ColumnDef::new(Folders::Description).text())
@@ -77,23 +65,11 @@ fn create_folders_org_idx_stmnt() -> IndexCreateStatement {
         .to_owned()
 }
 
-/// Statement to create unique index on folders_id surrogate key.
-fn create_folders_folders_id_idx_stmnt() -> IndexCreateStatement {
-    sea_query::Index::create()
-        .if_not_exists()
-        .name(FOLDERS_FOLDER_ID_IDX)
-        .table(Folders::Table)
-        .col(Folders::FolderId)
-        .unique()
-        .to_owned()
-}
-
-/// Identifiers used in queries on the folder table.
+/// Identifiers used in queries on the folders table.
 #[derive(DeriveIden)]
 enum Folders {
     Table,
     Id,
-    FolderId,
     Org,
     Name,
     Description,
@@ -126,10 +102,6 @@ mod tests {
             &create_folders_org_idx_stmnt().to_string(PostgresQueryBuilder),
             r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folders" ("org")"#
         );
-        assert_eq!(
-            &create_folders_folders_id_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_folder_id_idx" ON "folders" ("folder_id")"#
-        );
     }
 
     #[test]
@@ -151,10 +123,6 @@ mod tests {
             &create_folders_org_idx_stmnt().to_string(MysqlQueryBuilder),
             r#"CREATE INDEX `folders_org_idx` ON `folders` (`org`)"#
         );
-        assert_eq!(
-            &create_folders_folders_id_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `folders_folder_id_idx` ON `folders` (`folder_id`)"#
-        );
     }
 
     #[test]
@@ -175,10 +143,6 @@ mod tests {
         assert_eq!(
             &create_folders_org_idx_stmnt().to_string(SqliteQueryBuilder),
             r#"CREATE INDEX IF NOT EXISTS "folders_org_idx" ON "folders" ("org")"#
-        );
-        assert_eq!(
-            &create_folders_folders_id_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_folder_id_idx" ON "folders" ("folder_id")"#
         );
     }
 }
