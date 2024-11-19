@@ -5,7 +5,6 @@ pub struct Migration;
 
 const FOLDERS_ORG_IDX: &str = "folders_org_idx";
 const FOLDERS_FOLDER_ID_IDX: &str = "folders_folder_id_idx";
-const FOLDERS_ORG_NAME_TYPE_IDX: &str = "folders_org_name_type_idx";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -17,16 +16,10 @@ impl MigrationTrait for Migration {
         manager
             .create_index(create_folders_folders_id_idx_stmnt())
             .await?;
-        manager
-            .create_index(create_folders_org_name_type_idx_stmnt())
-            .await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_index(Index::drop().name(FOLDERS_ORG_NAME_TYPE_IDX).to_owned())
-            .await?;
         manager
             .drop_index(Index::drop().name(FOLDERS_FOLDER_ID_IDX).to_owned())
             .await?;
@@ -95,19 +88,6 @@ fn create_folders_folders_id_idx_stmnt() -> IndexCreateStatement {
         .to_owned()
 }
 
-/// Statement to create unique index on org, name, type combination.
-fn create_folders_org_name_type_idx_stmnt() -> IndexCreateStatement {
-    sea_query::Index::create()
-        .if_not_exists()
-        .name(FOLDERS_ORG_NAME_TYPE_IDX)
-        .table(Folders::Table)
-        .col(Folders::Org)
-        .col(Folders::Name)
-        .col(Folders::Type)
-        .unique()
-        .to_owned()
-}
-
 /// Identifiers used in queries on the folder table.
 #[derive(DeriveIden)]
 enum Folders {
@@ -150,10 +130,6 @@ mod tests {
             &create_folders_folders_id_idx_stmnt().to_string(PostgresQueryBuilder),
             r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_folders_id_idx" ON "folder" ("folders_id")"#
         );
-        assert_eq!(
-            &create_folders_org_name_type_idx_stmnt().to_string(PostgresQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_org_name_type_idx" ON "folder" ("org", "name", "type")"#
-        );
     }
 
     #[test]
@@ -179,10 +155,6 @@ mod tests {
             &create_folders_folders_id_idx_stmnt().to_string(MysqlQueryBuilder),
             r#"CREATE UNIQUE INDEX `folders_folders_id_idx` ON `folder` (`folders_id`)"#
         );
-        assert_eq!(
-            &create_folders_org_name_type_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `folders_org_name_type_idx` ON `folder` (`org`, `name`, `type`)"#
-        );
     }
 
     #[test]
@@ -207,10 +179,6 @@ mod tests {
         assert_eq!(
             &create_folders_folders_id_idx_stmnt().to_string(SqliteQueryBuilder),
             r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_folders_id_idx" ON "folder" ("folders_id")"#
-        );
-        assert_eq!(
-            &create_folders_org_name_type_idx_stmnt().to_string(SqliteQueryBuilder),
-            r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_org_name_type_idx" ON "folder" ("org", "name", "type")"#
         );
     }
 }
