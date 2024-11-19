@@ -47,7 +47,7 @@ fn create_folder_table_statement() -> TableCreateStatement {
         .if_not_exists()
         .col(
             ColumnDef::new(Folder::Id)
-                .integer()
+                .big_integer()
                 .not_null()
                 .auto_increment()
                 .primary_key(),
@@ -133,7 +133,7 @@ mod tests {
             &create_folder_table_statement().to_string(PostgresQueryBuilder),
             r#"
                 CREATE TABLE IF NOT EXISTS "folder" (
-                "id" serial NOT NULL PRIMARY KEY,
+                "id" bigserial NOT NULL PRIMARY KEY,
                 "folder_id" varchar(256) NOT NULL,
                 "org" varchar(100) NOT NULL,
                 "name" varchar(256) NOT NULL,
@@ -162,7 +162,7 @@ mod tests {
             &create_folder_table_statement().to_string(MysqlQueryBuilder),
             r#"
                 CREATE TABLE IF NOT EXISTS `folder` (
-                `id` int NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
                 `folder_id` varchar(256) NOT NULL,
                 `org` varchar(100) NOT NULL,
                 `name` varchar(256) NOT NULL,
