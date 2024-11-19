@@ -1,7 +1,7 @@
 use config::meta::folder::Folder;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter,
+    QueryOrder, Set, TryIntoModel,
 };
 
 use super::entity::folder::{ActiveModel, Column, Entity, Model};
@@ -47,12 +47,27 @@ pub async fn list_dashboard_folders(org_id: &str) -> Result<Vec<Folder>, errors:
 /// the new or updated folder.
 pub async fn put(org_id: &str, folder: Folder) -> Result<Folder, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // We should probably generate folder_id here for new folders, rather than
+    // depending on caller code to generate it.
     let folder_id = folder.folder_id;
     let mut active: ActiveModel = match get_model(client, org_id, &folder_id).await? {
+        // If a folder with the given folder_id already exists, get that folder
+        // model and use it as the active model so that Sea ORM will update the
+        // corresponding DB record when the active model is saved.
         Some(model) => model.into(),
+        // In no folder with the given folder_id already exists, create a new
+        // active record so that Sea ORM will create a new DB record when the
+        // active model is saved.
         None => ActiveModel {
-            id: NotSet,
-            // We should probably set folder_id here rather than in caller code.
+            org: Set(org_id.to_owned()),
+            folder_id: Set(folder_id),
+            // Currently we only create dashboard folders. If we want to support
+            // creating different type of folders then we need to change the API
+            // for folders, either by adding the type field to the folder model
+            // or by creating specialized routes for creating folders of
+            // different types.
+            r#type: Set(DASHBOARDS_FOLDER_TYPE),
             ..Default::default()
         },
     };
@@ -63,7 +78,7 @@ pub async fn put(org_id: &str, folder: Folder) -> Result<Folder, errors::Error> 
     } else {
         Some(folder.description)
     });
-    let model = active.update(client).await?;
+    let model: Model = active.save(client).await?.try_into_model()?;
     Ok(model.into())
 }
 
