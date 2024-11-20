@@ -45,9 +45,6 @@ impl MigrationTrait for Migration {
                 .into_iter()
                 .map(|m| {
                     // Transform unstructured JSON from the meta record.
-                    let id = m.key2.parse::<i64>().map_err(|_| {
-                        DbErr::Migration("folder_id is not a 64-bit signed integer".to_owned())
-                    })?;
                     let json: MetaFolder =
                         json::from_str(&m.value).map_err(|e| DbErr::Migration(e.to_string()))?;
                     let description = if json.description.is_empty() {
@@ -56,8 +53,8 @@ impl MigrationTrait for Migration {
                         Some(json.description)
                     };
                     Ok(folder::ActiveModel {
-                        id: Set(id),
                         org: Set(m.key1),
+                        folder_id: Set(m.key2),
                         name: Set(json.name),
                         description: Set(description),
                         r#type: Set(0), // 0 indicates the dashboard folder type.
@@ -125,9 +122,10 @@ mod folder {
     #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
     #[sea_orm(table_name = "folders")]
     pub struct Model {
-        #[sea_orm(primary_key, auto_increment = false)]
+        #[sea_orm(primary_key)]
         pub id: i64,
         pub org: String,
+        pub folder_id: String,
         pub name: String,
         #[sea_orm(column_type = "Text", nullable)]
         pub description: Option<String>,
