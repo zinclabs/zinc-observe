@@ -25,6 +25,7 @@ use tantivy::{
 use writer::PuffinDirWriter;
 
 pub mod reader;
+pub mod reader_cache;
 pub mod writer;
 
 // We do not need all of the tantivy files, only the .term and .idx files

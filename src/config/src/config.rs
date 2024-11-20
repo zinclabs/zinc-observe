@@ -717,6 +717,12 @@ pub struct Common {
     )]
     pub inverted_index_enabled: bool,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_CACHE_ENABLED",
+        default = false,
+        help = "Toggle inverted index cache."
+    )]
+    pub inverted_index_cache_enabled: bool,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
         default = "",
         help = "Characters which should be used as a delimiter to split the string, default using all ascii punctuations."
@@ -874,7 +880,7 @@ pub struct Limit {
     // MB, per data file size limit in memory
     #[env_config(name = "ZO_MAX_FILE_SIZE_IN_MEMORY", default = 128)]
     pub max_file_size_in_memory: usize,
-    #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 0)]
+    #[env_config(name = "ZO_UDSCHEMA_MAX_FIELDS", default = 2000)]
     pub udschema_max_fields: usize,
     // MB, total data size in memory, default is 50% of system memory
     #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
@@ -1062,6 +1068,12 @@ pub struct Limit {
     pub max_enrichment_table_size: usize,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_CACHE_MAX_ENTRIES",
+        default = 100000,
+        help = "Maximum number of entries in the inverted index cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_cache_max_entries: usize,
 }
 
 #[derive(EnvConfig)]

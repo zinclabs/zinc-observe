@@ -791,6 +791,7 @@ export default defineComponent({
     watch(
       () => [
         dashboardPanelData.meta.stream.streamResults,
+        dashboardPanelData.meta.stream.streamResultsType,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream,
@@ -812,8 +813,14 @@ export default defineComponent({
               ].fields.stream_type
         );
 
-        // if fields found
-        if (fields) {
+        // if fields found and stream result is of same type
+        if (
+          fields &&
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type ===
+            dashboardPanelData.meta.stream.streamResultsType
+        ) {
           try {
             await extractFields();
           } catch (error: any) {
@@ -831,6 +838,7 @@ export default defineComponent({
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type,
         dashboardPanelData.meta.stream.streamResults,
+        dashboardPanelData.meta.stream.streamResultsType,
       ],
       () => {
         // if (!props.editMode) {
@@ -848,12 +856,17 @@ export default defineComponent({
         // );
 
         // set the first stream as the selected stream when the api loads the data
+        // Here, we need to check if the stream results are same as the selected stream type
         if (
           // !props.editMode &&
           // !dashboardPanelData.data.queries[
           //   dashboardPanelData.layout.currentQueryIndex
           // ].fields.stream &&
-          dashboardPanelData.meta.stream.streamResults.length > 0
+          dashboardPanelData.meta.stream.streamResults.length > 0 &&
+          dashboardPanelData.meta.stream.streamResultsType ===
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type
         ) {
           const currentIndex = dashboardPanelData.layout.currentQueryIndex;
           // Check if selected stream for current query exists in index options
@@ -939,6 +952,8 @@ export default defineComponent({
         dashboardPanelData.meta.stream.streamResults = [];
 
         dashboardPanelData.meta.stream.streamResults = res.list;
+
+        dashboardPanelData.meta.stream.streamResultsType = stream_type;
       });
     };
     const filterFieldFn = (rows: any, terms: any) => {
@@ -1048,7 +1063,13 @@ export default defineComponent({
         const schemaFields: any = [];
         let userDefineSchemaSettings: any = [];
 
-        if (dashboardPanelData.meta.stream.streamResults.length > 0) {
+        if (
+          dashboardPanelData.meta.stream.streamResults.length > 0 &&
+          dashboardPanelData.meta.stream.streamResultsType ===
+            dashboardPanelData.data.queries[
+              dashboardPanelData.layout.currentQueryIndex
+            ].fields.stream_type
+        ) {
           for (const stream of dashboardPanelData.meta.stream.streamResults) {
             if (
               dashboardPanelData.data.queries[

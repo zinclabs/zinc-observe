@@ -53,6 +53,7 @@ use crate::service::{
         tantivy::puffin_directory::{
             convert_puffin_file_to_tantivy_dir,
             reader::{warm_up_terms, PuffinDirReader},
+            reader_cache,
         },
     },
 };
@@ -562,29 +563,51 @@ async fn search_tantivy_index(
         ));
     };
 
+    // cache the indexer and reader
     let cfg = get_config();
-    let puffin_dir: Box<dyn Directory> =
-        if cfg.common.inverted_index_tantivy_mode == InvertedIndexTantivyMode::Mmap.to_string() {
-            let puffin_dir_path = format!(
-                "{}{}",
-                cfg.common.data_cache_dir,
-                ttv_file_name.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER)
-            );
-            if !is_exists(&puffin_dir_path) {
-                let read_dir = get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?;
-                let _ = convert_puffin_file_to_tantivy_dir(read_dir, &puffin_dir_path).await?;
-            }
-            Box::new(tantivy::directory::MmapDirectory::open(&puffin_dir_path)?)
-        } else {
-            Box::new(get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?)
-        };
+    let indexer = if cfg.common.inverted_index_cache_enabled {
+        reader_cache::GLOBAL_CACHE.get(&ttv_file_name)
+    } else {
+        None
+    };
+    let (tantivy_index, tantivy_reader) = match indexer {
+        Some((indexer, reader)) => (indexer, reader),
+        None => {
+            log::debug!("init cache for puffin file: {}", ttv_file_name);
+            let puffin_dir: Box<dyn Directory> = if cfg.common.inverted_index_tantivy_mode
+                == InvertedIndexTantivyMode::Mmap.to_string()
+            {
+                let puffin_dir_path = format!(
+                    "{}{}",
+                    cfg.common.data_cache_dir,
+                    ttv_file_name.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER)
+                );
+                if !is_exists(&puffin_dir_path) {
+                    let read_dir =
+                        get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?;
+                    let _ = convert_puffin_file_to_tantivy_dir(read_dir, &puffin_dir_path).await?;
+                }
+                Box::new(tantivy::directory::MmapDirectory::open(&puffin_dir_path)?)
+            } else {
+                Box::new(get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?)
+            };
 
-    let tantivy_index = tantivy::Index::open(puffin_dir)?;
-    let tantivy_reader = tantivy_index
-        .reader_builder()
-        .reload_policy(tantivy::ReloadPolicy::Manual)
-        .num_warming_threads(0)
-        .try_into()?;
+            let index = tantivy::Index::open(puffin_dir)?;
+            let reader = index
+                .reader_builder()
+                .reload_policy(tantivy::ReloadPolicy::Manual)
+                .num_warming_threads(0)
+                .try_into()?;
+            let index = Arc::new(index);
+            let reader = Arc::new(reader);
+            if cfg.common.inverted_index_cache_enabled {
+                reader_cache::GLOBAL_CACHE
+                    .put(ttv_file_name.to_string(), (index.clone(), reader.clone()));
+            }
+            (index, reader)
+        }
+    };
+
     let tantivy_searcher = tantivy_reader.searcher();
     let tantivy_schema = tantivy_index.schema();
     let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).unwrap();

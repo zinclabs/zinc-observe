@@ -23,6 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="selectedButtonType === 'auto' ? 'selected' : ''"
           class="button button-left"
           @click="onUpdateButton('auto', $event)"
+          :style="{
+            backgroundColor:
+            store.state.theme == 'dark' ? '#bfbebef5' : '#f0eaea',
+          }"
         >
           {{ t("panel.auto") }}
         </button>
@@ -31,6 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           data-test="dashboard-promQL"
           class="button"
+          :style="{
+            backgroundColor:
+            store.state.theme == 'dark' ? '#bfbebef5' : '#f0eaea',
+          }"
           :class="selectedButtonType === 'promql' ? 'selected' : ''"
           v-show="
             dashboardPanelData.data.queries[
@@ -46,6 +54,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           data-test="dashboard-customSql"
           :class="selectedButtonType === 'custom-sql' ? 'selected' : ''"
+          :style="{
+            backgroundColor:
+            store.state.theme == 'dark' ? '#bfbebef5' : '#f0eaea',
+          }"
           class="button button-right"
           @click="onUpdateButton('custom-sql', $event)"
         >
@@ -78,6 +90,7 @@ import { useRouter } from "vue-router";
 import { useQuasar } from "quasar";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
 import ConfirmDialog from "../../ConfirmDialog.vue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "QueryTypeSelector",
@@ -88,7 +101,7 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18n();
     const $q = useQuasar();
-
+    const store = useStore();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
       "dashboard"
@@ -273,6 +286,7 @@ export default defineComponent({
       changeToggle,
       confirmQueryModeChangeDialog,
       selectedButtonType,
+      store,
     };
   },
   components: { ConfirmDialog },
@@ -294,7 +308,7 @@ export default defineComponent({
 .button {
   display: block;
   cursor: pointer;
-  background-color: #f0eaea;
+  // background-color: #f0eaea;
   border: none;
   font-size: 14px;
   padding: 3px 10px;

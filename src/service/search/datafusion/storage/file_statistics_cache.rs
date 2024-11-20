@@ -39,9 +39,11 @@ impl FileStatisticsCache {
             max_entries,
         }
     }
+
     pub fn len(&self) -> usize {
         self.statistics.len()
     }
+
     fn format_key(&self, k: &Path) -> String {
         if let Some(mut p) = k.as_ref().find("/$$/") {
             if let Some(pp) = k.as_ref()[..p].find("/schema=") {

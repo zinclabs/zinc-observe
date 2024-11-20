@@ -392,15 +392,16 @@ impl Report {
         let email = email
             .multipart(
                 MultiPart::mixed()
-                    .singlepart(SinglePart::html(self.message.clone()))
                     .singlepart(SinglePart::html(format!(
-                        "<p><a href='{dashb_url}' target='_blank'>Link to dashboard</a></p>"
+                        "{}\n\n<p><a href='{dashb_url}' target='_blank'>Link to dashboard</a></p>",
+                        self.message
                     )))
                     .singlepart(
                         // Only supports PDF for now, attach the PDF
-                        lettre::message::Attachment::new(
-                            self.title.clone(), // Attachment filename
-                        )
+                        lettre::message::Attachment::new(format!(
+                            "{}.pdf",
+                            sanitize_filename(&self.title)
+                        ))
                         .body(pdf_data.to_owned(), ContentType::parse("application/pdf")?),
                     ),
             )
@@ -651,4 +652,17 @@ async fn wait_for_panel_data_load(page: &Page) -> Result<(), anyhow::Error> {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
+}
+
+fn sanitize_filename(filename: &str) -> String {
+    filename
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == ' ' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }

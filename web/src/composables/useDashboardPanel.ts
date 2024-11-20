@@ -172,6 +172,7 @@ const getDefaultDashboardPanelData: any = () => ({
       customQueryFields: [],
       functions: [],
       streamResults: <any>[],
+      streamResultsType: "",
       filterField: "",
     },
   },
