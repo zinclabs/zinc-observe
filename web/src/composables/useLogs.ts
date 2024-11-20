@@ -4482,17 +4482,22 @@ const useLogs = () => {
 
       webSocket.connect(url, 2000, 5);
 
+      // Gets called when socket connect is established
+      webSocket.addOpenHandler(
+        sendSearchMessage.bind(null, queryReq, type, traceId),
+      );
+
+      // When we receive message from BE/server
       webSocket.addMessageHandler(
         handleSearchResponse.bind(null, queryReq, isPagination, type, traceId),
       );
 
+      // On closing of ws, when search is completed Server closes the WS
       webSocket.addCloseHandler(
-        handleSearchClose.bind(null, queryReq, type, isPagination),
+        handleSearchClose.bind(null, queryReq, type, isPagination, traceId),
       );
+
       webSocket.addErrorHandler(handleSearchError);
-      webSocket.addOpenHandler(
-        sendSearchMessage.bind(null, queryReq, type, traceId),
-      );
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -4569,8 +4574,6 @@ const useLogs = () => {
     response: any,
   ) => {
     try {
-      removeTraceId(traceId);
-
       const parsedSQL = fnParsedSQL();
 
       // When using limit
@@ -4672,8 +4675,6 @@ const useLogs = () => {
     traceId: string,
     response: any,
   ) => {
-    removeTraceId(traceId);
-
     searchObjDebug["histogramProcessingStartTime"] = performance.now();
     searchObj.loading = false;
     if (searchObj.data.queryResults.aggs == null) {
@@ -4855,13 +4856,15 @@ const useLogs = () => {
     queryReq: SearchRequestPayload,
     type: "search" | "histogram" | "pageCount" | "cancel",
     isPagination: boolean,
+    traceId: string,
     response: any,
   ) => {
+    if (traceId) removeTraceId(traceId);
     searchObj.loading = false;
-    if (type === "search" && !isPagination) processHistogramRequest(queryReq);
+    searchObj.loadingHistogram = false;
 
-    if (type === "histogram") {
-      searchObj.loadingHistogram = false;
+    if (type === "search" && !isPagination) {
+      processHistogramRequest(queryReq);
     }
 
     if (type === "cancel") {
