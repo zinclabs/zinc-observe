@@ -58,7 +58,12 @@ pub async fn create_dashboard(
                 .await;
                 Ok(res)
             }
-            Err(_) => todo!(),
+            Err(error) => Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    error.to_string(),
+                )),
+            ),
         }
     } else {
         if folder_id == DEFAULT_FOLDER {

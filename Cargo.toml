@@ -65,7 +65,6 @@ anyhow.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
-async-std = { version = "1", features = ["attributes", "tokio1"] }
 awc = "3.5"
 aws-sdk-sns.workspace = true
 base64.workspace = true
@@ -145,7 +144,6 @@ regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
 rust-embed-for-web = "11.2.1"
-sea-orm.workspace = true
 segment.workspace = true
 serde.workspace = true
 serde_json.workspace = true

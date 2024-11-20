@@ -16,7 +16,7 @@
 use config::meta::folder::Folder;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter,
-    QueryOrder, Set, TryIntoModel,
+    QueryOrder, Set,
 };
 
 use super::entity::folders::{ActiveModel, Column, Entity, Model};
@@ -25,8 +25,19 @@ use crate::{
     errors,
 };
 
-// Flags that indicate the type of data the folder can contain.
-const DASHBOARDS_FOLDER_TYPE: i16 = 0;
+/// Indicates the type of data that the folder can contain.
+#[derive(Debug, Clone, Copy)]
+enum FolderType {
+    Dashboards,
+}
+
+impl From<FolderType> for i16 {
+    fn from(value: FolderType) -> Self {
+        match value {
+            FolderType::Dashboards => 0,
+        }
+    }
+}
 
 impl From<Model> for Folder {
     fn from(value: Model) -> Self {
@@ -51,7 +62,7 @@ pub async fn get(org_id: &str, folder_id: &str) -> Result<Option<Folder>, errors
 /// Lists all dashboard folders.
 pub async fn list_dashboard_folders(org_id: &str) -> Result<Vec<Folder>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let folders = list_models(client, org_id, DASHBOARDS_FOLDER_TYPE)
+    let folders = list_models(client, org_id, FolderType::Dashboards)
         .await?
         .into_iter()
         .map(Folder::from)
@@ -67,35 +78,42 @@ pub async fn put(org_id: &str, folder: Folder) -> Result<Folder, errors::Error> 
     // We should probably generate folder_id here for new folders, rather than
     // depending on caller code to generate it.
     let folder_id = parse_folder_id(&folder.folder_id)?;
-    let mut active: ActiveModel = match get_model(client, org_id, folder_id).await? {
-        // If a folder with the given folder_id already exists, get that folder
-        // model and use it as the active model so that Sea ORM will update the
-        // corresponding DB record when the active model is saved.
-        Some(model) => model.into(),
-        // In no folder with the given folder_id already exists, create a new
-        // active record so that Sea ORM will create a new DB record when the
-        // active model is saved.
-        None => ActiveModel {
-            org: Set(org_id.to_owned()),
-            id: Set(folder_id),
-            // Currently we only create dashboard folders. If we want to support
-            // creating different type of folders then we need to change the API
-            // for folders, either by adding the type field to the folder model
-            // or by creating specialized routes for creating folders of
-            // different types.
-            r#type: Set(DASHBOARDS_FOLDER_TYPE),
-            ..Default::default()
-        },
-    };
-
-    active.name = Set(folder.name);
-    active.description = Set(if folder.description.is_empty() {
+    let name = folder.name;
+    let description = if folder.description.is_empty() {
         None
     } else {
         Some(folder.description)
-    });
-    let model: Model = active.save(client).await?.try_into_model()?;
-    Ok(model.into())
+    };
+
+    match get_model(client, org_id, folder_id).await? {
+        // If a folder with the given folder_id already exists then update it.
+        Some(model) => {
+            let mut active: ActiveModel = model.into();
+            active.name = Set(name);
+            active.description = Set(description);
+            let model = active.update(client).await?;
+            Ok(model.into())
+        }
+        // In no folder with the given folder_id already exists, create a new
+        // folder.
+        None => {
+            let active = ActiveModel {
+                id: Set(folder_id),
+                org: Set(org_id.to_owned()),
+                // Currently we only create dashboard folders. If we want to support
+                // creating different type of folders then we need to change the API
+                // for folders, either by adding the type field to the folder model
+                // or by creating specialized routes for creating folders of
+                // different types.
+                r#type: Set(FolderType::Dashboards.into()),
+                name: Set(name),
+                description: Set(description),
+                ..Default::default()
+            };
+            let model = active.insert(client).await?;
+            Ok(model.into())
+        }
+    }
 }
 
 /// Deletes a folder with the given `folder_id` surrogate key.
@@ -135,11 +153,11 @@ async fn get_model(
 async fn list_models(
     db: &DatabaseConnection,
     org_id: &str,
-    folder_type: i16,
+    folder_type: FolderType,
 ) -> Result<Vec<Model>, sea_orm::DbErr> {
     Entity::find()
         .filter(Column::Org.eq(org_id))
-        .filter(Column::Type.eq(folder_type))
+        .filter(Column::Type.eq::<i16>(folder_type.into()))
         .order_by(Column::Id, sea_orm::Order::Asc)
         .all(db)
         .await
