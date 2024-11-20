@@ -65,42 +65,40 @@ pub async fn create_dashboard(
                 )),
             ),
         }
-    } else {
-        if folder_id == DEFAULT_FOLDER {
-            let folder = Folder {
-                folder_id: DEFAULT_FOLDER.to_string(),
-                name: DEFAULT_FOLDER.to_string(),
-                description: DEFAULT_FOLDER.to_string(),
-            };
-            folders::save_folder(org_id, folder, true).await?;
-            let dashboard_id = ider::generate();
-            match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
-                Ok(res) => {
-                    set_ownership(
-                        org_id,
-                        "dashboards",
-                        Authz {
-                            obj_id: dashboard_id,
-                            parent_type: "folders".to_owned(),
-                            parent: folder_id.to_owned(),
-                        },
-                    )
-                    .await;
-                    Ok(res)
-                }
-                Err(error) => Ok(HttpResponse::InternalServerError().json(
-                    MetaHttpResponse::message(
-                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        error.to_string(),
-                    ),
-                )),
+    } else if folder_id == DEFAULT_FOLDER {
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: DEFAULT_FOLDER.to_string(),
+        };
+        folders::save_folder(org_id, folder, true).await?;
+        let dashboard_id = ider::generate();
+        match save_dashboard(org_id, &dashboard_id, folder_id, body, None).await {
+            Ok(res) => {
+                set_ownership(
+                    org_id,
+                    "dashboards",
+                    Authz {
+                        obj_id: dashboard_id,
+                        parent_type: "folders".to_owned(),
+                        parent: folder_id.to_owned(),
+                    },
+                )
+                .await;
+                Ok(res)
             }
-        } else {
-            Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
-                "folder not found".to_string(),
-            )))
+            Err(error) => Ok(
+                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
+                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                    error.to_string(),
+                )),
+            ),
         }
+    } else {
+        Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            "folder not found".to_string(),
+        )))
     }
 }
 
