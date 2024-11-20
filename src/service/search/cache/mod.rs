@@ -602,46 +602,54 @@ pub async fn write_results_v2(
     ts_column: &str,
     req_query_start_time: i64,
     req_query_end_time: i64,
-    res: &config::meta::search::Response,
+    res: &Vec<config::meta::search::Response>,
     file_path: String,
     is_aggregate: bool,
     is_descending: bool,
 ) {
-    let mut local_resp = res.clone();
-    // let remove_hit = if is_descending {
-    //     local_resp.hits.last()
-    // } else {
-    //     local_resp.hits.first()
-    // };
-
-    // if !local_resp.hits.is_empty() && remove_hit.is_some() {
-    //     let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
-
-    //     if let Some(ts_value) = ts_value_to_remove {
-    //         local_resp
-    //             .hits
-    //             .retain(|hit| hit.get(ts_column) != Some(&ts_value));
-    //     }
-    // }
-
-    if local_resp.hits.is_empty() {
+    if res.is_empty() {
         return;
     }
 
-    let last_rec_ts = get_ts_value(ts_column, local_resp.hits.last().unwrap());
-    let first_rec_ts = get_ts_value(ts_column, local_resp.hits.first().unwrap());
+    // Calculate the first and last timestamps across all responses
+    let mut first_rec_ts = i64::MAX;
+    let mut last_rec_ts = i64::MIN;
 
+    for response in res {
+        if let Some(first_hit) = response.hits.first() {
+            let ts_first = get_ts_value(ts_column, first_hit);
+            if ts_first < first_rec_ts {
+                first_rec_ts = ts_first;
+            }
+        }
+
+        if let Some(last_hit) = response.hits.last() {
+            let ts_last = get_ts_value(ts_column, last_hit);
+            if ts_last > last_rec_ts {
+                last_rec_ts = ts_last;
+            }
+        }
+    }
+
+    // If no valid timestamps were found, return early
+    if first_rec_ts == i64::MAX || last_rec_ts == i64::MIN {
+        return;
+    }
+
+    // Calculate the smallest and largest timestamps
     let smallest_ts = std::cmp::min(first_rec_ts, last_rec_ts);
+    let largest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
+
     let discard_duration = get_config().common.result_cache_discard_duration * 1000 * 1000;
 
+    // Discard results if the time range is too small
     if (last_rec_ts - first_rec_ts).abs() < discard_duration
         && smallest_ts > Utc::now().timestamp_micros() - discard_duration
     {
         return;
     }
 
-    let largest_ts = std::cmp::max(first_rec_ts, last_rec_ts);
-
+    // Calculate the cache start and end times
     let cache_end_time = if largest_ts > 0 && largest_ts < req_query_end_time {
         largest_ts
     } else {
@@ -662,9 +670,11 @@ pub async fn write_results_v2(
         if is_descending { 1 } else { 0 }
     );
 
-    let res_cache = json::to_string(&local_resp).unwrap();
+    let res_cache = json::to_string(&res).unwrap();
     let query_key = file_path.replace('/', "_");
     let trace_id = trace_id.to_string();
+
+    // Cache the results to disk
     tokio::spawn(async move {
         let file_path_local = file_path.clone();
 

@@ -15,9 +15,13 @@ use rand::prelude::SliceRandom;
 use tracing::Instrument;
 
 use crate::{
-    common::meta::{self, search::MultiCachedQueryResponse},
+    common::meta::{
+        self,
+        search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
+    },
     handler::http::request::websocket::utils::{
-        sessions_cache_utils, SearchEventReq, SearchResponseType, WsClientEvents, WsServerEvents,
+        enterprise_utils, sessions_cache_utils, SearchEventReq, SearchResponseType, WsClientEvents,
+        WsServerEvents,
     },
     service::search::{self as SearchService, cache::cacher::get_ts_col_order_by, sql::Sql},
 };
@@ -28,6 +32,7 @@ pub struct SessionHandler {
     user_id: String,
     request_id: String,
     org_id: String,
+    accumulated_results: Vec<Response>,
 }
 
 impl SessionHandler {
@@ -44,6 +49,7 @@ impl SessionHandler {
             user_id: user_id.to_string(),
             request_id: request_id.to_string(),
             org_id: org_id.to_string(),
+            accumulated_results: Vec::new(),
         }
     }
 
@@ -152,7 +158,7 @@ impl SessionHandler {
                     request_id: self.request_id.clone(),
                     error: format!("{e}"),
                 };
-                self.send_message(err_res.to_json().to_string(), None, None, 0, 0)
+                self.send_message(err_res.to_json().to_string())
                     .await
                     .unwrap();
 
@@ -206,94 +212,24 @@ impl SessionHandler {
                     trace_id: trace_id.clone(),
                     error: e.to_string(),
                 };
-                self.send_message(
-                    err_res.to_json().to_string(),
-                    None,
-                    None,
-                    start_time,
-                    end_time,
-                )
-                .await?;
+                self.send_message(err_res.to_json().to_string()).await?;
                 return Ok(());
             }
         };
 
-        // get stream settings
+        // Check permissions for each stream
+        #[cfg(feature = "enterprise")]
         for stream_name in stream_names {
-            if let Some(settings) =
-                infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+            if let Err(e) =
+                enterprise_utils::check_permissions(&stream_name, stream_type, &user_id, &org_id)
+                    .await
             {
-                let max_query_range = settings.max_query_range;
-                if max_query_range > 0
-                    && (req.payload.query.end_time - req.payload.query.start_time)
-                        > max_query_range * 3600 * 1_000_000
-                {
-                    req.payload.query.start_time =
-                        req.payload.query.end_time - max_query_range * 3600 * 1_000_000;
-                    // range_error = format!(
-                    //     "Query duration is modified due to query range restriction of {} hours",
-                    //     max_query_range
-                    // );
-                    log::info!(
-                        "[WS_SEARCH]: Query duration is modified due to query range restriction of {} hours",
-                        max_query_range
-                    );
-                }
-            }
-
-            // Check permissions on stream
-            #[cfg(feature = "enterprise")]
-            {
-                use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
-
-                use crate::common::{
-                    infra::config::USERS,
-                    utils::auth::{is_root_user, AuthExtractor},
+                let err_res = WsServerEvents::SearchError {
+                    trace_id: trace_id.clone(),
+                    error: e.to_string(),
                 };
-
-                if !is_root_user(&user_id) {
-                    let user: meta::user::User =
-                        USERS.get(&format!("{org_id}/{}", user_id)).unwrap().clone();
-                    let stream_type_str = stream_type.to_string();
-
-                    if user.is_external
-                        && !crate::handler::http::auth::validator::check_permissions(
-                            &user_id,
-                            AuthExtractor {
-                                auth: "".to_string(),
-                                method: "GET".to_string(),
-                                o2_type: format!(
-                                    "{}:{}",
-                                    OFGA_MODELS
-                                        .get(stream_type_str.as_str())
-                                        .map_or(stream_type_str.as_str(), |model| model.key),
-                                    stream_name
-                                ),
-                                org_id: org_id.clone(),
-                                bypass_check: false,
-                                parent_id: "".to_string(),
-                            },
-                            Some(user.role),
-                        )
-                        .await
-                    {
-                        // return forbidden on websockets
-                        let err_res = WsServerEvents::SearchError {
-                            trace_id: trace_id.clone(),
-                            error: "Unauthorized Access".to_string(),
-                        };
-                        self.send_message(
-                            err_res.to_json().to_string(),
-                            None,
-                            None,
-                            start_time,
-                            end_time,
-                        )
-                        .await?;
-                        return Ok(());
-                    }
-                    // Check permissions on stream ends
-                }
+                self.send_message(err_res.to_json().to_string()).await?;
+                return Ok(());
             }
         }
 
@@ -324,316 +260,88 @@ impl SessionHandler {
                 deltas.sort();
                 deltas.dedup();
 
+                // If there are cached responses, process them
                 if !cached_resp.is_empty() {
-                    // Initialize iterators for deltas and cached responses
-                    let mut delta_iter = deltas.iter().peekable();
-                    let mut cached_resp_iter = cached_resp.iter().peekable();
-
-                    // Process cached responses and deltas in sorted order
-                    while cached_resp_iter.peek().is_some() || delta_iter.peek().is_some() {
-                        if let (Some(&delta), Some(cached)) =
-                            (delta_iter.peek(), cached_resp_iter.peek())
-                        {
-                            // If the delta is before the current cached response time, fetch
-                            // partitions
-
-                            if delta.delta_end_time < cached.response_start_time {
-                                let partitions = self.get_partitions(&req).await;
-
-                                if partitions.is_empty() {
-                                    return Ok(());
-                                }
-
-                                // get start_index for pagination
-                                let start_idx =
-                                    self.find_start_partition_idx(&partitions, req.time_offset);
-                                let mut curr_res_size = 0;
-
-                                log::info!(
-                                    "[WS_SEARCH] Found {} partitions for trace_id: {}",
-                                    partitions.len(),
-                                    trace_id
-                                );
-
-                                // search by handling pagination
-                                for (idx, &[start_time, end_time]) in
-                                    partitions.iter().enumerate().skip(start_idx)
-                                {
-                                    let mut req = req.clone();
-                                    req.payload.query.start_time = start_time;
-                                    req.payload.query.end_time = end_time;
-
-                                    if req_size != -1 {
-                                        req.payload.query.size -= curr_res_size;
-                                    }
-
-                                    let search_res = self.do_search(&req).await?;
-                                    curr_res_size += search_res.hits.len() as i64;
-
-                                    if !search_res.hits.is_empty() {
-                                        let ws_search_res = WsServerEvents::SearchResponse {
-                                            trace_id: trace_id.clone(),
-                                            results: search_res.clone(),
-                                            response_type: SearchResponseType::Partition {
-                                                current: idx as u64 + 1,
-                                                total: partitions.len() as u64,
-                                            },
-                                            time_offset: end_time,
-                                        };
-                                        self.send_message(
-                                            ws_search_res.to_json().to_string(),
-                                            Some(search_res),
-                                            Some(c_resp.clone()),
-                                            start_time,
-                                            end_time,
-                                        )
-                                        .await?;
-                                    }
-
-                                    // Stop if we've reached the requested result size
-                                    if req_size != -1 && curr_res_size >= req_size {
-                                        log::info!(
-                                            "[WS_SEARCH]: Reached requested result size ({}), stopping search",
-                                            req_size
-                                        );
-                                        break;
-                                    }
-                                }
-                                delta_iter.next(); // Move to the next delta after processing
-                            } else {
-                                // Send cached response if delta is not before the cached response
-                                // time
-                                if !cached.cached_response.hits.is_empty() {
-                                    let ws_search_res = WsServerEvents::SearchResponse {
-                                        trace_id: trace_id.clone(),
-                                        results: cached.cached_response.clone(),
-                                        response_type: SearchResponseType::Partition {
-                                            current: 1000 as u64 + 1,
-                                            total: 1000 as u64,
-                                        },
-                                        time_offset: cached.response_end_time,
-                                    };
-                                    self.send_message(
-                                        ws_search_res.to_json().to_string(),
-                                        Some(cached.cached_response.clone()),
-                                        Some(c_resp.clone()),
-                                        start_time,
-                                        end_time,
-                                    )
-                                    .await?;
-                                }
-                                cached_resp_iter.next(); // Move to the next cached response
-                            }
-                        } else if let Some(&delta) = delta_iter.peek() {
-                            // Process remaining deltas if no more cached responses
-                            let partitions = self.get_partitions(&req).await;
-
-                            if partitions.is_empty() {
-                                return Ok(());
-                            }
-
-                            let start_idx =
-                                self.find_start_partition_idx(&partitions, req.time_offset);
-                            let mut curr_res_size = 0;
-
-                            log::info!(
-                                "[WS_SEARCH] Found {} partitions for trace_id: {}",
-                                partitions.len(),
-                                trace_id
-                            );
-
-                            for (idx, &[start_time, end_time]) in
-                                partitions.iter().enumerate().skip(start_idx)
-                            {
-                                let mut req = req.clone();
-                                req.payload.query.start_time = start_time;
-                                req.payload.query.end_time = end_time;
-
-                                if req_size != -1 {
-                                    req.payload.query.size -= curr_res_size;
-                                }
-
-                                let search_res = self.do_search(&req).await?;
-                                curr_res_size += search_res.hits.len() as i64;
-
-                                log::info!(
-                                    "[WS_SEARCH]: Found {} hits for trace_id: {}",
-                                    search_res.hits.len(),
-                                    trace_id
-                                );
-
-                                if !search_res.hits.is_empty() {
-                                    log::info!(
-                                        "[WS_SEARCH]: Sending search response for trace_id: {}",
-                                        trace_id
-                                    );
-                                    let ws_search_res = WsServerEvents::SearchResponse {
-                                        trace_id: trace_id.clone(),
-                                        results: search_res.clone(),
-                                        response_type: SearchResponseType::Partition {
-                                            current: idx as u64 + 1,
-                                            total: partitions.len() as u64,
-                                        },
-                                        time_offset: end_time,
-                                    };
-                                    self.send_message(
-                                        ws_search_res.to_json().to_string(),
-                                        Some(search_res),
-                                        Some(c_resp.clone()),
-                                        start_time,
-                                        end_time,
-                                    )
-                                    .await?;
-                                }
-
-                                // Stop if we've reached the requested result size
-                                if req_size != -1 && curr_res_size >= req_size {
-                                    log::info!(
-                                        "[WS_SEARCH]: Reached requested result size ({}), stopping search",
-                                        req_size
-                                    );
-                                    break;
-                                }
-                            }
-                            delta_iter.next(); // Move to the next delta after processing
-                        } else if let Some(cached) = cached_resp_iter.next() {
-                            // Process remaining cached responses if no more deltas
-                            let ws_search_res = WsServerEvents::SearchResponse {
-                                trace_id: trace_id.clone(),
-                                results: cached.cached_response.clone(),
-                                response_type: SearchResponseType::Partition {
-                                    current: 1000 as u64 + 1,
-                                    total: 1000 as u64,
-                                },
-                                time_offset: cached.response_end_time,
-                            };
-                            self.send_message(
-                                ws_search_res.to_json().to_string(),
-                                Some(cached.cached_response.clone()),
-                                Some(c_resp.clone()),
-                                start_time,
-                                end_time,
-                            )
-                            .await?;
-                        }
-                    }
+                    self.process_cached_responses_and_deltas(
+                        &req,
+                        trace_id.clone(),
+                        start_time,
+                        end_time,
+                        req_size,
+                        cached_resp,
+                        deltas,
+                        c_resp.clone(),
+                    )
+                    .await?;
                 } else {
-                    let partitions = self.get_partitions(&req.clone()).await;
-
-                    if partitions.is_empty() {
-                        return Ok(());
-                    }
-
-                    let start_idx = self.find_start_partition_idx(&partitions, req.time_offset);
-                    let mut curr_res_size = 0;
-
-                    log::info!(
-                        "[WS_SEARCH] Found {} partitions for trace_id: {}",
-                        partitions.len(),
-                        trace_id
-                    );
-
-                    for (idx, &[start_time, end_time]) in
-                        partitions.iter().enumerate().skip(start_idx)
-                    {
-                        let mut req = req.clone();
-                        req.payload.query.start_time = start_time;
-                        req.payload.query.end_time = end_time;
-
-                        if req_size != -1 {
-                            req.payload.query.size -= curr_res_size;
-                        }
-
-                        let search_res = self.do_search(&req).await?;
-                        curr_res_size += search_res.hits.len() as i64;
-
-                        if !search_res.hits.is_empty() {
-                            let ws_search_res = WsServerEvents::SearchResponse {
-                                trace_id: trace_id.clone(),
-                                results: search_res.clone(),
-                                response_type: SearchResponseType::Partition {
-                                    current: idx as u64 + 1,
-                                    total: partitions.len() as u64,
-                                },
-                                time_offset: end_time,
-                            };
-                            self.send_message(
-                                ws_search_res.to_json().to_string(),
-                                Some(search_res),
-                                Some(c_resp.clone()),
-                                start_time,
-                                end_time,
-                            )
-                            .await?;
-                        }
-
-                        // Stop if we've reached the requested result size
-                        if req_size != -1 && curr_res_size >= req_size {
-                            log::info!(
-                                "[WS_SEARCH]: Reached requested result size ({}), stopping search",
-                                req_size
-                            );
-                            break;
-                        }
-                    }
+                    // If no cached response, process the deltas directly
+                    self.process_deltas_only(&req, trace_id.clone(), req_size, c_resp.clone())
+                        .await?;
                 }
+                self.write_results_to_file(c_resp.clone(), start_time, end_time)
+                    .await?;
             }
         } else {
-            // call search directly
+            // Single search (non-partitioned)
             log::info!("[WS_SEARCH]: Single search for trace_id: {}", trace_id);
             let end_time = req.payload.query.end_time;
             let search_res = self.do_search(&req).await?;
+
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
                 results: search_res.clone(),
                 response_type: SearchResponseType::Single,
                 time_offset: end_time,
             };
-            self.send_message(
-                ws_search_res.to_json().to_string(),
-                None,
-                None,
-                start_time,
-                end_time,
-            )
-            .await?;
+            self.send_message(ws_search_res.to_json().to_string())
+                .await?;
         }
+
+        // Once all searches are complete, write the accumulated results to a file
+        log::info!(
+            "[WS_SEARCH]: All searches completed for trace_id: {}",
+            trace_id
+        );
 
         Ok(())
     }
 
-    async fn send_message(
+    async fn write_results_to_file(
         &mut self,
-        message: String,
-        search_res: Option<Response>,
-        cached_resp: Option<MultiCachedQueryResponse>,
+        c_resp: MultiCachedQueryResponse,
         start_time: i64,
         end_time: i64,
     ) -> Result<(), Error> {
+        if self.accumulated_results.is_empty() {
+            return Ok(());
+        }
+
+        log::info!(
+            "[WS_SEARCH]: Writing results to file for trace_id: {}",
+            c_resp.trace_id
+        );
+
+        crate::service::search::cache::write_results_v2(
+            &c_resp.trace_id,
+            &c_resp.ts_column,
+            start_time,
+            end_time,
+            &self.accumulated_results,
+            c_resp.file_path,
+            c_resp.is_aggregate,
+            c_resp.is_descending,
+        )
+        .await;
+        Ok(())
+    }
+
+    async fn send_message(&mut self, message: String) -> Result<(), Error> {
         if self.session.text(message).await.is_err() {
             log::error!(
                 "[WS_HANDLER]: Failed to send message for request_id: {}",
                 self.request_id
             );
         }
-        // write it only after request completion
-        if let Some(search_res) = search_res {
-            let c_resp = cached_resp.unwrap();
-            if c_resp.cache_query_response {
-                crate::service::search::cache::write_results_v2(
-                    &c_resp.trace_id,
-                    &c_resp.ts_column,
-                    start_time,
-                    end_time,
-                    &search_res,
-                    c_resp.file_path,
-                    c_resp.is_aggregate,
-                    c_resp.is_descending,
-                )
-                .await;
-            }
-        }
-
         Ok(())
     }
 
@@ -722,15 +430,14 @@ impl SessionHandler {
         match crate::service::search::cancel_query(&self.org_id, &trace_id).await {
             Ok(ret) => {
                 let res = serde_json::to_string(&ret)?;
-                self.send_message(res, None, None, 0, 0).await?;
+                self.send_message(res).await?;
             }
             Err(_) => {
                 let res = WsServerEvents::CancelResponse {
                     trace_id: trace_id.to_string(),
                     is_success: false,
                 };
-                self.send_message(res.to_json().to_string(), None, None, 0, 0)
-                    .await?;
+                self.send_message(res.to_json().to_string()).await?;
             }
         }
 
@@ -752,5 +459,254 @@ impl SessionHandler {
         }
 
         0
+    }
+
+    // Process cached responses and deltas
+    async fn process_cached_responses_and_deltas(
+        &mut self,
+        req: &SearchEventReq,
+        trace_id: String,
+        start_time: i64,
+        end_time: i64,
+        req_size: i64,
+        cached_resp: Vec<CachedQueryResponse>,
+        mut deltas: Vec<QueryDelta>,
+        c_resp: MultiCachedQueryResponse,
+    ) -> Result<(), Error> {
+        // Initialize iterators for deltas and cached responses
+        let mut delta_iter = deltas.iter().peekable();
+        let mut cached_resp_iter = cached_resp.iter().peekable();
+        let mut curr_res_size = 0;
+
+        // Process cached responses and deltas in sorted order
+        while cached_resp_iter.peek().is_some() || delta_iter.peek().is_some() {
+            if let (Some(&delta), Some(cached)) = (delta_iter.peek(), cached_resp_iter.peek()) {
+                // If the delta is before the current cached response time, fetch
+                // partitions
+                if delta.delta_end_time < cached.response_start_time {
+                    self.process_delta(
+                        req,
+                        trace_id.clone(),
+                        delta,
+                        req_size,
+                        &mut curr_res_size,
+                        &c_resp,
+                    )
+                    .await?;
+                    delta_iter.next(); // Move to the next delta after processing
+                } else {
+                    // Send cached response
+                    self.process_cached_response(
+                        trace_id.clone(),
+                        cached,
+                        start_time,
+                        end_time,
+                        &c_resp,
+                    )
+                    .await?;
+                    cached_resp_iter.next(); // Move to the next cached response
+                }
+            } else if let Some(&delta) = delta_iter.peek() {
+                // Process remaining deltas
+                self.process_delta(
+                    req,
+                    trace_id.clone(),
+                    delta,
+                    req_size,
+                    &mut curr_res_size,
+                    &c_resp,
+                )
+                .await?;
+                delta_iter.next(); // Move to the next delta after processing
+            } else if let Some(cached) = cached_resp_iter.next() {
+                // Process remaining cached responses
+                self.process_cached_response(
+                    trace_id.clone(),
+                    cached,
+                    start_time,
+                    end_time,
+                    &c_resp,
+                )
+                .await?;
+            }
+
+            // Stop if reached the requested result size
+            if req_size != -1 && curr_res_size >= req_size {
+                log::info!(
+                    "[WS_SEARCH]: Reached requested result size ({}), stopping search",
+                    req_size
+                );
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    // Process deltas only (no cached response)
+    async fn process_deltas_only(
+        &mut self,
+        req: &SearchEventReq,
+        trace_id: String,
+        req_size: i64,
+        c_resp: MultiCachedQueryResponse,
+    ) -> Result<(), Error> {
+        let partitions = self.get_partitions(&req).await;
+
+        if partitions.is_empty() {
+            return Ok(());
+        }
+
+        let start_idx = self.find_start_partition_idx(&partitions, req.time_offset);
+        let mut curr_res_size = 0;
+
+        log::info!(
+            "[WS_SEARCH] Found {} partitions for trace_id: {}",
+            partitions.len(),
+            trace_id
+        );
+
+        for (idx, &[start_time, end_time]) in partitions.iter().enumerate().skip(start_idx) {
+            let mut req = req.clone();
+            req.payload.query.start_time = start_time;
+            req.payload.query.end_time = end_time;
+
+            if req_size != -1 {
+                req.payload.query.size -= curr_res_size;
+            }
+
+            let search_res = self.do_search(&req).await?;
+            curr_res_size += search_res.hits.len() as i64;
+
+            if !search_res.hits.is_empty() {
+                // Accumulate the result
+                self.accumulated_results.push(search_res.clone());
+
+                // Send the cached response
+                let ws_search_res = WsServerEvents::SearchResponse {
+                    trace_id: trace_id.clone(),
+                    results: search_res.clone(),
+                    response_type: SearchResponseType::Partition {
+                        current: idx as u64 + 1,
+                        total: partitions.len() as u64,
+                    },
+                    time_offset: end_time,
+                };
+                self.send_message(ws_search_res.to_json().to_string())
+                    .await?;
+            }
+
+            // Stop if reached the requested result size
+            if req_size != -1 && curr_res_size >= req_size {
+                log::info!(
+                    "[WS_SEARCH]: Reached requested result size ({}), stopping search",
+                    req_size
+                );
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    // Process a single cached response
+    async fn process_cached_response(
+        &mut self,
+        trace_id: String,
+        cached: &CachedQueryResponse,
+        start_time: i64,
+        end_time: i64,
+        c_resp: &MultiCachedQueryResponse,
+    ) -> Result<(), Error> {
+        // Accumulate the result
+        self.accumulated_results
+            .push(cached.cached_response.clone());
+
+        // Send the cached response
+        let ws_search_res = WsServerEvents::SearchResponse {
+            trace_id: trace_id.clone(),
+            results: cached.cached_response.clone(),
+            response_type: SearchResponseType::Partition {
+                current: 1000 as u64 + 1,
+                total: 1000 as u64,
+            },
+            time_offset: cached.response_end_time,
+        };
+        self.send_message(ws_search_res.to_json().to_string())
+            .await?;
+
+        Ok(())
+    }
+
+    // Process a single delta (time range not covered by cache)
+    async fn process_delta(
+        &mut self,
+        req: &SearchEventReq,
+        trace_id: String,
+        delta: &QueryDelta,
+        req_size: i64,
+        curr_res_size: &mut i64,
+        c_resp: &MultiCachedQueryResponse,
+    ) -> Result<(), Error> {
+        let partitions = self.get_partitions(&req).await;
+
+        if partitions.is_empty() {
+            return Ok(());
+        }
+
+        let start_idx = self.find_start_partition_idx(&partitions, req.time_offset);
+
+        log::info!(
+            "[WS_SEARCH] Found {} partitions for trace_id: {}",
+            partitions.len(),
+            trace_id
+        );
+
+        for (idx, &[start_time, end_time]) in partitions.iter().enumerate().skip(start_idx) {
+            let mut req = req.clone();
+            req.payload.query.start_time = start_time;
+            req.payload.query.end_time = end_time;
+
+            if req_size != -1 {
+                req.payload.query.size -= *curr_res_size;
+            }
+
+            let search_res = self.do_search(&req).await?;
+            *curr_res_size += search_res.hits.len() as i64;
+
+            log::info!(
+                "[WS_SEARCH]: Found {} hits for trace_id: {}",
+                search_res.hits.len(),
+                trace_id
+            );
+
+            if !search_res.hits.is_empty() {
+                // Accumulate the result
+                self.accumulated_results.push(search_res.clone());
+
+                let ws_search_res = WsServerEvents::SearchResponse {
+                    trace_id: trace_id.clone(),
+                    results: search_res.clone(),
+                    response_type: SearchResponseType::Partition {
+                        current: idx as u64 + 1,
+                        total: partitions.len() as u64,
+                    },
+                    time_offset: end_time,
+                };
+                self.send_message(ws_search_res.to_json().to_string())
+                    .await?;
+            }
+
+            // Stop if reached the request result size
+            if req_size != -1 && *curr_res_size >= req_size {
+                log::info!(
+                    "[WS_SEARCH]: Reached requested result size ({}), stopping search",
+                    req_size
+                );
+                break;
+            }
+        }
+
+        Ok(())
     }
 }

@@ -1,5 +1,71 @@
 use serde::{Deserialize, Serialize};
 
+pub mod enterprise_utils {
+    use config::meta::stream::StreamType;
+
+    use crate::common::meta;
+
+    #[cfg(feature = "enterprise")]
+    pub async fn check_permissions(
+        stream_name: &str,
+        stream_type: StreamType,
+        user_id: &str,
+        org_id: &str,
+    ) -> Result<(), String> {
+        use o2_enterprise::enterprise::openfga::meta::mapping::OFGA_MODELS;
+
+        use crate::common::{
+            infra::config::USERS,
+            utils::auth::{is_root_user, AuthExtractor},
+        };
+
+        // Check if the user is a root user (has all permissions)
+        if is_root_user(&user_id) {
+            return Ok(());
+        }
+
+        // Get user details from the USERS cache
+        let user: meta::user::User = USERS
+            .get(&format!("{}/{}", org_id, user_id))
+            .ok_or_else(|| "User not found".to_string())?
+            .clone();
+
+        // If the user is external, check permissions
+        if user.is_external {
+            let stream_type_str = stream_type.to_string();
+            let o2_type = format!(
+                "{}:{}",
+                OFGA_MODELS
+                    .get(stream_type_str.as_str())
+                    .map_or(stream_type_str.as_str(), |model| model.key),
+                stream_name
+            );
+
+            let auth_extractor = AuthExtractor {
+                auth: "".to_string(),
+                method: "GET".to_string(),
+                o2_type,
+                org_id: org_id.to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+            };
+
+            let has_permission = crate::handler::http::auth::validator::check_permissions(
+                &user_id,
+                auth_extractor,
+                Some(user.role),
+            )
+            .await;
+
+            if !has_permission {
+                return Err("Unauthorized Access".to_string());
+            }
+        }
+
+        Ok(())
+    }
+}
+
 pub mod sessions_cache_utils {
     use crate::common::infra::config::WS_SESSIONS;
 
