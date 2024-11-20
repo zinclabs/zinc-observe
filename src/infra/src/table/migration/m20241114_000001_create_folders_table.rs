@@ -104,8 +104,7 @@ mod tests {
             &create_folders_table_statement().to_string(PostgresQueryBuilder),
             r#"
                 CREATE TABLE IF NOT EXISTS "folders" (
-                "id" bigserial NOT NULL PRIMARY KEY,
-                "folder_id" varchar(256) NOT NULL,
+                "id" bigint NOT NULL PRIMARY KEY,
                 "org" varchar(100) NOT NULL,
                 "name" varchar(256) NOT NULL,
                 "description" text,
@@ -125,8 +124,7 @@ mod tests {
             &create_folders_table_statement().to_string(MysqlQueryBuilder),
             r#"
                 CREATE TABLE IF NOT EXISTS `folders` (
-                `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                `folder_id` varchar(256) NOT NULL,
+                `id` bigint NOT NULL PRIMARY KEY,
                 `org` varchar(100) NOT NULL,
                 `name` varchar(256) NOT NULL,
                 `description` text,
@@ -146,8 +144,7 @@ mod tests {
             &create_folders_table_statement().to_string(SqliteQueryBuilder),
             r#"
                 CREATE TABLE IF NOT EXISTS "folders" (
-                "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
-                "folder_id" varchar(256) NOT NULL,
+                "id" bigint NOT NULL PRIMARY KEY,
                 "org" varchar(100) NOT NULL,
                 "name" varchar(256) NOT NULL,
                 "description" text,
