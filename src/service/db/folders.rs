@@ -49,6 +49,6 @@ pub(crate) async fn list_dashboard_folders(org_id: &str) -> Result<Vec<Folder>, 
 /// Deletes the folder with the given `folder_id`.
 #[tracing::instrument]
 pub(crate) async fn delete(org_id: &str, folder_id: &str) -> Result<(), anyhow::Error> {
-    let _ = folders::delete(org_id, folder_id).await?;
+    folders::delete(org_id, folder_id).await?;
     Ok(())
 }
