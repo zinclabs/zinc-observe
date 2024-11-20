@@ -80,7 +80,7 @@ impl MigrationTrait for Migration {
 /// Representation of a folder in the meta table.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MetaFolder {
+struct MetaFolder {
     #[serde(default)]
     pub folder_id: String,
     pub name: String,
