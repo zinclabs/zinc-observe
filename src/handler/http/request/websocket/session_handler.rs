@@ -110,7 +110,9 @@ impl SessionHandler {
                     #[cfg(feature = "enterprise")]
                     WsClientEvents::Cancel { trace_id } => {
                         match self.handle_cancel(&trace_id).await {
-                            Ok(_) => {}
+                            Ok(_) => {
+                                self.cleanup().await;
+                            }
                             Err(e) => {
                                 log::error!(
                                     "[WS_HANDLER]: Failed to get cancel search for trace_id: {}, error: {:?}",
