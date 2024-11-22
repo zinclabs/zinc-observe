@@ -129,7 +129,6 @@ const defaultObject = {
     resultGrid: {
       wrapCells: false,
       manualRemoveFields: false,
-      rowsPerPage: 100,
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
@@ -4417,8 +4416,8 @@ const useLogs = () => {
         );
       }
 
-      if (searchObj.data.datetime.type === "relative" && !isPagination) {
-        initialQueryPayload.value = cloneDeep(queryReq);
+      if (searchObj.data.datetime.type === "relative") {
+        if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
       } else {
         if (
           searchObj.meta.refreshInterval == 0 &&
@@ -4614,10 +4613,21 @@ const useLogs = () => {
           delete response.content.total;
         }
 
-        searchObj.data.queryResults = {
-          ...searchObj.data.queryResults,
-          ...response.content.results,
-        };
+
+        if (
+          searchObj.data.queryResults.hasOwnProperty("hits") &&
+          searchObj.data.queryResults.hits.length > 0
+        ) {
+          searchObj.data.queryResults.hits.push(
+            ...response.content.results.hits,
+          );
+          searchObj.data.queryResults.total =
+            searchObj.data.queryResults.total + response.content.results.total;
+          searchObj.data.queryResults.took =
+            searchObj.data.queryResults.took + response.content.results.took;
+        } else {
+          searchObj.data.queryResults = response.content.results;
+        }
       }
 
       // If its a pagination request, then append
@@ -4626,7 +4636,7 @@ const useLogs = () => {
         searchObj.data.queryResults.pagination = [];
       }
 
-      if (isPagination) refreshPagination(true); // check whats this
+      if (isPagination) refreshPagination(true);
 
       processPostPaginationData();
 
