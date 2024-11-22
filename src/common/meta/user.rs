@@ -211,7 +211,6 @@ pub enum UserRole {
     #[cfg(feature = "enterprise")]
     #[serde(rename = "editor")]
     Editor,
-    #[cfg(feature = "enterprise")]
     #[serde(rename = "service_account")]
     ServiceAccount,
 }

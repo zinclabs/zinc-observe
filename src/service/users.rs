@@ -517,19 +517,26 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
     }
 }
 
-pub async fn list_users(org_id: &str) -> Result<HttpResponse, Error> {
-    let mut user_list: Vec<UserResponse> = vec![];
-    for user in USERS.iter() {
-        if user.key().starts_with(&format!("{org_id}/")) {
-            user_list.push(UserResponse {
-                email: user.value().email.clone(),
-                role: user.value().role.clone(),
-                first_name: user.value().first_name.clone(),
-                last_name: user.value().last_name.clone(),
-                is_external: user.value().is_external,
-            })
-        }
-    }
+pub async fn list_users(org_id: &str, role: Option<UserRole>) -> Result<HttpResponse, Error> {
+    let mut user_list: Vec<UserResponse> = USERS
+        .iter()
+        .filter(|user| user.key().starts_with(&format!("{org_id}/"))) // Filter by organization ID
+        .filter(|user| {
+            if let Some(ref required_role) = role {
+                // Filter by role if specified
+                user.value().role == *required_role
+            } else {
+                 user.value().role!=UserRole::ServiceAccount
+            }
+        })
+        .map(|user| UserResponse {
+            email: user.value().email.clone(),
+            role: user.value().role.clone(),
+            first_name: user.value().first_name.clone(),
+            last_name: user.value().last_name.clone(),
+            is_external: user.value().is_external,
+        })
+        .collect();
 
     #[cfg(feature = "enterprise")]
     {
@@ -734,7 +741,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_users() {
         set_up().await;
-        assert!(list_users("dummy").await.is_ok())
+        assert!(list_users("dummy", None).await.is_ok())
     }
 
     #[tokio::test]

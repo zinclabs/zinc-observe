@@ -68,7 +68,7 @@ use crate::{
 #[get("/{org_id}/users")]
 pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    users::list_users(&org_id).await
+    users::list_users(&org_id, None).await
 }
 
 /// CreateUser
