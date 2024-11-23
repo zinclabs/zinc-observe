@@ -242,11 +242,21 @@ impl SessionHandler {
             req.payload.query.size
         };
 
+        log::info!(
+            "[WS_SEARCH]: Checking cache for trace_id: {}, req_size: {}",
+            trace_id,
+            req_size
+        );
         // get partitions and call search for each
         if self
             .is_partition_request(&req.payload, req.stream_type)
             .await
         {
+            log::info!(
+                "[WS_SEARCH]: Partitioned search for trace_id: {}, req_size: {}",
+                trace_id,
+                req_size
+            );
             let c_resp = crate::service::search::cache::check_cache_v2(
                 &trace_id,
                 &org_id,
@@ -262,8 +272,26 @@ impl SessionHandler {
                 deltas.sort();
                 deltas.dedup();
 
+                log::info!(
+                    "[WS_SEARCH]: Cache Status: cached_resp: {:#?}, deltas: {:#?}, c_resp: {:#?}",
+                    &cached_resp,
+                    &deltas,
+                    &c_resp
+                );
+
+                log::info!(
+                    "[WS_SEARCH]: Found {} cached responses and {} deltas for trace_id: {}",
+                    cached_resp.len(),
+                    deltas.len(),
+                    trace_id
+                );
+
                 // If there are cached responses, process them
                 if !cached_resp.is_empty() {
+                    log::info!(
+                        "[WS_SEARCH]: processing cached responses and deltas for trace_id: {}",
+                        trace_id
+                    );
                     self.process_cached_responses_and_deltas(
                         &req,
                         trace_id.clone(),
@@ -277,6 +305,10 @@ impl SessionHandler {
                     .await?;
                 } else {
                     // If no cached response, process the deltas directly
+                    log::info!(
+                        "[WS_SEARCH]: processing deltas only for trace_id: {}",
+                        trace_id
+                    );
                     self.process_deltas_only(&req, trace_id.clone(), req_size, c_resp.clone())
                         .await?;
                 }
@@ -285,7 +317,10 @@ impl SessionHandler {
             }
         } else {
             // Single search (non-partitioned)
-            log::info!("[WS_SEARCH]: Single search for trace_id: {}", trace_id);
+            log::info!(
+                "[WS_SEARCH]: Non-partitioned search for trace_id: {}",
+                trace_id,
+            );
             let end_time = req.payload.query.end_time;
             let search_res = self.do_search(&req).await?;
 
@@ -319,8 +354,9 @@ impl SessionHandler {
         }
 
         log::info!(
-            "[WS_SEARCH]: Writing results to file for trace_id: {}",
-            c_resp.trace_id
+            "[WS_SEARCH]: Writing results to file for trace_id: {}, file_path: {}",
+            c_resp.trace_id,
+            c_resp.file_path,
         );
 
         crate::service::search::cache::write_results_v2(
@@ -377,7 +413,7 @@ impl SessionHandler {
         ts_column.is_some()
     }
 
-    async fn get_partitions(&self, req: &SearchEventReq) -> Vec<[i64; 2]> {
+    async fn get_partitions(&mut self, req: &SearchEventReq) -> Vec<[i64; 2]> {
         let search_payload = req.payload.clone();
         let search_partition_req = SearchPartitionRequest {
             sql: search_payload.query.sql.clone(),
@@ -407,6 +443,15 @@ impl SessionHandler {
                     req.trace_id,
                     e
                 );
+                let _ = self.send_message(
+                    WsServerEvents::SearchError {
+                        trace_id: req.trace_id.clone(),
+                        error: e.to_string(),
+                    }
+                    .to_json()
+                    .to_string(),
+                ).await;
+                self.cleanup().await;
                 return vec![];
             }
         };
@@ -475,6 +520,12 @@ impl SessionHandler {
         mut deltas: Vec<QueryDelta>,
         c_resp: MultiCachedQueryResponse,
     ) -> Result<(), Error> {
+        log::info!(
+            "[WS_SEARCH] Found {} cached responses and {} deltas for trace_id: {}",
+            cached_resp.len(),
+            deltas.len(),
+            trace_id
+        );
         // Initialize iterators for deltas and cached responses
         let mut delta_iter = deltas.iter().peekable();
         let mut cached_resp_iter = cached_resp.iter().peekable();
@@ -485,6 +536,11 @@ impl SessionHandler {
             if let (Some(&delta), Some(cached)) = (delta_iter.peek(), cached_resp_iter.peek()) {
                 // If the delta is before the current cached response time, fetch
                 // partitions
+                log::info!(
+                    "[WS_SEARCH]: checking delta: {:?}, cached: {:?}",
+                    trace_id,
+                    delta
+                );
                 if delta.delta_end_time < cached.response_start_time {
                     self.process_delta(
                         req,
@@ -563,9 +619,10 @@ impl SessionHandler {
         let mut curr_res_size = 0;
 
         log::info!(
-            "[WS_SEARCH] Found {} partitions for trace_id: {}",
+            "[WS_SEARCH] Found {} partitions for trace_id: {}, partitions: {:#?}",
             partitions.len(),
-            trace_id
+            trace_id,
+            &partitions
         );
 
         for (idx, &[start_time, end_time]) in partitions.iter().enumerate().skip(start_idx) {
@@ -620,6 +677,11 @@ impl SessionHandler {
         end_time: i64,
         c_resp: &MultiCachedQueryResponse,
     ) -> Result<(), Error> {
+        log::info!(
+            "[WS_SEARCH]: Processing cached response for trace_id: {}",
+            trace_id
+        );
+
         // Accumulate the result
         self.accumulated_results
             .push(cached.cached_response.clone());
@@ -634,6 +696,10 @@ impl SessionHandler {
             },
             time_offset: cached.response_end_time,
         };
+        log::info!(
+            "[WS_SEARCH]: Sending cached search response for trace_id: {}",
+            trace_id
+        );
         self.send_message(ws_search_res.to_json().to_string())
             .await?;
 
@@ -650,6 +716,11 @@ impl SessionHandler {
         curr_res_size: &mut i64,
         c_resp: &MultiCachedQueryResponse,
     ) -> Result<(), Error> {
+        log::info!(
+            "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
+            trace_id,
+            delta
+        );
         let partitions = self.get_partitions(&req).await;
 
         if partitions.is_empty() {
@@ -695,6 +766,11 @@ impl SessionHandler {
                     },
                     time_offset: end_time,
                 };
+                log::info!(
+                    "[WS_SEARCH]: Sending search response for trace_id: {}, delta: {:?}",
+                    trace_id,
+                    delta
+                );
                 self.send_message(ws_search_res.to_json().to_string())
                     .await?;
             }

@@ -688,6 +688,11 @@ pub async fn write_results_v2(
         {
             Ok(_) => {
                 let mut w = QUERY_RESULT_CACHE.write().await;
+                log::info!(
+                    "[trace_id {trace_id}] Caching results to disk for query key: {}, file_name: {}",
+                    query_key,
+                    file_name,
+                );
                 w.entry(query_key)
                     .or_insert_with(Vec::new)
                     .push(ResultCacheMeta {
