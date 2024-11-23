@@ -65,6 +65,7 @@ const defaultObject = {
   currentSelectedNodeData : <any> {
     stream_type: "logs",
     stream_name: "",
+    dynamic_stream_name:"",
     data: {},
     type:"",
   },

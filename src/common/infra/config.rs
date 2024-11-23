@@ -18,6 +18,7 @@ use std::sync::Arc;
 use config::{
     meta::{
         alerts::{alert::Alert, destinations::Destination, templates::Template},
+        dashboards::reports,
         function::Transform,
         stream::StreamParams,
     },
@@ -32,8 +33,8 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
-        dashboards::reports, maxmind::MaxmindClient, organization::OrganizationSetting,
-        prom::ClusterLeader, syslog::SyslogRoute, user::User,
+        maxmind::MaxmindClient, organization::OrganizationSetting, prom::ClusterLeader,
+        syslog::SyslogRoute, user::User,
     },
     service::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,

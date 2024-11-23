@@ -19,13 +19,14 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use ahash::HashSet;
 use anyhow::{Context, Result};
+use hashbrown::HashSet;
 use tantivy::{
     directory::{error::OpenReadError, Directory, RamDirectory, WatchCallback, WatchHandle},
     HasLen,
 };
 
+use super::{footer_cache::build_footer_cache, FOOTER_CACHE};
 use crate::service::search::tantivy::{
     puffin::{writer::PuffinBytesWriter, BlobTypes},
     puffin_directory::{ALLOWED_FILE_EXT, META_JSON},
@@ -111,6 +112,16 @@ impl PuffinDirWriter {
                 )
                 .context("Failed to add blob")?;
         }
+
+        // write footer cache
+        let meta_bytes = build_footer_cache(self.ram_directory.clone())?;
+        puffin_writer
+            .add_blob(
+                &meta_bytes,
+                BlobTypes::O2TtvFooterV1,
+                FOOTER_CACHE.to_string(),
+            )
+            .context("Failed to add meta bytes blob")?;
 
         puffin_writer.finish().context("Failed to finish writing")?;
         Ok(puffin_buf)

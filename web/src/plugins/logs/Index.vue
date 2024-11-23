@@ -994,6 +994,7 @@ export default defineComponent({
       field,
       isFieldExistInSQL,
     ) => {
+      let fieldPrefix = "";
       if (parsedSQL) {
         if (isFieldExistInSQL) {
           // Remove the field from the query
@@ -1010,7 +1011,6 @@ export default defineComponent({
             parsedSQL.columns = filteredData;
           }
         } else {
-          let fieldPrefix = "";
           if (searchObj.data.stream.selectedStream.length > 1) {
             if (parsedSQL && parsedSQL.from.length > 1) {
               fieldPrefix = parsedSQL.from[0].as

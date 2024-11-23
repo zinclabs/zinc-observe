@@ -780,7 +780,7 @@ pub async fn merge_files(
     // clear cached data
     let files = new_file_list.into_iter().map(|f| f.key).collect::<Vec<_>>();
     for file in files.iter() {
-        let _ = file_data::disk::remove(&trace_id, file).await;
+        let _ = file_data::disk::remove("", file).await;
     }
 
     let (_new_schema, buf) = match merge_result {

@@ -121,7 +121,7 @@ pub async fn update_function(
     if let Ok(associated_pipelines) = db::pipeline::list_by_org(org_id).await {
         for pipeline in associated_pipelines {
             if pipeline.contains_function(&func.name) {
-                if let Err(e) = db::pipeline::update(&pipeline).await {
+                if let Err(e) = db::pipeline::update(&pipeline, None).await {
                     return Ok(HttpResponse::InternalServerError().json(
                         MetaHttpResponse::message(
                             http::StatusCode::INTERNAL_SERVER_ERROR.into(),

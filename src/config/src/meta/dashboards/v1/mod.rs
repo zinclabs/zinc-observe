@@ -14,9 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, FixedOffset, Utc};
-use config::meta::stream::StreamType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use crate::meta::stream::StreamType;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -166,10 +167,10 @@ pub struct CustomFieldsOption {
 
 #[cfg(test)]
 mod tests {
-    use config::utils::json;
     use expect_test::expect;
 
     use super::*;
+    use crate::utils::json;
 
     #[test]
     fn test_dashboard1() {

@@ -24,16 +24,18 @@ mod tests {
     use chrono::{Duration, Utc};
     use config::{
         get_config,
-        meta::alerts::{
-            alert::Alert,
-            destinations::{Destination, DestinationType},
-            Operator, QueryCondition, TriggerCondition,
+        meta::{
+            alerts::{
+                alert::Alert,
+                destinations::{Destination, DestinationType},
+                Operator, QueryCondition, TriggerCondition,
+            },
+            dashboards::{v1, Dashboard, Dashboards},
         },
         utils::json,
     };
     use infra::scheduler::Trigger;
     use openobserve::{
-        common::meta::dashboards::{v1, Dashboard, Dashboards},
         handler::{
             grpc::{auth::check_auth, flight::FlightServiceImpl},
             http::router::*,

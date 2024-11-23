@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod authz;
-pub mod dashboards;
 pub mod http;
 pub mod ingestion;
 pub mod maxmind;

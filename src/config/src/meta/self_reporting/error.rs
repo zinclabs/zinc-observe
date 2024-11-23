@@ -46,6 +46,8 @@ pub enum ErrorSource {
 pub struct PipelineError {
     pub pipeline_id: String,
     pub pipeline_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(serialize_with = "serialize_values_only")]
     pub node_errors: HashMap<String, NodeErrors>,
@@ -56,6 +58,7 @@ impl PipelineError {
         Self {
             pipeline_id: pipeline_id.to_string(),
             pipeline_name: pipeline_name.to_string(),
+            error: None,
             node_errors: HashMap::new(),
         }
     }
@@ -122,6 +125,7 @@ mod tests {
             error_source: ErrorSource::Pipeline(PipelineError {
                 pipeline_id: "pipeline_id".to_string(),
                 pipeline_name: "pipeline_name".to_string(),
+                error: Some("pipeline init error".to_string()),
                 node_errors: HashMap::from([(
                     "node_1".to_string(),
                     NodeErrors {

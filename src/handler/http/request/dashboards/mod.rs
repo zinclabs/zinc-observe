@@ -16,11 +16,9 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
+use config::meta::dashboards::MoveDashboard;
 
-use crate::{
-    common::meta::{dashboards::MoveDashboard, http::HttpResponse as MetaHttpResponse},
-    service::dashboards,
-};
+use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::dashboards};
 
 pub mod reports;
 

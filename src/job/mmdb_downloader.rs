@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::min, path::Path};
+use std::{cmp::min, path::Path, sync::Arc};
 
 use config::{MMDB_ASN_FILE_NAME, MMDB_CITY_FILE_NAME};
 use futures::stream::StreamExt;
 use once_cell::sync::Lazy;
 use reqwest::Client;
 use sha256::try_digest;
-use tokio::{fs::File, io::AsyncWriteExt, time};
+use tokio::{fs::File, io::AsyncWriteExt, sync::Notify, time};
 
 use crate::{
     common::{
@@ -31,6 +31,7 @@ use crate::{
 };
 
 static CLIENT_INITIALIZED: Lazy<bool> = Lazy::new(|| true);
+pub static MMDB_INIT_NOTIFIER: Lazy<Arc<Notify>> = Lazy::new(|| Arc::new(Notify::new()));
 
 pub async fn run() -> Result<(), anyhow::Error> {
     let cfg = config::get_config();
@@ -88,6 +89,7 @@ async fn run_download_files() {
         update_global_maxmind_client(&asn_fname).await;
         update_global_maxmind_client(&city_fname).await;
         log::info!("Maxmind client initialized");
+        Lazy::force(&MMDB_INIT_NOTIFIER).notify_one();
     } else {
         if download_asn_files {
             log::info!("New asn file found, updating client");

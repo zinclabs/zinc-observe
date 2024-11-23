@@ -2391,25 +2391,56 @@ export default defineComponent({
       emit("showSearchHistory");
     };
 
+    const QUERY_TEMPLATE = 'SELECT [FIELD_LIST] FROM "[STREAM_NAME]"';
+
+    function getFieldList(streamFields, interestingFields, isQuickMode) {
+      return streamFields
+        .filter((item) => interestingFields.includes(item.name))
+        .map((item) => item.name);
+    }
+
+    function buildStreamQuery(stream, fieldList, isQuickMode) {
+      return QUERY_TEMPLATE.replace("[STREAM_NAME]", stream).replace(
+        "[FIELD_LIST]",
+        fieldList.length > 0 && isQuickMode ? fieldList.join(",") : "*",
+      );
+    }
+
     const resetFilters = () => {
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL = fnParsedSQL();
-        if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
-          parsedSQL.where = null;
-        }
+        if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 0) {
+          if (Object.hasOwn(parsedSQL, "where") && parsedSQL.where != "") {
+            parsedSQL.where = null;
+          }
 
-        if (Object.hasOwn(parsedSQL, "limit") && parsedSQL.limit != "") {
-          parsedSQL.limit = null;
-        }
+          if (Object.hasOwn(parsedSQL, "limit") && parsedSQL.limit != "") {
+            parsedSQL.limit = null;
+          }
 
-        if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
-          parsedSQL._next.where = null;
-          parsedSQL._next.limit = null;
-        }
+          if (Object.hasOwn(parsedSQL, "_next") && parsedSQL._next != "") {
+            parsedSQL._next.where = null;
+            parsedSQL._next.limit = null;
+          }
 
-        searchObj.data.query = fnUnparsedSQL(parsedSQL);
-        searchObj.data.query = searchObj.data.query.replaceAll("`", '"');
-        searchObj.data.editorValue = searchObj.data.query;
+          searchObj.data.query = fnUnparsedSQL(parsedSQL);
+          searchObj.data.query = searchObj.data.query.replaceAll("`", '"');
+          searchObj.data.editorValue = searchObj.data.query;
+        } else {
+          // Handle both single and multiple stream scenarios
+          const fieldList = getFieldList(
+            searchObj.data.stream.selectedStreamFields,
+            searchObj.data.stream.interestingFieldList,
+            searchObj.meta.quickMode,
+          );
+
+          const queries = searchObj.data.stream.selectedStream.map((stream) =>
+            buildStreamQuery(stream, fieldList, searchObj.meta.quickMode),
+          );
+
+          searchObj.data.query = queries.join(" UNION ");
+          searchObj.data.editorValue = searchObj.data.query;
+        }
       } else {
         searchObj.data.query = "";
         searchObj.data.editorValue = "";

@@ -34,12 +34,14 @@ pub(crate) static REGEX_MATCHES_UDF: Lazy<ScalarUDF> =
 
 /// # `re_matches` User-Defined Function (UDF)
 ///
-/// This UDF extracts all substrings from a string column that match a given regular expression pattern.
-/// It is designed to work with the DataFusion query engine and supports both scalar and array inputs.
+/// This UDF extracts all substrings from a string column that match a given regular expression
+/// pattern. It is designed to work with the DataFusion query engine and supports both scalar and
+/// array inputs.
 ///
 /// ## Purpose
 ///
-/// The `re_matches` UDF allows users to extract all matches of a regular expression from a string column.
+/// The `re_matches` UDF allows users to extract all matches of a regular expression from a string
+/// column.
 ///
 /// ## Function Signature
 ///
@@ -52,9 +54,9 @@ pub(crate) static REGEX_MATCHES_UDF: Lazy<ScalarUDF> =
 ///
 /// ## Return Type
 ///
-/// - The function returns a `List` of strings for each input row. If no matches are found, an empty list is returned.
+/// - The function returns a `List` of strings for each input row. If no matches are found, an empty
+///   list is returned.
 /// - If the input string or pattern is null, the function returns null for that row.
-///
 #[derive(Debug)]
 pub struct RegexpMatchesFunc {
     signature: Signature,
@@ -150,9 +152,8 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
     // Precompile the regex if it's scalar
     let scalar_regex = if is_scalar_pattern {
         Some(
-            Regex::new(regex.value(0)).map_err(|e| {
-                DataFusionError::Execution(format!("Invalid regex pattern: {}", e))
-            })?,
+            Regex::new(regex.value(0))
+                .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {}", e)))?,
         )
     } else {
         None
@@ -257,7 +258,7 @@ mod tests {
 
         // Define schema
         let schema = Arc::new(Schema::new(vec![
-            Field::new("log", DataType::Utf8, true),    // Allow NULLs in `log`
+            Field::new("log", DataType::Utf8, true), // Allow NULLs in `log`
             Field::new("regex", DataType::Utf8, true), // Allow NULLs in `regex`
         ]));
 
@@ -266,22 +267,22 @@ mod tests {
             schema.clone(),
             vec![
                 Arc::new(StringArray::from(vec![
-                    Some("abc123def456"), // Normal case: numbers in the string
+                    Some("abc123def456"),  // Normal case: numbers in the string
                     Some("no match here"), // No match case
-                    Some("789ghi123"), // Multiple matches
-                    None, // NULL log
-                    Some(""), // Empty string
+                    Some("789ghi123"),     // Multiple matches
+                    None,                  // NULL log
+                    Some(""),              // Empty string
                 ])),
                 Arc::new(StringArray::from(vec![
-                    Some("\\d+"), // Match any digits
+                    Some("\\d+"),     // Match any digits
                     Some("no match"), // Match literal "no match"
-                    Some("ghi"), // Match substring "ghi"
-                    Some("\\w+"), // Match any word (NULL log should return NULL)
-                    None, // NULL regex
+                    Some("ghi"),      // Match substring "ghi"
+                    Some("\\w+"),     // Match any word (NULL log should return NULL)
+                    None,             // NULL regex
                 ])),
             ],
         )
-            .unwrap();
+        .unwrap();
 
         // Create a session context
         let ctx = SessionContext::new();

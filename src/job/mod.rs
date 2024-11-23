@@ -39,6 +39,8 @@ mod stats;
 pub(crate) mod syslog_server;
 mod telemetry;
 
+pub use mmdb_downloader::MMDB_INIT_NOTIFIER;
+
 pub async fn init() -> Result<(), anyhow::Error> {
     let email_regex = Regex::new(
         r"^([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",

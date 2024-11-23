@@ -16,15 +16,10 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use config::meta::dashboards::reports::{Report, ReportListFilters};
 
 use crate::{
-    common::{
-        meta::{
-            dashboards::reports::{Report, ReportListFilters},
-            http::HttpResponse as MetaHttpResponse,
-        },
-        utils::auth::UserEmail,
-    },
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     service::dashboards::reports,
 };
 

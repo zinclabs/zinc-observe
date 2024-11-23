@@ -182,7 +182,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                     .await
                 {
                     log::error!(
-                        "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                        "[SELF-REPORTING] Error in pushing back un-ingested UsageData to UsageQueue: {e}"
                     );
                 }
             }
@@ -204,7 +204,7 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                     .await
                 {
                     log::error!(
-                        "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
+                        "[SELF-REPORTING] Error in pushing back un-ingested ErrorData to ErrorQueue: {e}"
                     );
                 }
             }

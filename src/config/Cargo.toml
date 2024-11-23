@@ -69,3 +69,6 @@ tracing-subscriber.workspace = true
 urlencoding.workspace = true
 utoipa.workspace = true
 vrl.workspace = true
+
+[dev-dependencies]
+expect-test.workspace = true

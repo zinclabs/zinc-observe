@@ -1,0 +1,44 @@
+[
+    {
+      "test_name": "Basic join query",
+      "sql_query": "SELECT o.order_id, o.product, o.amount, u.name, u.age FROM \"orders\" o JOIN \"u1\" u ON o.user_id = u.user_id"
+    },
+    {
+      "test_name": "Left join query",
+      "sql_query": "SELECT o.order_id, o.product, o.amount, u.name, u.age FROM \"orders\" AS o LEFT JOIN \"u1\" AS u ON o.user_id = u.user_id"
+    },
+    {
+      "test_name": "Grouped left join query",
+      "sql_query": "SELECT u.name AS user_name, u.status AS user_status, COUNT(o.order_id) AS order_count FROM u1 u LEFT JOIN orders o ON u.user_id = o.user_id GROUP BY u.name, u.status"
+    },
+    {
+      "test_name": "Filtered grouped left join query",
+      "sql_query": "SELECT usr.name AS user_name, usr.status AS user_status, COUNT(o.order_id) AS order_count FROM u1 usr LEFT JOIN orders o ON usr.user_id = o.user_id WHERE usr.status IN ('active','pending') GROUP BY usr.name, usr.status"
+    },
+    {
+      "test_name": "Grouped left join with alias",
+      "sql_query": "SELECT usr.name AS user_name, usr.status AS user_status, COUNT(o.order_id) AS order_count FROM u1 usr LEFT JOIN orders o ON usr.user_id = o.user_id GROUP BY user_name, user_status"
+    },
+    {
+      "test_name": "Inner join with subquery for total orders",
+      "sql_query": "SELECT u1.name, u1.status, o.amount, (SELECT COUNT(*) FROM orders ) AS total_orders FROM u1 JOIN orders o ON u1.user_id = o.user_id"
+    },
+    {
+      "test_name": "Right join with subquery for total orders",
+      "sql_query": "SELECT u1.name, u1.status, o.amount, (SELECT COUNT(*) FROM orders ) AS total_orders FROM u1 RIGHT JOIN orders o ON u1.user_id = o.user_id"
+    },
+    {
+      "test_name": "Union query: Select amount from orders and age from u1",
+      "sql_query": "SELECT amount FROM \"orders\" UNION SELECT age FROM \"u1\""
+    },
+    {
+      "test_name": "Error count query: Users without orders",
+      "sql_query": "SELECT COUNT(*) AS error_count FROM u1 usr LEFT JOIN orders o ON usr.user_id = o.user_id WHERE o.order_id IS NULL"
+    },
+
+    {
+        "test_name": "Total Orders Query",
+        "sql_query": "WITH total AS (SELECT COUNT(*) AS total_count FROM orders) SELECT u1.name, u1.status, o.amount, total.total_count AS total_orders FROM u1 JOIN orders o ON u1.user_id = o.user_id CROSS JOIN total"
+    }
+  ]
+  

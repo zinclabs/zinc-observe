@@ -15,12 +15,9 @@
 
 use std::sync::Arc;
 
-use config::utils::json;
+use config::{meta::dashboards::reports::Report, utils::json};
 
-use crate::{
-    common::{infra::config::DASHBOARD_REPORTS, meta::dashboards::reports::Report},
-    service::db,
-};
+use crate::{common::infra::config::DASHBOARD_REPORTS, service::db};
 
 pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
     let report_key = format!("{org_id}/{name}");

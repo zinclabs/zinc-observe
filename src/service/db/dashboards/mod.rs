@@ -14,12 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::web;
-use config::utils::{hash::Sum64, json};
-
-use crate::{
-    common::meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
-    service::db,
+use config::{
+    meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
+    utils::{hash::Sum64, json},
 };
+
+use crate::service::db;
 
 pub mod reports;
 

@@ -21,6 +21,7 @@ use config::meta::{
     stream::StreamParams,
 };
 use infra::pipeline::{self as infra_pipeline};
+use once_cell::sync::Lazy;
 
 use crate::{
     common::infra::config::STREAM_EXECUTABLE_PIPELINES,
@@ -39,7 +40,7 @@ pub async fn set(pipeline: &Pipeline) -> Result<()> {
     // save to cache if realtime pipeline
     if let PipelineSource::Realtime(stream_params) = &pipeline.source {
         if pipeline.enabled {
-            update_cache(stream_params, pipeline, PipelineTableEvent::Add).await;
+            update_cache(stream_params, PipelineTableEvent::Add(pipeline)).await;
         }
     }
 
@@ -49,20 +50,24 @@ pub async fn set(pipeline: &Pipeline) -> Result<()> {
 /// Updates a pipeline entry with the sane values.
 ///
 /// Pipeline validation should be handled by the caller.
-pub async fn update(pipeline: &Pipeline) -> Result<()> {
+pub async fn update(pipeline: &Pipeline, prev_source_stream: Option<StreamParams>) -> Result<()> {
     if let Err(e) = infra_pipeline::update(pipeline).await {
         log::error!("Error updating pipeline: {}", e);
         return Err(anyhow::anyhow!("Error updating pipeline: {}", e));
     }
 
+    if let Some(prev_stream_params) = prev_source_stream {
+        update_cache(&prev_stream_params, PipelineTableEvent::Remove).await;
+    }
+
     // save to cache if realtime pipeline
     if let PipelineSource::Realtime(stream_params) = &pipeline.source {
         let db_event = if pipeline.enabled {
-            PipelineTableEvent::Add
+            PipelineTableEvent::Add(pipeline)
         } else {
             PipelineTableEvent::Remove
         };
-        update_cache(stream_params, pipeline, db_event).await;
+        update_cache(stream_params, db_event).await;
     }
 
     Ok(())
@@ -161,7 +166,7 @@ pub async fn delete(pipeline_id: &str) -> Result<()> {
         Ok(pipeline) => {
             // remove from cache if realtime pipeline
             if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-                update_cache(stream_params, &pipeline, PipelineTableEvent::Remove).await;
+                update_cache(stream_params, PipelineTableEvent::Remove).await;
             }
         }
     }
@@ -172,6 +177,17 @@ pub async fn delete(pipeline_id: &str) -> Result<()> {
 /// Preload all enabled pipelines into the cache at startup.
 pub async fn cache() -> Result<(), anyhow::Error> {
     let pipelines = list().await?;
+    if pipelines
+        .iter()
+        .any(|pl| pl.enabled && pl.num_of_func() > 0)
+        && !config::get_config().common.mmdb_disable_download
+    {
+        log::info!("[PIPELINE:CACHE] waiting mmdb data to be available");
+        Lazy::force(&crate::job::MMDB_INIT_NOTIFIER)
+            .notified()
+            .await;
+        log::info!("[PIPELINE:CACHE] done waiting");
+    }
     let mut stream_exec_pl = STREAM_EXECUTABLE_PIPELINES.write().await;
     for pipeline in pipelines.into_iter() {
         if pipeline.enabled {
@@ -197,21 +213,21 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 /// Update STREAM_PIPELINES cache for realtime pipelines
-async fn update_cache(
-    stream_params: &StreamParams,
-    pipeline: &Pipeline,
-    event: PipelineTableEvent,
-) {
+async fn update_cache<'a>(stream_params: &StreamParams, event: PipelineTableEvent<'a>) {
     match event {
         PipelineTableEvent::Remove => {
-            log::info!("[Pipeline]: pipeline {} removed from cache.", &pipeline.id);
-            STREAM_EXECUTABLE_PIPELINES
+            if let Some(removed) = STREAM_EXECUTABLE_PIPELINES
                 .write()
                 .await
-                .remove(stream_params);
+                .remove(stream_params)
+            {
+                log::info!(
+                    "[Pipeline]: pipeline {} removed from cache.",
+                    removed.get_pipeline_id()
+                );
+            }
         }
-        PipelineTableEvent::Add => {
-            let mut stream_pl_exec = STREAM_EXECUTABLE_PIPELINES.write().await;
+        PipelineTableEvent::Add(pipeline) => {
             match ExecutablePipeline::new(pipeline).await {
                 Err(e) => {
                     log::error!(
@@ -223,15 +239,16 @@ async fn update_cache(
                     );
                 }
                 Ok(exec_pl) => {
+                    let mut stream_pl_exec = STREAM_EXECUTABLE_PIPELINES.write().await;
                     stream_pl_exec.insert(stream_params.clone(), exec_pl);
+                    log::info!("[Pipeline]: pipeline {} added to cache.", &pipeline.id);
                 }
             };
-            log::info!("[Pipeline]: pipeline {} added to cache.", &pipeline.id);
         }
     }
 }
 
-enum PipelineTableEvent {
-    Add,
+enum PipelineTableEvent<'a> {
+    Add(&'a Pipeline),
     Remove,
 }

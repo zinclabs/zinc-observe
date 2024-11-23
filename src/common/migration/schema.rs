@@ -17,6 +17,7 @@ use chrono::Utc;
 use config::{
     meta::{
         alerts::{alert::Alert, destinations::Destination, templates::Template},
+        dashboards::reports::Report,
         stream::StreamType,
     },
     utils::json,
@@ -38,7 +39,6 @@ use o2_enterprise::enterprise::openfga::authorizer::authz::get_ownership_tuple;
 use crate::{
     common::{
         infra::config::VERSION,
-        meta::dashboards::reports::Report,
         utils::auth::{into_ofga_supported_format, is_ofga_unsupported},
     },
     service::db,

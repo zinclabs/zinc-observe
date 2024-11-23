@@ -16,9 +16,20 @@
 use std::{str::FromStr, time::Duration};
 
 use actix_web::http;
+use async_trait::async_trait;
 use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams, Page};
 use chrono::Timelike;
-use config::{get_chrome_launch_options, get_config, SMTP_CLIENT};
+use config::{
+    get_chrome_launch_options, get_config,
+    meta::dashboards::{
+        datetime_now,
+        reports::{
+            HttpReportPayload, Report, ReportDashboard, ReportDestination, ReportEmailDetails,
+            ReportFrequencyType, ReportListFilters, ReportTimerangeType,
+        },
+    },
+    SMTP_CLIENT,
+};
 use cron::Schedule;
 use futures::{future::try_join_all, StreamExt};
 use lettre::{
@@ -29,17 +40,7 @@ use reqwest::Client;
 
 use crate::{
     common::{
-        meta::{
-            authz::Authz,
-            dashboards::{
-                datetime_now,
-                reports::{
-                    HttpReportPayload, Report, ReportDashboard, ReportDestination,
-                    ReportEmailDetails, ReportFrequencyType, ReportListFilters,
-                    ReportTimerangeType,
-                },
-            },
-        },
+        meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::{db, short_url},
@@ -285,9 +286,16 @@ pub async fn enable(
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
 
-impl Report {
+#[async_trait]
+pub trait SendReport {
     /// Sends the report to subscribers
-    pub async fn send_subscribers(&self) -> Result<(), anyhow::Error> {
+    async fn send_subscribers(&self) -> Result<(), anyhow::Error>;
+}
+
+#[async_trait]
+impl SendReport for Report {
+    /// Sends the report to subscribers
+    async fn send_subscribers(&self) -> Result<(), anyhow::Error> {
         if self.dashboards.is_empty() {
             return Err(anyhow::anyhow!("Atleast one dashboard is required"));
         }
@@ -355,66 +363,70 @@ impl Report {
                 &self.name,
             )
             .await?;
-            self.send_email(&report.0, report.1).await
+            send_email(self, &report.0, report.1).await
+        }
+    }
+}
+
+/// Sends emails to the [`Report`] recipients. Currently only one pdf data is supported.
+async fn send_email(
+    report: &Report,
+    pdf_data: &[u8],
+    dashb_url: String,
+) -> Result<(), anyhow::Error> {
+    let cfg = get_config();
+    if !cfg.smtp.smtp_enabled {
+        return Err(anyhow::anyhow!("SMTP configuration not enabled"));
+    }
+
+    let mut recipients = vec![];
+    for recipient in &report.destinations {
+        match recipient {
+            ReportDestination::Email(email) => recipients.push(email),
         }
     }
 
-    /// Sends emails to the [`Report`] recipients. Currently only one pdf data is supported.
-    async fn send_email(&self, pdf_data: &[u8], dashb_url: String) -> Result<(), anyhow::Error> {
-        let cfg = get_config();
-        if !cfg.smtp.smtp_enabled {
-            return Err(anyhow::anyhow!("SMTP configuration not enabled"));
+    if recipients.is_empty() {
+        return Ok(());
+    }
+
+    let mut email = Message::builder()
+        .from(cfg.smtp.smtp_from_email.parse()?)
+        .subject(report.title.to_string());
+
+    for recipient in recipients {
+        email = email.to(recipient.parse()?);
+    }
+
+    if !cfg.smtp.smtp_reply_to.is_empty() {
+        email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
+    }
+
+    let email = email
+        .multipart(
+            MultiPart::mixed()
+                .singlepart(SinglePart::html(format!(
+                    "{}\n\n<p><a href='{dashb_url}' target='_blank'>Link to dashboard</a></p>",
+                    report.message
+                )))
+                .singlepart(
+                    // Only supports PDF for now, attach the PDF
+                    lettre::message::Attachment::new(format!(
+                        "{}.pdf",
+                        sanitize_filename(&report.title)
+                    ))
+                    .body(pdf_data.to_owned(), ContentType::parse("application/pdf")?),
+                ),
+        )
+        .unwrap();
+
+    // Send the email
+    match SMTP_CLIENT.as_ref().unwrap().send(email).await {
+        Ok(_) => {
+            log::info!("email sent successfully for the report {}", &report.name);
+            Ok(())
         }
-
-        let mut recipients = vec![];
-        for recipient in &self.destinations {
-            match recipient {
-                ReportDestination::Email(email) => recipients.push(email),
-            }
-        }
-
-        if recipients.is_empty() {
-            return Ok(());
-        }
-
-        let mut email = Message::builder()
-            .from(cfg.smtp.smtp_from_email.parse()?)
-            .subject(self.title.to_string());
-
-        for recipient in recipients {
-            email = email.to(recipient.parse()?);
-        }
-
-        if !cfg.smtp.smtp_reply_to.is_empty() {
-            email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
-        }
-
-        let email = email
-            .multipart(
-                MultiPart::mixed()
-                    .singlepart(SinglePart::html(format!(
-                        "{}\n\n<p><a href='{dashb_url}' target='_blank'>Link to dashboard</a></p>",
-                        self.message
-                    )))
-                    .singlepart(
-                        // Only supports PDF for now, attach the PDF
-                        lettre::message::Attachment::new(format!(
-                            "{}.pdf",
-                            sanitize_filename(&self.title)
-                        ))
-                        .body(pdf_data.to_owned(), ContentType::parse("application/pdf")?),
-                    ),
-            )
-            .unwrap();
-
-        // Send the email
-        match SMTP_CLIENT.as_ref().unwrap().send(email).await {
-            Ok(_) => {
-                log::info!("email sent successfully for the report {}", &self.name);
-                Ok(())
-            }
-            Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
-        }
+        Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
     }
 }
 

@@ -20,6 +20,7 @@ use config::{
     get_config,
     meta::{
         alerts::FrequencyType,
+        dashboards::reports::ReportFrequencyType,
         self_reporting::usage::{TriggerData, TriggerDataStatus, TriggerDataType},
         stream::{StreamParams, StreamType},
     },
@@ -34,18 +35,16 @@ use futures::future::try_join_all;
 use infra::scheduler::get_scheduler_max_retries;
 use proto::cluster_rpc;
 
-use crate::{
-    common::meta::dashboards::reports::ReportFrequencyType,
-    service::{
-        alerts::{
-            alert::{get_alert_start_end_time, get_row_column_map, AlertExt},
-            derived_streams::DerivedStreamExt,
-        },
-        db::{self, scheduler::ScheduledTriggerData},
-        ingestion::ingestion_service,
-        pipeline::batch_execution::ExecutablePipeline,
-        self_reporting::publish_triggers_usage,
+use crate::service::{
+    alerts::{
+        alert::{get_alert_start_end_time, get_row_column_map, AlertExt},
+        derived_streams::DerivedStreamExt,
     },
+    dashboards::reports::SendReport,
+    db::{self, scheduler::ScheduledTriggerData},
+    ingestion::ingestion_service,
+    pipeline::batch_execution::ExecutablePipeline,
+    self_reporting::publish_triggers_usage,
 };
 
 pub async fn run() -> Result<(), anyhow::Error> {

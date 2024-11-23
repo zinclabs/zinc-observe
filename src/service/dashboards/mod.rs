@@ -18,14 +18,17 @@ use std::io;
 use actix_web::{http, web, HttpResponse};
 use config::{
     ider,
-    meta::folder::{Folder, DEFAULT_FOLDER},
+    meta::{
+        dashboards::Dashboards,
+        folder::{Folder, DEFAULT_FOLDER},
+    },
     utils::json,
 };
 
 use super::folders;
 use crate::{
     common::{
-        meta::{authz::Authz, dashboards::Dashboards, http::HttpResponse as MetaHttpResponse},
+        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
     },
     service::db,

@@ -81,42 +81,27 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error
 
 #[tracing::instrument(skip(pipeline))]
 pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error> {
-    match db::pipeline::get_by_id(&pipeline.id).await {
-        Err(_err) => {
-            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                StatusCode::NOT_FOUND.into(),
-                format!("Existing Pipeline with ID {} not found", pipeline.id),
-            )));
-        }
-        Ok(existing_pipeline) => {
-            if existing_pipeline == pipeline {
-                return Ok(HttpResponse::Ok().json("No changes found".to_string()));
-            }
-            // check version
-            if existing_pipeline.version != pipeline.version {
-                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                    http::StatusCode::BAD_REQUEST.into(),
-                    format!(
-                        "Pipeline with ID {} modified by someone else. Please refresh",
-                        pipeline.id
-                    ),
-                )));
-            }
-            // if the source is changed, check if the new source exists in another pipeline
-            if existing_pipeline.source != pipeline.source {
-                if let Ok(similar_pl) = db::pipeline::get_with_same_source_stream(&pipeline).await {
-                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                        http::StatusCode::BAD_REQUEST.into(),
-                        format!(
-                            "The new source already exists in another pipeline in org: {} with name: {}",
-                            similar_pl.org,
-                            similar_pl.name
-                        ),
-                    )));
-                }
-            }
-        }
+    let Ok(existing_pipeline) = db::pipeline::get_by_id(&pipeline.id).await else {
+        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            StatusCode::NOT_FOUND.into(),
+            format!("Existing Pipeline with ID {} not found", pipeline.id),
+        )));
     };
+
+    if existing_pipeline == pipeline {
+        return Ok(HttpResponse::Ok().json("No changes found".to_string()));
+    }
+
+    // check version
+    if existing_pipeline.version != pipeline.version {
+        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::BAD_REQUEST.into(),
+            format!(
+                "Pipeline with ID {} modified by someone else. Please refresh",
+                pipeline.id
+            ),
+        )));
+    }
 
     // validate pipeline
     if let Err(e) = pipeline.validate() {
@@ -126,13 +111,54 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
         )));
     }
 
+    // additional checks when the source is changed
+    let prev_source_stream = if existing_pipeline.source != pipeline.source {
+        // check if the new source exists in another pipeline
+        if let Ok(similar_pl) = db::pipeline::get_with_same_source_stream(&pipeline).await {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!(
+                    "The updated source already exists in another pipeline with name {}, under org {}. Same source can have only one pipeline in an org",
+                    similar_pl.name, similar_pl.org
+                ),
+            )));
+        }
+        match existing_pipeline.source {
+            // realtime: remove prev. src. stream_params from cache
+            PipelineSource::Realtime(stream_params) => Some(stream_params),
+            // scheduled: delete prev. trigger
+            PipelineSource::Scheduled(derived_stream) => {
+                if let Err(error) = super::alerts::derived_streams::delete(
+                    derived_stream,
+                    &existing_pipeline.name,
+                    &existing_pipeline.id,
+                )
+                .await
+                {
+                    let err_msg = format!(
+                        "Failed to update: error deleting DerivedStream associated with previous pipeline version: {}",
+                        error
+                    );
+                    return Ok(HttpResponse::InternalServerError().json(
+                        MetaHttpResponse::message(
+                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            err_msg,
+                        ),
+                    ));
+                }
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // update the pipeline version
     pipeline.version += 1;
 
     // Save DerivedStream details if there's any
     if let PipelineSource::Scheduled(ref mut derived_stream) = &mut pipeline.source {
         derived_stream.query_condition.search_event_type = Some(SearchEventType::DerivedStream);
-        // save derived_stream to triggers table
         if let Err(e) = super::alerts::derived_streams::save(
             derived_stream.clone(),
             &pipeline.name,
@@ -147,7 +173,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
         }
     }
 
-    match db::pipeline::update(&pipeline).await {
+    match db::pipeline::update(&pipeline, prev_source_stream).await {
         Err(error) => Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -216,7 +242,7 @@ pub async fn enable_pipeline(
     };
 
     pipeline.enabled = value;
-    match db::pipeline::update(&pipeline).await {
+    match db::pipeline::update(&pipeline, None).await {
         Err(error) => Ok(
             HttpResponse::InternalServerError().json(MetaHttpResponse::message(
                 http::StatusCode::INTERNAL_SERVER_ERROR.into(),
