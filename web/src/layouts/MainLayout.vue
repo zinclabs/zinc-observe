@@ -798,9 +798,9 @@ export default defineComponent({
         : "";
       let tempDefaultOrg = {};
       let localOrgFlag = false;
+      const url = new URL(window.location.href);
       if (store.state.organizations?.length > 0) {
         const localOrg: any = useLocalOrganization();
-        const url = new URL(window.location.href);
         if (
           Object.keys(localOrg.value).length == 0 &&
           url.searchParams.get("org_identifier") != null
@@ -849,7 +849,7 @@ export default defineComponent({
               useLocalOrganization(optiondata);
             }
 
-            if (localOrg.value.identifier == data.identifier) {
+            if (localOrg.value.identifier == data.identifier || url.searchParams.get("org_identifier") == data.identifier) {
               localOrgFlag = true;
             }
 
