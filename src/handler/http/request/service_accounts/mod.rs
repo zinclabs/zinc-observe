@@ -13,36 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 
 use actix_web::{
     delete, get,
     http::{self},
-    post, put, web, HttpResponse,
+    post, put, web, HttpRequest, HttpResponse,
 };
 use config::utils::rand::generate_random_string;
-#[cfg(feature = "enterprise")]
-use {
-    crate::service::self_reporting::audit, o2_enterprise::enterprise::common::auditor::AuditMessage,
-};
+use hashbrown::HashMap;
 
 use crate::{
     common::{
         meta::{
             self,
-            service_account::ServiceAccountRequest,
-            user::{SignInResponse, UpdateUser, UserRequest, UserRole},
+            http::HttpResponse as MetaHttpResponse,
+            service_account::{APIToken, ServiceAccountRequest, UpdateServiceAccountRequest},
+            user::{UpdateUser, UserRequest, UserRole},
         },
         utils::auth::UserEmail,
     },
     service::users,
 };
 
-/// ListUsers
+/// ListServiceAccounts
 #[utoipa::path(
     context_path = "/api",
-    tag = "Users",
-    operation_id = "UserList",
+    tag = "ServiceAccounts",
+    operation_id = "ServiceAccountsList",
     security(
         ("Authorization"= [])
     ),
@@ -59,18 +57,18 @@ pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     users::list_users(&org_id, Some(UserRole::ServiceAccount)).await
 }
 
-/// CreateUser
+/// CreateServiceAccount
 #[utoipa::path(
     context_path = "/api",
-    tag = "Users",
-    operation_id = "UserSave",
+    tag = "ServiceAccounts",
+    operation_id = "ServiceAccountSave",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
     ),
-    request_body(content = UserRequest, description = "User data", content_type = "application/json"),
+    request_body(content = ServiceAccountRequest, description = "ServiceAccount data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
@@ -96,19 +94,19 @@ pub async fn save(
     users::post_user(&org_id, user, &initiator_id).await
 }
 
-/// UpdateUser
+/// UpdateServiceAccount
 #[utoipa::path(
     context_path = "/api",
-    tag = "Users",
-    operation_id = "UserUpdate",
+    tag = "ServiceAccounts",
+    operation_id = "ServiceAccountUpdate",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("email_id" = String, Path, description = "User's email id"),
+        ("email_id" = String, Path, description = "Service Account email id"),
     ),
-    request_body(content = UpdateUser, description = "User data", content_type = "application/json"),
+    request_body(content = ServiceAccountRequest, description = "Service Account data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
@@ -116,14 +114,42 @@ pub async fn save(
 #[put("/{org_id}/service_accounts/{email_id}")]
 pub async fn update(
     params: web::Path<(String, String)>,
-    service_account: web::Json<ServiceAccountRequest>,
+    service_account: web::Json<UpdateServiceAccountRequest>,
     user_email: UserEmail,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let email_id = email_id.trim().to_string();
+    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
 
+    let rotate_token = match query.get("rotateToken") {
+        Some(s) => match s.to_lowercase().as_str() {
+            "true" => true,
+            "false" => false,
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    " 'rotateToken' query param with value 'true' or 'false' allowed",
+                ));
+            }
+        },
+        None => false,
+    };
+
+    if rotate_token {
+        return match crate::service::organization::update_passcode(Some(&org_id), &email_id).await {
+            Ok(passcode) => Ok(HttpResponse::Ok().json(APIToken {
+                token: passcode.passcode,
+                user: passcode.user,
+            })),
+            Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+                http::StatusCode::NOT_FOUND.into(),
+                e.to_string(),
+            ))),
+        };
+    };
     let service_account = service_account.into_inner();
-    if service_account.eq(&ServiceAccountRequest::default()) {
+    if service_account.eq(&UpdateServiceAccountRequest::default()) {
         return Ok(
             HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
@@ -146,17 +172,17 @@ pub async fn update(
     users::update_user(&org_id, &email_id, false, initiator_id, user).await
 }
 
-/// RemoveUserFromOrganization
+/// RemoveServiceAccount
 #[utoipa::path(
     context_path = "/api",
-    tag = "Users",
-    operation_id = "RemoveUserFromOrg",
+    tag = "ServiceAccounts",
+    operation_id = "RemoveServiceAccount",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("email_id" = String, Path, description = "User name"),
+        ("email_id" = String, Path, description = "Service Account email id"),
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
@@ -173,18 +199,34 @@ pub async fn delete(
     users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
 }
 
-fn unauthorized_error(mut resp: SignInResponse) -> Result<HttpResponse, Error> {
-    resp.status = false;
-    resp.message = "Invalid credentials".to_string();
-    Ok(HttpResponse::Unauthorized().json(resp))
-}
-
-#[cfg(feature = "enterprise")]
-async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
-    use chrono::Utc;
-
-    audit_message._timestamp = Utc::now().timestamp_micros();
-    audit_message.response_code = 401;
-    // Even if the user_email of audit_message is not set, still the event should be audited
-    audit(audit_message).await;
+/// GetAPIToken
+#[utoipa::path(
+    context_path = "/api",
+     tag = "ServiceAccounts",
+    operation_id = "GetServiceAccountToken",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = APIToken),
+        (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
+    )
+)]
+#[get("/{org_id}/service_accounts/{email_id}")]
+async fn get_api_token(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+    let (org, user_id) = path.into_inner();
+    let org_id = Some(org.as_str());
+    match crate::service::organization::get_passcode(org_id, &user_id).await {
+        Ok(passcode) => Ok(HttpResponse::Ok().json(APIToken {
+            token: passcode.passcode,
+            user: passcode.user,
+        })),
+        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            e.to_string(),
+        ))),
+    }
 }
