@@ -45,6 +45,7 @@ import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
 import useWebSocket from "../useWebSocket";
 import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
+import useSearchWebSocket from "@/composables/useSearchWebSocket";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -77,6 +78,7 @@ export const usePanelDataLoader = (
   let runCount = 0;
 
   const webSocket = useWebSocket();
+  const { fetchQueryDataWithWebSocket } = useSearchWebSocket();
 
   /**
    * Calculate cache key for panel
@@ -525,8 +527,8 @@ export const usePanelDataLoader = (
   };
 
   const handleHistogramResponse = async (
-    abortControllerRef: any,
-    currentQueryIndex: number,
+    requestId: string,
+    payload: any,
     searchRes: any,
   ) => {
     // remove past error detail
@@ -545,40 +547,36 @@ export const usePanelDataLoader = (
     console.log(searchRes);
 
     // if the query is aborted or the response is partial, break the loop
-    if (abortControllerRef?.signal?.aborted) {
+    if (payload.abortControllerRef?.signal?.aborted) {
       return;
     }
 
-    state.data[currentQueryIndex] = searchRes?.content?.results?.hits ?? {};
+    state.data[payload.currentQueryIndex] =
+      searchRes?.content?.results?.hits ?? {};
 
     // update result metadata
-    state.resultMetaData[currentQueryIndex] = searchRes?.content?.results ?? {};
+    state.resultMetaData[payload.currentQueryIndex] =
+      searchRes?.content?.results ?? {};
   };
 
-  const sendSearchMessage = async (
-    query: any,
-    it: any,
-    startISOTimestamp: string,
-    endISOTimestamp: string,
-    traceId: string,
-    pageType: string,
-  ) => {
+  const sendSearchMessage = async (requestId: string, payload: any) => {
     console.log("send search message through ws");
 
     webSocket.sendMessage(
+      requestId,
       JSON.stringify({
         type: "search",
         content: {
-          trace_id: traceId,
+          trace_id: payload.traceId,
           payload: {
             query: await getHistogramSearchRequest(
-              query,
-              it,
-              startISOTimestamp,
-              endISOTimestamp,
+              payload.queryReq.query,
+              payload.queryReq.it,
+              payload.queryReq.startISOTimestamp,
+              payload.queryReq.endISOTimestamp,
             ),
           },
-          stream_type: pageType,
+          stream_type: payload.pageType,
           search_type: "dashboards",
           use_cache: (window as any).use_cache ?? true,
         },
@@ -586,14 +584,18 @@ export const usePanelDataLoader = (
     );
   };
 
-  const handleSearchClose = (traceId: string, response: any) => {
-    removeTraceId(traceId);
+  const handleSearchClose = (
+    requestId: string,
+    payload: any,
+    response: any,
+  ) => {
+    removeTraceId(payload.traceId);
 
     // set loading to false
     state.loading = false;
   };
 
-  const handleSearchError = (response: any) => {
+  const handleSearchError = (requestId: string, response: any) => {
     // set loading to false
     state.loading = false;
 
@@ -613,40 +615,35 @@ export const usePanelDataLoader = (
       const { traceId } = generateTraceContext();
       addTraceId(traceId);
 
-      const requestId = getUUID();
-      const url = getWebSocketUrl(
-        requestId,
-        store.state.organizationIdentifier,
-      );
-
-      webSocket.connect(url, 2000, 5);
-
-      // Gets called when socket connect is established
-      webSocket.addOpenHandler(
-        sendSearchMessage.bind(
-          null,
+      const payload: {
+        queryReq: any;
+        type: "search" | "histogram" | "pageCount";
+        isPagination: boolean;
+        traceId: string;
+        org_id: string;
+        pageType: string;
+      } = {
+        queryReq: {
           query,
           it,
           startISOTimestamp,
           endISOTimestamp,
-          traceId,
-          pageType,
-        ),
-      );
-
-      // When we receive message from BE/server
-      webSocket.addMessageHandler(
-        handleHistogramResponse.bind(
-          null,
           abortControllerRef,
           currentQueryIndex,
-        ),
-      );
+        },
+        type: "histogram",
+        isPagination: false,
+        traceId,
+        org_id: store.state.organizationIdentifier,
+        pageType,
+      };
 
-      // On closing of ws, when search is completed Server closes the WS
-      webSocket.addCloseHandler(handleSearchClose.bind(null, traceId));
-
-      webSocket.addErrorHandler(handleSearchError);
+      fetchQueryDataWithWebSocket(payload, {
+        open: sendSearchMessage,
+        close: handleSearchClose,
+        error: handleSearchError,
+        message: handleHistogramResponse,
+      });
     } catch (e: any) {
       state.errorDetail = e?.message || e;
       state.loading = false;
