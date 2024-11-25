@@ -544,18 +544,16 @@ export const usePanelDataLoader = (
     //   throw new Error(`Function error: ${searchRes.data.function_error}`);
     // }
 
-    console.log(searchRes);
-
     // if the query is aborted or the response is partial, break the loop
     // if (payload.abortControllerRef?.signal?.aborted) {
     //   return;
     // }
 
-    state.data[payload.currentQueryIndex] =
+    state.data[payload?.queryReq?.currentQueryIndex] =
       searchRes?.content?.results?.hits ?? {};
 
     // update result metadata
-    state.resultMetaData[payload.currentQueryIndex] =
+    state.resultMetaData[payload?.queryReq?.currentQueryIndex] =
       searchRes?.content?.results ?? {};
   };
 
