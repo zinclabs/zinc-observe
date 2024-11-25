@@ -335,6 +335,7 @@ import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
 import savedviewsService from "@/services/saved_views";
 import dashboardService from "@/services/dashboards";
+import serviceAccountService from "@/services/service_accounts";
 import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -1263,6 +1264,7 @@ const getResourceEntities = (resource: Resource | Entity) => {
     dashboard: getDashboards,
     metadata: getMetadataStreams,
     report: getReports,
+    service_accounts: getServiceAccounts,
   };
 
   return new Promise(async (resolve, reject) => {
@@ -1543,6 +1545,18 @@ const getReports = async () => {
   );
 
   updateResourceEntities("report", ["name"], [...reports.data]);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getServiceAccounts = async () => {
+  const accounts = await serviceAccountService.list(
+    store.state.selectedOrganization.identifier
+  );
+
+  updateResourceEntities("service_accounts", ["email"], accounts.data.data);
 
   return new Promise((resolve) => {
     resolve(true);
