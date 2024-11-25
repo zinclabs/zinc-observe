@@ -181,7 +181,8 @@ pub async fn get_latest_traces(
                         bypass_check: false,
                         parent_id: "".to_string(),
                     },
-                    Some(user.role),
+                    user.role,
+                    user.is_external,
                 )
                 .await
             {

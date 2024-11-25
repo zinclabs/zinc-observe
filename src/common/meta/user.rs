@@ -193,10 +193,9 @@ pub struct UpdateUser {
     pub token: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema, EnumIter)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, ToSchema, EnumIter)]
 pub enum UserRole {
     #[serde(rename = "admin")]
-    #[default]
     Admin,
     #[serde(rename = "member")] // admin in OpenSource
     Member,
@@ -213,6 +212,16 @@ pub enum UserRole {
     Editor,
     #[serde(rename = "service_account")]
     ServiceAccount,
+}
+
+impl Default for UserRole {
+    fn default() -> Self {
+        if cfg!(feature = "enterprise") {
+            UserRole::User
+        } else {
+            UserRole::Admin
+        }
+    }
 }
 
 impl fmt::Display for UserRole {

@@ -182,7 +182,8 @@ async fn query(
                             bypass_check: false,
                             parent_id: "".to_string(),
                         },
-                        Some(user.role),
+                        user.role,
+                        user.is_external,
                     )
                     .await
                 {
@@ -352,7 +353,8 @@ async fn query_range(
                             bypass_check: false,
                             parent_id: "".to_string(),
                         },
-                        Some(user.role),
+                        user.role,
+                        user.is_external,
                     )
                     .await
                 {
@@ -608,7 +610,8 @@ async fn series(
                         bypass_check: false,
                         parent_id: "".to_string(),
                     },
-                    Some(user.role),
+                    user.role,
+                    user.is_external,
                 )
                 .await
             {
