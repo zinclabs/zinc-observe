@@ -36,9 +36,11 @@ const useFunctions = () => {
           return;
         })
         .catch((e: any) => {
+          console.log(e,"error")
           throw new Error(e.message);
         });
     } catch (e: any) {
+      console.log(e,"error")
       throw new Error(e.message);
     }
   };

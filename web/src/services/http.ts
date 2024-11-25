@@ -34,11 +34,13 @@ const http = ({ headers } = {} as any) => {
     headers,
   });
 
+
   instance.interceptors.response.use(
     function (response) {
       return response;
     },
     function (error) {
+      console.log(error,"error")
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:

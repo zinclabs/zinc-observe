@@ -1,9 +1,0 @@
-// Vitest Snapshot v1
-
-exports[`Alert List > Should render json when user clicks on json tab 1`] = `
-"{
-  \\"_timestamp\\": \\"1680246906650420\\",
-  \\"kubernetes_container_name\\": \\"ziox\\",
-  \\"kubernetes_container_hash\\": \\"058694856476.dkr.ecr.us-west-2.amazonaws.com/ziox@sha256:3dbbb0dc1eab2d5a3b3e4a75fd87d194e8095c92d7b2b62e7cdbd07020f54589\\"
-}"
-`;

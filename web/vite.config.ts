@@ -109,7 +109,7 @@ export default defineConfig({
       template: { transformAssetUrls },
     }),
     quasar({
-      sassVariables: "src/styles/quasar-variables.sass",
+      sassVariables: "@/styles/quasar-variables.sass",
     }),
     process.env.VITE_COVERAGE === "true" &&
       istanbul({

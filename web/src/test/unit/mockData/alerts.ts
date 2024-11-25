@@ -51,7 +51,7 @@ export default {
           frequency: 2,
           time_between_alerts: 2,
           destination: "dest1",
-          is_real_time: false,
+          is_real_time: true,
           stream_type: "logs",
         },
       ],

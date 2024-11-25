@@ -16,6 +16,7 @@
 import http from "./http";
 
 const alerts = {
+
   list: (
     page_num: number,
     page_size: number,
@@ -24,6 +25,7 @@ const alerts = {
     name: string,
     org_identifier: string
   ) => {
+    console.log("this is working")
     return http().get(
       `/api/${org_identifier}/alerts?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
     );
@@ -45,6 +47,7 @@ const alerts = {
     stream_type: string,
     data: any
   ) => {
+    console.log('is this gettging invoed')
     return http().put(
       `/api/${org_identifier}/${stream_name}/alerts/${encodeURIComponent(
         data.name

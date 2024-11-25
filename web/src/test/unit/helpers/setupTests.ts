@@ -12,17 +12,62 @@ import "whatwg-fetch";
 import store from "./store";
 import "../../__mocks__/index";
 import home from "../mockData/home";
+import axios from 'axios';
+import MockAdapter from 'axios-mock-adapter';
 
-import.meta.env.VITE_OPENOBSERVE_ENDPOINT = "http://localhost:8080";
+
+
+const mock = new MockAdapter(axios);
+
 
 // TODO OK: Move below rest handlers to separate file
 export const restHandlers = [
   http.get(
     `${store.state.API_ENDPOINT}/api/organizations/associated_members/${store.state.selectedOrganization.identifier}`,
     ({ request }) => {
+
       return HttpResponse.json(associate_members);
     },
   ),
+
+  http.get(
+    `http://localhost:5080/api/default_organization_01/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`,
+    ({ request }) => {
+      console.log('mocked request');
+      return HttpResponse.json({
+        list:[
+          {
+              "function": ".a=123 \n .",
+              "name": "lskjf",
+              "params": "row",
+              "numArgs": 1,
+              "transType": 0
+          },
+          {
+              "function": ".a=123 \n .",
+              "name": "nginx_function",
+              "params": "row",
+              "numArgs": 1,
+              "transType": 0
+          }
+      ]
+      });
+    },
+  
+  ),
+
+
+  http.post(
+    `http://localhost:5080/api/default/k8s_json/alerts/?type=logs`,
+    () => {
+      return HttpResponse.json({
+
+      })
+    }
+  ),
+
+
+
 
   http.get(
     `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/streams`,
@@ -138,6 +183,8 @@ export const restHandlers = [
 
 const server = setupServer(...restHandlers);
 
+server.listen();
+
 // This is added to support multiple responses on same end point.
 // example: suppose for '/posts' we need to need to test sending response as error, [] and [post1, post2].
 // For this we need instance of server while testing
@@ -146,10 +193,28 @@ declare global {
   // eslint-disable-next-line no-var
   var server: any;
 }
+class MockIntersectionObserver {
+  constructor(callback, options) {
+    this.callback = callback;
+    this.options = options;
+  }
+
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+}
+
+// Assign the mock to the global object
+global.IntersectionObserver = MockIntersectionObserver;
+
 vi.stubGlobal("server", server);
 
+global.document.queryCommandSupported = vi.fn().mockReturnValue(true);
+
 // Start server before all tests
-beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+beforeAll(() =>{
+  console.log("Starting server...");
+   server.listen({ onUnhandledRequest: 'error' })});
 
 //  Close server after all tests
 afterAll(() => {

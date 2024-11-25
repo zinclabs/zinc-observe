@@ -2,13 +2,14 @@ import { createStore } from "vuex";
 
 const store = createStore({
   state: {
-    API_ENDPOINT: "http://localhost:8080",
+    API_ENDPOINT: "http://localhost:5080",
     selectedOrganization: {
       label: "default Organization",
       id: 159,
       identifier: "default_organization_01",
       user_email: "example@gmail.com",
       subscription_type: "",
+      activeTab:"custom",
     },
     currentuser: {
       role: "",

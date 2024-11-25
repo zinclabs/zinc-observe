@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="row justify-start items-start" style="width: 1024px">
         <div style="width: calc(100% - 401px)">
-          <q-form class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
+          <q-form data-test="add-alert-form" class="add-alert-form" ref="addAlertForm" @submit="onSubmit">
             <div
               class="flex justify-start items-center q-pb-sm q-col-gutter-md flex-wrap"
             >
@@ -618,7 +618,11 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       await importSqlParser();
+     try {
       await getAllFunctions();
+     } catch (error) {
+      console.log("Error while fetching functions", error);
+     }
     });
 
     const importSqlParser = async () => {
@@ -667,8 +671,6 @@ export default defineComponent({
     const editorData = ref("");
     const prefixCode = ref("");
     const suffixCode = ref("");
-
-    onMounted(async () => {});
 
     const updateEditorContent = async (stream_name: string) => {
       triggerCols.value = [];
@@ -993,7 +995,7 @@ export default defineComponent({
       payload.query_condition.type = payload.is_real_time
         ? "custom"
         : formData.value.query_condition.type;
-
+        
       formData.value.context_attributes.forEach((attr: any) => {
         if (attr.key?.trim() && attr.value?.trim())
           payload.context_attributes[attr.key] = attr.value;
@@ -1053,6 +1055,7 @@ export default defineComponent({
     };
 
     const validateInputs = (input: any, notify: boolean = true) => {
+  console.log('here in validate inputs')
       if (isNaN(Number(input.trigger_condition.silence))) {
         notify &&
           q.notify({
@@ -1063,7 +1066,7 @@ export default defineComponent({
         return false;
       }
 
-      if (input.is_real_time) return true;
+      // if (input.is_real_time) return true;
 
       if (
         Number(input.trigger_condition.period) < 1 ||
@@ -1193,6 +1196,8 @@ export default defineComponent({
         formData.value.query_condition.multi_time_range = value;
       }
     };
+
+
 
     return {
       t,
@@ -1340,6 +1345,7 @@ export default defineComponent({
       // When user updated query and click on save
       await new Promise((resolve) => setTimeout(resolve, 500));
 
+
       if (
         this.formData.is_real_time == "false" &&
         this.formData.query_condition.type == "sql" &&
@@ -1354,6 +1360,7 @@ export default defineComponent({
       }
 
       if (this.formData.stream_name == "") {
+        console.log('this is exec')
         this.q.notify({
           type: "negative",
           message: "Please select stream name.",
@@ -1396,6 +1403,7 @@ export default defineComponent({
         if (!valid) {
           return false;
         }
+
 
         const payload = this.getAlertPayload();
         if (!this.validateInputs(payload)) return;
@@ -1465,10 +1473,10 @@ export default defineComponent({
             payload.stream_type,
             payload
           );
-
           callAlert
             .then((res: { data: any }) => {
-              this.formData = { ...defaultValue };
+              this.formData = defaultValue();;
+
               this.$emit("update:list");
               this.addAlertForm.resetValidation();
               dismiss();
@@ -1478,6 +1486,7 @@ export default defineComponent({
               });
             })
             .catch((err: any) => {
+              console.log('alert saved error')
               dismiss();
               this.q.notify({
                 type: "negative",
@@ -1494,8 +1503,48 @@ export default defineComponent({
             page: "Add/Update Alert",
           });
         }
+      }).catch((err: any) => {
+        console.log('error in validation')
       });
     },
+
+    async testSubmit () {
+      const dismiss = this.q.notify({
+        spinner: true,
+        message: "Please wait...",
+        timeout: 2000,
+      });
+      const payload = this.getAlertPayload();
+      callAlert = alertsService.create(
+            this.store.state.selectedOrganization.identifier,
+            payload.stream_name,
+            payload.stream_type,
+            payload
+          );
+          callAlert
+            .then((res: { data: any }) => {
+              this.formData = defaultValue();;
+
+              this.$emit("update:list");
+              this.addAlertForm.resetValidation();
+              dismiss();
+              this.q.notify({
+                type: "positive",
+                message: `Alert saved successfully.`,
+              });
+            })
+            .catch((err: any) => {
+              console.log('alert saved error')
+              dismiss();
+              this.q.notify({
+                type: "negative",
+                message:
+                  err.response?.data?.error || err.response?.data?.message,
+              });
+            });
+    }
+    
+
   },
 });
 </script>

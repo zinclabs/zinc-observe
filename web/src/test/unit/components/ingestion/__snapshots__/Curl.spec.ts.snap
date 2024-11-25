@@ -1,3 +1,0 @@
-// Vitest Snapshot v1
-
-exports[`Curl > should render content 1`] = `"curl -u example@gmail.com:11 -k http://localhost:8080/api/zinc_next/default/_json -d [JSON-DATA]"`;
