@@ -44,11 +44,11 @@ const onOpen = (socketId: string, event: Event) => {
   openHandlers[socketId]?.forEach((handler) => handler(event));
 
   // Start ping interval
-  pingIntervals[socketId] = setInterval(() => {
-    if (sockets[socketId]?.readyState === WebSocket.OPEN) {
-      sockets[socketId].send(JSON.stringify({ type: "ping", message: "ping" }));
-    }
-  }, pingTimeout);
+  // pingIntervals[socketId] = setInterval(() => {
+  //   if (sockets[socketId]?.readyState === WebSocket.OPEN) {
+  //     sockets[socketId].send(JSON.stringify({ type: "ping", message: "ping" }));
+  //   }
+  // }, pingTimeout);
 };
 
 const onMessage = (socketId: string, event: MessageEvent) => {
