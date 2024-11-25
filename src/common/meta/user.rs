@@ -227,7 +227,6 @@ impl fmt::Display for UserRole {
             UserRole::Editor => write!(f, "editor"),
             #[cfg(feature = "enterprise")]
             UserRole::User => write!(f, "user"),
-            #[cfg(feature = "enterprise")]
             UserRole::ServiceAccount => write!(f, "service_account"),
         }
     }
@@ -245,7 +244,6 @@ impl UserRole {
             UserRole::Editor => "Editor".to_string(),
             #[cfg(feature = "enterprise")]
             UserRole::User => "User".to_string(),
-            #[cfg(feature = "enterprise")]
             UserRole::ServiceAccount => "Service Account".to_string(),
         }
     }
