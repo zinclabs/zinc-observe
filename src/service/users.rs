@@ -518,7 +518,7 @@ pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
 }
 
 pub async fn list_users(org_id: &str, role: Option<UserRole>) -> Result<HttpResponse, Error> {
-    let mut user_list: Vec<UserResponse> = USERS
+    let user_list: Vec<UserResponse> = USERS
         .iter()
         .filter(|user| user.key().starts_with(&format!("{org_id}/"))) // Filter by organization ID
         .filter(|user| {
@@ -543,13 +543,17 @@ pub async fn list_users(org_id: &str, role: Option<UserRole>) -> Result<HttpResp
         if !org_id.eq(DEFAULT_ORG) {
             let root = ROOT_USER.get("root").unwrap();
             let root_user = root.value();
-            user_list.push(UserResponse {
+            let mut enterprise_user_list = user_list;
+            enterprise_user_list.push(UserResponse {
                 email: root_user.email.clone(),
                 role: root_user.role.clone(),
                 first_name: root_user.first_name.clone(),
                 last_name: root_user.last_name.clone(),
                 is_external: root_user.is_external,
-            })
+            });
+            return Ok(HttpResponse::Ok().json(UserList {
+                data: enterprise_user_list,
+            }));
         }
     }
 
