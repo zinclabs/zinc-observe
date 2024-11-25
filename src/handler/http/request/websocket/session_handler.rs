@@ -23,8 +23,17 @@ use crate::{
         enterprise_utils, sessions_cache_utils, SearchEventReq, SearchResponseType, WsClientEvents,
         WsServerEvents,
     },
-    service::search::{self as SearchService, cache::cacher::get_ts_col_order_by, sql::Sql},
+    service::search::{
+        self as SearchService,
+        cache::{self, cacher::get_ts_col_order_by},
+        sql::Sql,
+    },
 };
+
+pub enum SearchResultType {
+    Cached(Response),
+    Search(Response),
+}
 
 pub struct SessionHandler {
     session: Session,
@@ -32,7 +41,7 @@ pub struct SessionHandler {
     user_id: String,
     request_id: String,
     org_id: String,
-    accumulated_results: Vec<Response>,
+    accumulated_results: Vec<SearchResultType>,
 }
 
 impl SessionHandler {
@@ -354,23 +363,50 @@ impl SessionHandler {
         }
 
         log::info!(
-            "[WS_SEARCH]: Writing results to file for trace_id: {}, file_path: {}",
+            "[WS_SEARCH]: Writing results to file for trace_id: {}, file_path: {}, accumulated_results len: {}",
+            c_resp.trace_id,
+            c_resp.file_path,
+            self.accumulated_results.len()
+        );
+
+        let mut cached_responses = Vec::new();
+        let mut search_responses = Vec::new();
+
+        for result in &self.accumulated_results {
+            match result {
+                SearchResultType::Cached(resp) => cached_responses.push(resp.clone()),
+                SearchResultType::Search(resp) => search_responses.push(resp.clone()),
+            }
+        }
+
+        // TODO: write new merge_response_v2 function
+        let merged_response = cache::merge_response(
+            &c_resp.trace_id,
+            &mut cached_responses,
+            &mut search_responses,
+            &c_resp.ts_column,
+            c_resp.limit,
+            c_resp.is_descending,
+            c_resp.took,
+        );
+
+        cache::write_results_v2(
+            &c_resp.trace_id,
+            &c_resp.ts_column,
+            start_time,
+            end_time,
+            &merged_response,
+            c_resp.file_path.clone(),
+            c_resp.is_aggregate,
+            c_resp.is_descending,
+        )
+        .await;
+
+        log::info!(
+            "[WS_SEARCH]: Results written to file for trace_id: {}, file_path: {}",
             c_resp.trace_id,
             c_resp.file_path,
         );
-
-        for res in &self.accumulated_results {
-            crate::service::search::cache::write_results_v2(
-                &c_resp.trace_id,
-                &c_resp.ts_column,
-                start_time,
-                end_time,
-                res,
-                c_resp.file_path.clone(),
-                c_resp.is_aggregate,
-                c_resp.is_descending,
-            ).await;
-        }
 
         Ok(())
     }
@@ -445,14 +481,16 @@ impl SessionHandler {
                     req.trace_id,
                     e
                 );
-                let _ = self.send_message(
-                    WsServerEvents::SearchError {
-                        trace_id: req.trace_id.clone(),
-                        error: e.to_string(),
-                    }
-                    .to_json()
-                    .to_string(),
-                ).await;
+                let _ = self
+                    .send_message(
+                        WsServerEvents::SearchError {
+                            trace_id: req.trace_id.clone(),
+                            error: e.to_string(),
+                        }
+                        .to_json()
+                        .to_string(),
+                    )
+                    .await;
                 self.cleanup().await;
                 return vec![];
             }
@@ -641,7 +679,8 @@ impl SessionHandler {
 
             if !search_res.hits.is_empty() {
                 // Accumulate the result
-                self.accumulated_results.push(search_res.clone());
+                self.accumulated_results
+                    .push(SearchResultType::Search(search_res.clone()));
 
                 // Send the cached response
                 let ws_search_res = WsServerEvents::SearchResponse {
@@ -686,7 +725,7 @@ impl SessionHandler {
 
         // Accumulate the result
         self.accumulated_results
-            .push(cached.cached_response.clone());
+            .push(SearchResultType::Cached(cached.cached_response.clone()));
 
         // Send the cached response
         let ws_search_res = WsServerEvents::SearchResponse {
@@ -757,7 +796,8 @@ impl SessionHandler {
 
             if !search_res.hits.is_empty() {
                 // Accumulate the result
-                self.accumulated_results.push(search_res.clone());
+                self.accumulated_results
+                    .push(SearchResultType::Search(search_res.clone()));
 
                 let ws_search_res = WsServerEvents::SearchResponse {
                     trace_id: trace_id.clone(),

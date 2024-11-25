@@ -356,7 +356,7 @@ pub async fn search(
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start
 // or end to cache response
-fn merge_response(
+pub fn merge_response(
     trace_id: &str,
     cache_responses: &mut Vec<config::meta::search::Response>,
     search_response: &mut Vec<config::meta::search::Response>,
@@ -625,6 +625,10 @@ pub async fn write_results_v2(
     // }
 
     if local_resp.hits.is_empty() {
+        log::info!(
+            "[trace_id {trace_id}] No hits found for caching, skipping caching",
+            trace_id = trace_id
+        );
         return;
     }
 
@@ -674,7 +678,7 @@ pub async fn write_results_v2(
             &file_name,
             res_cache,
         )
-            .await
+        .await
         {
             Ok(_) => {
                 let mut w = QUERY_RESULT_CACHE.write().await;
