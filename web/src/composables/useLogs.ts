@@ -68,6 +68,7 @@ import useWebSocket from "@/composables/useWebSocket";
 import searchService from "@/services/search";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
+import useSearchWebSocket from "./useSearchWebSocket";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -127,6 +128,7 @@ const defaultObject = {
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
     resultGrid: {
+      rowsPerPage: 100,
       wrapCells: false,
       manualRemoveFields: false,
       chartInterval: "1 second",
@@ -287,6 +289,8 @@ const useLogs = () => {
   const notificationMsg = ref("");
 
   const webSocket = useWebSocket();
+
+  const { fetchQueryDataWithWebSocket } = useSearchWebSocket();
 
   const { updateFieldKeywords } = useSqlSuggestions();
 
@@ -4457,7 +4461,29 @@ const useLogs = () => {
         searchObj.meta.resultGrid.rowsPerPage;
       queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
-      fetchSearchData(queryReq, "search", isPagination);
+      const { traceparent, traceId } = generateTraceContext();
+      addTraceId(traceId);
+
+      const payload: {
+        queryReq: SearchRequestPayload;
+        type: "search" | "histogram" | "pageCount";
+        isPagination: boolean;
+        traceId: string;
+        org_id: string;
+      } = {
+        queryReq,
+        type: "search",
+        isPagination,
+        traceId,
+        org_id: searchObj.organizationIdentifier,
+      };
+
+      fetchQueryDataWithWebSocket(payload, {
+        open: sendSearchMessage,
+        close: handleSearchClose,
+        error: handleSearchError,
+        message: handleSearchResponse,
+      });
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -4467,58 +4493,19 @@ const useLogs = () => {
     }
   };
 
-  const fetchSearchData = (
-    queryReq: SearchRequestPayload,
-    type: "search" | "histogram" | "pageCount",
-    isPagination: boolean,
-  ) => {
-    try {
-      const { traceId } = generateTraceContext();
-      addTraceId(traceId);
-
-      const requestId = getUUID();
-      const url = getWebSocketUrl(requestId, searchObj.organizationIdentifier);
-
-      webSocket.connect(url, 2000, 5);
-
-      // Gets called when socket connect is established
-      webSocket.addOpenHandler(
-        sendSearchMessage.bind(null, queryReq, type, traceId),
-      );
-
-      // When we receive message from BE/server
-      webSocket.addMessageHandler(
-        handleSearchResponse.bind(null, queryReq, isPagination, type, traceId),
-      );
-
-      // On closing of ws, when search is completed Server closes the WS
-      webSocket.addCloseHandler(
-        handleSearchClose.bind(null, queryReq, type, isPagination, traceId),
-      );
-
-      webSocket.addErrorHandler(handleSearchError);
-    } catch (e: any) {
-      searchObj.loading = false;
-      showErrorNotification(
-        notificationMsg.value || "Error occurred in socket creation.",
-      );
-      notificationMsg.value = "";
-    }
-  };
-
   const sendSearchMessage = (
+    requestId: string,
     queryReq: SearchRequestPayload,
-    type: "search" | "histogram" | "pageCount",
-    trace_id: string,
   ) => {
     try {
       webSocket.sendMessage(
+        requestId,
         JSON.stringify({
           type: "search",
           content: {
-            trace_id,
+            trace_id: queryReq.traceId,
             payload: {
-              query: queryReq.query,
+              query: queryReq.queryReq.query,
             },
             stream_type: searchObj.data.stream.streamType,
             search_type: "ui",
@@ -4542,27 +4529,30 @@ const useLogs = () => {
   };
 
   // Limit, aggregation, vrl function, pagination, function error and query error
-  const handleSearchResponse = async (
-    queryReq: SearchRequestPayload,
-    isPagination: boolean,
-    type: "search" | "histogram" | "pageCount" | "cancel",
-    traceId: string,
+  const handleSearchResponse = (
+    requestId: string,
+    payload: any,
     response: any,
   ) => {
-    if (type === "search") {
-      handleLogsResponse(queryReq, isPagination, traceId, response);
+    if (payload.type === "search") {
+      handleLogsResponse(
+        payload.queryReq,
+        payload.isPagination,
+        payload.traceId,
+        response,
+      );
     }
 
-    if (type === "histogram") {
-      handleHistogramResponse(queryReq, traceId, response);
+    if (payload.type === "histogram") {
+      handleHistogramResponse(payload.queryReq, payload.traceId, response);
     }
 
-    if (type === "pageCount") {
-      handlePageCountResponse(queryReq, traceId, response);
+    if (payload.type === "pageCount") {
+      handlePageCountResponse(payload.queryReq, payload.traceId, response);
     }
 
-    if (type === "cancel") {
-      handleCancelSearchResponse(traceId, response);
+    if (payload.type === "cancel") {
+      handleCancelSearchResponse(payload.traceId, response);
     }
   };
 
@@ -4613,7 +4603,6 @@ const useLogs = () => {
           delete response.content.total;
         }
 
-
         if (
           searchObj.data.queryResults.hasOwnProperty("hits") &&
           searchObj.data.queryResults.hits.length > 0
@@ -4645,6 +4634,7 @@ const useLogs = () => {
       searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
     } catch (e: any) {
       searchObj.loading = false;
+      console.log(e);
       showErrorNotification(
         notificationMsg.value || "Error occurred while handling logs response.",
       );
@@ -4818,7 +4808,29 @@ const useLogs = () => {
 
         histogramResults = [];
 
-        fetchSearchData(searchObj.data.histogramQuery, "histogram", false);
+        const { traceparent, traceId } = generateTraceContext();
+        addTraceId(traceId);
+
+        const payload: {
+          queryReq: SearchRequestPayload;
+          type: "search" | "histogram" | "pageCount";
+          isPagination: boolean;
+          traceId: string;
+          org_id: string;
+        } = {
+          queryReq: searchObj.data.histogramQuery,
+          type: "histogram",
+          isPagination: false,
+          traceId,
+          org_id: searchObj.organizationIdentifier,
+        };
+
+        fetchQueryDataWithWebSocket(payload, {
+          open: sendSearchMessage,
+          close: handleSearchClose,
+          error: handleSearchError,
+          message: handleSearchResponse,
+        });
       }
     } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
       resetHistogramWithError("Histogram is not available for limit queries.");
@@ -4863,26 +4875,24 @@ const useLogs = () => {
   }
 
   const handleSearchClose = (
-    queryReq: SearchRequestPayload,
-    type: "search" | "histogram" | "pageCount" | "cancel",
-    isPagination: boolean,
-    traceId: string,
+    requestId: string,
+    payload: any,
     response: any,
   ) => {
-    if (traceId) removeTraceId(traceId);
+    if (payload.traceId) removeTraceId(payload.traceId);
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
 
-    if (type === "search" && !isPagination) {
-      processHistogramRequest(queryReq);
+    if (payload.type === "search" && !payload.isPagination) {
+      processHistogramRequest(payload.queryReq);
     }
 
-    if (type === "cancel") {
+    if (payload.type === "cancel") {
       searchObj.data.isOperationCancelled = false;
     }
   };
 
-  const handleSearchError = (response: any) => {
+  const handleSearchError = (requestId: string, response: any) => {
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
     //handlePageCountError
@@ -4941,7 +4951,26 @@ const useLogs = () => {
     const { traceparent, traceId } = generateTraceContext();
     addTraceId(traceId);
 
-    fetchSearchData(queryReq, "pageCount", false);
+    const payload: {
+      queryReq: SearchRequestPayload;
+      type: "search" | "histogram" | "pageCount";
+      isPagination: boolean;
+      traceId: string;
+      org_id: string;
+    } = {
+      queryReq,
+      type: "pageCount",
+      isPagination: false,
+      traceId,
+      org_id: searchObj.organizationIdentifier,
+    };
+
+    fetchQueryDataWithWebSocket(payload, {
+      open: sendSearchMessage,
+      close: handleSearchClose,
+      error: handleSearchError,
+      message: handleSearchResponse,
+    });
   };
 
   const sendCancelSearchMessage = () => {
