@@ -359,17 +359,19 @@ impl SessionHandler {
             c_resp.file_path,
         );
 
-        crate::service::search::cache::write_results_v2(
-            &c_resp.trace_id,
-            &c_resp.ts_column,
-            start_time,
-            end_time,
-            &self.accumulated_results,
-            c_resp.file_path,
-            c_resp.is_aggregate,
-            c_resp.is_descending,
-        )
-        .await;
+        for res in &self.accumulated_results {
+            crate::service::search::cache::write_results_v2(
+                &c_resp.trace_id,
+                &c_resp.ts_column,
+                start_time,
+                end_time,
+                res,
+                c_resp.file_path.clone(),
+                c_resp.is_aggregate,
+                c_resp.is_descending,
+            ).await;
+        }
+
         Ok(())
     }
 
