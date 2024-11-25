@@ -547,9 +547,9 @@ export const usePanelDataLoader = (
     console.log(searchRes);
 
     // if the query is aborted or the response is partial, break the loop
-    if (payload.abortControllerRef?.signal?.aborted) {
-      return;
-    }
+    // if (payload.abortControllerRef?.signal?.aborted) {
+    //   return;
+    // }
 
     state.data[payload.currentQueryIndex] =
       searchRes?.content?.results?.hits ?? {};
@@ -578,7 +578,8 @@ export const usePanelDataLoader = (
           },
           stream_type: payload.pageType,
           search_type: "dashboards",
-          use_cache: (window as any).use_cache ?? true,
+          // use_cache: (window as any).use_cache ?? true,
+          use_cache: false,
         },
       }),
     );
@@ -634,7 +635,7 @@ export const usePanelDataLoader = (
         type: "histogram",
         isPagination: false,
         traceId,
-        org_id: store.state.organizationIdentifier,
+        org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
       };
 
@@ -1030,6 +1031,8 @@ export const usePanelDataLoader = (
                   periodAsStr: "",
                 },
               };
+
+              state.metadata.queries[panelQueryIndex] = metadata;
 
               // await getDataThroughPartitions(
               //   query,
