@@ -35,7 +35,7 @@ use tracing::{Instrument, Span};
 
 use crate::{
     common::{
-        meta::{self, http::HttpResponse as MetaHttpResponse, user::UserRole},
+        meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::{
             functions,
             http::{
