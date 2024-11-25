@@ -40,6 +40,7 @@ pub struct NewEmptyExec {
     filters: Vec<Expr>,
     limit: Option<usize>,
     sorted_by_time: bool,
+    full_schema: SchemaRef, // The schema use for remove filter feature
 }
 
 impl NewEmptyExec {
@@ -51,6 +52,7 @@ impl NewEmptyExec {
         filters: &[Expr],
         limit: Option<usize>,
         sorted_by_time: bool,
+        full_schema: SchemaRef,
     ) -> Self {
         let cache = Self::compute_properties(Arc::clone(&schema), 1, sorted_by_time);
         NewEmptyExec {
@@ -62,6 +64,7 @@ impl NewEmptyExec {
             filters: filters.to_owned(),
             limit,
             sorted_by_time,
+            full_schema,
         }
     }
 
@@ -135,6 +138,10 @@ impl NewEmptyExec {
 
     pub fn sorted_by_time(&self) -> bool {
         self.sorted_by_time
+    }
+
+    pub fn full_schema(&self) -> SchemaRef {
+        Arc::clone(&self.full_schema)
     }
 }
 
@@ -249,7 +256,7 @@ mod tests {
     #[test]
     fn test_new_empty_exec() {
         let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
-        let exec = NewEmptyExec::new("test", schema, None, &[], None, false);
+        let exec = NewEmptyExec::new("test", schema.clone(), None, &[], None, false, schema);
         assert_eq!(exec.name(), "test");
         assert_eq!(exec.projection(), None);
         assert_eq!(exec.filters().len(), 0);

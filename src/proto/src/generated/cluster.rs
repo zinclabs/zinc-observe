@@ -2460,6 +2460,8 @@ pub struct NewEmptyExecNode {
     pub limit: ::core::option::Option<u64>,
     #[prost(bool, tag = "6")]
     pub sorted_by_time: bool,
+    #[prost(message, optional, tag = "7")]
+    pub full_schema: ::core::option::Option<::datafusion_proto::protobuf::Schema>,
 }
 /// Search request
 #[allow(clippy::derive_partial_eq_without_eq)]

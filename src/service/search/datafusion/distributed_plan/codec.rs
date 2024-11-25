@@ -52,6 +52,7 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
             ))
         })?;
         let schema = Arc::new(convert_required!(proto.schema)?);
+        let full_schema = Arc::new(convert_required!(proto.full_schema)?);
         let extension_codec = DefaultLogicalExtensionCodec {};
         let filters = proto
             .filters
@@ -76,6 +77,7 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
             &filters,
             proto.limit.map(|v| v as usize),
             proto.sorted_by_time,
+            full_schema,
         )))
     }
 
@@ -95,6 +97,7 @@ impl PhysicalExtensionCodec for EmptyExecPhysicalExtensionCodec {
             filters,
             limit: node.limit().map(|v| v as u64),
             sorted_by_time: node.sorted_by_time(),
+            full_schema: Some(node.full_schema().as_ref().try_into()?),
         };
         proto.encode(buf).map_err(|e| {
             DataFusionError::Internal(format!(
@@ -174,14 +177,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_datafusion_codec() -> Result<()> {
-        let schema = Schema::new(vec![Field::new("a", DataType::Int32, false)]);
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
         let plan: Arc<dyn ExecutionPlan> = Arc::new(NewEmptyExec::new(
             "test",
-            Arc::new(schema),
+            Arc::clone(&schema),
             Some(&vec![0]),
             &[],
             Some(10),
             false,
+            Arc::clone(&schema),
         ));
 
         // encode
@@ -202,6 +206,7 @@ mod tests {
         assert_eq!(plan.projection(), plan2.projection());
         assert_eq!(plan.filters(), plan2.filters());
         assert_eq!(plan.limit(), plan2.limit());
+        assert_eq!(plan.full_schema(), plan2.full_schema());
 
         Ok(())
     }

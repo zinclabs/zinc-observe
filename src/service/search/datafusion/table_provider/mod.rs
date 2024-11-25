@@ -51,12 +51,7 @@ use datafusion::{
     },
     logical_expr::{utils::conjunction, Expr, SortExpr, TableProviderFilterPushDown, TableType},
     physical_expr::{create_physical_expr, expressions, LexOrdering, PhysicalSortExpr},
-    physical_plan::{
-        empty::EmptyExec,
-        expressions::{CastExpr, Column},
-        projection::ProjectionExec,
-        ExecutionPlan, PhysicalExpr,
-    },
+    physical_plan::{empty::EmptyExec, ExecutionPlan},
 };
 use futures::{
     future::{self, try_join_all},
@@ -66,6 +61,8 @@ use hashbrown::HashMap;
 use helpers::*;
 use object_store::ObjectStore;
 use tokio::sync::Semaphore;
+
+use crate::service::search::index::IndexCondition;
 
 pub mod empty_table;
 mod helpers;
@@ -82,6 +79,8 @@ pub(crate) struct NewListingTable {
     diff_rules: HashMap<String, DataType>,
     options: ListingOptions,
     collected_statistics: FileStatisticsCache,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
 }
 
 impl NewListingTable {
@@ -94,7 +93,12 @@ impl NewListingTable {
     /// If the schema is provided then it must be resolved before creating the table
     /// and should contain the fields of the file without the table
     /// partitioning columns.
-    pub fn try_new(config: ListingTableConfig, rules: HashMap<String, DataType>) -> Result<Self> {
+    pub fn try_new(
+        config: ListingTableConfig,
+        rules: HashMap<String, DataType>,
+        index_condition: Option<IndexCondition>,
+        fst_fields: Vec<String>,
+    ) -> Result<Self> {
         let file_schema = config
             .file_schema
             .ok_or_else(|| DataFusionError::Internal("No schema provided.".into()))?;
@@ -116,6 +120,8 @@ impl NewListingTable {
             diff_rules: rules,
             options,
             collected_statistics: Arc::new(DefaultFileStatisticsCache::default()),
+            index_condition,
+            fst_fields,
         };
 
         Ok(table)
@@ -332,6 +338,12 @@ impl TableProvider for NewListingTable {
             return Ok(Arc::new(EmptyExec::new(Arc::new(Schema::empty()))));
         };
 
+        let (parquet_projection, filter_projection) = if self.index_condition.is_some() {
+            (None, projection)
+        } else {
+            (projection, None)
+        };
+
         // create the execution plan
         let parquet_exec = self
             .options
@@ -341,7 +353,7 @@ impl TableProvider for NewListingTable {
                 FileScanConfig::new(object_store_url, Arc::clone(&self.file_schema))
                     .with_file_groups(partitioned_file_lists)
                     .with_statistics(statistics)
-                    .with_projection(projection.cloned())
+                    .with_projection(parquet_projection.cloned())
                     .with_limit(limit)
                     .with_output_ordering(output_ordering)
                     .with_table_partition_cols(table_partition_cols),
@@ -349,23 +361,20 @@ impl TableProvider for NewListingTable {
             )
             .await?;
 
-        // add the diff rules to the execution plan
-        if self.diff_rules.is_empty() {
-            return Ok(parquet_exec);
-        }
-        let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> =
-            Vec::with_capacity(projected_schema.fields().len());
-        for (idx, field) in projected_schema.fields().iter().enumerate() {
-            let name = field.name().to_string();
-            let col = Arc::new(Column::new(&name, idx));
-            if let Some(data_type) = self.diff_rules.get(&name) {
-                exprs.push((Arc::new(CastExpr::new(col, data_type.clone(), None)), name));
-            } else {
-                exprs.push((col, name));
-            }
-        }
-        let projection_exec = ProjectionExec::try_new(exprs, parquet_exec)?;
-        Ok(Arc::new(projection_exec))
+        let projection_exec = apply_projection(
+            &self.schema(),
+            &self.diff_rules,
+            parquet_projection,
+            parquet_exec,
+        )?;
+
+        apply_filter(
+            self.index_condition.as_ref(),
+            &self.schema(),
+            &self.fst_fields,
+            projection_exec,
+            filter_projection,
+        )
     }
 
     fn supports_filters_pushdown(

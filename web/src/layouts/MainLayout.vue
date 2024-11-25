@@ -738,7 +738,7 @@ export default defineComponent({
       });
       useLocalOrganization(selectedOrg.value);
       store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
-
+      setSelectedOrganization();
       // if (
       //   config.isCloud &&
       //   selectedOrg.value.subscription_type == config.freePlan

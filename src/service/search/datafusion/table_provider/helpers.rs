@@ -34,9 +34,11 @@
 
 use std::sync::Arc;
 
+use arrow_schema::{DataType, Schema, SchemaRef};
 use config::{INDEX_SEGMENT_LENGTH, PARQUET_MAX_ROW_GROUP_SIZE};
 use datafusion::{
     common::{
+        project_schema,
         stats::Precision,
         tree_node::{TreeNode, TreeNodeRecursion},
         Column, DataFusionError, Result,
@@ -47,11 +49,16 @@ use datafusion::{
     },
     logical_expr::{Expr, Volatility},
     parquet::arrow::arrow_reader::{RowSelection, RowSelector},
+    physical_plan::{
+        expressions::CastExpr, filter::FilterExec, projection::ProjectionExec, ExecutionPlan,
+        PhysicalExpr,
+    },
 };
 use futures::{stream::BoxStream, TryStreamExt};
+use hashbrown::HashMap;
 use object_store::ObjectStore;
 
-use crate::service::search::datafusion::storage;
+use crate::service::search::{datafusion::storage, index::IndexCondition};
 
 /// Check whether the given expression can be resolved using only the columns `col_names`.
 /// This means that if this function returns true:
@@ -274,6 +281,62 @@ pub fn generate_access_plan_row_level(file: &PartitionedFile) -> Option<Arc<Parq
         access_plan
     );
     Some(Arc::new(access_plan))
+}
+
+fn wrap_filter(
+    index_condition: &IndexCondition,
+    schema: &Schema,
+    fst_fields: &[String],
+    exec: Arc<dyn ExecutionPlan>,
+    projection: Option<&Vec<usize>>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    let expr = index_condition
+        .to_physical_expr(schema, fst_fields)
+        .map_err(|e| DataFusionError::External(e.into()))?;
+
+    Ok(Arc::new(
+        FilterExec::try_new(expr, exec)?.with_projection(projection.cloned())?,
+    ))
+}
+
+pub fn apply_projection(
+    schema: &SchemaRef,
+    diff_rules: &HashMap<String, DataType>,
+    projection: Option<&Vec<usize>>,
+    memory_exec: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    if diff_rules.is_empty() {
+        return Ok(memory_exec);
+    }
+    let projected_schema = project_schema(schema, projection)?;
+    let mut exprs: Vec<(Arc<dyn PhysicalExpr>, String)> =
+        Vec::with_capacity(projected_schema.fields().len());
+    for (idx, field) in projected_schema.fields().iter().enumerate() {
+        let name = field.name().to_string();
+        let col = Arc::new(datafusion::physical_expr::expressions::Column::new(
+            &name, idx,
+        ));
+        if let Some(data_type) = diff_rules.get(&name) {
+            exprs.push((Arc::new(CastExpr::new(col, data_type.clone(), None)), name));
+        } else {
+            exprs.push((col, name));
+        }
+    }
+    Ok(Arc::new(ProjectionExec::try_new(exprs, memory_exec)?))
+}
+
+pub fn apply_filter(
+    index_condition: Option<&IndexCondition>,
+    schema: &Schema,
+    fst_fields: &[String],
+    exec_plan: Arc<dyn ExecutionPlan>,
+    filter_projection: Option<&Vec<usize>>,
+) -> Result<Arc<dyn ExecutionPlan>> {
+    if let Some(condition) = index_condition {
+        wrap_filter(condition, schema, fst_fields, exec_plan, filter_projection)
+    } else {
+        Ok(exec_plan)
+    }
 }
 
 #[cfg(test)]

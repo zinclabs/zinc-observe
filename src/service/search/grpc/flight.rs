@@ -27,10 +27,15 @@ use config::{
         search::ScanStats,
         stream::{FileKey, StreamPartition, StreamType},
     },
+    utils::json,
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes};
+use infra::{
+    errors::{Error, ErrorCodes},
+    schema::{get_stream_setting_fts_fields, unwrap_stream_settings},
+};
+use itertools::Itertools;
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
 
@@ -46,6 +51,7 @@ use crate::service::{
             exec::{prepare_datafusion_context, register_udf},
             table_provider::uniontable::NewUnionTable,
         },
+        index::IndexCondition,
         match_file,
     },
 };
@@ -112,11 +118,26 @@ pub async fn search(
     );
 
     // construct latest schema map
-    let schema_latest = empty_exec.schema();
+    let schema_latest = empty_exec.full_schema();
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
         schema_latest_map.insert(field.name(), field);
     }
+
+    // construct index condition
+    let index_condition = generate_index_condition(&req.index_condition)?;
+
+    let stream_settings = unwrap_stream_settings(schema_latest.as_ref());
+    let fst_fields = get_stream_setting_fts_fields(&stream_settings)
+        .into_iter()
+        .filter_map(|v| {
+            if schema_latest_map.contains_key(&v) {
+                Some(v)
+            } else {
+                None
+            }
+        })
+        .collect_vec();
 
     // construct partition filters
     let search_partition_keys: Vec<(String, String)> = req
@@ -175,11 +196,10 @@ pub async fn search(
             query_params.clone(),
             schema_latest.clone(),
             &file_list,
-            &req.equal_keys,
-            &req.match_all_keys,
-            &req.index_condition,
             empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
+            index_condition.clone(),
+            fst_fields.clone(),
         )
         .await
         {
@@ -207,6 +227,8 @@ pub async fn search(
             &search_partition_keys,
             empty_exec.sorted_by_time(),
             file_stats_cache.clone(),
+            index_condition.clone(),
+            fst_fields.clone(),
         )
         .await
         {
@@ -233,6 +255,8 @@ pub async fn search(
             schema_latest.clone(),
             &search_partition_keys,
             empty_exec.sorted_by_time(),
+            index_condition.clone(),
+            fst_fields.clone(),
         )
         .await
         {
@@ -252,7 +276,7 @@ pub async fn search(
 
     // create a Union Plan to merge all tables
     let start = std::time::Instant::now();
-    let union_table = Arc::new(NewUnionTable::try_new(schema_latest.clone(), tables)?);
+    let union_table = Arc::new(NewUnionTable::try_new(empty_exec.schema().clone(), tables)?);
 
     let union_exec = union_table
         .scan(
@@ -328,4 +352,21 @@ async fn get_file_list_by_ids(
     files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
     files.dedup_by(|a, b| a.key == b.key);
     Ok((files, start.elapsed().as_millis() as usize))
+}
+
+fn generate_index_condition(index_condition: &str) -> Result<Option<IndexCondition>, Error> {
+    Ok(if !index_condition.is_empty() {
+        let condition: IndexCondition = match json::from_str(index_condition) {
+            Ok(cond) => cond,
+            Err(e) => {
+                return Err(Error::ErrorCode(ErrorCodes::SearchSQLNotValid(format!(
+                    "Invalid index condition JSON: {}",
+                    e
+                ))));
+            }
+        };
+        Some(condition)
+    } else {
+        None
+    })
 }

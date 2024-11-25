@@ -153,7 +153,24 @@ impl Sql {
         let mut match_visitor = MatchVisitor::new();
         statement.visit(&mut match_visitor);
 
-        // 5. generate used schema
+        // 5. check if have full text search filed in stream
+        if stream_names.len() == 1 && match_visitor.match_items.is_some() {
+            let schema = total_schemas.values().next().unwrap();
+            let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
+            let fts_fields = get_stream_setting_fts_fields(&stream_settings);
+            // check if schema don't have full text search field
+            if fts_fields
+                .into_iter()
+                .all(|field| !schema.contains_field(&field))
+            {
+                return Err(Error::Message(
+                    "Using match_all() function in a stream that don't have full text search field"
+                        .to_string(),
+                ));
+            }
+        }
+
+        // 6. generate used schema
         let mut used_schemas = HashMap::with_capacity(total_schemas.len());
         if column_visitor.is_wildcard {
             let has_original_column = has_original_column(&column_visitor.columns);
@@ -174,21 +191,21 @@ impl Sql {
             }
         }
 
-        // 6. get partition column value
+        // 7. get partition column value
         let mut partition_column_visitor = PartitionColumnVisitor::new(&used_schemas);
         statement.visit(&mut partition_column_visitor);
 
-        // 7. get prefix column value
+        // 8. get prefix column value
         let mut prefix_column_visitor = PrefixColumnVisitor::new(&used_schemas);
         statement.visit(&mut prefix_column_visitor);
 
-        // 8. pick up histogram interval
+        // 9. pick up histogram interval
         let mut histogram_interval_visitor =
             HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
 
         // NOTE: only this place can modify the sql
-        // 9. add _timestamp and _o2_id if need
+        // 10. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
             statement.visit(&mut add_timestamp_visitor);
@@ -198,7 +215,7 @@ impl Sql {
             }
         }
 
-        // 10. generate tantivy query
+        // 11. generate tantivy query
         let mut index_condition = None;
         if get_config()
             .common
@@ -560,7 +577,7 @@ impl VisitorMut for IndexVisitor {
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
-                self.index_condition = Some(index);
+                self.index_condition = index;
                 if self.is_remove_filter {
                     select.selection = other_expr;
                 }
@@ -1213,7 +1230,7 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
             pattern: _,
             escape_char: _,
         } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Function(f) => f.name.to_string().starts_with("match_all"),
+        Expr::Function(f) => f.name.to_string().to_lowercase() == "match_all",
         _ => false,
     }
 }

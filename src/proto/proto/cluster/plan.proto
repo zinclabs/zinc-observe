@@ -17,6 +17,7 @@ message NewEmptyExecNode {
     repeated datafusion.LogicalExprNode filters = 4;
     optional uint64                       limit = 5;
     bool                         sorted_by_time = 6;
+    datafusion_common.Schema        full_schema = 7;
 }
 
 // Search request

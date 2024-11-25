@@ -61,6 +61,7 @@ use super::{
     table_provider::{uniontable::NewUnionTable, NewListingTable},
     udf::transform_udf::get_all_transform,
 };
+use crate::service::search::index::IndexCondition;
 
 const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
@@ -340,6 +341,8 @@ pub async fn register_table(
         rules.clone(),
         sorted_by_time,
         ctx.runtime_env().cache_manager.get_file_statistic_cache(),
+        None,
+        vec![],
     )
     .await?;
     ctx.register_table(table_name, table)?;
@@ -347,6 +350,7 @@ pub async fn register_table(
     Ok(ctx)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn create_parquet_table(
     session: &SearchSession,
     schema: Arc<Schema>,
@@ -354,6 +358,8 @@ pub async fn create_parquet_table(
     rules: HashMap<String, DataType>,
     sorted_by_time: bool,
     file_stat_cache: Option<FileStatisticsCache>,
+    index_condition: Option<IndexCondition>,
+    fst_fields: Vec<String>,
 ) -> Result<Arc<dyn TableProvider>> {
     let cfg = get_config();
     let mut target_partitions = if session.target_partitions == 0 {
@@ -432,7 +438,7 @@ pub async fn create_parquet_table(
         schema
     };
     config = config.with_schema(schema);
-    let mut table = NewListingTable::try_new(config, rules)?;
+    let mut table = NewListingTable::try_new(config, rules, index_condition, fst_fields)?;
     if session.storage_type != StorageType::Tmpfs && file_stat_cache.is_some() {
         table = table.with_cache(file_stat_cache);
     }
