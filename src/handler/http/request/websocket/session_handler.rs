@@ -313,12 +313,12 @@ impl SessionHandler {
                     )
                     .await?;
                 } else {
-                    // If no cached response, process the deltas directly
+                    // If no cached response, process the req directly
                     log::info!(
                         "[WS_SEARCH]: processing deltas only for trace_id: {}",
                         trace_id
                     );
-                    self.process_deltas_only(&req, trace_id.clone(), req_size, c_resp.clone())
+                    self.do_partitioned_search(&req, trace_id.clone(), req_size)
                         .await?;
                 }
                 self.write_results_to_file(c_resp.clone(), start_time, end_time)
@@ -379,7 +379,6 @@ impl SessionHandler {
             }
         }
 
-        // TODO: write new merge_response_v2 function
         let merged_response = cache::merge_response(
             &c_resp.trace_id,
             &mut cached_responses,
@@ -582,15 +581,8 @@ impl SessionHandler {
                     delta
                 );
                 if delta.delta_end_time < cached.response_start_time {
-                    self.process_delta(
-                        req,
-                        trace_id.clone(),
-                        delta,
-                        req_size,
-                        &mut curr_res_size,
-                        &c_resp,
-                    )
-                    .await?;
+                    self.process_delta(req, trace_id.clone(), delta, req_size, &mut curr_res_size)
+                        .await?;
                     delta_iter.next(); // Move to the next delta after processing
                 } else {
                     // Send cached response
@@ -606,15 +598,8 @@ impl SessionHandler {
                 }
             } else if let Some(&delta) = delta_iter.peek() {
                 // Process remaining deltas
-                self.process_delta(
-                    req,
-                    trace_id.clone(),
-                    delta,
-                    req_size,
-                    &mut curr_res_size,
-                    &c_resp,
-                )
-                .await?;
+                self.process_delta(req, trace_id.clone(), delta, req_size, &mut curr_res_size)
+                    .await?;
                 delta_iter.next(); // Move to the next delta after processing
             } else if let Some(cached) = cached_resp_iter.next() {
                 // Process remaining cached responses
@@ -641,13 +626,12 @@ impl SessionHandler {
         Ok(())
     }
 
-    // Process deltas only (no cached response)
-    async fn process_deltas_only(
+    // Do partitioned search without any cache
+    async fn do_partitioned_search(
         &mut self,
         req: &SearchEventReq,
         trace_id: String,
         req_size: i64,
-        c_resp: MultiCachedQueryResponse,
     ) -> Result<(), Error> {
         let partitions = self.get_partitions(&req).await;
 
@@ -655,7 +639,6 @@ impl SessionHandler {
             return Ok(());
         }
 
-        let start_idx = self.find_start_partition_idx(&partitions, req.time_offset);
         let mut curr_res_size = 0;
 
         log::info!(
@@ -665,7 +648,7 @@ impl SessionHandler {
             &partitions
         );
 
-        for (idx, &[start_time, end_time]) in partitions.iter().enumerate().skip(start_idx) {
+        for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
             let mut req = req.clone();
             req.payload.query.start_time = start_time;
             req.payload.query.end_time = end_time;
@@ -755,20 +738,21 @@ impl SessionHandler {
         delta: &QueryDelta,
         req_size: i64,
         curr_res_size: &mut i64,
-        c_resp: &MultiCachedQueryResponse,
     ) -> Result<(), Error> {
         log::info!(
             "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
             trace_id,
             delta
         );
+        let mut req = req.clone();
+        req.payload.query.start_time = delta.delta_start_time;
+        req.payload.query.end_time = delta.delta_end_time;
+
         let partitions = self.get_partitions(&req).await;
 
         if partitions.is_empty() {
             return Ok(());
         }
-
-        let start_idx = self.find_start_partition_idx(&partitions, req.time_offset);
 
         log::info!(
             "[WS_SEARCH] Found {} partitions for trace_id: {}",
@@ -776,7 +760,7 @@ impl SessionHandler {
             trace_id
         );
 
-        for (idx, &[start_time, end_time]) in partitions.iter().enumerate().skip(start_idx) {
+        for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
             let mut req = req.clone();
             req.payload.query.start_time = start_time;
             req.payload.query.end_time = end_time;
@@ -784,6 +768,9 @@ impl SessionHandler {
             if req_size != -1 {
                 req.payload.query.size -= *curr_res_size;
             }
+
+            // TODO: Check why delta is sending dup records
+            // req.use_cache = false;
 
             let search_res = self.do_search(&req).await?;
             *curr_res_size += search_res.hits.len() as i64;

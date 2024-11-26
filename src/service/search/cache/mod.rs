@@ -660,8 +660,8 @@ pub async fn write_results_v2(
 
     let file_name = format!(
         "{}_{}_{}_{}.json",
-        req_query_start_time,
-        req_query_end_time,
+        cache_start_time,
+        cache_end_time,
         if is_aggregate { 1 } else { 0 },
         if is_descending { 1 } else { 0 }
     );
@@ -685,8 +685,8 @@ pub async fn write_results_v2(
                 w.entry(query_key)
                     .or_insert_with(Vec::new)
                     .push(ResultCacheMeta {
-                        start_time: req_query_start_time,
-                        end_time: req_query_end_time,
+                        start_time: cache_start_time,
+                        end_time: cache_end_time,
                         is_aggregate,
                         is_descending,
                     });
