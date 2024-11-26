@@ -165,10 +165,12 @@ impl SessionHandler {
                     msg,
                     e
                 );
-                let err_res = WsServerEvents::Error(ErrorType::RequestError {
-                    request_id: self.request_id.clone(),
-                    error: format!("{e}"),
-                });
+                let err_res = WsServerEvents::Error {
+                    error_type: ErrorType::RequestError {
+                        request_id: self.request_id.clone(),
+                        error: format!("{e}"),
+                    }
+                };
                 self.send_message(err_res.to_json().to_string())
                     .await
                     .unwrap();
@@ -219,10 +221,12 @@ impl SessionHandler {
         let stream_names = match resolve_stream_names(&req.payload.query.sql) {
             Ok(v) => v.clone(),
             Err(e) => {
-                let err_res = WsServerEvents::Error(ErrorType::SearchError {
-                    trace_id: trace_id.clone(),
-                    error: e.to_string(),
-                });
+                let err_res = WsServerEvents::Error {
+                    error_type: ErrorType::SearchError {
+                        trace_id: trace_id.clone(),
+                        error: e.to_string(),
+                    }
+                };
                 self.send_message(err_res.to_json().to_string()).await?;
                 return Ok(());
             }
@@ -235,10 +239,12 @@ impl SessionHandler {
                 enterprise_utils::check_permissions(&stream_name, stream_type, &user_id, &org_id)
                     .await
             {
-                let err_res = WsServerEvents::Error(ErrorType::SearchError {
-                    trace_id: trace_id.clone(),
-                    error: e.to_string(),
-                });
+                let err_res = WsServerEvents::Error {
+                    error_type: ErrorType::SearchError {
+                        trace_id: trace_id.clone(),
+                        error: e.to_string(),
+                    }
+                };
                 self.send_message(err_res.to_json().to_string()).await?;
                 return Ok(());
             }
@@ -273,7 +279,7 @@ impl SessionHandler {
                 &req.payload,
                 req.use_cache,
             )
-            .await;
+                .await;
             if let Ok(c_resp) = c_resp {
                 let local_c_resp = c_resp.clone();
                 let cached_resp = local_c_resp.cached_response;
@@ -311,7 +317,7 @@ impl SessionHandler {
                         deltas,
                         c_resp.clone(),
                     )
-                    .await?;
+                        .await?;
                 } else {
                     // If no cached response, process the req directly
                     log::info!(
@@ -399,7 +405,7 @@ impl SessionHandler {
             c_resp.is_aggregate,
             c_resp.is_descending,
         )
-        .await;
+            .await;
 
         log::info!(
             "[WS_SEARCH]: Results written to file for trace_id: {}, file_path: {}",
@@ -468,8 +474,8 @@ impl SessionHandler {
             req.stream_type,
             &search_partition_req,
         )
-        .instrument(tracing::info_span!("search_partition"))
-        .await;
+            .instrument(tracing::info_span!("search_partition"))
+            .await;
 
         // get the list of partitions
         let partitions = match res {
@@ -482,12 +488,15 @@ impl SessionHandler {
                 );
                 let _ = self
                     .send_message(
-                        WsServerEvents::Error(ErrorType::SearchError {
-                            trace_id: req.trace_id.clone(),
-                            error: e.to_string(),
-                        })
-                        .to_json()
-                        .to_string(),
+                        WsServerEvents::Error {
+                            error_type: ErrorType::SearchError {
+                                trace_id: req.trace_id.clone(),
+                                error: e.to_string(),
+                            }
+                        }
+
+                            .to_json()
+                            .to_string(),
                     )
                     .await;
                 self.cleanup().await;
@@ -507,8 +516,8 @@ impl SessionHandler {
             &req.payload,
             req.use_cache,
         )
-        .instrument(tracing::info_span!("search"))
-        .await
+            .instrument(tracing::info_span!("search"))
+            .await
     }
 
     #[cfg(feature = "enterprise")]
@@ -597,7 +606,7 @@ impl SessionHandler {
                         end_time,
                         &c_resp,
                     )
-                    .await?;
+                        .await?;
                     cached_resp_iter.next(); // Move to the next cached response
                 }
             } else if let Some(&delta) = delta_iter.peek() {
@@ -614,7 +623,7 @@ impl SessionHandler {
                     end_time,
                     &c_resp,
                 )
-                .await?;
+                    .await?;
             }
 
             // Stop if reached the requested result size
