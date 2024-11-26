@@ -564,6 +564,24 @@ export const usePanelDataLoader = (
       searchRes?.content?.results ?? {};
   };
 
+  // Limit, aggregation, vrl function, pagination, function error and query error
+  const handleSearchResponse = (
+    requestId: string,
+    payload: any,
+    response: any,
+  ) => {
+    if (response.type === "search_response") {
+      handleHistogramResponse(payload.queryReq, payload.traceId, response);
+    }
+
+    if (response.type === "error") {
+      // set loading to false
+      state.loading = false;
+
+      processApiError(response?.content?.meta, "sql");
+    }
+  };
+
   const sendSearchMessage = async (requestId: string, payload: any) => {
     console.log("send search message through ws");
 
@@ -595,6 +613,10 @@ export const usePanelDataLoader = (
     removeTraceId(payload.traceId);
 
     removeRequestId(requestId);
+
+    if (response.type === "error") {
+      processApiError(response?.content?.meta, "sql");
+    }
 
     // set loading to false
     state.loading = false;
@@ -655,7 +677,7 @@ export const usePanelDataLoader = (
         open: sendSearchMessage,
         close: handleSearchClose,
         error: handleSearchError,
-        message: handleHistogramResponse,
+        message: handleSearchResponse,
       });
 
       addRequestId(requestId, traceId);
@@ -1322,7 +1344,9 @@ export const usePanelDataLoader = (
         const errorDetailValue =
           error?.response?.data.error_detail ||
           error?.response?.data.message ||
-          error?.message;
+          error?.message ||
+          error?.error;
+
         const trimmedErrorMessage =
           errorDetailValue?.length > 300
             ? errorDetailValue.slice(0, 300) + " ..."
