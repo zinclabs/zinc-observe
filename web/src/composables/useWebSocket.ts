@@ -136,9 +136,14 @@ const useWebSocket = () => {
     }
   });
 
+  const getWebSocketBasedOnSocketId = (socketId: string) => {
+    return sockets[socketId];
+  };
+
   return {
     connect,
     sendMessage,
+    getWebSocketBasedOnSocketId,
     addMessageHandler: (socketId: string, handler: MessageHandler) =>
       addHandler(messageHandlers, socketId, handler),
     removeMessageHandler: (socketId: string, handler: MessageHandler) =>

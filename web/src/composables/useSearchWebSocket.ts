@@ -62,6 +62,14 @@ const useSearchWebSocket = () => {
     requestId: string,
     trace_id: string,
   ) => {
+    const socket = webSocket.getWebSocketBasedOnSocketId(requestId);
+
+    // check state of socket
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      socket.close();
+      return;
+    }
+
     webSocket.sendMessage(
       requestId,
       JSON.stringify({

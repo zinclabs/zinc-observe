@@ -4059,6 +4059,13 @@ const useLogs = () => {
   const cancelQuery = () => {
     if (searchObj.communicationMethod === "ws") {
       sendCancelSearchMessage();
+      searchObj.data.isOperationCancelled = false;
+      $q.notify({
+        message: "Running query cancelled successfully",
+        color: "positive",
+        position: "bottom",
+        timeout: 4000,
+      });
       return;
     }
 
