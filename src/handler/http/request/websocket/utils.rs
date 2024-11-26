@@ -153,7 +153,9 @@ pub enum WsServerEvents {
         trace_id: String,
         is_success: bool,
     },
-    Error(ErrorType),
+    Error {
+        error_type: ErrorType
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
