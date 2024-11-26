@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 pub mod enterprise_utils {
+    #[allow(unused_imports)]
     use config::meta::stream::StreamType;
-
+    #[allow(unused_imports)]
     use crate::common::meta;
 
     #[cfg(feature = "enterprise")]
@@ -55,7 +56,7 @@ pub mod enterprise_utils {
                 auth_extractor,
                 Some(user.role),
             )
-            .await;
+                .await;
 
             if !has_permission {
                 return Err("Unauthorized Access".to_string());
@@ -146,7 +147,6 @@ pub enum WsServerEvents {
     SearchResponse {
         trace_id: String,
         results: config::meta::search::Response,
-        response_type: SearchResponseType,
         time_offset: i64,
     },
     CancelResponse {
@@ -154,7 +154,7 @@ pub enum WsServerEvents {
         is_success: bool,
     },
     Error {
-        error_type: ErrorType
+        error_type: ErrorType,
     },
 }
 
@@ -163,12 +163,6 @@ pub enum WsServerEvents {
 pub enum ErrorType {
     SearchError { trace_id: String, error: String },
     RequestError { request_id: String, error: String },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum SearchResponseType {
-    Single,
-    Partition { current: u64, total: u64 },
 }
 
 impl WsServerEvents {

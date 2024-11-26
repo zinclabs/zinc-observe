@@ -16,12 +16,11 @@ use tracing::Instrument;
 
 use crate::{
     common::meta::{
-        self,
         search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
     },
     handler::http::request::websocket::utils::{
-        enterprise_utils, sessions_cache_utils, ErrorType, SearchEventReq, SearchResponseType,
-        WsClientEvents, WsServerEvents,
+        sessions_cache_utils, ErrorType, SearchEventReq, WsClientEvents,
+        WsServerEvents,
     },
     service::search::{
         self as SearchService,
@@ -169,7 +168,7 @@ impl SessionHandler {
                     error_type: ErrorType::RequestError {
                         request_id: self.request_id.clone(),
                         error: format!("{e}"),
-                    }
+                    },
                 };
                 self.send_message(err_res.to_json().to_string())
                     .await
@@ -204,6 +203,7 @@ impl SessionHandler {
 
     async fn handle_search_request(&mut self, mut req: SearchEventReq) -> Result<(), Error> {
         let cfg = config::get_config();
+        #[allow(unused_variables)]
         let user_id = self.user_id.clone();
         let org_id = self.org_id.clone();
         let trace_id = req.trace_id.clone();
@@ -218,6 +218,7 @@ impl SessionHandler {
         }
 
         // get stream name
+        #[allow(unused_variables)]
         let stream_names = match resolve_stream_names(&req.payload.query.sql) {
             Ok(v) => v.clone(),
             Err(e) => {
@@ -225,7 +226,7 @@ impl SessionHandler {
                     error_type: ErrorType::SearchError {
                         trace_id: trace_id.clone(),
                         error: e.to_string(),
-                    }
+                    },
                 };
                 self.send_message(err_res.to_json().to_string()).await?;
                 return Ok(());
@@ -243,7 +244,7 @@ impl SessionHandler {
                     error_type: ErrorType::SearchError {
                         trace_id: trace_id.clone(),
                         error: e.to_string(),
-                    }
+                    },
                 };
                 self.send_message(err_res.to_json().to_string()).await?;
                 return Ok(());
@@ -310,12 +311,9 @@ impl SessionHandler {
                     self.process_cached_responses_and_deltas(
                         &req,
                         trace_id.clone(),
-                        start_time,
-                        end_time,
                         req_size,
                         cached_resp,
                         deltas,
-                        c_resp.clone(),
                     )
                         .await?;
                 } else {
@@ -342,7 +340,6 @@ impl SessionHandler {
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
                 results: search_res.clone(),
-                response_type: SearchResponseType::Single,
                 time_offset: end_time,
             };
             self.send_message(ws_search_res.to_json().to_string())
@@ -462,7 +459,7 @@ impl SessionHandler {
             sql: search_payload.query.sql.clone(),
             start_time: search_payload.query.start_time,
             end_time: search_payload.query.end_time,
-            encoding: search_payload.encoding.clone(),
+            encoding: search_payload.encoding,
             regions: search_payload.regions.clone(),
             clusters: search_payload.clusters.clone(),
             query_fn: search_payload.query.query_fn.clone(),
@@ -478,7 +475,7 @@ impl SessionHandler {
             .await;
 
         // get the list of partitions
-        let partitions = match res {
+        match res {
             Ok(res) => res.partitions,
             Err(e) => {
                 log::error!(
@@ -492,19 +489,16 @@ impl SessionHandler {
                             error_type: ErrorType::SearchError {
                                 trace_id: req.trace_id.clone(),
                                 error: e.to_string(),
-                            }
+                            },
                         }
-
                             .to_json()
                             .to_string(),
                     )
                     .await;
                 self.cleanup().await;
-                return vec![];
+                vec![]
             }
-        };
-
-        partitions
+        }
     }
 
     async fn do_search(&mut self, req: &SearchEventReq) -> Result<Response, infra::errors::Error> {
@@ -565,12 +559,9 @@ impl SessionHandler {
         &mut self,
         req: &SearchEventReq,
         trace_id: String,
-        start_time: i64,
-        end_time: i64,
         req_size: i64,
         cached_resp: Vec<CachedQueryResponse>,
-        mut deltas: Vec<QueryDelta>,
-        c_resp: MultiCachedQueryResponse,
+        deltas: Vec<QueryDelta>,
     ) -> Result<(), Error> {
         log::info!(
             "[WS_SEARCH] Found {} cached responses and {} deltas for trace_id: {}",
@@ -602,9 +593,6 @@ impl SessionHandler {
                     self.process_cached_response(
                         trace_id.clone(),
                         cached,
-                        start_time,
-                        end_time,
-                        &c_resp,
                     )
                         .await?;
                     cached_resp_iter.next(); // Move to the next cached response
@@ -619,9 +607,6 @@ impl SessionHandler {
                 self.process_cached_response(
                     trace_id.clone(),
                     cached,
-                    start_time,
-                    end_time,
-                    &c_resp,
                 )
                     .await?;
             }
@@ -646,7 +631,7 @@ impl SessionHandler {
         trace_id: String,
         req_size: i64,
     ) -> Result<(), Error> {
-        let partitions = self.get_partitions(&req).await;
+        let partitions = self.get_partitions(req).await;
 
         if partitions.is_empty() {
             return Ok(());
@@ -661,7 +646,7 @@ impl SessionHandler {
             &partitions
         );
 
-        for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
+        for &[start_time, end_time] in partitions.iter() {
             let mut req = req.clone();
             req.payload.query.start_time = start_time;
             req.payload.query.end_time = end_time;
@@ -682,10 +667,6 @@ impl SessionHandler {
                 let ws_search_res = WsServerEvents::SearchResponse {
                     trace_id: trace_id.clone(),
                     results: search_res.clone(),
-                    response_type: SearchResponseType::Partition {
-                        current: idx as u64 + 1,
-                        total: partitions.len() as u64,
-                    },
                     time_offset: end_time,
                 };
                 self.send_message(ws_search_res.to_json().to_string())
@@ -710,9 +691,6 @@ impl SessionHandler {
         &mut self,
         trace_id: String,
         cached: &CachedQueryResponse,
-        start_time: i64,
-        end_time: i64,
-        c_resp: &MultiCachedQueryResponse,
     ) -> Result<(), Error> {
         log::info!(
             "[WS_SEARCH]: Processing cached response for trace_id: {}",
@@ -727,10 +705,6 @@ impl SessionHandler {
         let ws_search_res = WsServerEvents::SearchResponse {
             trace_id: trace_id.clone(),
             results: cached.cached_response.clone(),
-            response_type: SearchResponseType::Partition {
-                current: 1000 as u64 + 1,
-                total: 1000 as u64,
-            },
             time_offset: cached.response_end_time,
         };
         log::info!(
@@ -773,7 +747,7 @@ impl SessionHandler {
             trace_id
         );
 
-        for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
+        for &[start_time, end_time] in partitions.iter() {
             let mut req = req.clone();
             req.payload.query.start_time = start_time;
             req.payload.query.end_time = end_time;
@@ -781,9 +755,6 @@ impl SessionHandler {
             if req_size != -1 {
                 req.payload.query.size -= *curr_res_size;
             }
-
-            // TODO: Check why delta is sending dup records
-            // req.use_cache = false;
 
             let search_res = self.do_search(&req).await?;
             *curr_res_size += search_res.hits.len() as i64;
@@ -802,10 +773,6 @@ impl SessionHandler {
                 let ws_search_res = WsServerEvents::SearchResponse {
                     trace_id: trace_id.clone(),
                     results: search_res.clone(),
-                    response_type: SearchResponseType::Partition {
-                        current: idx as u64 + 1,
-                        total: partitions.len() as u64,
-                    },
                     time_offset: end_time,
                 };
                 log::info!(

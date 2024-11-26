@@ -743,7 +743,6 @@ pub async fn check_cache_v2(
     let hashed_query = h.sum64(&hash_body.join(","));
 
     let mut should_exec_query = true;
-    let mut ext_took_wait = 0;
 
     let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
     rpc_req.org_id = org_id.to_string();

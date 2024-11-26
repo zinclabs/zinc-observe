@@ -25,7 +25,6 @@ use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 use crate::{
     common::infra::cluster,
     router::http::ws_proxy::{convert_to_websocket_url, ws_proxy},
-    service::promql::value,
 };
 
 const QUERIER_ROUTES: [&str; 19] = [
@@ -168,7 +167,7 @@ async fn dispatch(
 
     // check if the request is a websocket request
     let path_columns: Vec<&str> = path.split('/').collect();
-    if path_columns.get(3).unwrap_or(&"").to_string() == "ws".to_string() {
+    if *path_columns.get(3).unwrap_or(&"") == "ws" {
         let node_role = cfg.common.node_role.clone();
         log::info!(
             "[WS_ROUTER] Websocket request received on dispatcher: {}, node role: {}",
