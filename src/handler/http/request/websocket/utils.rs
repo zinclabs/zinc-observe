@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 pub mod enterprise_utils {
     #[allow(unused_imports)]
     use config::meta::stream::StreamType;
+
     #[allow(unused_imports)]
     use crate::common::meta;
 
@@ -56,7 +57,7 @@ pub mod enterprise_utils {
                 auth_extractor,
                 Some(user.role),
             )
-                .await;
+            .await;
 
             if !has_permission {
                 return Err("Unauthorized Access".to_string());

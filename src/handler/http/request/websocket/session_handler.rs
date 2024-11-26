@@ -15,12 +15,9 @@ use rand::prelude::SliceRandom;
 use tracing::Instrument;
 
 use crate::{
-    common::meta::{
-        search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
-    },
+    common::meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
     handler::http::request::websocket::utils::{
-        sessions_cache_utils, ErrorType, SearchEventReq, WsClientEvents,
-        WsServerEvents,
+        sessions_cache_utils, ErrorType, SearchEventReq, WsClientEvents, WsServerEvents,
     },
     service::search::{
         self as SearchService,
@@ -280,7 +277,7 @@ impl SessionHandler {
                 &req.payload,
                 req.use_cache,
             )
-                .await;
+            .await;
             if let Ok(c_resp) = c_resp {
                 let local_c_resp = c_resp.clone();
                 let cached_resp = local_c_resp.cached_response;
@@ -315,7 +312,7 @@ impl SessionHandler {
                         cached_resp,
                         deltas,
                     )
-                        .await?;
+                    .await?;
                 } else {
                     // If no cached response, process the req directly
                     log::info!(
@@ -402,7 +399,7 @@ impl SessionHandler {
             c_resp.is_aggregate,
             c_resp.is_descending,
         )
-            .await;
+        .await;
 
         log::info!(
             "[WS_SEARCH]: Results written to file for trace_id: {}, file_path: {}",
@@ -471,8 +468,8 @@ impl SessionHandler {
             req.stream_type,
             &search_partition_req,
         )
-            .instrument(tracing::info_span!("search_partition"))
-            .await;
+        .instrument(tracing::info_span!("search_partition"))
+        .await;
 
         // get the list of partitions
         match res {
@@ -491,8 +488,8 @@ impl SessionHandler {
                                 error: e.to_string(),
                             },
                         }
-                            .to_json()
-                            .to_string(),
+                        .to_json()
+                        .to_string(),
                     )
                     .await;
                 self.cleanup().await;
@@ -510,8 +507,8 @@ impl SessionHandler {
             &req.payload,
             req.use_cache,
         )
-            .instrument(tracing::info_span!("search"))
-            .await
+        .instrument(tracing::info_span!("search"))
+        .await
     }
 
     #[cfg(feature = "enterprise")]
@@ -590,10 +587,7 @@ impl SessionHandler {
                     delta_iter.next(); // Move to the next delta after processing
                 } else {
                     // Send cached response
-                    self.process_cached_response(
-                        trace_id.clone(),
-                        cached,
-                    )
+                    self.process_cached_response(trace_id.clone(), cached)
                         .await?;
                     cached_resp_iter.next(); // Move to the next cached response
                 }
@@ -604,10 +598,7 @@ impl SessionHandler {
                 delta_iter.next(); // Move to the next delta after processing
             } else if let Some(cached) = cached_resp_iter.next() {
                 // Process remaining cached responses
-                self.process_cached_response(
-                    trace_id.clone(),
-                    cached,
-                )
+                self.process_cached_response(trace_id.clone(), cached)
                     .await?;
             }
 
