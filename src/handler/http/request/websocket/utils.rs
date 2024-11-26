@@ -153,14 +153,14 @@ pub enum WsServerEvents {
         trace_id: String,
         is_success: bool,
     },
-    SearchError {
-        trace_id: String,
-        error: String,
-    },
-    RequestError {
-        request_id: String,
-        error: String,
-    },
+    Error(ErrorType),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorType {
+    SearchError { trace_id: String, error: String },
+    RequestError { request_id: String, error: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

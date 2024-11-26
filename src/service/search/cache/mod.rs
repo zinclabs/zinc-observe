@@ -607,7 +607,7 @@ pub async fn write_results_v2(
     is_aggregate: bool,
     is_descending: bool,
 ) {
-    let mut local_resp = res.clone();
+    let local_resp = res.clone();
     // let remove_hit = if is_descending {
     //     local_resp.hits.last()
     // } else {

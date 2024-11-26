@@ -20,8 +20,8 @@ use crate::{
         search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
     },
     handler::http::request::websocket::utils::{
-        enterprise_utils, sessions_cache_utils, SearchEventReq, SearchResponseType, WsClientEvents,
-        WsServerEvents,
+        enterprise_utils, sessions_cache_utils, ErrorType, SearchEventReq, SearchResponseType,
+        WsClientEvents, WsServerEvents,
     },
     service::search::{
         self as SearchService,
@@ -165,10 +165,10 @@ impl SessionHandler {
                     msg,
                     e
                 );
-                let err_res = WsServerEvents::RequestError {
+                let err_res = WsServerEvents::Error(ErrorType::RequestError {
                     request_id: self.request_id.clone(),
                     error: format!("{e}"),
-                };
+                });
                 self.send_message(err_res.to_json().to_string())
                     .await
                     .unwrap();
@@ -219,10 +219,10 @@ impl SessionHandler {
         let stream_names = match resolve_stream_names(&req.payload.query.sql) {
             Ok(v) => v.clone(),
             Err(e) => {
-                let err_res = WsServerEvents::SearchError {
+                let err_res = WsServerEvents::Error(ErrorType::SearchError {
                     trace_id: trace_id.clone(),
                     error: e.to_string(),
-                };
+                });
                 self.send_message(err_res.to_json().to_string()).await?;
                 return Ok(());
             }
@@ -235,10 +235,10 @@ impl SessionHandler {
                 enterprise_utils::check_permissions(&stream_name, stream_type, &user_id, &org_id)
                     .await
             {
-                let err_res = WsServerEvents::SearchError {
+                let err_res = WsServerEvents::Error(ErrorType::SearchError {
                     trace_id: trace_id.clone(),
                     error: e.to_string(),
-                };
+                });
                 self.send_message(err_res.to_json().to_string()).await?;
                 return Ok(());
             }
@@ -482,10 +482,10 @@ impl SessionHandler {
                 );
                 let _ = self
                     .send_message(
-                        WsServerEvents::SearchError {
+                        WsServerEvents::Error(ErrorType::SearchError {
                             trace_id: req.trace_id.clone(),
                             error: e.to_string(),
-                        }
+                        })
                         .to_json()
                         .to_string(),
                     )
@@ -530,7 +530,11 @@ impl SessionHandler {
         Ok(())
     }
 
-    fn find_start_partition_idx(&self, partitions: &[[i64; 2]], time_offset: Option<i64>) -> usize {
+    fn _find_start_partition_idx(
+        &self,
+        partitions: &[[i64; 2]],
+        time_offset: Option<i64>,
+    ) -> usize {
         if let Some(offset) = time_offset {
             for (idx, [_, end_time]) in partitions.iter().enumerate() {
                 if *end_time == offset {
