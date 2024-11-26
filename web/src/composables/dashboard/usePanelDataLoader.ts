@@ -599,8 +599,7 @@ export const usePanelDataLoader = (
         },
         stream_type: payload.pageType,
         search_type: "dashboards",
-        // use_cache: (window as any).use_cache ?? true,
-        use_cache: false,
+        use_cache: (window as any).use_cache ?? true,
       },
     });
   };
@@ -1070,25 +1069,27 @@ export const usePanelDataLoader = (
 
               state.metadata.queries[panelQueryIndex] = metadata;
 
-              // await getDataThroughPartitions(
-              //   query,
-              //   metadata,
-              //   it,
-              //   startISOTimestamp,
-              //   endISOTimestamp,
-              //   pageType,
-              //   abortControllerRef,
-              // );
-
-              await getDataThroughWebSocket(
-                query,
-                it,
-                startISOTimestamp,
-                endISOTimestamp,
-                pageType,
-                abortControllerRef,
-                panelQueryIndex,
-              );
+              if ((window as any).use_web_socket) {
+                await getDataThroughWebSocket(
+                  query,
+                  it,
+                  startISOTimestamp,
+                  endISOTimestamp,
+                  pageType,
+                  abortControllerRef,
+                  panelQueryIndex,
+                );
+              } else {
+                await getDataThroughPartitions(
+                  query,
+                  metadata,
+                  it,
+                  startISOTimestamp,
+                  endISOTimestamp,
+                  pageType,
+                  abortControllerRef,
+                );
+              }
             }
           }
 
