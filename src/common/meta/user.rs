@@ -216,11 +216,10 @@ pub enum UserRole {
 
 impl Default for UserRole {
     fn default() -> Self {
-        if cfg!(feature = "enterprise") {
-            UserRole::User
-        } else {
-            UserRole::Admin
-        }
+        #[cfg(not(feature = "enterprise"))]
+        return UserRole::Admin;
+        #[cfg(feature = "enterprise")]
+        return UserRole::User;
     }
 }
 

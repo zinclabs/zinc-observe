@@ -776,7 +776,8 @@ pub(crate) async fn check_permissions(
 pub(crate) async fn check_permissions(
     _user_id: &str,
     _auth_info: AuthExtractor,
-    _role: Option<UserRole>,
+    _role: UserRole,
+    _is_external: bool,
 ) -> bool {
     true
 }
