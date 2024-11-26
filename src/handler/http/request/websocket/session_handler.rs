@@ -28,6 +28,8 @@ use infra::errors::Error;
 use proto::cluster_rpc::SearchQuery;
 use rand::prelude::SliceRandom;
 use tracing::Instrument;
+#[allow(unused_imports)]
+use crate::handler::http::request::websocket::utils::enterprise_utils;
 
 use crate::{
     common::meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
@@ -247,7 +249,6 @@ impl SessionHandler {
 
         // Check permissions for each stream
         #[cfg(feature = "enterprise")]
-        use crate::handler::http::request::websocket::utils::enterprise_utils;
         for stream_name in stream_names {
             if let Err(e) =
                 enterprise_utils::check_permissions(&stream_name, stream_type, &user_id, &org_id)
