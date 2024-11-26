@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use config::{
-    meta::{cluster::NodeInfo, stream::FileKey},
+    meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey},
     utils::json,
 };
 use hashbrown::HashMap;
@@ -22,6 +22,7 @@ pub struct RemoteScanNodes {
     pub equal_keys: HashMap<String, Vec<KvItem>>,
     pub match_all_keys: Vec<String>,
     pub index_condition: Option<IndexCondition>,
+    pub index_optimize_mode: Option<InvertedIndexOptimizeMode>,
     pub is_leader: bool, // for super cluster
     pub opentelemetry_context: opentelemetry::Context,
 }
@@ -36,6 +37,7 @@ impl RemoteScanNodes {
         equal_keys: HashMap<String, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
+        index_optimize_mode: Option<InvertedIndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -47,6 +49,7 @@ impl RemoteScanNodes {
             equal_keys,
             match_all_keys,
             index_condition,
+            index_optimize_mode,
             is_leader,
             opentelemetry_context,
         }
@@ -84,6 +87,7 @@ impl RemoteScanNodes {
             index_condition,
             equal_keys: self.equal_keys.get(table_name).unwrap_or(&vec![]).clone(),
             match_all_keys: self.match_all_keys.clone(),
+            index_optimize_mode: self.index_optimize_mode.map(|x| x.into()),
         };
 
         let super_cluster_info = SuperClusterInfo {

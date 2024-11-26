@@ -46,10 +46,11 @@ message SearchInfo {
 }
 
 message IndexInfo {
-    bool               use_inverted_index = 1;
-    string                index_condition = 2; 
-    repeated KvItem            equal_keys = 3; 
-    repeated string        match_all_keys = 4;
+    bool                   use_inverted_index = 1;
+    string                    index_condition = 2; 
+    repeated KvItem                equal_keys = 3; 
+    repeated string            match_all_keys = 4;
+    IdxOptimizeMode       index_optimize_mode = 5;
 }
 
 message SuperClusterInfo {
@@ -58,6 +59,20 @@ message SuperClusterInfo {
     optional string            work_group = 3; 
     optional string     search_event_type = 4; // use for super cluster
 }
+
+message IdxOptimizeMode {
+  oneof mode {
+    SimpleSelect simple_select = 1;
+    SimpleCount   simple_count = 2;
+  }
+}
+
+message SimpleSelect {
+  uint32 index = 1;
+  bool     asc = 2;
+}
+
+message SimpleCount {}
 
 message KvItem {
     string   key = 1;

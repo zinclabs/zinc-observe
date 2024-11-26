@@ -2519,6 +2519,8 @@ pub struct IndexInfo {
     pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
     #[prost(string, repeated, tag = "4")]
     pub match_all_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(message, optional, tag = "5")]
+    pub index_optimize_mode: ::core::option::Option<IdxOptimizeMode>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -2533,6 +2535,34 @@ pub struct SuperClusterInfo {
     #[prost(string, optional, tag = "4")]
     pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IdxOptimizeMode {
+    #[prost(oneof = "idx_optimize_mode::Mode", tags = "1, 2")]
+    pub mode: ::core::option::Option<idx_optimize_mode::Mode>,
+}
+/// Nested message and enum types in `IdxOptimizeMode`.
+pub mod idx_optimize_mode {
+    #[allow(clippy::derive_partial_eq_without_eq)]
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Mode {
+        #[prost(message, tag = "1")]
+        SimpleSelect(super::SimpleSelect),
+        #[prost(message, tag = "2")]
+        SimpleCount(super::SimpleCount),
+    }
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleSelect {
+    #[prost(uint32, tag = "1")]
+    pub index: u32,
+    #[prost(bool, tag = "2")]
+    pub asc: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SimpleCount {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KvItem {

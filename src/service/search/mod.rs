@@ -95,6 +95,186 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .unwrap()
 });
 
+#[tracing::instrument(name = "service:search:enter", skip_all)]
+pub async fn search(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    user_id: Option<String>,
+    in_req: &search::Request,
+) -> Result<search::Response, Error> {
+    let start = std::time::Instant::now();
+    let started_at = chrono::Utc::now().timestamp_micros();
+    let cfg = get_config();
+
+    let trace_id = if trace_id.is_empty() {
+        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
+            let ctx = tracing::Span::current().context();
+            ctx.span().span_context().trace_id().to_string()
+        } else {
+            ider::uuid()
+        }
+    } else {
+        trace_id.to_string()
+    };
+
+    #[cfg(feature = "enterprise")]
+    {
+        let sql = Some(in_req.query.sql.clone());
+        let start_time = Some(in_req.query.start_time);
+        let end_time = Some(in_req.query.end_time);
+        let s_event_type = in_req
+            .search_type
+            .map(|s_event_type| s_event_type.to_string());
+        // set search task
+        SEARCH_SERVER
+            .insert(
+                trace_id.clone(),
+                TaskStatus::new_leader(
+                    vec![],
+                    true,
+                    user_id.clone(),
+                    Some(org_id.to_string()),
+                    Some(stream_type.to_string()),
+                    sql,
+                    start_time,
+                    end_time,
+                    s_event_type,
+                ),
+            )
+            .await;
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    let req_regions = vec![];
+    #[cfg(not(feature = "enterprise"))]
+    let req_clusters = vec![];
+    #[cfg(feature = "enterprise")]
+    let req_regions = in_req.regions.clone();
+    #[cfg(feature = "enterprise")]
+    let req_clusters = in_req.clusters.clone();
+
+    let query: SearchQuery = in_req.query.clone().into();
+    let req_query = query.clone();
+    let request = crate::service::search::request::Request::new(
+        trace_id.clone(),
+        org_id.to_string(),
+        stream_type,
+        in_req.timeout,
+        user_id.clone(),
+        Some((query.start_time, query.end_time)),
+        in_req.search_type.map(|v| v.to_string()),
+    );
+
+    let span = tracing::span::Span::current();
+    let handle = tokio::task::spawn(
+        async move { cluster::http::search(request, query, req_regions, req_clusters).await }
+            .instrument(span),
+    );
+    let res = match handle.await {
+        Ok(Ok(res)) => Ok(res),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(Error::Message(e.to_string())),
+    };
+    log::info!("[trace_id {trace_id}] in leader task finish");
+
+    // remove task because task if finished
+    let mut _work_group = None;
+    #[cfg(feature = "enterprise")]
+    {
+        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await {
+            if let Some((_, stat)) = status.first() {
+                match stat.work_group.as_ref() {
+                    Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
+                    Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
+                    None => _work_group = None,
+                }
+            }
+        };
+    }
+
+    metrics::QUERY_RUNNING_NUMS
+        .with_label_values(&[org_id])
+        .dec();
+
+    // do this because of clippy warning
+    match res {
+        Ok(mut res) => {
+            res.set_work_group(_work_group.clone());
+            let time = start.elapsed().as_secs_f64();
+            let (report_usage, search_type, search_event_context) = match in_req.search_type {
+                Some(search_type) => {
+                    if matches!(
+                        search_type,
+                        search::SearchEventType::UI
+                            | search::SearchEventType::Values
+                            | search::SearchEventType::Other
+                    ) {
+                        (false, None, None)
+                    } else {
+                        (
+                            true,
+                            in_req.search_type,
+                            in_req.search_event_context.clone(),
+                        )
+                    }
+                }
+                None => (false, None, None),
+            };
+
+            if report_usage {
+                let stream_name = match config::meta::sql::Sql::new(&req_query.sql) {
+                    Ok(v) => v.source.to_string(),
+                    Err(e) => {
+                        log::error!("report_usage: parse sql error: {:?}", e);
+                        "".to_string()
+                    }
+                };
+                let req_stats = RequestStats {
+                    records: res.hits.len() as i64,
+                    response_time: time,
+                    size: res.scan_size as f64,
+                    request_body: Some(req_query.sql.clone()),
+                    function: if req_query.query_fn.is_empty() {
+                        None
+                    } else {
+                        Some(req_query.query_fn.clone())
+                    },
+                    user_email: user_id,
+                    min_ts: Some(req_query.start_time),
+                    max_ts: Some(req_query.end_time),
+                    cached_ratio: Some(res.cached_ratio),
+                    search_type,
+                    search_event_context,
+                    trace_id: Some(trace_id),
+                    took_wait_in_queue: if res.took_detail.is_some() {
+                        let resp_took = res.took_detail.as_ref().unwrap();
+                        // Consider only the cluster wait queue duration
+                        Some(resp_took.cluster_wait_queue)
+                    } else {
+                        None
+                    },
+                    work_group: _work_group,
+                    ..Default::default()
+                };
+                let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
+                report_request_usage_stats(
+                    req_stats,
+                    org_id,
+                    &stream_name,
+                    StreamType::Logs,
+                    UsageType::Search,
+                    num_fn,
+                    started_at,
+                )
+                .await;
+            }
+            Ok(res)
+        }
+        Err(e) => Err(e),
+    }
+}
+
 /// Returns Error if the first query is failed, otherwise returns the partial results.
 /// In case one query fails, the remaining queries are not executed.
 #[tracing::instrument(name = "service:search_multi:enter", skip(multi_req))]
@@ -351,186 +531,6 @@ pub async fn search_multi(
         .await;
     }
     Ok(multi_res)
-}
-
-#[tracing::instrument(name = "service:search:enter", skip_all)]
-pub async fn search(
-    trace_id: &str,
-    org_id: &str,
-    stream_type: StreamType,
-    user_id: Option<String>,
-    in_req: &search::Request,
-) -> Result<search::Response, Error> {
-    let start = std::time::Instant::now();
-    let started_at = chrono::Utc::now().timestamp_micros();
-    let cfg = get_config();
-
-    let trace_id = if trace_id.is_empty() {
-        if cfg.common.tracing_enabled || cfg.common.tracing_search_enabled {
-            let ctx = tracing::Span::current().context();
-            ctx.span().span_context().trace_id().to_string()
-        } else {
-            ider::uuid()
-        }
-    } else {
-        trace_id.to_string()
-    };
-
-    #[cfg(feature = "enterprise")]
-    {
-        let sql = Some(in_req.query.sql.clone());
-        let start_time = Some(in_req.query.start_time);
-        let end_time = Some(in_req.query.end_time);
-        let s_event_type = in_req
-            .search_type
-            .map(|s_event_type| s_event_type.to_string());
-        // set search task
-        SEARCH_SERVER
-            .insert(
-                trace_id.clone(),
-                TaskStatus::new_leader(
-                    vec![],
-                    true,
-                    user_id.clone(),
-                    Some(org_id.to_string()),
-                    Some(stream_type.to_string()),
-                    sql,
-                    start_time,
-                    end_time,
-                    s_event_type,
-                ),
-            )
-            .await;
-    }
-
-    #[cfg(not(feature = "enterprise"))]
-    let req_regions = vec![];
-    #[cfg(not(feature = "enterprise"))]
-    let req_clusters = vec![];
-    #[cfg(feature = "enterprise")]
-    let req_regions = in_req.regions.clone();
-    #[cfg(feature = "enterprise")]
-    let req_clusters = in_req.clusters.clone();
-
-    let query: SearchQuery = in_req.query.clone().into();
-    let req_query = query.clone();
-    let request = crate::service::search::request::Request::new(
-        trace_id.clone(),
-        org_id.to_string(),
-        stream_type,
-        in_req.timeout,
-        user_id.clone(),
-        Some((query.start_time, query.end_time)),
-        in_req.search_type.map(|v| v.to_string()),
-    );
-
-    let span = tracing::span::Span::current();
-    let handle = tokio::task::spawn(
-        async move { cluster::http::search(request, query, req_regions, req_clusters).await }
-            .instrument(span),
-    );
-    let res = match handle.await {
-        Ok(Ok(res)) => Ok(res),
-        Ok(Err(e)) => Err(e),
-        Err(e) => Err(Error::Message(e.to_string())),
-    };
-    log::info!("[trace_id {trace_id}] in leader task finish");
-
-    // remove task because task if finished
-    let mut _work_group = None;
-    #[cfg(feature = "enterprise")]
-    {
-        if let Some(status) = SEARCH_SERVER.remove(&trace_id, false).await {
-            if let Some((_, stat)) = status.first() {
-                match stat.work_group.as_ref() {
-                    Some(WorkGroup::Short) => _work_group = Some("short".to_string()),
-                    Some(WorkGroup::Long) => _work_group = Some("long".to_string()),
-                    None => _work_group = None,
-                }
-            }
-        };
-    }
-
-    metrics::QUERY_RUNNING_NUMS
-        .with_label_values(&[org_id])
-        .dec();
-
-    // do this because of clippy warning
-    match res {
-        Ok(mut res) => {
-            res.set_work_group(_work_group.clone());
-            let time = start.elapsed().as_secs_f64();
-            let (report_usage, search_type, search_event_context) = match in_req.search_type {
-                Some(search_type) => {
-                    if matches!(
-                        search_type,
-                        search::SearchEventType::UI
-                            | search::SearchEventType::Values
-                            | search::SearchEventType::Other
-                    ) {
-                        (false, None, None)
-                    } else {
-                        (
-                            true,
-                            in_req.search_type,
-                            in_req.search_event_context.clone(),
-                        )
-                    }
-                }
-                None => (false, None, None),
-            };
-
-            if report_usage {
-                let stream_name = match config::meta::sql::Sql::new(&req_query.sql) {
-                    Ok(v) => v.source.to_string(),
-                    Err(e) => {
-                        log::error!("report_usage: parse sql error: {:?}", e);
-                        "".to_string()
-                    }
-                };
-                let req_stats = RequestStats {
-                    records: res.hits.len() as i64,
-                    response_time: time,
-                    size: res.scan_size as f64,
-                    request_body: Some(req_query.sql.clone()),
-                    function: if req_query.query_fn.is_empty() {
-                        None
-                    } else {
-                        Some(req_query.query_fn.clone())
-                    },
-                    user_email: user_id,
-                    min_ts: Some(req_query.start_time),
-                    max_ts: Some(req_query.end_time),
-                    cached_ratio: Some(res.cached_ratio),
-                    search_type,
-                    search_event_context,
-                    trace_id: Some(trace_id),
-                    took_wait_in_queue: if res.took_detail.is_some() {
-                        let resp_took = res.took_detail.as_ref().unwrap();
-                        // Consider only the cluster wait queue duration
-                        Some(resp_took.cluster_wait_queue)
-                    } else {
-                        None
-                    },
-                    work_group: _work_group,
-                    ..Default::default()
-                };
-                let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
-                report_request_usage_stats(
-                    req_stats,
-                    org_id,
-                    &stream_name,
-                    StreamType::Logs,
-                    UsageType::Search,
-                    num_fn,
-                    started_at,
-                )
-                .await;
-            }
-            Ok(res)
-        }
-        Err(e) => Err(e),
-    }
 }
 
 #[tracing::instrument(name = "service:search_partition", skip(req))]

@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::NodeInfo, stream::FileKey};
+use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
 use datafusion::{
     common::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
@@ -45,6 +45,7 @@ impl RemoteScanRewriter {
         equal_keys: HashMap<String, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
+        index_optimizer_mode: Option<InvertedIndexOptimizeMode>,
         is_leader: bool,
         opentelemetry_context: opentelemetry::Context,
     ) -> Self {
@@ -57,6 +58,7 @@ impl RemoteScanRewriter {
                 equal_keys,
                 match_all_keys,
                 index_condition,
+                index_optimizer_mode,
                 is_leader,
                 opentelemetry_context,
             ),

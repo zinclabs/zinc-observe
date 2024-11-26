@@ -20,6 +20,7 @@ use chrono::Duration;
 use config::{
     get_config,
     meta::{
+        inverted_index::InvertedIndexOptimizeMode,
         sql::{resolve_stream_names, OrderBy, Sql as MetaSql},
         stream::StreamType,
     },
@@ -39,7 +40,6 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::SearchQuery;
 use regex::Regex;
-use serde::Serialize;
 use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
@@ -63,7 +63,7 @@ pub static RE_WHERE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i) where (.*)").u
 pub static RE_HISTOGRAM: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)histogram\(([^\)]*)\)").unwrap());
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
 pub struct Sql {
     pub sql: String,
     pub org_id: String,
@@ -84,6 +84,7 @@ pub struct Sql {
     pub sorted_by_time: bool,     // if only order by _timestamp
     pub use_inverted_index: bool, // if can use inverted index
     pub index_condition: Option<IndexCondition>, // use for tantivy index
+    pub index_optimize_mode: Option<InvertedIndexOptimizeMode>,
 }
 
 impl Sql {
@@ -204,7 +205,7 @@ impl Sql {
             HistogramIntervalVistor::new(Some((query.start_time, query.end_time)));
         statement.visit(&mut histogram_interval_visitor);
 
-        // NOTE: only this place can modify the sql
+        // NOTE: only this place modify the sql
         // 10. add _timestamp and _o2_id if need
         if !is_complex_query(&mut statement) {
             let mut add_timestamp_visitor = AddTimestampVisitor::new();
@@ -215,8 +216,10 @@ impl Sql {
             }
         }
 
+        // NOTE: only this place modify the sql
         // 11. generate tantivy query
         let mut index_condition = None;
+        let mut can_optimize = false;
         if get_config()
             .common
             .inverted_index_search_format
@@ -229,6 +232,20 @@ impl Sql {
             let mut index_visitor = IndexVisitor::new(&used_schemas, is_remove_filter);
             statement.visit(&mut index_visitor);
             index_condition = index_visitor.index_condition;
+            can_optimize = index_visitor.can_optimize;
+        }
+
+        // 12. get index optimizer rule
+        let mut index_optimize_mode = None;
+        if !is_complex_query(&mut statement)
+            && order_by.len() == 1
+            && order_by[0].0 == get_config().common.column_timestamp
+            && can_optimize
+        {
+            index_optimize_mode = Some(InvertedIndexOptimizeMode::SimpleSelect(
+                (offset + limit) as usize,
+                order_by[0].1 == OrderBy::Asc,
+            ));
         }
 
         Ok(Sql {
@@ -251,6 +268,7 @@ impl Sql {
             sorted_by_time: need_sort_by_time,
             use_inverted_index,
             index_condition,
+            index_optimize_mode,
         })
     }
 }
@@ -542,6 +560,7 @@ struct IndexVisitor {
     index_fields: HashSet<String>,
     is_remove_filter: bool,
     index_condition: Option<IndexCondition>,
+    pub can_optimize: bool,
 }
 
 impl IndexVisitor {
@@ -557,6 +576,7 @@ impl IndexVisitor {
             index_fields,
             is_remove_filter,
             index_condition: None,
+            can_optimize: false,
         }
     }
 
@@ -566,6 +586,7 @@ impl IndexVisitor {
             index_fields,
             is_remove_filter,
             index_condition: None,
+            can_optimize: false,
         }
     }
 }
@@ -578,6 +599,9 @@ impl VisitorMut for IndexVisitor {
             if let Some(expr) = select.selection.as_mut() {
                 let (index, other_expr) = get_index_condition_from_expr(&self.index_fields, expr);
                 self.index_condition = index;
+                if other_expr.is_none() {
+                    self.can_optimize = true;
+                }
                 if self.is_remove_filter {
                     select.selection = other_expr;
                 }

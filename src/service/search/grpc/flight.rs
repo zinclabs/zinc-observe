@@ -24,6 +24,7 @@ use config::{
     get_config,
     meta::{
         bitvec::BitVec,
+        inverted_index::InvertedIndexOptimizeMode,
         search::ScanStats,
         stream::{FileKey, StreamPartition, StreamType},
     },
@@ -100,6 +101,14 @@ pub async fn search(
         .downcast_ref::<NewEmptyExec>()
         .unwrap();
 
+    // here need reset the option because when init ctx we don't know this information
+    if empty_exec.sorted_by_time() {
+        ctx.state_ref().write().config_mut().options_mut().set(
+            "datafusion.execution.split_file_groups_by_statistics",
+            "true",
+        )?;
+    }
+
     // get stream name
     let stream_name = empty_exec.name();
 
@@ -166,6 +175,9 @@ pub async fn search(
         use_inverted_index: req.index_info.use_inverted_index,
     });
 
+    let idx_optimze_rule: Option<InvertedIndexOptimizeMode> =
+        req.index_info.index_optimize_mode.clone().map(|x| x.into());
+
     // get all tables
     let mut tables = Vec::new();
     let mut scan_stats = ScanStats::new();
@@ -203,6 +215,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
+            idx_optimze_rule,
         )
         .await
         {

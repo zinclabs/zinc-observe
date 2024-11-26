@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use anyhow::Context;
 use arrow_schema::Schema;
@@ -21,7 +21,7 @@ use config::{
     get_config, is_local_disk_storage,
     meta::{
         bitvec::BitVec,
-        inverted_index::InvertedIndexTantivyMode,
+        inverted_index::{InvertedIndexOptimizeMode, InvertedIndexTantivyMode},
         search::{ScanStats, StorageType},
         stream::FileKey,
     },
@@ -70,6 +70,7 @@ pub async fn search(
     file_stat_cache: Option<FileStatisticsCache>,
     mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
+    idx_optimze_rule: Option<InvertedIndexOptimizeMode>,
 ) -> super::SearchTable {
     let enter_span = tracing::span::Span::current();
     log::info!("[trace_id {}] search->storage: enter", query.trace_id);
@@ -133,9 +134,13 @@ pub async fn search(
     let mut idx_took = 0;
     let mut is_add_filter_back = false;
     if use_inverted_index {
-        (idx_took, is_add_filter_back) =
-            filter_file_list_by_tantivy_index(query.clone(), &mut files, index_condition.clone())
-                .await?;
+        (idx_took, is_add_filter_back) = filter_file_list_by_tantivy_index(
+            query.clone(),
+            &mut files,
+            index_condition.clone(),
+            idx_optimze_rule,
+        )
+        .await?;
         log::info!(
             "[trace_id {}] search->storage: stream {}/{}/{}, {} inverted index reduced file_list num to {} in {} ms",
             query.trace_id,
@@ -421,6 +426,7 @@ async fn filter_file_list_by_tantivy_index(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
     index_condition: Option<IndexCondition>,
+    idx_optimze_rule: Option<InvertedIndexOptimizeMode>,
 ) -> Result<(usize, bool), Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -437,7 +443,7 @@ async fn filter_file_list_by_tantivy_index(
             scan_stats.compressed_size += f.meta.index_size;
             if f.meta.index_size > 0 {
                 convert_parquet_idx_file_name_to_tantivy_file(&f.key)
-                    .map(|v| (f.key.clone(), v, f.meta.records))
+                    .map(|ttv_file| (ttv_file, f.clone()))
             } else {
                 None
             }
@@ -448,7 +454,7 @@ async fn filter_file_list_by_tantivy_index(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(_parquet_file, ttv_file, _)| ttv_file.as_str())
+            .map(|(ttv_file, _)| ttv_file.as_str())
             .collect_vec(),
         &mut scan_stats,
     )
@@ -467,74 +473,125 @@ async fn filter_file_list_by_tantivy_index(
         start.elapsed().as_millis()
     );
 
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
-    let mut tasks = Vec::new();
+    let time_range = query.time_range.unwrap_or((0, 0));
+    let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
+    let mut index_parquet_files = group_files_by_time_range(index_parquet_files, cfg.limit.cpu_num);
+    let query_limit =
+        if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimze_rule {
+            limit
+        } else {
+            0
+        };
 
-    for (parquet_file, _ttv_file, records) in index_file_names {
-        let file = parquet_file;
-        let file_size = file_list_map.get(&file).unwrap().meta.index_size as usize;
-        let trace_id = query.trace_id.to_string();
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        // Spawn a task for each file, wherein full text search and
-        // secondary index search queries are executed
-        let index_condition_clone = index_condition.clone();
-        let task = tokio::task::spawn(async move {
-            let res =
-                search_tantivy_index(&trace_id, &file, index_condition_clone, records, file_size)
-                    .await;
-            drop(permit);
-            res
-        });
-        tasks.push(task)
-    }
-
+    let mut no_more_files = false;
     let mut total_hits = 0;
     let mut is_add_filter_back = false;
-    for result in try_join_all(tasks)
-        .await
-        .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?
-    {
-        let result: anyhow::Result<(String, Option<BitVec>)> = result;
-        // Each result corresponds to a file in the file list
-        match result {
-            Ok((file_name, bitvec)) => {
-                if let Some(res) = bitvec {
-                    // Replace the segment IDs in the existing `FileKey` with the new found segments
-                    let file = file_list_map
+    let group_num = index_parquet_files.len();
+    let max_group_len = index_parquet_files
+        .iter()
+        .map(|g| g.len())
+        .max()
+        .unwrap_or(0);
+    for _ in 0..max_group_len {
+        if no_more_files {
+            // delete the rest of the files
+            for i in 0..group_num {
+                let Some(file) = index_parquet_files.get_mut(i).and_then(|g| {
+                    if g.is_empty() {
+                        None
+                    } else {
+                        Some(g.remove(g.len() - 1))
+                    }
+                }) else {
+                    continue;
+                };
+                file_list_map.remove(&file.key);
+            }
+            continue;
+        }
+
+        // Spawn a task for each group of files get row_id from index
+        let mut tasks = Vec::new();
+        for i in 0..group_num {
+            let Some(file) = index_parquet_files.get_mut(i).and_then(|g| {
+                if g.is_empty() {
+                    None
+                } else {
+                    Some(g.remove(g.len() - 1))
+                }
+            }) else {
+                continue;
+            };
+            let trace_id = query.trace_id.to_string();
+            // Spawn a task for each file, wherein full text search and
+            // secondary index search queries are executed
+            let index_condition_clone = index_condition.clone();
+            let task = tokio::task::spawn(async move {
+                search_tantivy_index(
+                    &trace_id,
+                    time_range,
+                    index_condition_clone,
+                    idx_optimze_rule,
+                    &file,
+                )
+                .await
+            });
+            tasks.push(task)
+        }
+
+        // Wait for all tasks to complete
+        for result in try_join_all(tasks)
+            .await
+            .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?
+        {
+            let result: anyhow::Result<(String, Option<BitVec>)> = result;
+            // Each result corresponds to a file in the file list
+            match result {
+                Ok((file_name, bitvec)) => {
+                    if let Some(res) = bitvec {
+                        // Replace the segment IDs in the existing `FileKey` with the new found
+                        // segments
+                        let file = file_list_map
                         .get_mut(&file_name)
                         // we expect each file name has atleast 1 file
                         .unwrap();
-                    let hits_per_file = res.count_ones();
-                    total_hits += hits_per_file;
-                    file.with_segment_ids(res);
-                    log::debug!(
+                        let hits_per_file = res.count_ones();
+                        total_hits += hits_per_file;
+                        file.with_segment_ids(res);
+                        log::debug!(
                         "[trace_id {}] search->storage: hits for index_condition: {:?} found {} in {}",
                         query.trace_id,
                         index_condition,
                         hits_per_file,
                         file_name
                     );
-                } else {
-                    // if the bitmap is empty then we remove the file from the list
-                    log::debug!(
-                        "[trace_id {}] search->storage: no match found in index for file {}",
-                        query.trace_id,
-                        file_name
-                    );
-                    file_list_map.remove(&file_name);
+                    } else {
+                        // if the bitmap is empty then we remove the file from the list
+                        log::debug!(
+                            "[trace_id {}] search->storage: no match found in index for file {}",
+                            query.trace_id,
+                            file_name
+                        );
+                        file_list_map.remove(&file_name);
+                    }
                 }
-            }
-            Err(e) => {
-                log::warn!(
+                Err(e) => {
+                    log::warn!(
                     "[trace_id {}] search->storage: error filtering file via FST index. Keep file to search. error: {}",
                     query.trace_id,
                     e.to_string()
                 );
-                is_add_filter_back = true;
-                continue;
+                    is_add_filter_back = true;
+                    continue;
+                }
             }
         }
+        // if limit is set and total hits exceed the limit, we stop searching
+        if query_limit > 0 && total_hits > query_limit {
+            no_more_files = true;
+        }
     }
+
     log::info!(
         "[trace_id {}] search->storage: total hits for index_condition: {:?} found {}",
         query.trace_id,
@@ -548,12 +605,12 @@ async fn filter_file_list_by_tantivy_index(
 pub async fn get_tantivy_directory(
     _trace_id: &str,
     file_name: &str,
-    file_size: usize,
+    file_size: i64,
 ) -> anyhow::Result<PuffinDirReader> {
     let source = object_store::ObjectMeta {
         location: file_name.into(),
         last_modified: *BASE_TIME,
-        size: file_size,
+        size: file_size as usize,
         e_tag: None,
         version: None,
     };
@@ -562,16 +619,16 @@ pub async fn get_tantivy_directory(
 
 async fn search_tantivy_index(
     trace_id: &str,
-    parquet_file_name: &str,
+    time_range: (i64, i64),
     index_condition: Option<IndexCondition>,
-    records: i64,
-    file_size: usize,
+    idx_optimze_rule: Option<InvertedIndexOptimizeMode>,
+    parquet_file: &FileKey,
 ) -> anyhow::Result<(String, Option<BitVec>)> {
-    let Some(ttv_file_name) = convert_parquet_idx_file_name_to_tantivy_file(parquet_file_name)
+    let Some(ttv_file_name) = convert_parquet_idx_file_name_to_tantivy_file(&parquet_file.key)
     else {
         return Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Unable to find tantivy index files for parquet file {}",
-            parquet_file_name
+            parquet_file.key.clone()
         ));
     };
 
@@ -595,14 +652,20 @@ async fn search_tantivy_index(
                     ttv_file_name.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER)
                 );
                 if !is_exists(&puffin_dir_path) {
-                    let read_dir =
-                        get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?;
+                    let read_dir = get_tantivy_directory(
+                        trace_id,
+                        &ttv_file_name,
+                        parquet_file.meta.index_size,
+                    )
+                    .await?;
                     let _ = convert_puffin_file_to_tantivy_dir(read_dir, &puffin_dir_path).await?;
                 }
                 Box::new(tantivy::directory::MmapDirectory::open(&puffin_dir_path)?)
             } else {
-                let puffin_dir =
-                    Arc::new(get_tantivy_directory(trace_id, &ttv_file_name, file_size).await?);
+                let puffin_dir = Arc::new(
+                    get_tantivy_directory(trace_id, &ttv_file_name, parquet_file.meta.index_size)
+                        .await?,
+                );
                 let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
                 let cache_dir =
                     CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
@@ -655,14 +718,40 @@ async fn search_tantivy_index(
     }
 
     // search the index
-    let matched_docs = tokio::task::spawn_blocking(move || {
-        tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)
-    })
-    .await??;
+    let file_in_range =
+        parquet_file.meta.min_ts <= time_range.1 && parquet_file.meta.max_ts >= time_range.0;
+    let matched_docs =
+        tokio::task::spawn_blocking(move || match (file_in_range, idx_optimze_rule) {
+            (false, _) | (true, None) => {
+                tantivy_searcher.search(&query, &tantivy::collector::DocSetCollector)
+            }
+            (true, Some(InvertedIndexOptimizeMode::SimpleSelect(limit, ascend))) => {
+                tantivy_searcher
+                    .search(
+                        &query,
+                        &tantivy::collector::TopDocs::with_limit(limit).tweak_score(
+                            move |_segment_reader: &tantivy::SegmentReader| {
+                                move |doc_id: tantivy::DocId, _original_score: tantivy::Score| {
+                                    if ascend {
+                                        doc_id as i64
+                                    } else {
+                                        -(doc_id as i64)
+                                    }
+                                }
+                            },
+                        ),
+                    )
+                    .map(|ret| ret.into_iter().map(|(_, doc)| doc).collect::<HashSet<_>>())
+            }
+            (true, Some(InvertedIndexOptimizeMode::SimpleCount)) => {
+                todo!("SimpleCount not implemented yet")
+            }
+        })
+        .await??;
 
     // return early if no matches in tantivy
     if matched_docs.is_empty() {
-        return Ok((parquet_file_name.to_string(), None));
+        return Ok((parquet_file.key.to_string(), None));
     }
 
     // Prepare a vec of segment offsets
@@ -670,18 +759,197 @@ async fn search_tantivy_index(
     let seg_metas = tantivy_index
         .searchable_segment_metas()
         .context("Count segments")?;
-    let mut res = BitVec::with_capacity(records as usize + 1);
-    // rewrite the empty bitvec
-    res.resize((records + 1) as usize, false);
+    let mut res = BitVec::repeat(false, parquet_file.meta.records as usize);
     // Return early if there is only one segment
     if seg_metas.len() == 1 {
         for doc in matched_docs {
             res.set(doc.doc_id as usize, true);
         }
-        Ok((parquet_file_name.to_string(), Some(res)))
+        Ok((parquet_file.key.to_string(), Some(res)))
     } else {
         Err(anyhow::anyhow!(
             "[trace_id {trace_id}] search->storage: Multiple segments in tantivy index not supported"
         ))
+    }
+}
+
+// Group files by time range
+// use the min_ts & max_ts of the file.meta to group files and each group can't contains crossing
+// time range files
+fn group_files_by_time_range(mut files: Vec<FileKey>, partition_num: usize) -> Vec<Vec<FileKey>> {
+    // sort files by max_ts in ascending order
+    files.sort_unstable_by(|a, b| a.meta.max_ts.cmp(&b.meta.max_ts));
+    // group by time range
+    let mut file_groups_indices: Vec<Vec<FileKey>> = vec![];
+    for file in files {
+        let file_group_to_insert = file_groups_indices.iter_mut().find(|group| {
+            file.meta.min_ts
+                > group
+                    .last()
+                    .expect("groups should be nonempty at construction")
+                    .meta
+                    .max_ts
+        });
+        match file_group_to_insert {
+            Some(group) => group.push(file),
+            None => file_groups_indices.push(vec![file]),
+        }
+    }
+    // regroup if the number of groups is less than expect partitions
+    if file_groups_indices.len() >= partition_num {
+        file_groups_indices
+    } else {
+        repartition_sorted_groups(file_groups_indices, partition_num)
+    }
+}
+
+// 1. first get larger group
+// 2. split larger groups based on odd and even numbers
+// 3. loop until the group reaches the number of partitions
+fn repartition_sorted_groups(
+    mut groups: Vec<Vec<FileKey>>,
+    partition_num: usize,
+) -> Vec<Vec<FileKey>> {
+    if groups.is_empty() {
+        return groups;
+    }
+
+    while groups.len() < partition_num {
+        let max_index = find_max_group_index(&groups);
+        let max_group = groups.remove(max_index);
+
+        // if the max group has less than 1 files, we don't split it further
+        if max_group.len() <= 1 {
+            groups.push(max_group);
+            break;
+        }
+
+        // split max_group into odd and even groups
+        let group_cap = (max_group.len() + 1) / 2;
+        let mut odd_group = Vec::with_capacity(group_cap);
+        let mut even_group = Vec::with_capacity(group_cap);
+
+        for (idx, file) in max_group.into_iter().enumerate() {
+            if idx % 2 == 0 {
+                even_group.push(file);
+            } else {
+                odd_group.push(file);
+            }
+        }
+
+        if !odd_group.is_empty() {
+            groups.push(odd_group);
+        }
+        if !even_group.is_empty() {
+            groups.push(even_group);
+        }
+    }
+
+    groups
+}
+
+// find the index of the group with the most files
+fn find_max_group_index(groups: &[Vec<FileKey>]) -> usize {
+    groups
+        .iter()
+        .enumerate()
+        .fold(0, |max_index, (idx, group)| {
+            if group.len() > groups[max_index].len() {
+                idx
+            } else {
+                max_index
+            }
+        })
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::FileMeta;
+
+    use super::*;
+
+    fn create_file_key(min_ts: i64, max_ts: i64) -> FileKey {
+        FileKey {
+            key: format!("file_{}_{}", min_ts, max_ts),
+            meta: FileMeta {
+                min_ts,
+                max_ts,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_group_files_by_time_range() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+            create_file_key(31, 40),
+            create_file_key(41, 50),
+        ];
+        let partition_num = 3;
+        let groups = group_files_by_time_range(files, partition_num);
+        assert_eq!(groups.len(), 3);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_with_overlap() {
+        let files = vec![
+            create_file_key(1, 10),
+            create_file_key(5, 15),
+            create_file_key(11, 20),
+            create_file_key(18, 30),
+            create_file_key(31, 40),
+            create_file_key(41, 50),
+        ];
+        let partition_num = 2;
+        let groups = group_files_by_time_range(files, partition_num);
+        assert_eq!(groups.len(), 2);
+    }
+
+    #[test]
+    fn test_group_files_by_time_range_with_less_partitions() {
+        let files = vec![create_file_key(1, 10), create_file_key(11, 20)];
+        let partition_num = 3;
+        let groups = group_files_by_time_range(files, partition_num);
+        assert_eq!(groups.len(), 2);
+    }
+
+    #[test]
+    fn test_repartition_sorted_groups() {
+        let groups = vec![
+            vec![create_file_key(1, 10), create_file_key(11, 20)],
+            vec![create_file_key(21, 30), create_file_key(31, 40)],
+        ];
+        let partition_num = 4;
+        let repartitioned_groups = repartition_sorted_groups(groups, partition_num);
+        assert_eq!(repartitioned_groups.len(), 4);
+    }
+
+    #[test]
+    fn test_repartition_sorted_groups_with_large_group() {
+        let groups = vec![vec![
+            create_file_key(1, 10),
+            create_file_key(11, 20),
+            create_file_key(21, 30),
+            create_file_key(31, 40),
+            create_file_key(41, 50),
+        ]];
+        let partition_num = 3;
+        let repartitioned_groups = repartition_sorted_groups(groups, partition_num);
+        assert_eq!(repartitioned_groups.len(), 3);
+    }
+
+    #[test]
+    fn test_find_max_group_index() {
+        let groups = vec![
+            vec![create_file_key(1, 10)],
+            vec![create_file_key(11, 20), create_file_key(21, 30)],
+            vec![create_file_key(31, 40)],
+        ];
+        let max_index = find_max_group_index(&groups);
+        assert_eq!(max_index, 1);
     }
 }
