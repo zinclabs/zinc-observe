@@ -223,6 +223,9 @@ const defaultObject = {
     customDownloadQueryObj: <any>{},
     functionError: "",
     searchRequestTraceIds: <string[]>[],
+    searchWebSocketRequestIdsAndTraceIds: <
+      { requestId: string; traceId: string }[]
+    >[],
     isOperationCancelled: false,
   },
 };
@@ -290,7 +293,11 @@ const useLogs = () => {
 
   const webSocket = useWebSocket();
 
-  const { fetchQueryDataWithWebSocket } = useSearchWebSocket();
+  const {
+    fetchQueryDataWithWebSocket,
+    sendSearchMessageBasedOnRequestId,
+    cancelSearchQueryBasedOnRequestId,
+  } = useSearchWebSocket();
 
   const { updateFieldKeywords } = useSqlSuggestions();
 
@@ -4035,6 +4042,20 @@ const useLogs = () => {
       );
   };
 
+  const addRequestId = (requestId: string, traceId: string) => {
+    searchObj.data.searchWebSocketRequestIdsAndTraceIds.push({
+      requestId,
+      traceId,
+    });
+  };
+
+  const removeRequestId = (requestId: string) => {
+    searchObj.data.searchWebSocketRequestIdsAndTraceIds =
+      searchObj.data.searchWebSocketRequestIdsAndTraceIds.filter(
+        (id) => id.requestId !== requestId,
+      );
+  };
+
   const cancelQuery = () => {
     if (searchObj.communicationMethod === "ws") {
       sendCancelSearchMessage();
@@ -4478,12 +4499,14 @@ const useLogs = () => {
         org_id: searchObj.organizationIdentifier,
       };
 
-      fetchQueryDataWithWebSocket(payload, {
+      const requestId = fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
         error: handleSearchError,
         message: handleSearchResponse,
       });
+
+      addRequestId(requestId, traceId);
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -4493,26 +4516,20 @@ const useLogs = () => {
     }
   };
 
-  const sendSearchMessage = (
-    requestId: string,
-    queryReq: SearchRequestPayload,
-  ) => {
+  const sendSearchMessage = (requestId: string, queryReq: any) => {
     try {
-      webSocket.sendMessage(
-        requestId,
-        JSON.stringify({
-          type: "search",
-          content: {
-            trace_id: queryReq.traceId,
-            payload: {
-              query: queryReq.queryReq.query,
-            },
-            stream_type: searchObj.data.stream.streamType,
-            search_type: "ui",
-            use_cache: (window as any).use_cache ?? true,
+      sendSearchMessageBasedOnRequestId(requestId, {
+        type: "search",
+        content: {
+          trace_id: queryReq.traceId,
+          payload: {
+            query: queryReq.queryReq.query,
           },
-        }),
-      );
+          stream_type: searchObj.data.stream.streamType,
+          search_type: "ui",
+          use_cache: (window as any).use_cache ?? true,
+        },
+      });
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -4552,7 +4569,7 @@ const useLogs = () => {
     }
 
     if (payload.type === "cancel") {
-      handleCancelSearchResponse(payload.traceId, response);
+      handleCancelSearchResponse(requestId, payload.traceId, response);
     }
   };
 
@@ -4825,12 +4842,14 @@ const useLogs = () => {
           org_id: searchObj.organizationIdentifier,
         };
 
-        fetchQueryDataWithWebSocket(payload, {
+        const requestId = fetchQueryDataWithWebSocket(payload, {
           open: sendSearchMessage,
           close: handleSearchClose,
           error: handleSearchError,
           message: handleSearchResponse,
         });
+
+        addRequestId(requestId, traceId);
       }
     } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
       resetHistogramWithError("Histogram is not available for limit queries.");
@@ -4880,6 +4899,9 @@ const useLogs = () => {
     response: any,
   ) => {
     if (payload.traceId) removeTraceId(payload.traceId);
+
+    if (requestId) removeRequestId(requestId);
+
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
 
@@ -4965,28 +4987,34 @@ const useLogs = () => {
       org_id: searchObj.organizationIdentifier,
     };
 
-    fetchQueryDataWithWebSocket(payload, {
+    const requestId = fetchQueryDataWithWebSocket(payload, {
       open: sendSearchMessage,
       close: handleSearchClose,
       error: handleSearchError,
       message: handleSearchResponse,
     });
+
+    addRequestId(requestId, traceId);
   };
 
   const sendCancelSearchMessage = () => {
     console.log("send cancel message through ws");
-    webSocket.sendMessage(
-      JSON.stringify({
-        type: "cancel",
-        content: {
-          trace_id: searchObj.data.searchRequestTraceIds[0],
-        },
-      }),
+
+    // loop on all requestIds
+    searchObj.data.searchWebSocketRequestIdsAndTraceIds.forEach(
+      ({ requestId, traceId }) => {
+        cancelSearchQueryBasedOnRequestId(requestId, traceId);
+      },
     );
   };
 
-  const handleCancelSearchResponse = (traceId: string, response: any) => {
+  const handleCancelSearchResponse = (
+    requestId: string,
+    traceId: string,
+    response: any,
+  ) => {
     removeTraceId(traceId);
+    removeRequestId(requestId);
 
     const isCancelled = response?.content?.some((item: any) => item.is_success);
     if (isCancelled) {
