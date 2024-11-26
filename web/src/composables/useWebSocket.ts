@@ -52,9 +52,14 @@ const onOpen = (socketId: string, event: Event) => {
 };
 
 const onMessage = (socketId: string, event: MessageEvent) => {
-  messageHandlers[socketId]?.forEach((handler) =>
-    handler(JSON.parse(event.data)),
-  );
+  const data = JSON.parse(event.data);
+
+  if (data.type === "error") {
+    errorHandlers[socketId]?.forEach((handler) => handler(data));
+    return;
+  }
+
+  messageHandlers[socketId]?.forEach((handler) => handler(data));
 };
 
 const onClose = (
