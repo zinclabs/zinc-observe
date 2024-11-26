@@ -48,13 +48,35 @@ const useSearchWebSocket = () => {
         requestId,
         handlers.close.bind(null, requestId, data),
       );
+      return requestId;
     } catch (e: any) {
       throw new Error("Error in fetching search data", e);
     }
   };
 
+  const sendSearchMessageBasedOnRequestId = (requestId: string, data: any) => {
+    webSocket.sendMessage(requestId, JSON.stringify(data));
+  };
+
+  const cancelSearchQueryBasedOnRequestId = (
+    requestId: string,
+    trace_id: string,
+  ) => {
+    webSocket.sendMessage(
+      requestId,
+      JSON.stringify({
+        type: "cancel",
+        content: {
+          trace_id: trace_id,
+        },
+      }),
+    );
+  };
+
   return {
     fetchQueryDataWithWebSocket,
+    sendSearchMessageBasedOnRequestId,
+    cancelSearchQueryBasedOnRequestId,
   };
 };
 

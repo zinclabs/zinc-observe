@@ -35,15 +35,9 @@ import {
   formatRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
-import {
-  b64EncodeUnicode,
-  generateTraceContext,
-  getUUID,
-  getWebSocketUrl,
-} from "@/utils/zincutils";
+import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
-import useWebSocket from "../useWebSocket";
 import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 
@@ -77,8 +71,11 @@ export const usePanelDataLoader = (
   };
   let runCount = 0;
 
-  const webSocket = useWebSocket();
-  const { fetchQueryDataWithWebSocket } = useSearchWebSocket();
+  const {
+    fetchQueryDataWithWebSocket,
+    sendSearchMessageBasedOnRequestId,
+    cancelSearchQueryBasedOnRequestId,
+  } = useSearchWebSocket();
 
   /**
    * Calculate cache key for panel
@@ -115,6 +112,9 @@ export const usePanelDataLoader = (
     lastTriggeredAt: null as any,
     isCachedDataDifferWithCurrentTimeRange: false,
     searchRequestTraceIds: <string[]>[],
+    searchWebSocketRequestIdsAndTraceIds: <
+      { requestId: string; traceId: string }[]
+    >[],
   });
 
   // observer for checking if panel is visible on the screen
@@ -288,6 +288,13 @@ export const usePanelDataLoader = (
   const cancelQueryAbort = () => {
     if (abortController) {
       abortController?.abort();
+    }
+
+    // loop on state.searchWebSocketRequestIdsAndTraceIds
+    if (state.searchWebSocketRequestIdsAndTraceIds) {
+      state.searchWebSocketRequestIdsAndTraceIds.forEach((it) => {
+        cancelSearchQueryBasedOnRequestId(it.requestId, it.traceId);
+      });
     }
   };
 
@@ -560,27 +567,24 @@ export const usePanelDataLoader = (
   const sendSearchMessage = async (requestId: string, payload: any) => {
     console.log("send search message through ws");
 
-    webSocket.sendMessage(
-      requestId,
-      JSON.stringify({
-        type: "search",
-        content: {
-          trace_id: payload.traceId,
-          payload: {
-            query: await getHistogramSearchRequest(
-              payload.queryReq.query,
-              payload.queryReq.it,
-              payload.queryReq.startISOTimestamp,
-              payload.queryReq.endISOTimestamp,
-            ),
-          },
-          stream_type: payload.pageType,
-          search_type: "dashboards",
-          // use_cache: (window as any).use_cache ?? true,
-          use_cache: false,
+    sendSearchMessageBasedOnRequestId(requestId, {
+      type: "search",
+      content: {
+        trace_id: payload.traceId,
+        payload: {
+          query: await getHistogramSearchRequest(
+            payload.queryReq.query,
+            payload.queryReq.it,
+            payload.queryReq.startISOTimestamp,
+            payload.queryReq.endISOTimestamp,
+          ),
         },
-      }),
-    );
+        stream_type: payload.pageType,
+        search_type: "dashboards",
+        // use_cache: (window as any).use_cache ?? true,
+        use_cache: false,
+      },
+    });
   };
 
   const handleSearchClose = (
@@ -590,11 +594,21 @@ export const usePanelDataLoader = (
   ) => {
     removeTraceId(payload.traceId);
 
+    removeRequestId(requestId);
+
     // set loading to false
     state.loading = false;
   };
 
-  const handleSearchError = (requestId: string, response: any) => {
+  const handleSearchError = (
+    requestId: string,
+    payload: any,
+    response: any,
+  ) => {
+    removeTraceId(payload.traceId);
+
+    removeRequestId(requestId);
+
     // set loading to false
     state.loading = false;
 
@@ -637,12 +651,14 @@ export const usePanelDataLoader = (
         pageType,
       };
 
-      fetchQueryDataWithWebSocket(payload, {
+      const requestId = fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
         error: handleSearchError,
         message: handleHistogramResponse,
       });
+
+      addRequestId(requestId, traceId);
     } catch (e: any) {
       state.errorDetail = e?.message || e;
       state.loading = false;
@@ -1331,6 +1347,20 @@ export const usePanelDataLoader = (
     state.searchRequestTraceIds = state.searchRequestTraceIds.filter(
       (id: any) => id !== traceId,
     );
+  };
+
+  const addRequestId = (requestId: string, traceId: string) => {
+    state.searchWebSocketRequestIdsAndTraceIds = [
+      ...state.searchWebSocketRequestIdsAndTraceIds,
+      { requestId, traceId },
+    ];
+  };
+
+  const removeRequestId = (requestId: string) => {
+    state.searchWebSocketRequestIdsAndTraceIds =
+      state.searchWebSocketRequestIdsAndTraceIds.filter(
+        (id: any) => id !== requestId,
+      );
   };
 
   const hasAtLeastOneQuery = () =>
