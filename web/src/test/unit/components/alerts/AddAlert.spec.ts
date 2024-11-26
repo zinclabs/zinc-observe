@@ -266,7 +266,7 @@ describe('AddAlert Component', () => {
       await sqlTab.trigger('click');
       expect(scheduledAlertComponent.vm.sql).toBe(sqlQuery);
     });
-    it.skip('should submit the form when the user gives all the data for test usage', async () => {
+    it('should submit the form when the user gives all the data for test usage', async () => {
       wrapper.vm.addAlertForm = {
         validate: vi.fn().mockResolvedValue(true), // Simulates a valid form
         resetValidation: vi.fn(), // Mock other methods if needed
@@ -590,7 +590,7 @@ describe('AddAlert Component', () => {
       await flushPromises();
       expect(alertCreateSpy).toHaveBeenCalledTimes(0);
     })
-    it('should call api when user doesnot select destination and return error with Destination Required message ',async () => {
+    it('should not call api when user doesnot select destination and return error with Destination Required message ',async () => {
       const alertCreateSpy = vi.spyOn(alertsService, 'create');
 
       vi.spyOn(wrapper.vm, 'updateStreams').mockResolvedValue({ success: true });
@@ -1029,9 +1029,217 @@ describe('AddAlert Component', () => {
 
 
     })
+    it('should convert corn expression into frequency ', async () => {
+      const alertCreateSpy = vi.spyOn(alertsService, 'create');
+      const onSubmitSpy = vi.spyOn(wrapper.vm, 'onSubmit');
+      wrapper.vm.formData = {
+        "name": "basic_standard_alert_10",
+        "stream_type": "logs",
+        "stream_name": "k8s_json",
+        "is_real_time": "false",
+        "query_condition": {
+            "conditions": [],
+            "sql": "",
+            "promql": "",
+            "type": "custom",
+            "aggregation": {
+                "group_by": [
+                    ""
+                ],
+                "function": "avg",
+                "having": {
+                    "column": "",
+                    "operator": ">=",
+                    "value": 1
+                }
+            },
+            "promql_condition": null,
+            "vrl_function": null,
+            "multi_time_range": []
+        },
+        "trigger_condition": {
+            "period": -10,
+            "operator": ">=",
+            "frequency": 1,
+            "cron": "",
+            "threshold": 10,
+            "silence": 10,
+            "frequency_type": "cron",
+            "timezone": "UTC"
+        },
+        "destinations": [
+            "ksjf"
+        ],
+        "context_attributes": [],
+        "enabled": true,
+        "description": "",
+        "lastTriggeredAt": 0,
+        "createdAt": "",
+        "updatedAt": "2024-11-21T08:26:50.907Z",
+        "owner": "",
+        "lastEditedBy": ""
+    }
+    const ScheduledAlertWrapper = wrapper.findComponent(ScheduledAlert);
+
+    const cronToggleBtn = await  wrapper.find('[data-test="scheduled-alert-cron-toggle-btn"]').trigger('click');
+    const cronInput = await ScheduledAlertWrapper.find('[data-test="scheduled-alert-cron-input-field"]');
+
+    console.log(cronInput,'cronInput')
+    await cronInput.setValue('1 40 * * * *')
+
+      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger('click');
+      await wrapper.find('[data-test="add-alert-form"]').trigger('submit');
+      
 
 
-  });
+      await flushPromises();  
+      await vi.advanceTimersByTime(500);
+      expect(wrapper.vm.formData.tz_offset).toBe(0);
+      await flushPromises();
+      await vi.advanceTimersByTime(500);
+
+
+
+      expect(alertCreateSpy).toHaveBeenCalledTimes(1);
+    })
+    it('should throw an error when invalid sql query given', async () => {
+      const onSubmitSpy = vi.spyOn(wrapper.vm, 'onSubmit');
+      const addAlertFormSpy = vi.spyOn(wrapper.vm.addAlertForm, 'validate');
+      const validateSqlPromise = vi.spyOn(wrapper.vm, 'validateSqlQuery');
+      wrapper.vm.formData = {
+        "name": "basic_standard_alert_10",
+        "stream_type": "logs",
+        "stream_name": "k8s_json",
+        "is_real_time": "false",
+        "query_condition": {
+            "conditions": [],
+            "sql": "select code from ''",
+            "promql": "",
+            "type": "sql",
+            "aggregation": {
+                "group_by": [
+                    ""
+                ],
+                "function": "avg",
+                "having": {
+                    "column": "",
+                    "operator": ">=",
+                    "value": 1
+                }
+            },
+            "promql_condition": null,
+            "vrl_function": null,
+            "multi_time_range": []
+        },
+        "trigger_condition": {
+            "period": 10,
+            "operator": ">=",
+            "frequency": 1,
+            "cron": "",
+            "threshold": 10,
+            "silence": 10,
+            "frequency_type": "cron",
+            "timezone": "UTC"
+        },
+        "destinations": [
+            "ksjf"
+        ],
+        "context_attributes": [],
+        "enabled": true,
+        "description": "",
+        "lastTriggeredAt": 0,
+        "createdAt": "",
+        "updatedAt": "2024-11-21T08:26:50.907Z",
+        "owner": "",
+        "lastEditedBy": ""
+    }
+
+            await wrapper.find('[data-test="add-alert-submit-btn"]').trigger('click');
+      await wrapper.find('[data-test="add-alert-form"]').trigger('submit');
+
+      await flushPromises();
+
+
+      await vi.advanceTimersByTime(500);
+
+      await flushPromises();
+
+      await vi.advanceTimersByTime(300);
+
+      expect(onSubmitSpy.mock.settledResults[0].value).toBe(undefined);
+
+    });
+
+    it('should update the alert successfully', async () => {
+      wrapper.vm.addAlertForm = {
+        validate: vi.fn().mockResolvedValue(true), // Simulates a valid form
+        resetValidation: vi.fn(), // Mock other methods if needed
+      };
+      const submitSpy = vi.spyOn(alertsService,'update');
+      wrapper.vm.beingUpdated = true;
+      wrapper.vm.formData = {
+        "name": "basic_standard_alert_10",
+        "stream_type": "logs",
+        "stream_name": "k8s_json",
+        "is_real_time": "false",
+        "query_condition": {
+            "conditions": [],
+            "sql": "",
+            "promql": "",
+            "type": "custom",
+            "aggregation": {
+                "group_by": [
+                    ""
+                ],
+                "function": "avg",
+                "having": {
+                    "column": "",
+                    "operator": ">=",
+                    "value": 1
+                }
+            },
+            "promql_condition": null,
+            "vrl_function": null,
+            "multi_time_range": []
+        },
+        "trigger_condition": {
+            "period": 10,
+            "operator": ">=",
+            "frequency": 1,
+            "cron": "",
+            "threshold": 3,
+            "silence": 10,
+            "frequency_type": "minutes",
+            "timezone": "UTC"
+        },
+        "destinations": [
+            "ksjf"
+        ],
+        "context_attributes": [],
+        "enabled": true,
+        "description": "",
+        "lastTriggeredAt": 0,
+        "createdAt": "",
+        "updatedAt": "2024-11-21T08:26:50.907Z",
+        "owner": "",
+        "lastEditedBy": ""
+    }
+
+
+      
+      await wrapper.find('[data-test="add-alert-submit-btn"]').trigger('click')
+
+      await wrapper.find('[data-test="add-alert-form"]').trigger('submit');
+      await flushPromises();
+      await vi.advanceTimersByTime(500);
+
+      await flushPromises();
+
+      expect(submitSpy).toHaveBeenCalledTimes(1);
+
+    })
+
+});
 
 
 

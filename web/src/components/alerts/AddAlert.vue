@@ -1341,9 +1341,12 @@ export default defineComponent({
     },
 
     async onSubmit() {
+
       // Delaying submission by 500ms to allow the form to validate, as query is validated in validateSqlQuery method
       // When user updated query and click on save
       await new Promise((resolve) => setTimeout(resolve, 500));
+      console.log('here it is 2')
+
 
 
       if (
@@ -1354,16 +1357,6 @@ export default defineComponent({
         this.q.notify({
           type: "negative",
           message: "Selecting all Columns in SQL query is not allowed.",
-          timeout: 1500,
-        });
-        return false;
-      }
-
-      if (this.formData.stream_name == "") {
-        console.log('this is exec')
-        this.q.notify({
-          type: "negative",
-          message: "Please select stream name.",
           timeout: 1500,
         });
         return false;
@@ -1395,7 +1388,7 @@ export default defineComponent({
           time,
           this.formData.trigger_condition.timezone
         );
-
+        console.log('here it is', convertedDateTime)
         this.formData.tz_offset = convertedDateTime.offset;
       }
 
@@ -1432,6 +1425,7 @@ export default defineComponent({
         }
 
         if (this.beingUpdated) {
+          console.log('here it is 3')
           callAlert = alertsService.update(
             this.store.state.selectedOrganization.identifier,
             payload.stream_name,
@@ -1507,42 +1501,6 @@ export default defineComponent({
         console.log('error in validation')
       });
     },
-
-    async testSubmit () {
-      const dismiss = this.q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
-      const payload = this.getAlertPayload();
-      callAlert = alertsService.create(
-            this.store.state.selectedOrganization.identifier,
-            payload.stream_name,
-            payload.stream_type,
-            payload
-          );
-          callAlert
-            .then((res: { data: any }) => {
-              this.formData = defaultValue();;
-
-              this.$emit("update:list");
-              this.addAlertForm.resetValidation();
-              dismiss();
-              this.q.notify({
-                type: "positive",
-                message: `Alert saved successfully.`,
-              });
-            })
-            .catch((err: any) => {
-              console.log('alert saved error')
-              dismiss();
-              this.q.notify({
-                type: "negative",
-                message:
-                  err.response?.data?.error || err.response?.data?.message,
-              });
-            });
-    }
     
 
   },
