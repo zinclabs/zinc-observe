@@ -496,7 +496,8 @@ fn sort_response(is_descending: bool, cache_response: &mut search::Response, ts_
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+// TODO: deprecate
+#[allow(clippy::too_many_arguments, unused_variables)]
 pub async fn write_results(
     trace_id: &str,
     ts_column: &str,
@@ -508,6 +509,7 @@ pub async fn write_results(
     is_descending: bool,
 ) {
     return;
+    #[allow(unreachable_code)]
     let mut local_resp = res.clone();
     let remove_hit = if is_descending {
         local_resp.hits.last()

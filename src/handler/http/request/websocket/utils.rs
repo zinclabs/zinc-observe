@@ -118,7 +118,7 @@ pub mod sessions_cache_utils {
     rename_all(serialize = "snake_case", deserialize = "snake_case")
 )]
 pub enum WsClientEvents {
-    Search(SearchEventReq),
+    Search(Box<SearchEventReq>),
     #[cfg(feature = "enterprise")]
     Cancel {
         trace_id: String,
@@ -147,7 +147,7 @@ pub struct SearchEventReq {
 pub enum WsServerEvents {
     SearchResponse {
         trace_id: String,
-        results: config::meta::search::Response,
+        results: Box<config::meta::search::Response>,
         time_offset: i64,
     },
     CancelResponse {

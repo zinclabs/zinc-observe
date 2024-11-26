@@ -98,7 +98,7 @@ impl SessionHandler {
                 );
                 match client_msg {
                     WsClientEvents::Search(search_req) => {
-                        match self.handle_search_request(search_req.clone()).await {
+                        match self.handle_search_request(*search_req.clone()).await {
                             Ok(_) => {
                                 // force close the session once search is complete
                                 self.cleanup().await;
@@ -336,7 +336,7 @@ impl SessionHandler {
 
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
-                results: search_res.clone(),
+                results: Box::new(search_res.clone()),
                 time_offset: end_time,
             };
             self.send_message(ws_search_res.to_json().to_string())
@@ -657,7 +657,7 @@ impl SessionHandler {
                 // Send the cached response
                 let ws_search_res = WsServerEvents::SearchResponse {
                     trace_id: trace_id.clone(),
-                    results: search_res.clone(),
+                    results: Box::new(search_res.clone()),
                     time_offset: end_time,
                 };
                 self.send_message(ws_search_res.to_json().to_string())
@@ -695,7 +695,7 @@ impl SessionHandler {
         // Send the cached response
         let ws_search_res = WsServerEvents::SearchResponse {
             trace_id: trace_id.clone(),
-            results: cached.cached_response.clone(),
+            results: Box::new(cached.cached_response.clone()),
             time_offset: cached.response_end_time,
         };
         log::info!(
@@ -763,7 +763,7 @@ impl SessionHandler {
 
                 let ws_search_res = WsServerEvents::SearchResponse {
                     trace_id: trace_id.clone(),
-                    results: search_res.clone(),
+                    results: Box::new(search_res.clone()),
                     time_offset: end_time,
                 };
                 log::info!(
