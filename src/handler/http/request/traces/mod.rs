@@ -164,27 +164,26 @@ pub async fn get_latest_traces(
                 .clone();
             let stream_type_str = StreamType::Traces.to_string();
 
-            if user.is_external
-                && !crate::handler::http::auth::validator::check_permissions(
-                    user_id.to_str().unwrap(),
-                    AuthExtractor {
-                        auth: "".to_string(),
-                        method: "GET".to_string(),
-                        o2_type: format!(
-                            "{}:{}",
-                            OFGA_MODELS
-                                .get(stream_type_str.as_str())
-                                .map_or(stream_type_str.as_str(), |model| model.key),
-                            stream_name
-                        ),
-                        org_id: org_id.clone(),
-                        bypass_check: false,
-                        parent_id: "".to_string(),
-                    },
-                    user.role,
-                    user.is_external,
-                )
-                .await
+            if !crate::handler::http::auth::validator::check_permissions(
+                user_id.to_str().unwrap(),
+                AuthExtractor {
+                    auth: "".to_string(),
+                    method: "GET".to_string(),
+                    o2_type: format!(
+                        "{}:{}",
+                        OFGA_MODELS
+                            .get(stream_type_str.as_str())
+                            .map_or(stream_type_str.as_str(), |model| model.key),
+                        stream_name
+                    ),
+                    org_id: org_id.clone(),
+                    bypass_check: false,
+                    parent_id: "".to_string(),
+                },
+                user.role,
+                user.is_external,
+            )
+            .await
             {
                 return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
             }
