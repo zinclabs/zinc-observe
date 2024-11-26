@@ -155,12 +155,13 @@ pub enum WsServerEvents {
         is_success: bool,
     },
     Error {
+        #[serde(flatten)]
         error_type: ErrorType,
     },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "error_type", content = "meta", rename_all = "snake_case")]
 pub enum ErrorType {
     SearchError { trace_id: String, error: String },
     RequestError { request_id: String, error: String },
