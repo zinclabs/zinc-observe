@@ -39,7 +39,6 @@ use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::TaskStatus;
 use prost::Message;
-use proto::cluster_rpc::FlightSearchRequest;
 use tonic::{Request, Response, Status, Streaming};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
@@ -47,7 +46,9 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::service::search::SEARCH_SERVER;
 use crate::{
     handler::grpc::MetadataMap,
-    service::search::{grpc::flight as grpcFlight, utils::AsyncDefer},
+    service::search::{
+        grpc::flight as grpcFlight, request::FlightSearchRequest, utils::AsyncDefer,
+    },
 };
 
 #[derive(Default)]
@@ -83,15 +84,16 @@ impl FlightService for FlightServiceImpl {
             .map_err(|e| DataFusionError::Internal(format!("{e:?}")))
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        log::info!("[trace_id {}] flight->search: do_get", req.trace_id);
+        let req: FlightSearchRequest = req.into();
+        let trace_id = req.query_identifier.trace_id.clone();
+        let is_super_cluster = req.super_cluster_info.is_super_cluster;
+
+        log::info!("[trace_id {}] flight->search: do_get", trace_id);
 
         #[cfg(feature = "enterprise")]
-        if req.is_super_cluster && !SEARCH_SERVER.contain_key(&req.trace_id).await {
+        if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id).await {
             SEARCH_SERVER
-                .insert(
-                    req.trace_id.clone(),
-                    TaskStatus::new_follower(vec![], false),
-                )
+                .insert(trace_id.clone(), TaskStatus::new_follower(vec![], false))
                 .await;
         }
 
@@ -101,8 +103,8 @@ impl FlightService for FlightServiceImpl {
         let result = get_ctx_and_physical_plan(&req).await;
 
         #[cfg(feature = "enterprise")]
-        if req.is_super_cluster && !SEARCH_SERVER.is_leader(&req.trace_id).await {
-            SEARCH_SERVER.remove(&req.trace_id, false).await;
+        if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id).await {
+            SEARCH_SERVER.remove(&trace_id, false).await;
         }
 
         // 2. prepare dataufion context
@@ -110,12 +112,12 @@ impl FlightService for FlightServiceImpl {
             Ok(v) => v,
             Err(e) => {
                 // clear session data
-                crate::service::search::datafusion::storage::file_list::clear(&req.trace_id);
+                crate::service::search::datafusion::storage::file_list::clear(&trace_id);
                 // release wal lock files
-                crate::common::infra::wal::release_request(&req.trace_id);
+                crate::common::infra::wal::release_request(&trace_id);
                 log::error!(
                     "[trace_id {}] flight->search: do_get physical plan generate error: {e:?}",
-                    req.trace_id,
+                    trace_id,
                 );
                 return Err(Status::internal(e.to_string()));
             }
@@ -123,8 +125,8 @@ impl FlightService for FlightServiceImpl {
 
         log::info!(
             "[trace_id {}] flight->search: executing stream, is super cluster: {}",
-            req.trace_id,
-            req.is_super_cluster
+            trace_id,
+            is_super_cluster
         );
 
         let mut schema = physical_plan.schema();
@@ -136,7 +138,7 @@ impl FlightService for FlightServiceImpl {
             println!("+---------------------------+--------------------------+");
             println!(
                 "follow physical plan, is_super_cluster_follower_leader: {}",
-                req.is_super_cluster
+                is_super_cluster
             );
             println!("+---------------------------+--------------------------+");
             println!("{}", plan);
@@ -153,11 +155,11 @@ impl FlightService for FlightServiceImpl {
             .with_max_flight_data_size(33554432) // 32MB
             .with_options(write_options)
             .build(FlightSenderStream::new(
-                req.trace_id.to_string(),
+                trace_id.to_string(),
                 execute_stream(physical_plan, ctx.task_ctx().clone()).map_err(|e| {
                     log::error!(
                         "[trace_id {}] flight->search: do_get physical plan execution error: {e:?}",
-                        req.trace_id,
+                        trace_id,
                     );
                     Status::internal(e.to_string())
                 })?,
@@ -321,7 +323,7 @@ type PlanResult = (
 async fn get_ctx_and_physical_plan(
     req: &FlightSearchRequest,
 ) -> Result<PlanResult, infra::errors::Error> {
-    if req.is_super_cluster {
+    if req.super_cluster_info.is_super_cluster {
         let (ctx, physical_plan, defer, scan_stats) =
             crate::service::search::super_cluster::follower::search(req).await?;
         Ok((ctx, physical_plan, Some(defer), scan_stats))

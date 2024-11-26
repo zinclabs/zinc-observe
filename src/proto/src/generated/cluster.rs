@@ -2467,47 +2467,71 @@ pub struct NewEmptyExecNode {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FlightSearchRequest {
-    /// query identifier
+    #[prost(message, optional, tag = "1")]
+    pub query_identifier: ::core::option::Option<QueryIdentifier>,
+    #[prost(message, optional, tag = "2")]
+    pub search_info: ::core::option::Option<SearchInfo>,
+    #[prost(message, optional, tag = "3")]
+    pub index_info: ::core::option::Option<IndexInfo>,
+    #[prost(message, optional, tag = "4")]
+    pub super_cluster_info: ::core::option::Option<SuperClusterInfo>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct QueryIdentifier {
     #[prost(string, tag = "1")]
     pub trace_id: ::prost::alloc::string::String,
-    #[prost(uint32, tag = "2")]
-    pub partition: u32,
-    #[prost(string, tag = "3")]
-    pub job_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "4")]
+    #[prost(string, tag = "2")]
     pub org_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "5")]
+    #[prost(string, tag = "3")]
     pub stream_type: ::prost::alloc::string::String,
-    /// used for search
-    #[prost(bytes = "vec", tag = "7")]
+    /// the partition number of the remote scan
+    #[prost(uint32, tag = "4")]
+    pub partition: u32,
+    /// the unique id for each remote scan
+    #[prost(string, tag = "5")]
+    pub job_id: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SearchInfo {
+    #[prost(bytes = "vec", tag = "1")]
     pub plan: ::prost::alloc::vec::Vec<u8>,
-    #[prost(int64, repeated, tag = "8")]
+    #[prost(int64, repeated, tag = "2")]
     pub file_id_list: ::prost::alloc::vec::Vec<i64>,
-    #[prost(message, repeated, tag = "9")]
+    #[prost(message, repeated, tag = "3")]
     pub idx_file_list: ::prost::alloc::vec::Vec<IdxFileName>,
-    #[prost(message, repeated, tag = "10")]
-    pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
-    #[prost(string, repeated, tag = "11")]
-    pub match_all_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-    #[prost(int64, tag = "12")]
+    #[prost(int64, tag = "4")]
     pub start_time: i64,
-    #[prost(int64, tag = "13")]
+    #[prost(int64, tag = "5")]
     pub end_time: i64,
-    #[prost(int64, tag = "14")]
+    #[prost(int64, tag = "6")]
     pub timeout: i64,
-    /// used for super cluster and enterprise
-    #[prost(bool, tag = "18")]
-    pub is_super_cluster: bool,
-    #[prost(bool, tag = "19")]
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IndexInfo {
+    #[prost(bool, tag = "1")]
     pub use_inverted_index: bool,
-    #[prost(string, optional, tag = "20")]
-    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "21")]
-    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "22")]
-    pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, tag = "23")]
+    #[prost(string, tag = "2")]
     pub index_condition: ::prost::alloc::string::String,
+    #[prost(message, repeated, tag = "3")]
+    pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
+    #[prost(string, repeated, tag = "4")]
+    pub match_all_keys: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SuperClusterInfo {
+    #[prost(bool, tag = "1")]
+    pub is_super_cluster: bool,
+    #[prost(string, optional, tag = "2")]
+    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "3")]
+    pub work_group: ::core::option::Option<::prost::alloc::string::String>,
+    /// use for super cluster
+    #[prost(string, optional, tag = "4")]
+    pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

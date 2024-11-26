@@ -137,11 +137,9 @@ mod tests {
     #[test]
     fn test_get_file_name_v1() {
         let file_key = get_file_name_v1("nexus", "Olympics", 2);
-        assert!(
-            file_key
-                .as_str()
-                .ends_with("/wal/nexus/logs/Olympics/Olympics_2.json")
-        );
+        assert!(file_key
+            .as_str()
+            .ends_with("/wal/nexus/logs/Olympics/Olympics_2.json"));
     }
 
     #[test]

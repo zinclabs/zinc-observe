@@ -22,28 +22,41 @@ message NewEmptyExecNode {
 
 // Search request
 message FlightSearchRequest {
-    // query identifier
-    string                       trace_id = 1;
-    uint32                      partition = 2;
-    string                         job_id = 3;
-    string                         org_id = 4;
-    string                    stream_type = 5;
-    // used for search
-    bytes                            plan = 7;
-    repeated int64           file_id_list = 8;
-    repeated IdxFileName    idx_file_list = 9;
-    repeated KvItem           equal_keys = 10;
-    repeated string       match_all_keys = 11;
-    int64                     start_time = 12;
-    int64                       end_time = 13;
-    int64                        timeout = 14;
-    // used for super cluster and enterprise
-    bool                is_super_cluster = 18;
-    bool              use_inverted_index = 19;
-    optional string           work_group = 20;
-    optional string              user_id = 21;
-    optional string    search_event_type = 22;
-    string               index_condition = 23;
+    QueryIdentifier         query_identifier = 1;
+    SearchInfo                   search_info = 2;
+    IndexInfo                     index_info = 3;
+    SuperClusterInfo      super_cluster_info = 4;
+}
+
+message QueryIdentifier {
+    string                       trace_id = 1; 
+    string                         org_id = 2;
+    string                    stream_type = 3;
+    uint32                      partition = 4; // the partition number of the remote scan
+    string                         job_id = 5; // the unique id for each remote scan 
+}
+
+message SearchInfo {
+    bytes                            plan = 1;
+    repeated int64           file_id_list = 2;
+    repeated IdxFileName    idx_file_list = 3;
+    int64                      start_time = 4;
+    int64                        end_time = 5;
+    int64                         timeout = 6;
+}
+
+message IndexInfo {
+    bool               use_inverted_index = 1;
+    string                index_condition = 2; 
+    repeated KvItem            equal_keys = 3; 
+    repeated string        match_all_keys = 4;
+}
+
+message SuperClusterInfo {
+    bool                 is_super_cluster = 1;
+    optional string               user_id = 2;
+    optional string            work_group = 3; 
+    optional string     search_event_type = 4; // use for super cluster
 }
 
 message KvItem {

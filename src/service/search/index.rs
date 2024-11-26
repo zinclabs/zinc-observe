@@ -281,7 +281,7 @@ impl Condition {
                 if expr_list.is_empty() {
                     return Err(anyhow::anyhow!(
                         "Using match_all() function in a stream that don't have full text search field"
-                    )); // already check this in sql.rs 
+                    )); // already check this in sql.rs
                 }
                 Ok(disjunction(expr_list))
             }

@@ -47,6 +47,7 @@ md5.workspace = true
 memchr.workspace = true
 murmur3.workspace = true
 once_cell.workspace = true
+ordered-float.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
 prometheus.workspace = true

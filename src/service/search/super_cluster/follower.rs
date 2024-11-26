@@ -15,13 +15,10 @@
 
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
-use config::{
-    meta::{
-        cluster::{IntoArcVec, RoleGroup},
-        search::{ScanStats, SearchEventType},
-        stream::FileKey,
-    },
-    utils::json,
+use config::meta::{
+    cluster::{IntoArcVec, RoleGroup},
+    search::{ScanStats, SearchEventType},
+    stream::FileKey,
 };
 use datafusion::{
     common::tree_node::TreeNode, physical_plan::ExecutionPlan, prelude::SessionContext,
@@ -31,7 +28,7 @@ use infra::{
     errors::{Error, Result},
     schema::get_stream_setting_index_fields,
 };
-use proto::cluster_rpc::{FlightSearchRequest, KvItem, SearchQuery};
+use proto::cluster_rpc::{KvItem, SearchQuery};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
@@ -43,14 +40,14 @@ use crate::service::search::{
         distributed_plan::{
             codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
             empty_exec::NewEmptyExec,
+            node::{RemoteScanNode, SearchInfos},
             remote_scan::RemoteScanExec,
             NewEmptyExecVisitor,
         },
         exec::prepare_datafusion_context,
     },
     generate_filter_from_equal_items,
-    index::IndexCondition,
-    request::Request,
+    request::{FlightSearchRequest, Request},
     utils::AsyncDefer,
 };
 
@@ -72,7 +69,7 @@ pub async fn search(
 )> {
     let start = std::time::Instant::now();
     let cfg = config::get_config();
-    let mut req: Request = flight_request.clone().into();
+    let mut req: Request = (*flight_request).clone().into();
     let trace_id = req.trace_id.clone();
 
     // create datafusion context, just used for decode plan, the params can use default
@@ -87,8 +84,11 @@ pub async fn search(
     let proto = ComposedPhysicalExtensionCodec {
         codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
     };
-    let mut physical_plan =
-        physical_plan_from_bytes_with_extension_codec(&flight_request.plan, &ctx, &proto)?;
+    let mut physical_plan = physical_plan_from_bytes_with_extension_codec(
+        &flight_request.search_info.plan,
+        &ctx,
+        &proto,
+    )?;
 
     // replace empty table to real table
     let mut visitor = NewEmptyExecVisitor::default();
@@ -126,7 +126,7 @@ pub async fn search(
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
         "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, num: {}, took: {} ms",
-        (flight_request.start_time, flight_request.end_time),
+        req.time_range,
         file_id_list_vec.len(),
         file_id_list_took,
     );
@@ -142,8 +142,8 @@ pub async fn search(
             &trace_id,
             &req,
             stream_name,
-            &flight_request.equal_keys,
-            &flight_request.match_all_keys,
+            &flight_request.index_info.equal_keys,
+            &flight_request.index_info.match_all_keys,
         )
         .await?;
     scan_stats.idx_scan_size = idx_scan_size as i64;
@@ -208,42 +208,31 @@ pub async fn search(
         )
         .await;
 
-    let index_condition: Option<IndexCondition> =
-        match json::from_str(&flight_request.index_condition) {
-            Ok(v) => Some(v),
-            Err(_) => None,
-        };
+    let search_infos = SearchInfos {
+        plan: vec![],
+        file_id_list: partition_file_lists.clone(),
+        idx_file_list,
+        start_time: req.time_range.as_ref().map(|x| x.0).unwrap_or(0),
+        end_time: req.time_range.as_ref().map(|x| x.1).unwrap_or(0),
+        timeout: req.timeout as u64,
+    };
 
     let context = tracing::Span::current().context();
+    let mut remote_scan_node = RemoteScanNode::from_flight_search_request(
+        flight_request,
+        search_infos,
+        nodes.into_arc_vec(),
+        context,
+    );
+    remote_scan_node.set_is_super_cluster(false);
+
     // add sort preserving merge node to preserving the order
     if physical_plan.name() == "SortPreservingMergeExec" {
         let top_merge_node = physical_plan.clone();
-        let remote_scan_exec = Arc::new(RemoteScanExec::new(
-            physical_plan,
-            partition_file_lists,
-            idx_file_list,
-            flight_request.equal_keys.clone(),
-            flight_request.match_all_keys.clone(),
-            index_condition,
-            false,
-            req.clone(),
-            nodes.into_arc_vec(),
-            context,
-        ));
+        let remote_scan_exec = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
         physical_plan = top_merge_node.with_new_children(vec![remote_scan_exec])?;
     } else {
-        physical_plan = Arc::new(RemoteScanExec::new(
-            physical_plan,
-            partition_file_lists,
-            idx_file_list,
-            flight_request.equal_keys.clone(),
-            flight_request.match_all_keys.clone(),
-            index_condition,
-            false,
-            req.clone(),
-            nodes.into_arc_vec(),
-            context,
-        ));
+        physical_plan = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
     }
 
     log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish",);

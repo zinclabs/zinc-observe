@@ -117,9 +117,20 @@ impl IntoArcVec for Vec<Node> {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum NodeStatus {
-    Prepare,
-    Online,
-    Offline,
+    Prepare = 1,
+    Online = 2,
+    Offline = 3,
+}
+
+impl From<u32> for NodeStatus {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => NodeStatus::Prepare,
+            2 => NodeStatus::Online,
+            3 => NodeStatus::Offline,
+            _ => NodeStatus::Prepare,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

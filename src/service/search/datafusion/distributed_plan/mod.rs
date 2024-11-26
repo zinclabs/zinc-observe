@@ -25,6 +25,7 @@ use datafusion::{
 
 pub mod codec;
 pub mod empty_exec;
+pub mod node;
 pub mod remote_scan;
 pub mod rewrite;
 

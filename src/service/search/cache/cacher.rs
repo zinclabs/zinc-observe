@@ -122,7 +122,7 @@ pub async fn check_cache(
             };
         handle_histogram(origin_sql, q_time_range);
         req.query.sql = origin_sql.clone();
-        discard_interval = interval * 1000 * 1000; //in microseconds
+        discard_interval = interval * 1000 * 1000; // in microseconds
     }
     // if req.query.size >= 0 {
     //     *file_path = format!("{}", file_path, req.query.from, req.query.size);

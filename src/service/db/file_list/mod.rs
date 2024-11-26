@@ -17,7 +17,6 @@ use config::{meta::stream::FileMeta, RwHashMap, RwHashSet};
 use dashmap::{DashMap, DashSet};
 use infra::{cache, cache::stats, file_list, file_list as infra_file_list};
 use once_cell::sync::Lazy;
-use tokio::time;
 
 pub mod broadcast;
 pub mod local;
@@ -89,7 +88,7 @@ pub async fn cache_stats() -> Result<(), anyhow::Error> {
             let stream_name = columns[2];
             stats::set_stream_stats(org_id, stream_name, stream_type.into(), stats);
         }
-        time::sleep(time::Duration::from_millis(100)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
     Ok(())
 }

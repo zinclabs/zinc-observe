@@ -280,21 +280,19 @@ async fn get_file_list(
                     .accept_compressed(CompressionEncoding::Gzip)
                     .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
                     .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-                let response: cluster_rpc::MetricsWalFileResponse = match client
-                    .wal_file(request)
-                    .await
-                {
-                    Ok(response) => response.into_inner(),
-                    Err(err) => {
-                        log::error!(
+                let response: cluster_rpc::MetricsWalFileResponse =
+                    match client.wal_file(request).await {
+                        Ok(response) => response.into_inner(),
+                        Err(err) => {
+                            log::error!(
                             "[trace_id {trace_id}] get wal file list from search node error: {}",
                             err
                         );
-                        return Err(DataFusionError::Execution(
-                            "get wal file list from search node error".to_string(),
-                        ));
-                    }
-                };
+                            return Err(DataFusionError::Execution(
+                                "get wal file list from search node error".to_string(),
+                            ));
+                        }
+                    };
                 Ok(response)
             }
             .instrument(grpc_span),

@@ -66,10 +66,7 @@ use infra::{
 use ingester::WAL_PARQUET_METADATA;
 use once_cell::sync::Lazy;
 use parquet::arrow::async_reader::ParquetRecordBatchStream;
-use tokio::{
-    sync::{Mutex, RwLock},
-    time,
-};
+use tokio::sync::{Mutex, RwLock};
 
 use crate::{
     common::{
@@ -119,7 +116,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if cluster::is_offline() {
             break;
         }
-        time::sleep(time::Duration::from_secs(cfg.limit.file_push_interval)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            cfg.limit.file_push_interval,
+        ))
+        .await;
         if let Err(e) = scan_wal_files(tx.clone()).await {
             log::error!("[INGESTER:JOB] Error prepare parquet files: {}", e);
         }
@@ -520,7 +520,7 @@ async fn move_files(
                         "[INGESTER:JOB:{thread_id}] the file is still in use, waiting for a few ms: {}",
                         file.key
                     );
-                    time::sleep(time::Duration::from_millis(100)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 } else {
                     need_skip = false;
                     break;
@@ -1298,7 +1298,7 @@ async fn prepare_index_record_batches(
                 .iter()
                 .map(|i| i / INDEX_SEGMENT_LENGTH)
                 .collect::<HashSet<_>>();
-            let segment_num = (total_num_rows + INDEX_SEGMENT_LENGTH - 1) / INDEX_SEGMENT_LENGTH;
+            let segment_num = total_num_rows.div_ceil(INDEX_SEGMENT_LENGTH);
             let mut bv = BitVec::with_capacity(segment_num);
             for i in 0..segment_num {
                 bv.push(segment_ids.contains(&i));

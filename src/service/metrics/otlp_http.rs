@@ -643,10 +643,10 @@ pub async fn metrics_json_handler(
     let mut out = BytesMut::with_capacity(response.encoded_len());
     response.encode(&mut out).expect("Out of memory");
 
-    return Ok(HttpResponse::Ok()
+    Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
         .content_type(CONTENT_TYPE_JSON)
-        .body(out));
+        .body(out))
 }
 
 fn process_sum(

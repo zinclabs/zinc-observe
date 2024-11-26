@@ -125,7 +125,7 @@ impl CacheAccessor<Path, Arc<Statistics>> for FileStatisticsCache {
 
     fn remove(&mut self, k: &Path) -> Option<Arc<Statistics>> {
         let k = self.format_key(k);
-        self.statistics.remove(&k).map(|x| x.1.1)
+        self.statistics.remove(&k).map(|x| x.1 .1)
     }
 
     fn contains_key(&self, k: &Path) -> bool {

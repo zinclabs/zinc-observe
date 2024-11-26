@@ -163,7 +163,7 @@ pub fn split_files(
     partitioned_files.sort_by(|a, b| a.path().cmp(b.path()));
 
     // effectively this is div with rounding up instead of truncating
-    let chunk_size = (partitioned_files.len() + n - 1) / n;
+    let chunk_size = partitioned_files.len().div_ceil(n);
     partitioned_files
         .chunks(chunk_size)
         .map(|c| c.to_vec())
@@ -184,8 +184,8 @@ pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessP
     let Precision::Exact(num_rows) = stats.num_rows else {
         return None;
     };
-    let row_group_count = (num_rows + PARQUET_MAX_ROW_GROUP_SIZE - 1) / PARQUET_MAX_ROW_GROUP_SIZE;
-    let segment_count = (num_rows + index_segment_length - 1) / index_segment_length;
+    let row_group_count = num_rows.div_ceil(PARQUET_MAX_ROW_GROUP_SIZE);
+    let segment_count = num_rows.div_ceil(index_segment_length);
     let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
     let mut selection = Vec::with_capacity(segment_ids.len());
     let mut last_group_id = 0;
@@ -232,7 +232,7 @@ pub fn generate_access_plan_row_level(file: &PartitionedFile) -> Option<Arc<Parq
     let Precision::Exact(num_rows) = stats.num_rows else {
         return None;
     };
-    let row_group_count = (num_rows + PARQUET_MAX_ROW_GROUP_SIZE - 1) / PARQUET_MAX_ROW_GROUP_SIZE;
+    let row_group_count = num_rows.div_ceil(PARQUET_MAX_ROW_GROUP_SIZE);
     let mut access_plan = ParquetAccessPlan::new_none(row_group_count);
 
     for (row_group_id, chunk) in row_ids.chunks(PARQUET_MAX_ROW_GROUP_SIZE).enumerate() {

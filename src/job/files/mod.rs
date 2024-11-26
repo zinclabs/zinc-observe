@@ -19,7 +19,6 @@ use config::{
     meta::stream::StreamType,
     FILE_EXT_PARQUET,
 };
-use tokio::time;
 
 pub mod broadcast;
 pub mod idx;
@@ -42,7 +41,7 @@ async fn clean_empty_dirs() -> Result<(), anyhow::Error> {
         if is_offline() {
             break;
         }
-        time::sleep(time::Duration::from_secs(3600)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
         let last_updated = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
         let root = format!("{}files/", config::get_config().common.data_wal_dir);
         if let Err(e) =

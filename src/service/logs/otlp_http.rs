@@ -546,8 +546,8 @@ pub async fn logs_json_handler(
         ])
         .inc();
 
-    return Ok(HttpResponse::Ok()
+    Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
         .content_type(CONTENT_TYPE_JSON)
-        .body(response_body));
+        .body(response_body))
 }

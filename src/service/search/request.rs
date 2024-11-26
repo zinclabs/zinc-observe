@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::stream::StreamType;
-use proto::cluster_rpc::FlightSearchRequest;
+use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier, SearchInfo, SuperClusterInfo};
 
 #[derive(Debug, Clone)]
 pub struct Request {
@@ -91,17 +91,59 @@ impl Request {
 }
 
 impl From<FlightSearchRequest> for Request {
+    fn from(req: FlightSearchRequest) -> Self {
+        Self {
+            trace_id: req.query_identifier.trace_id,
+            org_id: req.query_identifier.org_id,
+            stream_type: StreamType::from(req.query_identifier.stream_type.as_str()),
+            timeout: req.search_info.timeout,
+            user_id: req.super_cluster_info.user_id,
+            work_group: req.super_cluster_info.work_group,
+            time_range: Some((req.search_info.start_time, req.search_info.end_time)),
+            search_event_type: req.super_cluster_info.search_event_type,
+            use_inverted_index: req.index_info.use_inverted_index,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FlightSearchRequest {
+    pub query_identifier: QueryIdentifier,
+    pub search_info: SearchInfo,
+    pub index_info: IndexInfo,
+    pub super_cluster_info: SuperClusterInfo,
+}
+
+impl FlightSearchRequest {
+    // used in RemoteScanExec
+    pub fn set_partition(&mut self, partition: usize) {
+        self.query_identifier.partition = partition as u32;
+    }
+
+    // used in RemoteScanExec
+    pub fn set_job_id(&mut self, job_id: String) {
+        self.query_identifier.job_id = job_id;
+    }
+}
+
+impl From<cluster_rpc::FlightSearchRequest> for FlightSearchRequest {
+    fn from(request: cluster_rpc::FlightSearchRequest) -> Self {
+        Self {
+            query_identifier: request.query_identifier.unwrap(),
+            search_info: request.search_info.unwrap(),
+            index_info: request.index_info.unwrap(),
+            super_cluster_info: request.super_cluster_info.unwrap(),
+        }
+    }
+}
+
+impl From<FlightSearchRequest> for cluster_rpc::FlightSearchRequest {
     fn from(request: FlightSearchRequest) -> Self {
         Self {
-            trace_id: request.trace_id,
-            org_id: request.org_id,
-            stream_type: StreamType::from(request.stream_type.as_str()),
-            timeout: request.timeout,
-            user_id: request.user_id,
-            work_group: request.work_group,
-            time_range: Some((request.start_time, request.end_time)),
-            search_event_type: request.search_event_type,
-            use_inverted_index: request.use_inverted_index,
+            query_identifier: Some(request.query_identifier),
+            search_info: Some(request.search_info),
+            index_info: Some(request.index_info),
+            super_cluster_info: Some(request.super_cluster_info),
         }
     }
 }

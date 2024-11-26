@@ -15,7 +15,6 @@
 
 use config::cluster::LOCAL_NODE;
 use infra::{dist_lock, file_list as infra_file_list};
-use tokio::time;
 
 use crate::{common::infra::cluster::get_node_by_uuid, service::db};
 
@@ -52,7 +51,7 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
         if !stream_stats.is_empty() {
             infra_file_list::set_stream_stats(&org_id, &stream_stats).await?;
         }
-        time::sleep(time::Duration::from_secs(1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 
     // update offset

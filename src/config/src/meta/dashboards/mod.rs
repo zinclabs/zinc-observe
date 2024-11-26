@@ -17,6 +17,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+type OrdF64 = ordered_float::OrderedFloat<f64>;
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct DashboardVersion {
     #[serde(default = "default_version")]

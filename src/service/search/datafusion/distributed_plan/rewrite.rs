@@ -26,21 +26,13 @@ use datafusion::{
 use hashbrown::HashMap;
 use proto::cluster_rpc::KvItem;
 
-use super::{empty_exec::NewEmptyExec, remote_scan::RemoteScanExec};
+use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
 use crate::service::search::{index::IndexCondition, request::Request};
 
 // add remote scan to physical plan
 pub struct RemoteScanRewriter {
-    pub req: Request,
-    pub nodes: Vec<Arc<dyn NodeInfo>>,
-    pub file_id_lists: HashMap<String, Vec<Vec<i64>>>,
-    pub idx_file_list: Vec<FileKey>,
-    pub equal_keys: HashMap<String, Vec<KvItem>>,
-    pub match_all_keys: Vec<String>,
-    pub index_condition: Option<IndexCondition>,
-    pub is_leader: bool, // for super cluster
+    pub remote_scan_nodes: RemoteScanNodes,
     pub is_changed: bool,
-    pub context: opentelemetry::Context,
 }
 
 impl RemoteScanRewriter {
@@ -54,19 +46,21 @@ impl RemoteScanRewriter {
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
         is_leader: bool,
-        context: opentelemetry::Context,
+        opentelemetry_context: opentelemetry::Context,
     ) -> Self {
         Self {
-            req,
-            nodes,
-            file_id_lists,
-            idx_file_list,
-            equal_keys,
-            match_all_keys,
-            index_condition,
-            is_leader,
+            remote_scan_nodes: RemoteScanNodes::new(
+                req,
+                nodes,
+                file_id_lists,
+                idx_file_list,
+                equal_keys,
+                match_all_keys,
+                index_condition,
+                is_leader,
+                opentelemetry_context,
+            ),
             is_changed: false,
-            context,
         }
     }
 }
@@ -75,33 +69,18 @@ impl TreeNodeRewriter for RemoteScanRewriter {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
-        let empty_files = vec![];
-        let empty_keys = vec![];
         if node.name() == "RepartitionExec" || node.name() == "CoalescePartitionsExec" {
             let mut visitor = TableNameVisitor::new();
             node.visit(&mut visitor)?;
             if visitor.is_remote_scan {
                 let table_name = visitor.table_name.clone().unwrap();
                 let input = node.children()[0];
+                let node_len = self.remote_scan_nodes.nodes.len();
                 let remote_scan = Arc::new(RemoteScanExec::new(
                     input.clone(),
-                    self.file_id_lists
-                        .get(&table_name)
-                        .unwrap_or(&empty_files)
-                        .clone(),
-                    self.idx_file_list.clone(),
-                    self.equal_keys
-                        .get(&table_name)
-                        .unwrap_or(&empty_keys)
-                        .clone(),
-                    self.match_all_keys.clone(),
-                    self.index_condition.clone(),
-                    self.is_leader,
-                    self.req.clone(),
-                    self.nodes.clone(),
-                    self.context.clone(),
-                ));
-                let partitioning = Partitioning::RoundRobinBatch(self.nodes.len());
+                    self.remote_scan_nodes.get_remote_node(table_name.as_str()),
+                )?);
+                let partitioning = Partitioning::RoundRobinBatch(node_len);
                 let repartition = Arc::new(RepartitionExec::try_new(remote_scan, partitioning)?);
                 let new_node = node.with_new_children(vec![repartition])?;
                 self.is_changed = true;
@@ -118,22 +97,8 @@ impl TreeNodeRewriter for RemoteScanRewriter {
 
                 let remote_scan = Arc::new(RemoteScanExec::new(
                     new_input,
-                    self.file_id_lists
-                        .get(&table_name)
-                        .unwrap_or(&empty_files)
-                        .clone(),
-                    self.idx_file_list.clone(),
-                    self.equal_keys
-                        .get(&table_name)
-                        .unwrap_or(&empty_keys)
-                        .clone(),
-                    self.match_all_keys.clone(),
-                    self.index_condition.clone(),
-                    self.is_leader,
-                    self.req.clone(),
-                    self.nodes.clone(),
-                    self.context.clone(),
-                ));
+                    self.remote_scan_nodes.get_remote_node(table_name.as_str()),
+                )?);
                 let new_node = node.with_new_children(vec![remote_scan])?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
@@ -150,22 +115,8 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     let table_name = visitor.table_name.clone().unwrap();
                     let remote_scan = Arc::new(RemoteScanExec::new(
                         child.clone(),
-                        self.file_id_lists
-                            .get(&table_name)
-                            .unwrap_or(&empty_files)
-                            .clone(),
-                        self.idx_file_list.clone(),
-                        self.equal_keys
-                            .get(&table_name)
-                            .unwrap_or(&empty_keys)
-                            .clone(),
-                        self.match_all_keys.clone(),
-                        self.index_condition.clone(),
-                        self.is_leader,
-                        self.req.clone(),
-                        self.nodes.clone(),
-                        self.context.clone(),
-                    ));
+                        self.remote_scan_nodes.get_remote_node(table_name.as_str()),
+                    )?);
                     new_children.push(remote_scan);
                 }
                 let new_node = node.with_new_children(new_children)?;

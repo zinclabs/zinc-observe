@@ -53,21 +53,22 @@ use crate::service::{
         },
         index::IndexCondition,
         match_file,
+        request::FlightSearchRequest,
     },
 };
 
-#[tracing::instrument(name = "service:search:grpc:flight:do_get::search", skip_all, fields(org_id = req.org_id))]
+#[tracing::instrument(name = "service:search:grpc:flight:do_get::search", skip_all, fields(org_id = req.query_identifier.org_id))]
 pub async fn search(
-    req: &cluster_rpc::FlightSearchRequest,
+    req: &FlightSearchRequest,
 ) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, ScanStats), Error> {
     // let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let org_id = req.org_id.to_string();
-    let stream_type = StreamType::from(req.stream_type.as_str());
-    let work_group = req.work_group.clone();
+    let org_id = req.query_identifier.org_id.to_string();
+    let stream_type = StreamType::from(req.query_identifier.stream_type.as_str());
+    let work_group = req.super_cluster_info.work_group.clone();
 
-    let trace_id = Arc::new(req.trace_id.to_string());
+    let trace_id = Arc::new(req.query_identifier.trace_id.to_string());
     log::info!("[trace_id {trace_id}] flight->search: start");
 
     // create datafusion context, just used for decode plan, the params can use default
@@ -82,7 +83,8 @@ pub async fn search(
     let proto = ComposedPhysicalExtensionCodec {
         codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
     };
-    let mut physical_plan = physical_plan_from_bytes_with_extension_codec(&req.plan, &ctx, &proto)?;
+    let mut physical_plan =
+        physical_plan_from_bytes_with_extension_codec(&req.search_info.plan, &ctx, &proto)?;
 
     // replace empty table to real table
     let mut visitor = NewEmptyExecVisitor::default();
@@ -111,7 +113,7 @@ pub async fn search(
 
     log::info!(
         "[trace_id {trace_id}] flight->search: part_id: {}, stream: {}/{}/{}",
-        req.partition,
+        req.query_identifier.partition,
         org_id,
         stream_type,
         stream_name,
@@ -125,7 +127,7 @@ pub async fn search(
     }
 
     // construct index condition
-    let index_condition = generate_index_condition(&req.index_condition)?;
+    let index_condition = generate_index_condition(&req.index_info.index_condition)?;
 
     let stream_settings = unwrap_stream_settings(schema_latest.as_ref());
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
@@ -141,6 +143,7 @@ pub async fn search(
 
     // construct partition filters
     let search_partition_keys: Vec<(String, String)> = req
+        .index_info
         .equal_keys
         .iter()
         .filter_map(|v| {
@@ -155,12 +158,12 @@ pub async fn search(
     let query_params = Arc::new(super::QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.clone(),
-        job_id: req.job_id.clone(),
+        job_id: req.query_identifier.job_id.clone(),
         stream_type,
         stream_name: stream_name.to_string(),
-        time_range: Some((req.start_time, req.end_time)),
+        time_range: Some((req.search_info.start_time, req.search_info.end_time)),
         work_group: work_group.clone(),
-        use_inverted_index: req.use_inverted_index,
+        use_inverted_index: req.index_info.use_inverted_index,
     });
 
     // get all tables
@@ -169,7 +172,7 @@ pub async fn search(
     let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
 
     // search in object storage
-    if !req.file_id_list.is_empty() {
+    if !req.search_info.file_id_list.is_empty() {
         let stream_settings = infra::schema::get_settings(&org_id, stream_name, stream_type)
             .await
             .unwrap_or_default();
@@ -181,13 +184,13 @@ pub async fn search(
             query_params.time_range,
             &stream_settings.partition_keys,
             &search_partition_keys,
-            &req.file_id_list,
-            &req.idx_file_list,
+            &req.search_info.file_id_list,
+            &req.search_info.idx_file_list,
         )
         .await?;
         log::info!(
             "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, num: {}, took: {} ms",
-            req.partition,
+            req.query_identifier.partition,
             file_list.len(),
             file_list_took,
         );

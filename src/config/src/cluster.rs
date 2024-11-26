@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::net::IpAddr;
+use std::{
+    net::IpAddr,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 use once_cell::sync::Lazy;
 
@@ -24,7 +27,7 @@ use crate::{
 
 pub static mut LOCAL_NODE_ID: i32 = 0;
 pub static mut LOCAL_NODE_KEY_LEASE_ID: i64 = 0;
-pub static mut LOCAL_NODE_STATUS: NodeStatus = NodeStatus::Prepare;
+pub static LOCAL_NODE_STATUS: AtomicU32 = AtomicU32::new(NodeStatus::Prepare as _);
 pub static LOCAL_NODE: Lazy<Node> = Lazy::new(load_local_node);
 
 pub fn load_local_node() -> Node {
@@ -90,8 +93,13 @@ pub fn get_local_node_ip() -> String {
 }
 
 #[inline(always)]
+pub fn is_online() -> bool {
+    NodeStatus::from(LOCAL_NODE_STATUS.load(Ordering::Relaxed)) == NodeStatus::Online
+}
+
+#[inline(always)]
 pub fn is_offline() -> bool {
-    unsafe { LOCAL_NODE_STATUS == NodeStatus::Offline }
+    NodeStatus::from(LOCAL_NODE_STATUS.load(Ordering::Relaxed)) == NodeStatus::Offline
 }
 
 #[cfg(test)]

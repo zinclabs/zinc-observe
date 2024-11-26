@@ -39,7 +39,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     let orgOptions = ref([{ label: Number, value: String }]);
-    const selectedOrg = ref("");
+    const selectedOrg = ref({});
     const q = useQuasar();
     const router: any = useRouter();
 
@@ -66,6 +66,8 @@ export default defineComponent({
     const getDefaultOrganization = () => {
       organizationsService.list(0, 100000, "id", false, "").then((res: any) => {
         const localOrg: any = useLocalOrganization();
+        let tempDefaultOrg = {};
+        let localOrgFlag = false;
         if (
           localOrg.value != null &&
           localOrg.value.user_email !== store.state.userInfo.email
@@ -75,6 +77,7 @@ export default defineComponent({
         }
 
         store.dispatch("setOrganizations", res.data.data);
+
         orgOptions.value = res.data.data.map(
           (data: {
             id: any;
@@ -96,13 +99,25 @@ export default defineComponent({
                 store.state.userInfo.email == data.UserObj.email) ||
               res.data.data.length == 1
             ) {
+              localOrgFlag = true;
               selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
               useLocalOrganization(selectedOrg.value);
               store.dispatch("setSelectedOrganization", selectedOrg.value);
             }
+
+            if (data.type == "default") {
+              tempDefaultOrg = optiondata;
+            }
+
             return optiondata;
           }
         );
+
+        if (localOrgFlag == false) {
+          selectedOrg.value = tempDefaultOrg;
+          useLocalOrganization(tempDefaultOrg);
+          store.dispatch("setSelectedOrganization", tempDefaultOrg);
+        }
         redirectUser();
       });
     };

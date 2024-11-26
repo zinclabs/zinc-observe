@@ -588,10 +588,10 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
             );
             audit_message._timestamp = Utc::now().timestamp_micros();
             audit(audit_message).await;
-            return Ok(HttpResponse::Found()
+            Ok(HttpResponse::Found()
                 .append_header((header::LOCATION, url))
                 .cookie(auth_cookie)
-                .json(resp));
+                .json(resp))
         } else {
             audit_unauthorized_error(audit_message).await;
             unauthorized_error(resp)

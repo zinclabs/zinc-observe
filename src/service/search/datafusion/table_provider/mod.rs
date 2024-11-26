@@ -224,7 +224,7 @@ impl NewListingTable {
         part_file: &PartitionedFile,
     ) -> Result<Statistics> {
         let statistics_cache = self.collected_statistics.clone();
-        return match statistics_cache
+        match statistics_cache
             .get_with_extra(&part_file.object_meta.location, &part_file.object_meta)
         {
             Some(statistics) => Ok(statistics.as_ref().clone()),
@@ -241,7 +241,7 @@ impl NewListingTable {
                 );
                 Ok(statistics)
             }
-        };
+        }
     }
 }
 

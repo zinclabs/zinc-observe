@@ -233,7 +233,11 @@ async fn upgrade_schema_row_per_version() -> Result<bool, anyhow::Error> {
         std::result::Result::Ok(val) => {
             let val_str = std::str::from_utf8(&val).unwrap();
             let val = val_str.parse::<i64>().unwrap_or(0);
-            if val > 0 { Ok(false) } else { Ok(true) }
+            if val > 0 {
+                Ok(false)
+            } else {
+                Ok(true)
+            }
         }
         Err(_) => Ok(true),
     }

@@ -144,11 +144,6 @@ impl BlobMetadataBuilder {
         self
     }
 
-    pub fn compression_codec(mut self, compression_codec: Option<CompressionCodec>) -> Self {
-        self.compression_codec = compression_codec;
-        self
-    }
-
     pub fn properties(mut self, properties: HashMap<String, String>) -> Self {
         self.properties = properties;
         self

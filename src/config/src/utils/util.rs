@@ -17,7 +17,11 @@ pub fn zero_or<T>(v: T, def: T) -> T
 where
     T: PartialEq + Default,
 {
-    if v == Default::default() { def } else { v }
+    if v == Default::default() {
+        def
+    } else {
+        v
+    }
 }
 
 #[cfg(test)]

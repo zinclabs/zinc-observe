@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::cluster;
-use tokio::time;
 
 use crate::service::db::file_list::{broadcast, local::BROADCAST_QUEUE};
 
@@ -23,7 +22,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if cluster::is_offline() {
             break;
         }
-        time::sleep(time::Duration::from_secs(1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         let files = {
             let mut q = BROADCAST_QUEUE.write().await;
             if q.is_empty() {

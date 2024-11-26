@@ -177,11 +177,20 @@ size="xs" class="warning" />{{
           class="q-mx-sm current-organization"
         >
           <q-select
+            v-if="Object.keys(selectedOrg).length > 0"
             v-model="selectedOrg"
             borderless
             :options="orgOptions"
+            option-label="identifier"
             class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
             @update:model-value="updateOrganization()"
+          />
+          <q-select
+            v-else
+            borderless
+            option-label="identifier"
+            option-value="identifier"
+            class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
           />
         </div>
 
@@ -332,6 +341,7 @@ import {
   watch,
   markRaw,
   nextTick,
+  onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
@@ -624,6 +634,28 @@ export default defineComponent({
       },
     ];
 
+    onBeforeMount(() => {
+      try {
+        const url = new URL(window.location.href);
+        const localOrg: any = useLocalOrganization();
+        if (
+          Object.keys(localOrg.value).length == 0 &&
+          url.searchParams.get("org_identifier") != null
+        ) {
+          localOrg.value = {
+            identifier: url.searchParams.get("org_identifier"),
+            user_email: store.state.userInfo.email,
+          };
+
+          selectedOrg.value = localOrg.value;
+          useLocalOrganization(localOrg.value);
+          store.dispatch("setSelectedOrganization", localOrg.value);
+        }
+      } catch (error) {
+        console.error("Error in onBeforeMount:", error);
+      }
+    });
+
     onMounted(async () => {
       miniMode.value = true;
       filterMenus();
@@ -738,7 +770,7 @@ export default defineComponent({
       });
       useLocalOrganization(selectedOrg.value);
       store.dispatch("setSelectedOrganization", { ...selectedOrg.value });
-      setSelectedOrganization();
+      // setSelectedOrganization();
       // if (
       //   config.isCloud &&
       //   selectedOrg.value.subscription_type == config.freePlan
@@ -767,7 +799,6 @@ export default defineComponent({
       ) {
         await verifyStreamExist(selectedOrg.value);
       }
-      // }
     };
 
     const verifyStreamExist = async (selectedOrgData: any) => {
@@ -1039,7 +1070,7 @@ export default defineComponent({
 
       await this.getOrganizationSettings();
 
-      // this.isLoading = true;
+      this.isLoading = true;
     },
     changeUserInfo(newVal) {
       if (JSON.stringify(newVal) != "{}") {

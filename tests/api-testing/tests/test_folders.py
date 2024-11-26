@@ -131,7 +131,7 @@ def test_e2e_createdeletedashboard(create_session, base_url):
     )
     assert (
         resp_update_dashboard.status_code == 200
-    ), f"updating this folder, but got {resp_update_dashboard.status_code} {resp_update_dashboard.content}"
+    ), f"updating this dashboard, but got {resp_update_dashboard.status_code} {resp_update_dashboard.content}"
     resp_delete_dashboard = session.delete(
         f"{base_url}api/{org_id}/dashboards/{dashboard_id}"
     )

@@ -222,7 +222,11 @@ async fn wal_scan_files(root_dir: impl Into<PathBuf>, ext: &str) -> Result<Vec<P
             let path = entry.path();
             if path.is_file() {
                 let path_ext = path.extension()?.to_str()?;
-                if path_ext == ext { Some(path) } else { None }
+                if path_ext == ext {
+                    Some(path)
+                } else {
+                    None
+                }
             } else {
                 None
             }

@@ -165,23 +165,16 @@ pub async fn handle_grpc_request(
                 }
 
                 let mut rec = json::json!({});
-                match &resource_metric.resource {
-                    Some(res) => {
-                        for item in &res.attributes {
-                            rec[format_label_name(item.key.as_str())] =
-                                get_val(&item.value.as_ref());
-                        }
+                if let Some(res) = &resource_metric.resource {
+                    for item in &res.attributes {
+                        rec[format_label_name(item.key.as_str())] = get_val(&item.value.as_ref());
                     }
-                    None => {}
                 }
-                match &scope_metric.scope {
-                    Some(lib) => {
-                        rec["instrumentation_library_name"] =
-                            serde_json::Value::String(lib.name.to_owned());
-                        rec["instrumentation_library_version"] =
-                            serde_json::Value::String(lib.version.to_owned());
-                    }
-                    None => {}
+                if let Some(lib) = &scope_metric.scope {
+                    rec["instrumentation_library_name"] =
+                        serde_json::Value::String(lib.name.to_owned());
+                    rec["instrumentation_library_version"] =
+                        serde_json::Value::String(lib.version.to_owned());
                 }
                 rec[NAME_LABEL] = metric_name.to_owned().into();
 
@@ -569,10 +562,10 @@ pub async fn handle_grpc_request(
     let mut out = BytesMut::with_capacity(res.encoded_len());
     res.encode(&mut out).expect("Out of memory");
 
-    return Ok(HttpResponse::Ok()
+    Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
         .content_type("application/x-protobuf")
-        .body(out));
+        .body(out))
 }
 
 fn process_gauge(
@@ -815,34 +808,26 @@ fn process_exp_hist_data_point(
 
     let base = 2 ^ (2 ^ -data_point.scale);
     // add negative bucket records
-    match &data_point.negative {
-        Some(buckets) => {
-            let offset = buckets.offset;
-            for (i, val) in buckets.bucket_counts.iter().enumerate() {
-                let mut bucket_rec = rec.clone();
-                bucket_rec[NAME_LABEL] =
-                    format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
-                bucket_rec[VALUE_LABEL] = (*val as f64).into();
-                bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
-                bucket_recs.push(bucket_rec);
-            }
+    if let Some(buckets) = &data_point.negative {
+        let offset = buckets.offset;
+        for (i, val) in buckets.bucket_counts.iter().enumerate() {
+            let mut bucket_rec = rec.clone();
+            bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
+            bucket_rec[VALUE_LABEL] = (*val as f64).into();
+            bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
+            bucket_recs.push(bucket_rec);
         }
-        None => {}
     }
     // add positive bucket records
-    match &data_point.positive {
-        Some(buckets) => {
-            let offset = buckets.offset;
-            for (i, val) in buckets.bucket_counts.iter().enumerate() {
-                let mut bucket_rec = rec.clone();
-                bucket_rec[NAME_LABEL] =
-                    format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
-                bucket_rec[VALUE_LABEL] = (*val as f64).into();
-                bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
-                bucket_recs.push(bucket_rec);
-            }
+    if let Some(buckets) = &data_point.positive {
+        let offset = buckets.offset;
+        for (i, val) in buckets.bucket_counts.iter().enumerate() {
+            let mut bucket_rec = rec.clone();
+            bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
+            bucket_rec[VALUE_LABEL] = (*val as f64).into();
+            bucket_rec["le"] = (base ^ (offset + (i as i32) + 1)).to_string().into();
+            bucket_recs.push(bucket_rec);
         }
-        None => {}
     }
 
     bucket_recs

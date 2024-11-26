@@ -233,20 +233,8 @@ async fn run_datafusion(
         let table_name = sql.stream_names.first().unwrap();
         physical_plan = Arc::new(RemoteScanExec::new(
             physical_plan,
-            rewrite.file_id_lists.get(table_name).unwrap().clone(),
-            rewrite.idx_file_list.clone(),
-            rewrite
-                .equal_keys
-                .get(table_name)
-                .cloned()
-                .unwrap_or_default(),
-            rewrite.match_all_keys.clone(),
-            rewrite.index_condition,
-            false,
-            rewrite.req,
-            rewrite.nodes,
-            rewrite.context,
-        ));
+            rewrite.remote_scan_nodes.get_remote_node(table_name),
+        )?);
     }
 
     if cfg.common.print_key_sql {

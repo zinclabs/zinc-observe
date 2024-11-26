@@ -76,10 +76,7 @@ impl OptimizerRule for RewriteHistogram {
             .map(|expr| expr.exists(|expr| Ok(is_histogram(expr))).unwrap())
             .any(|x| x)
         {
-            let mut expr_rewriter = HistogramToDatebin {
-                start_time: self.start_time,
-                end_time: self.end_time,
-            };
+            let mut expr_rewriter = HistogramToDatebin::new(self.start_time, self.end_time);
 
             let name_preserver = NamePreserver::new(&plan);
             plan.map_expressions(|expr| {

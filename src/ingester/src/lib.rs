@@ -30,10 +30,7 @@ use config::RwAHashMap;
 pub use entry::Entry;
 pub use immutable::read_from_immutable;
 use once_cell::sync::Lazy;
-use tokio::{
-    sync::{mpsc, Mutex},
-    time,
-};
+use tokio::sync::{mpsc, Mutex};
 pub use writer::{check_memtable_size, flush_all, get_writer, read_from_memtable, Writer};
 
 pub(crate) type ReadRecordBatchEntry = (Arc<Schema>, Vec<Arc<entry::RecordBatchEntry>>);
@@ -55,7 +52,7 @@ pub async fn init() -> errors::Result<()> {
     // start a job to flush memtable to immutable
     tokio::task::spawn(async move {
         loop {
-            time::sleep(time::Duration::from_secs(
+            tokio::time::sleep(tokio::time::Duration::from_secs(
                 config::get_config().limit.max_file_retention_time,
             ))
             .await;

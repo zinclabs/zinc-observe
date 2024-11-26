@@ -17,10 +17,10 @@ use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use super::datetime_now;
+use super::{datetime_now, OrdF64};
 use crate::meta::stream::StreamType;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
     version: i32,
@@ -43,7 +43,7 @@ pub struct Dashboard {
     pub default_datetime_duration: Option<DateTimeOptions>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Layout {
     pub x: i64,
@@ -53,7 +53,7 @@ pub struct Layout {
     pub i: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Tab {
     pub tab_id: String,
@@ -62,7 +62,7 @@ pub struct Tab {
     pub panels: Vec<Panel>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Panel {
     pub id: String,
@@ -80,7 +80,7 @@ pub struct Panel {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub markdown_content: Option<String>,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Query {
     pub query: Option<String>,
@@ -90,7 +90,7 @@ pub struct Query {
     pub config: QueryConfig,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct PanelFields {
     pub stream: String,
     pub stream_type: StreamType,
@@ -115,7 +115,7 @@ pub struct PanelFields {
     pub filter: Vec<PanelFilter>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AxisItem {
     pub label: String,
@@ -132,12 +132,12 @@ pub struct AxisItem {
     pub is_derived: Option<bool>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct AxisArg {
     value: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum AggregationFunc {
     Count,
@@ -155,7 +155,7 @@ pub enum AggregationFunc {
     P99,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PanelFilter {
     #[serde(rename = "type")]
@@ -166,7 +166,7 @@ pub struct PanelFilter {
     pub value: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct PanelConfig {
     show_legends: bool,
     legends_position: Option<String>,
@@ -175,13 +175,13 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     unit_custom: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    decimals: Option<f64>,
+    decimals: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    top_results: Option<f64>,
+    top_results: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     top_results_others: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    axis_width: Option<f64>,
+    axis_width: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     axis_border_show: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -202,7 +202,7 @@ pub struct PanelConfig {
     wrap_table_cells: Option<bool>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DrillDown {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -218,7 +218,7 @@ pub struct DrillDown {
     data: Option<DrillDownData>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MarkLine {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -230,7 +230,7 @@ pub struct MarkLine {
     value: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DrillDownData {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -247,28 +247,28 @@ pub struct DrillDownData {
     variables: Option<Vec<DrillDownVariables>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct DrillDownVariables {
     name: Option<String>,
     value: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct QueryConfig {
     promql_legend: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     layer_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    weight_fixed: Option<f64>,
+    weight_fixed: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    limit: Option<f64>,
+    limit: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    min: Option<f64>,
+    min: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    max: Option<f64>,
+    max: Option<OrdF64>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Variables {
     pub list: Vec<VariableList>,
@@ -276,7 +276,7 @@ pub struct Variables {
     pub show_dynamic_filters: Option<bool>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DateTimeOptions {
     #[serde(rename = "type")]
@@ -289,7 +289,7 @@ pub struct DateTimeOptions {
     pub end_time: Option<i64>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VariableList {
     #[serde(rename = "type")]
@@ -304,7 +304,7 @@ pub struct VariableList {
     pub multi_select: Option<bool>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub struct QueryData {
     pub stream_type: StreamType,
     pub stream: String,
@@ -314,7 +314,7 @@ pub struct QueryData {
     pub filter: Option<Vec<Filters>>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Filters {
     pub name: Option<String>,
@@ -322,43 +322,43 @@ pub struct Filters {
     pub value: String,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomFieldsOption {
     pub label: String,
     pub value: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct BaseMap {
     #[serde(rename = "type")]
     pub type_field: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct MapView {
-    pub zoom: f64,
-    pub lat: f64,
-    pub lng: f64,
+    pub zoom: OrdF64,
+    pub lat: OrdF64,
+    pub lng: OrdF64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct MapSymbolStyle {
     pub size: String,
     pub size_by_value: Option<SizeByValue>,
-    pub size_fixed: f64,
+    pub size_fixed: OrdF64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct SizeByValue {
-    pub min: f64,
-    pub max: f64,
+    pub min: OrdF64,
+    pub max: OrdF64,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct LegendWidth {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<f64>,
+    pub value: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unit: Option<String>,
 }

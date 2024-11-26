@@ -1156,7 +1156,7 @@ pub async fn search_partition_multi(
 
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
 
-impl<'a> opentelemetry::propagation::Injector for MetadataMap<'a> {
+impl opentelemetry::propagation::Injector for MetadataMap<'_> {
     /// Set a key and value in the MetadataMap.  Does nothing if the key or
     /// value are not valid inputs
     fn set(&mut self, key: &str, value: String) {

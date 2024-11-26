@@ -130,7 +130,7 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
     ) -> Result<()>;
     async fn set_stream_stats(&self, org_id: &str, streams: &[(String, StreamStats)])
-    -> Result<()>;
+        -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
     async fn reset_stream_stats_min_ts(
         &self,

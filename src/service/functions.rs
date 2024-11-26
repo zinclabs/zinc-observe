@@ -325,10 +325,8 @@ mod tests {
         let list_resp = list_functions("nexus".to_string(), None).await;
         assert!(list_resp.is_ok());
 
-        assert!(
-            delete_function("nexus".to_string(), "dummyfn".to_owned())
-                .await
-                .is_ok()
-        );
+        assert!(delete_function("nexus".to_string(), "dummyfn".to_owned())
+            .await
+            .is_ok());
     }
 }

@@ -1232,7 +1232,8 @@ export default defineComponent({
       getSuggestions();
     };
 
-    const getColumnNames = (columnData: any) => {
+    const getColumnNames = (parsedSQL: any) => {
+      const columnData = parsedSQL?.columns;
       const columnNames = [];
       for (const item of columnData) {
         if (item.expr.type === "column_ref") {
@@ -1251,6 +1252,10 @@ export default defineComponent({
           });
         }
       }
+
+      if(parsedSQL?._next) {
+        columnNames = getColumnNames(parsedSQL._next);
+      }
       return columnNames;
     };
 
@@ -1265,7 +1270,8 @@ export default defineComponent({
           // onStreamChange(value);
         }
         if (parsedSQL != undefined && parsedSQL?.columns?.length > 0) {
-          const columnNames = getColumnNames(parsedSQL?.columns);
+          const columnNames = getColumnNames(parsedSQL);
+
           searchObj.data.stream.interestingFieldList = [];
           for (const col of columnNames) {
             if (
@@ -2393,7 +2399,21 @@ export default defineComponent({
 
     const QUERY_TEMPLATE = 'SELECT [FIELD_LIST] FROM "[STREAM_NAME]"';
 
-    function getFieldList(streamFields, interestingFields, isQuickMode) {
+    function getFieldList(
+      stream,
+      streamFields,
+      interestingFields,
+      isQuickMode,
+    ) {
+      searchObj.data.streamResults.list.forEach((item) => {
+        if (
+          item.name == stream &&
+          Object.hasOwn(item, "schema") &&
+          item.schema.length > 0
+        ) {
+          streamFields = item.schema;
+        }
+      });
       return streamFields
         .filter((item) => interestingFields.includes(item.name))
         .map((item) => item.name);
@@ -2428,15 +2448,31 @@ export default defineComponent({
           searchObj.data.editorValue = searchObj.data.query;
         } else {
           // Handle both single and multiple stream scenarios
-          const fieldList = getFieldList(
-            searchObj.data.stream.selectedStreamFields,
-            searchObj.data.stream.interestingFieldList,
-            searchObj.meta.quickMode,
-          );
+          const queries = searchObj.data.stream.selectedStream
+            .map((stream) => {
+              // Destructure for better readability
+              const { selectedStreamFields, interestingFieldList } =
+                searchObj.data.stream;
+              const { quickMode } = searchObj.meta;
 
-          const queries = searchObj.data.stream.selectedStream.map((stream) =>
-            buildStreamQuery(stream, fieldList, searchObj.meta.quickMode),
-          );
+              // Generate the field list for the current stream
+              const fieldList = getFieldList(
+                stream,
+                selectedStreamFields,
+                interestingFieldList,
+                quickMode,
+              );
+
+              // Ensure fieldList is valid before building the query
+              if (!fieldList || fieldList.length === 0) {
+                console.warn(`No fields available for stream: ${stream}`);
+                return null;
+              }
+
+              // Build and return the query for the current stream
+              return buildStreamQuery(stream, fieldList, quickMode);
+            })
+            .filter(Boolean);
 
           searchObj.data.query = queries.join(" UNION ");
           searchObj.data.editorValue = searchObj.data.query;

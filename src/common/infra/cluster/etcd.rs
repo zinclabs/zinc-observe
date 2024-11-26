@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::atomic::Ordering;
+
 use config::{
     cluster::*,
     get_config,
@@ -35,7 +37,16 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
 
     // keep alive
     tokio::task::spawn(async move {
+        // check if the node is already online
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            if is_online() {
+                break;
+            }
+        }
+        // after the node is online, keepalive
         let mut need_online_again = false;
+        let ttl = get_config().limit.node_heartbeat_ttl;
         loop {
             if is_offline() {
                 break;
@@ -49,12 +60,7 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
             }
 
             let lease_id = unsafe { LOCAL_NODE_KEY_LEASE_ID };
-            let ret = etcd::keepalive_lease_id(
-                lease_id,
-                get_config().limit.node_heartbeat_ttl,
-                is_offline,
-            )
-            .await;
+            let ret = etcd::keepalive_lease_id(lease_id, ttl, is_offline).await;
             if ret.is_ok() {
                 break;
             }
@@ -236,9 +242,7 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
     };
     let val = json::to_string(&node).unwrap();
 
-    unsafe {
-        LOCAL_NODE_STATUS = status;
-    }
+    LOCAL_NODE_STATUS.store(status as _, Ordering::Release);
 
     if new_lease_id {
         // get new lease id

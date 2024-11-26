@@ -192,7 +192,7 @@ impl JsonEncoder {
     ) -> Result<()> {
         let values = self.encode_to_json(metric_families);
         let x = serde_json::to_vec(&values).unwrap();
-        writer.write_all(&x)?; // String 
+        writer.write_all(&x)?; // String
         Ok(())
     }
 }

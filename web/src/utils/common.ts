@@ -16,9 +16,11 @@
 import { ref } from "vue";
 import organizationsService from "../services/organizations";
 import { useLocalOrganization, getPath } from "./zincutils";
+import { useStore } from "vuex";
 
 const selectedOrg = ref("");
 const orgOptions = ref([{ label: Number, value: String }]);
+const store = useStore();
 
 export const getDefaultOrganization = async (
   userInfo: any,

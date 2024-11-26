@@ -424,7 +424,7 @@ impl<'a> ColumnVisitor<'a> {
     }
 }
 
-impl<'a> VisitorMut for ColumnVisitor<'a> {
+impl VisitorMut for ColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
@@ -602,7 +602,7 @@ impl<'a> PartitionColumnVisitor<'a> {
     }
 }
 
-impl<'a> VisitorMut for PartitionColumnVisitor<'a> {
+impl VisitorMut for PartitionColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
@@ -732,7 +732,7 @@ impl<'a> PrefixColumnVisitor<'a> {
     }
 }
 
-impl<'a> VisitorMut for PrefixColumnVisitor<'a> {
+impl VisitorMut for PrefixColumnVisitor<'_> {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {

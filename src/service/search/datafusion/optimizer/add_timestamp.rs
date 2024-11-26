@@ -239,27 +239,21 @@ mod tests {
     #[tokio::test]
     async fn test_real_sql_for_timestamp() {
         let sqls = [
-            (
-                "select * from t order by _timestamp",
-                vec![
-                    "+------------+-------------+",
-                    "| _timestamp | name        |",
-                    "+------------+-------------+",
-                    "| 2          | observe     |",
-                    "| 3          | openobserve |",
-                    "+------------+-------------+",
-                ],
-            ),
-            (
-                "select name from t where name = 'openobserve'",
-                vec![
-                    "+-------------+",
-                    "| name        |",
-                    "+-------------+",
-                    "| openobserve |",
-                    "+-------------+",
-                ],
-            ),
+            ("select * from t order by _timestamp", vec![
+                "+------------+-------------+",
+                "| _timestamp | name        |",
+                "+------------+-------------+",
+                "| 2          | observe     |",
+                "| 3          | openobserve |",
+                "+------------+-------------+",
+            ]),
+            ("select name from t where name = 'openobserve'", vec![
+                "+-------------+",
+                "| name        |",
+                "+-------------+",
+                "| openobserve |",
+                "+-------------+",
+            ]),
             (
                 "select t1._timestamp, t1.name from t as t1 join t as t2 on t1.name = t2.name order by t1._timestamp",
                 vec![

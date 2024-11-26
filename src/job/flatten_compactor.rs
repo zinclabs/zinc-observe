@@ -16,10 +16,7 @@
 use std::sync::Arc;
 
 use config::{cluster::LOCAL_NODE, get_config, meta::stream::FileKey};
-use tokio::{
-    sync::{mpsc, Mutex},
-    time,
-};
+use tokio::sync::{mpsc, Mutex};
 
 use crate::service::compact;
 
@@ -68,7 +65,10 @@ pub async fn run() -> Result<(), anyhow::Error> {
 /// Generate flatten data file for parquet files
 async fn run_generate(tx: mpsc::Sender<FileKey>) -> Result<(), anyhow::Error> {
     loop {
-        time::sleep(time::Duration::from_secs(get_config().compact.interval)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            get_config().compact.interval,
+        ))
+        .await;
         log::debug!("[COMPACTOR] Running parquet file data flatten");
         let ret = compact::flatten::run_generate(tx.clone()).await;
         if ret.is_err() {

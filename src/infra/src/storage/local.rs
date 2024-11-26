@@ -214,7 +214,7 @@ impl ObjectStore for Local {
                     .inc();
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
         result
     }

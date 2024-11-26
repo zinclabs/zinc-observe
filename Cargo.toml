@@ -278,6 +278,7 @@ memchr = "2.7"
 murmur3 = "0.5"
 async-nats = "0.37"
 once_cell = "1.17"
+ordered-float = { version = "4.5.0", features = ["serde"] }
 parking_lot = "0.12"
 prometheus = "0.13"
 prost = "0.13.1"

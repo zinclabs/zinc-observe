@@ -285,7 +285,7 @@ impl Metadata for DistinctValues {
             if self.shutdown.load(Ordering::Relaxed) {
                 break;
             }
-            time::sleep(time::Duration::from_secs(1)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             log::info!("[DISTINCT_VALUES] shutting down");
             i += 1;
         }

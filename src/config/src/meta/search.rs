@@ -723,7 +723,7 @@ impl<'de> Deserialize<'de> for SearchEventType {
     {
         struct FieldVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+        impl serde::de::Visitor<'_> for FieldVisitor {
             type Value = SearchEventType;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

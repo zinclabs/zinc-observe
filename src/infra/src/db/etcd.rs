@@ -450,7 +450,7 @@ impl super::Db for Etcd {
                         Ok((watcher, stream)) => (watcher, stream),
                         Err(e) => {
                             log::error!("[ETCD:watch] prefix: {}, error: {}", key, e);
-                            time::sleep(time::Duration::from_secs(1)).await;
+                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                             continue;
                         }
                     };
@@ -578,7 +578,7 @@ where
             Ok((keeper, stream)) => (keeper, stream),
             Err(e) => {
                 log::error!("lease {:?} keep alive error: {:?}", id, e);
-                time::sleep(time::Duration::from_secs(1)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 continue;
             }
         };
@@ -586,7 +586,7 @@ where
             if stopper() {
                 break;
             }
-            time::sleep(time::Duration::from_secs(ttl_keep_alive)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             match keeper.keep_alive().await {
                 Ok(_) => {}
                 Err(e) => {

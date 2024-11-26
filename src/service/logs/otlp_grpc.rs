@@ -115,29 +115,22 @@ pub async fn handle_grpc_request(
             for log_record in &instrumentation_logs.log_records {
                 let mut rec = json::json!({});
 
-                match &resource_log.resource {
-                    Some(res) => {
-                        for item in &res.attributes {
-                            rec[item.key.as_str()] =
-                                get_val_with_type_retained(&item.value.as_ref());
-                        }
+                if let Some(res) = &resource_log.resource {
+                    for item in &res.attributes {
+                        rec[item.key.as_str()] = get_val_with_type_retained(&item.value.as_ref());
                     }
-                    None => {}
                 }
-                match &instrumentation_logs.scope {
-                    Some(lib) => {
-                        let library_name = lib.name.to_owned();
-                        if !library_name.is_empty() {
-                            rec["instrumentation_library_name"] =
-                                serde_json::Value::String(library_name);
-                        }
-                        let lib_version = lib.version.to_owned();
-                        if !lib_version.is_empty() {
-                            rec["instrumentation_library_version"] =
-                                serde_json::Value::String(lib_version);
-                        }
+                if let Some(lib) = &instrumentation_logs.scope {
+                    let library_name = lib.name.to_owned();
+                    if !library_name.is_empty() {
+                        rec["instrumentation_library_name"] =
+                            serde_json::Value::String(library_name);
                     }
-                    None => {}
+                    let lib_version = lib.version.to_owned();
+                    if !lib_version.is_empty() {
+                        rec["instrumentation_library_version"] =
+                            serde_json::Value::String(lib_version);
+                    }
                 }
 
                 let timestamp = if log_record.time_unix_nano != 0 {
@@ -426,10 +419,10 @@ pub async fn handle_grpc_request(
         ])
         .inc();
 
-    return Ok(HttpResponse::Ok()
+    Ok(HttpResponse::Ok()
         .status(http::StatusCode::OK)
         .content_type(CONTENT_TYPE_PROTO)
-        .body(response_body));
+        .body(response_body))
 }
 
 #[cfg(test)]

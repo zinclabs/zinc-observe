@@ -434,7 +434,7 @@ pub fn handle_timestamp(
     Ok(timestamp)
 }
 
-impl<'a> Iterator for IngestionDataIter<'a> {
+impl Iterator for IngestionDataIter<'_> {
     type Item = Result<json::Value, IngestionError>;
 
     fn next(&mut self) -> Option<Result<json::Value, IngestionError>> {
@@ -532,7 +532,7 @@ impl<'a> IngestionData<'a> {
                         }
                     }
                 }
-                return IngestionDataIter::KinesisFH(events.into_iter(), None);
+                IngestionDataIter::KinesisFH(events.into_iter(), None)
             }
         }
     }

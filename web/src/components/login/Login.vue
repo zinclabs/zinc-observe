@@ -118,7 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
       class="o2-input login-inputs"
     >
-      <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
+      <q-form ref="loginform"
+class="q-gutter-md" @submit.prevent="">
         <q-input
           v-model="name"
           data-cy="login-user-id"
@@ -200,6 +201,8 @@ export default defineComponent({
     const confirmpassword = ref("");
     const email = ref("");
     const loginform = ref();
+    const selectedOrg = ref({});
+    let orgOptions = ref([{ label: Number, value: String }]);
 
     const submitting = ref(false);
 
@@ -260,14 +263,14 @@ export default defineComponent({
                   auth_time: Math.floor(Date.now() / 1000),
                   name: name.value,
                   exp: Math.floor(
-                    (new Date().getTime() + 1000 * 60 * 60 * 24 * 30) / 1000
+                    (new Date().getTime() + 1000 * 60 * 60 * 24 * 30) / 1000,
                   ),
                   family_name: "",
                   email: name.value,
                   role: res.data.role,
                 };
                 const encodedUserInfo: any = b64EncodeStandard(
-                  JSON.stringify(userInfo)
+                  JSON.stringify(userInfo),
                 );
 
                 //set user info into localstorage & store
@@ -282,19 +285,11 @@ export default defineComponent({
                   window.sessionStorage.getItem("redirectURI");
                 window.sessionStorage.removeItem("redirectURI");
 
-                const selectedOrg: Ref<{
-                  label: string;
-                  id: string;
-                  type: string;
-                  identifier: string;
-                  user_email: string;
-                  ingest_threshold: string;
-                  search_threshold: string;
-                } | null> = ref(null);
-
                 //check organization information stored in localstorage along with email
                 //if email is different, remove organization information from localstorage
                 const localOrg: any = useLocalOrganization();
+                let tempDefaultOrg = {};
+                let localOrgFlag = false;
                 if (
                   Object.keys(localOrg.value).length > 0 &&
                   localOrg.value != null &&
@@ -308,31 +303,80 @@ export default defineComponent({
                 //and set first organization as selected organization
                 if (localOrg.value) {
                   selectedOrg.value = localOrg.value;
+                  useLocalOrganization(selectedOrg.value);
+                  store.dispatch("setSelectedOrganization", selectedOrg.value);
                 } else {
                   await organizationsService
                     .os_list(0, 100000, "id", false, "", "default")
                     .then((res: any) => {
-                      if (res.data.data.length) {
-                        const firstOrg = res.data.data[0];
-                        selectedOrg.value = {
-                          label: firstOrg.name,
-                          id: firstOrg.id,
-                          type: firstOrg.type,
-                          identifier: firstOrg.identifier,
-                          user_email: firstOrg.user_email,
-                          ingest_threshold: firstOrg.ingest_threshold,
-                          search_threshold: firstOrg.search_threshold,
-                        };
+                      orgOptions.value = res.data.data.map(
+                        (data: {
+                          id: any;
+                          name: any;
+                          type: any;
+                          identifier: any;
+                          UserObj: any;
+                          ingest_threshold: any;
+                          search_threshold: any;
+                          CustomerBillingObj: any;
+                          status: any;
+                        }) => {
+                          let optiondata: any = {
+                            label: data.name,
+                            id: data.id,
+                            identifier: data.identifier,
+                            user_email: store.state.userInfo.email,
+                            ingest_threshold: data.ingest_threshold,
+                            search_threshold: data.search_threshold,
+                            subscription_type: data.hasOwnProperty(
+                              "CustomerBillingObj",
+                            )
+                              ? data.CustomerBillingObj.subscription_type
+                              : "",
+                            status: data.status,
+                            note: data.hasOwnProperty("CustomerBillingObj")
+                              ? data.CustomerBillingObj.note
+                              : "",
+                          };
+
+                          if (
+                            (Object.keys(selectedOrg.value).length == 0 &&
+                              (data.type == "default" || data.id == "1") &&
+                              store.state.userInfo.email ==
+                                data.UserObj.email) ||
+                            res.data.data.length == 1
+                          ) {
+                            localOrgFlag = true;
+                            selectedOrg.value = localOrg.value
+                              ? localOrg.value
+                              : optiondata;
+                            useLocalOrganization(selectedOrg.value);
+                            store.dispatch(
+                              "setSelectedOrganization",
+                              selectedOrg.value,
+                            );
+                          }
+
+                          if (data.type == "default") {
+                            tempDefaultOrg = optiondata;
+                          }
+
+                          return optiondata;
+                        },
+                      );
+
+                      if (localOrgFlag == false) {
+                        selectedOrg.value = tempDefaultOrg;
+                        useLocalOrganization(tempDefaultOrg);
+                        store.dispatch(
+                          "setSelectedOrganization",
+                          tempDefaultOrg,
+                        );
                       }
                     });
                 }
 
-                //if selected organization is available, set it into localstorage and store
-                if (selectedOrg.value) {
-                  useLocalOrganization(selectedOrg.value);
-                  store.dispatch("setSelectedOrganization", selectedOrg.value);
-                  redirectUser(redirectURI);
-                }
+                redirectUser(redirectURI);
               } else {
                 //if user is not authorized, show error message and reset form.
                 submitting.value = false;

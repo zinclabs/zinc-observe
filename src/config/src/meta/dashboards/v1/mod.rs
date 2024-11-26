@@ -19,7 +19,7 @@ use utoipa::ToSchema;
 
 use crate::meta::stream::StreamType;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Dashboard {
     #[serde(default)]
@@ -46,7 +46,7 @@ fn datetime_now() -> DateTime<FixedOffset> {
     ))
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Layout {
     pub x: i64,
@@ -59,7 +59,7 @@ pub struct Layout {
     pub is_static: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Panel {
     pub id: String,
@@ -73,7 +73,7 @@ pub struct Panel {
     pub custom_query: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct PanelFields {
     pub stream: String,
     pub stream_type: StreamType,
@@ -82,7 +82,7 @@ pub struct PanelFields {
     pub filter: Vec<PanelFilter>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AxisItem {
     pub label: String,
@@ -93,7 +93,7 @@ pub struct AxisItem {
     pub aggregation_function: Option<AggregationFunc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum AggregationFunc {
     Count,
@@ -107,7 +107,7 @@ pub enum AggregationFunc {
     Median,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PanelFilter {
     #[serde(rename = "type")]
@@ -118,7 +118,7 @@ pub struct PanelFilter {
     pub value: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct PanelConfig {
     title: String,
     description: String,
@@ -131,13 +131,13 @@ pub struct PanelConfig {
     unit_custom: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Variables {
     pub list: Vec<VariableList>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct VariableList {
     #[serde(rename = "type")]
@@ -150,7 +150,7 @@ pub struct VariableList {
     pub options: Option<Vec<CustomFieldsOption>>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 pub struct QueryData {
     pub stream_type: StreamType,
     pub stream: String,
@@ -158,7 +158,7 @@ pub struct QueryData {
     pub max_record_size: Option<i64>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomFieldsOption {
     pub label: String,

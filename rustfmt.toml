@@ -1,4 +1,4 @@
-version = "Two"
+style_edition = "2021"
 unstable_features = true
 
 comment_width = 120

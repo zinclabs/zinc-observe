@@ -1548,11 +1548,9 @@ mod tests {
         // Optionally, deserialize and check the response body
         let body = test::read_body(resp).await;
         let destinations: Vec<Destination> = serde_json::from_slice(&body).unwrap();
-        assert!(
-            destinations
-                .iter()
-                .any(|d| d.destination_type == DestinationType::Sns)
-        );
+        assert!(destinations
+            .iter()
+            .any(|d| d.destination_type == DestinationType::Sns));
     }
 
     async fn e2e_update_sns_alert_destination() {

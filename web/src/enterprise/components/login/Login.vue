@@ -40,7 +40,7 @@ export default defineComponent({
     const store = useStore();
     const q = useQuasar();
     const router = useRouter();
-    const selectedOrg = ref("");
+    const selectedOrg = ref({});
     let orgOptions = ref([{ label: Number, value: String }]);
     let moment: any;
 
@@ -64,6 +64,8 @@ export default defineComponent({
       organizationsService
         .os_list(0, 100000, "id", false, "")
         .then((res: any) => {
+          let tempDefaultOrg = {};
+          let localOrgFlag = false;
           const localOrg: any = useLocalOrganization();
           if (
             localOrg.value != null &&
@@ -74,6 +76,7 @@ export default defineComponent({
           }
 
           store.dispatch("setOrganizations", res.data.data);
+
           orgOptions.value = res.data.data.map(
             (data: {
               id: any;
@@ -99,20 +102,32 @@ export default defineComponent({
               };
 
               if (
-                (selectedOrg.value == "" &&
+                (Object.keys(selectedOrg.value).length == 0 &&
                   (data.type == "default" || data.id == "1") &&
                   store.state.userInfo.email == data.UserObj.email) ||
                 res.data.data.length == 1
               ) {
+                localOrgFlag = true;
                 selectedOrg.value = localOrg.value
                   ? localOrg.value
                   : optiondata;
                 useLocalOrganization(selectedOrg.value);
                 store.dispatch("setSelectedOrganization", selectedOrg.value);
               }
+            
+              if (data.type == "default") {
+                tempDefaultOrg = optiondata;
+              }
+              
               return optiondata;
             }
           );
+
+          if (localOrgFlag == false) {
+            selectedOrg.value = tempDefaultOrg;
+            useLocalOrganization(tempDefaultOrg);
+            store.dispatch("setSelectedOrganization", tempDefaultOrg);
+          }
 
           const redirectURI = window.sessionStorage.getItem("redirectURI");
           window.sessionStorage.removeItem("redirectURI");

@@ -21,10 +21,7 @@ use config::{
     meta::{cluster::CompactionJobType, stream::FileKey},
     metrics,
 };
-use tokio::{
-    sync::{mpsc, Mutex},
-    time,
-};
+use tokio::sync::{mpsc, Mutex};
 
 use crate::service::compact::{
     self,
@@ -118,7 +115,7 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
     log::info!("[COMPACTOR] start run_compactor_pending_jobs_metric job");
 
     loop {
-        time::sleep(time::Duration::from_secs(interval)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
 
         log::debug!("[COMPACTOR] Running compactor pending jobs to report metric");
         let job_status = match infra::file_list::get_pending_jobs_count().await {
@@ -142,7 +139,10 @@ async fn run_compactor_pending_jobs_metric() -> Result<(), anyhow::Error> {
 /// Generate merging jobs
 async fn run_generate_job() -> Result<(), anyhow::Error> {
     loop {
-        time::sleep(time::Duration::from_secs(get_config().compact.interval)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            get_config().compact.interval,
+        ))
+        .await;
         log::debug!("[COMPACTOR] Running generate merge job");
         if let Err(e) = compact::run_generate_job(CompactionJobType::Current).await {
             log::error!("[COMPACTOR] run generate merge job error: {e}");
@@ -154,7 +154,7 @@ async fn run_generate_job() -> Result<(), anyhow::Error> {
 async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
     loop {
         // run every 1 hour at least
-        time::sleep(time::Duration::from_secs(
+        tokio::time::sleep(tokio::time::Duration::from_secs(
             get_config().compact.old_data_interval,
         ))
         .await;
@@ -168,7 +168,10 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
 /// Merge small files
 async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), anyhow::Error> {
     loop {
-        time::sleep(time::Duration::from_secs(get_config().compact.interval)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            get_config().compact.interval,
+        ))
+        .await;
         log::debug!("[COMPACTOR] Running data merge");
         if let Err(e) = compact::run_merge(tx.clone()).await {
             log::error!("[COMPACTOR] run data merge error: {e}");
@@ -179,7 +182,10 @@ async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), an
 /// Deletion for data retention
 async fn run_retention() -> Result<(), anyhow::Error> {
     loop {
-        time::sleep(time::Duration::from_secs(get_config().compact.interval + 1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            get_config().compact.interval + 1,
+        ))
+        .await;
         log::debug!("[COMPACTOR] Running data retention");
         if let Err(e) = compact::run_retention().await {
             log::error!("[COMPACTOR] run data retention error: {e}");
@@ -190,7 +196,10 @@ async fn run_retention() -> Result<(), anyhow::Error> {
 /// Delete files based on the file_file_deleted in the database
 async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     loop {
-        time::sleep(time::Duration::from_secs(get_config().compact.interval + 2)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            get_config().compact.interval + 2,
+        ))
+        .await;
         log::debug!("[COMPACTOR] Running data delay deletion");
         if let Err(e) = compact::run_delay_deletion().await {
             log::error!("[COMPACTOR] run data delay deletion error: {e}");
@@ -200,7 +209,7 @@ async fn run_delay_deletion() -> Result<(), anyhow::Error> {
 
 async fn run_sync_to_db() -> Result<(), anyhow::Error> {
     loop {
-        time::sleep(time::Duration::from_secs(
+        tokio::time::sleep(tokio::time::Duration::from_secs(
             get_config().compact.sync_to_db_interval,
         ))
         .await;
@@ -219,7 +228,7 @@ async fn run_check_running_jobs() -> Result<(), anyhow::Error> {
         if let Err(e) = infra::file_list::check_running_jobs(updated_at).await {
             log::error!("[COMPACTOR] run check running jobs error: {e}");
         }
-        time::sleep(time::Duration::from_secs(time as u64)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(time as u64)).await;
     }
 }
 
@@ -231,6 +240,6 @@ async fn run_clean_done_jobs() -> Result<(), anyhow::Error> {
         if let Err(e) = infra::file_list::clean_done_jobs(updated_at).await {
             log::error!("[COMPACTOR] run clean done jobs error: {e}");
         }
-        time::sleep(time::Duration::from_secs(time as u64)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(time as u64)).await;
     }
 }

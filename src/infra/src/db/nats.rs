@@ -31,7 +31,6 @@ use once_cell::sync::Lazy;
 use tokio::{
     sync::{mpsc, Mutex, OnceCell},
     task::JoinHandle,
-    time,
 };
 
 use crate::{
@@ -563,7 +562,7 @@ impl super::Db for NatsDb {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[NATS:watch] prefix: {}, get bucket error: {}", prefix, e);
-                        time::sleep(time::Duration::from_secs(1)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
                 };
@@ -575,7 +574,7 @@ impl super::Db for NatsDb {
                             prefix,
                             e
                         );
-                        time::sleep(time::Duration::from_secs(1)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
                 };
@@ -589,7 +588,7 @@ impl super::Db for NatsDb {
                             prefix,
                             e
                         );
-                        time::sleep(time::Duration::from_secs(1)).await;
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
                 };
@@ -778,7 +777,7 @@ impl Locker {
                 Err(err) => {
                     // created error, means the key locked by other thread, wait and retry
                     last_err = Some(err.to_string());
-                    time::sleep(time::Duration::from_millis(10)).await;
+                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
                 }
             };
         }

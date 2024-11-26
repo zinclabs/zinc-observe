@@ -1,7 +1,7 @@
 FROM public.ecr.aws/docker/library/rust:bookworm
 
-RUN rustup toolchain install nightly-2024-07-07
-RUN rustup default nightly-2024-07-07
+RUN rustup toolchain install nightly-2024-10-24
+RUN rustup default nightly-2024-10-24
 RUN rustup target add x86_64-unknown-linux-gnu
 RUN rustup component add rustfmt clippy llvm-tools
 RUN cargo install --locked sccache

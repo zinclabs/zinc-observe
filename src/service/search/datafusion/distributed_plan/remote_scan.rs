@@ -26,10 +26,7 @@ use arrow_flight::{
     Ticket,
 };
 use arrow_schema::{Schema, SchemaRef};
-use config::{
-    meta::{cluster::NodeInfo, search::ScanStats, stream::FileKey},
-    utils::json,
-};
+use config::meta::search::ScanStats;
 use datafusion::{
     common::{DataFusionError, Result, Statistics},
     execution::{RecordBatchStream, SendableRecordBatchStream, TaskContext},
@@ -43,71 +40,55 @@ use datafusion_proto::bytes::physical_plan_to_bytes_with_extension_codec;
 use futures::{Stream, StreamExt, TryStreamExt};
 use parking_lot::Mutex;
 use prost::Message;
-use proto::cluster_rpc::{self, FlightSearchRequest, KvItem};
+use proto::cluster_rpc;
 use tonic::{
     codec::CompressionEncoding,
     metadata::{MetadataKey, MetadataValue},
     Streaming,
 };
 
-use super::codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec};
-use crate::service::{
-    grpc::get_cached_channel,
-    search::{index::IndexCondition, request::Request, MetadataMap},
+use super::{
+    codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
+    node::RemoteScanNode,
 };
+use crate::service::{grpc::get_cached_channel, search::MetadataMap};
 
 /// Execution plan for empty relation with produce_one_row=false
 #[derive(Debug)]
 pub struct RemoteScanExec {
     input: Arc<dyn ExecutionPlan>,
-    file_id_list: Vec<Vec<i64>>,
-    idx_file_list: Vec<FileKey>,
-    equal_keys: Vec<KvItem>,
-    match_all_keys: Vec<String>,
-    index_condition: Option<IndexCondition>,
-    is_super_cluster: bool,
-    req: Request,
-    nodes: Vec<Arc<dyn NodeInfo>>,
+    remote_scan_node: RemoteScanNode,
     partitions: usize,
     cache: PlanProperties,
     pub scan_stats: Arc<Mutex<ScanStats>>,
     pub partial_err: Arc<Mutex<String>>,
-    pub context: opentelemetry::Context,
 }
 
 impl RemoteScanExec {
     /// Create a new RemoteScanExec
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         input: Arc<dyn ExecutionPlan>,
-        file_id_list: Vec<Vec<i64>>,
-        idx_file_list: Vec<FileKey>,
-        equal_keys: Vec<KvItem>,
-        match_all_keys: Vec<String>,
-        index_condition: Option<IndexCondition>,
-        is_super_cluster: bool,
-        req: Request,
-        nodes: Vec<Arc<dyn NodeInfo>>,
-        context: opentelemetry::Context,
-    ) -> Self {
-        let output_partitions = nodes.len();
+        mut remote_scan_node: RemoteScanNode,
+    ) -> Result<Self> {
+        let output_partitions = remote_scan_node.nodes.len();
         let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
-        RemoteScanExec {
+
+        // serialize the input plan and set it as the plan for the remote scan node
+        let proto = ComposedPhysicalExtensionCodec {
+            codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
+        };
+        let physical_plan_bytes =
+            physical_plan_to_bytes_with_extension_codec(input.clone(), &proto)?;
+        remote_scan_node.set_plan(physical_plan_bytes.to_vec());
+
+        Ok(RemoteScanExec {
             input,
-            req,
-            file_id_list,
-            idx_file_list,
-            equal_keys,
-            match_all_keys,
-            index_condition,
-            is_super_cluster,
-            nodes,
+            remote_scan_node,
             partitions: output_partitions,
             cache,
             scan_stats: Arc::new(Mutex::new(ScanStats::default())),
             partial_err: Arc::new(Mutex::new(String::new())),
-            context,
-        }
+        })
     }
 
     fn output_partitioning_helper(n_partitions: usize) -> Partitioning {
@@ -177,26 +158,11 @@ impl ExecutionPlan for RemoteScanExec {
         partition: usize,
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
-        let req = self.req.clone();
-        let file_id_list = if self.file_id_list.is_empty() {
-            vec![]
-        } else {
-            self.file_id_list[partition].clone()
-        };
         let fut = get_remote_batch(
-            self.input.clone(),
+            self.remote_scan_node.clone(),
             partition,
-            self.nodes[partition].clone(),
-            file_id_list,
-            self.idx_file_list.clone(),
-            self.equal_keys.clone(),
-            self.match_all_keys.clone(),
-            self.index_condition.clone(),
-            self.is_super_cluster,
-            req,
             self.scan_stats.clone(),
             self.partial_err.clone(),
-            self.context.clone(),
         );
         let stream = futures::stream::once(fut).try_flatten();
         Ok(Box::pin(RecordBatchStreamAdapter::new(
@@ -210,78 +176,32 @@ impl ExecutionPlan for RemoteScanExec {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn get_remote_batch(
-    input: Arc<dyn ExecutionPlan>,
+    remote_scan_node: RemoteScanNode,
     partition: usize,
-    node: Arc<dyn NodeInfo>,
-    file_id_list: Vec<i64>,
-    idx_file_list: Vec<FileKey>,
-    equal_keys: Vec<KvItem>,
-    match_all_keys: Vec<String>,
-    index_condition: Option<IndexCondition>,
-    is_super_cluster: bool,
-    req: Request,
     scan_stats: Arc<Mutex<ScanStats>>,
     partial_err: Arc<Mutex<String>>,
-    context: opentelemetry::Context,
 ) -> Result<SendableRecordBatchStream> {
-    let proto = ComposedPhysicalExtensionCodec {
-        codecs: vec![Arc::new(EmptyExecPhysicalExtensionCodec {})],
-    };
-    let physical_plan_bytes = physical_plan_to_bytes_with_extension_codec(input, &proto)?;
-    let (start_time, end_time) = req.time_range.unwrap_or((0, 0));
+    let trace_id = remote_scan_node.query_identifier.trace_id.clone();
+    let org_id = remote_scan_node.query_identifier.org_id.clone();
+    let context = remote_scan_node.opentelemetry_context.clone();
+    let node = remote_scan_node.nodes[partition].clone();
+    let is_querier = remote_scan_node.is_querier(partition);
 
-    let is_querier = !file_id_list.is_empty();
-    let idx_file_list = if is_querier {
-        idx_file_list
-            .iter()
-            .map(|f| cluster_rpc::IdxFileName {
-                key: f.key.clone(),
-                segment_ids: f.segment_ids.clone().map(|s| s.into_vec()),
-            })
-            .collect()
-    } else {
-        vec![]
-    };
-
-    let index_condition = match index_condition {
-        Some(index_condition) => json::to_string(&index_condition).unwrap(),
-        None => "".to_string(),
-    };
-
-    let job_id = config::ider::uuid();
-    let request = FlightSearchRequest {
-        trace_id: req.trace_id.clone(),
-        partition: partition as u32,
-        job_id,
-        org_id: req.org_id.clone(),
-        stream_type: req.stream_type.to_string(),
-        plan: physical_plan_bytes.to_vec(),
-        file_id_list: file_id_list.to_vec(),
-        idx_file_list,
-        equal_keys,
-        match_all_keys,
-        is_super_cluster,
-        start_time,
-        end_time,
-        timeout: req.timeout,
-        work_group: req.work_group.clone(),
-        user_id: req.user_id.clone(),
-        search_event_type: req.search_event_type,
-        use_inverted_index: req.use_inverted_index,
-        index_condition,
-    };
+    let mut request = remote_scan_node.get_flight_search_request(partition);
+    request.set_job_id(config::ider::uuid());
+    request.set_partition(partition);
 
     log::info!(
         "[trace_id {}] flight->search: request node: {}, is_querier: {}, files: {}, idx_files: {}",
-        req.trace_id,
+        trace_id,
         &node.get_grpc_addr(),
         is_querier,
-        request.file_id_list.len(),
-        request.idx_file_list.len(),
+        request.search_info.file_id_list.len(),
+        request.search_info.idx_file_list.len(),
     );
 
+    let request: cluster_rpc::FlightSearchRequest = request.into();
     let mut buf: Vec<u8> = Vec::new();
     request
         .encode(&mut buf)
@@ -292,8 +212,7 @@ async fn get_remote_batch(
     });
 
     let cfg = config::get_config();
-    let org_id: MetadataValue<_> = req
-        .org_id
+    let org_id: MetadataValue<_> = org_id
         .parse()
         .map_err(|_| DataFusionError::Internal("invalid org_id".to_string()))?;
 
@@ -315,7 +234,7 @@ async fn get_remote_batch(
         .map_err(|err| {
             log::error!(
                 "[trace_id {}] flight->search: node: {}, connect err: {:?}",
-                req.trace_id.clone(),
+                trace_id.clone(),
                 &node.get_grpc_addr(),
                 err
             );
@@ -357,7 +276,7 @@ async fn get_remote_batch(
     }
 
     Ok(Box::pin(FlightStream::new(
-        req.trace_id,
+        trace_id,
         schema,
         stream,
         node.get_grpc_addr(),

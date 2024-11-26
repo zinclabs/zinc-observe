@@ -12,8 +12,8 @@ FROM public.ecr.aws/zinclabs/rust:bookworm-sccache AS builder
 # RUN apt-get install -y protobuf-compiler
 # RUN apt-get install -y cmake curl
 
-# RUN rustup toolchain install nightly-2024-07-07
-# RUN rustup default nightly-2024-07-07
+# RUN rustup toolchain install nightly-2024-10-24
+# RUN rustup default nightly-2024-10-24
 # RUN rustup target add aarch64-unknown-linux-gnu
 
 WORKDIR /openobserve

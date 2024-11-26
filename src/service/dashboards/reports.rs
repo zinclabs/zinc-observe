@@ -500,7 +500,7 @@ async fn generate_report(
 
     // Does not seem to work for single page client application
     page.wait_for_navigation().await?;
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     let timerange = &dashboard.timerange;
     let search_type_params = if no_of_recipients == 0 {
@@ -577,7 +577,7 @@ async fn generate_report(
     page.goto(&format!("{web_url}/?org_identifier={org_id}"))
         .await?;
     page.wait_for_navigation().await?;
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
     log::debug!("headless: navigated to the org_id: {org_id}");
 
     page.goto(&dashb_url).await?;
@@ -662,7 +662,7 @@ async fn wait_for_panel_data_load(page: &Page) -> Result<(), anyhow::Error> {
             ));
         }
 
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 }
 

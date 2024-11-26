@@ -60,18 +60,6 @@ impl PuffinBytesReader {
         Ok(decompressed)
     }
 
-    pub async fn get_field(&mut self, field: &str) -> Result<Option<BlobMetadata>> {
-        self.parse_footer().await?;
-        match self.metadata.as_ref() {
-            None => Err(anyhow!("Metadata not found")),
-            Some(v) => Ok(v
-                .blobs
-                .iter()
-                .find(|b| b.properties.get("blob_tag").is_some_and(|val| val == field))
-                .cloned()),
-        }
-    }
-
     pub async fn get_metadata(&mut self) -> Result<Option<PuffinMeta>> {
         self.parse_footer().await?;
         Ok(self.metadata.clone())

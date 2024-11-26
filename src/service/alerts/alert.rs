@@ -1070,7 +1070,7 @@ enum VarValue<'a> {
     Vector(&'a [String]),
 }
 
-impl<'a> VarValue<'a> {
+impl VarValue<'_> {
     fn len(&self) -> usize {
         match self {
             VarValue::Str(v) => v.chars().count(),
