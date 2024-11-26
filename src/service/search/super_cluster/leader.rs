@@ -218,6 +218,7 @@ async fn run_datafusion(
         partition_keys,
         match_all_keys,
         sql.index_condition.clone(),
+        sql.index_optimize_mode,
         true,
         context,
     );
