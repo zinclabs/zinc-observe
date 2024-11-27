@@ -659,6 +659,9 @@ fn calculate_deltas_multi(
             let mut end_time = meta.response_start_time;
             if end_time % histogram_interval != 0 {
                 end_time = end_time - (end_time % histogram_interval);
+                if end_time < start_time {
+                    end_time = start_time;
+                }
             }
             end_time
         } else {
