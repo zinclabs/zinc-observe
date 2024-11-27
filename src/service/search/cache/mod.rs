@@ -496,7 +496,6 @@ fn sort_response(is_descending: bool, cache_response: &mut search::Response, ts_
     }
 }
 
-// TODO: deprecate
 #[allow(clippy::too_many_arguments, unused_variables)]
 pub async fn write_results(
     trace_id: &str,
@@ -508,6 +507,7 @@ pub async fn write_results(
     is_aggregate: bool,
     is_descending: bool,
 ) {
+    // TODO: remove return
     return;
     #[allow(unreachable_code)]
     let mut local_resp = res.clone();
@@ -790,4 +790,130 @@ pub async fn check_cache_v2(
             }
         }
     })
+}
+
+// based on _timestamp of first record in config::meta::search::Response either add it in start
+// or end to cache response
+pub fn merge_response_v2(
+    trace_id: &str,
+    cache_responses: &mut Vec<search::Response>,
+    search_responses: &mut Vec<search::Response>,
+    ts_column: &str,
+    limit: i64,
+    is_descending: bool,
+    cache_took: usize,
+) -> search::Response {
+    cache_responses.retain(|res| !res.hits.is_empty());
+    search_responses.retain(|res| !res.hits.is_empty());
+
+    if cache_responses.is_empty() && search_responses.is_empty() {
+        log::info!(
+            "[trace_id {trace_id}] No hits found for merging, skipping merge",
+            trace_id = trace_id
+        );
+        return search::Response::default();
+    }
+
+    log::info!(
+        "[trace_id {trace_id}] merge response v2, cache_response.len: {}, search_response.len: {}",
+        cache_responses.len(),
+        search_responses.len()
+    );
+
+    let mut merged_response = config::meta::search::Response::default();
+    let mut fn_error = String::new();
+
+    // aggregate cache responses
+    for c_resp in cache_responses {
+        merged_response.total += c_resp.total;
+        merged_response.scan_size += c_resp.scan_size;
+        merged_response.scan_records += c_resp.scan_records;
+        if c_resp.hits.is_empty() {
+            continue;
+        }
+        merged_response.hits.extend(c_resp.hits.clone());
+        merged_response.histogram_interval = c_resp.histogram_interval;
+        if !c_resp.function_error.is_empty() {
+            fn_error = c_resp.function_error.clone();
+        }
+    }
+    merged_response.took += cache_took;
+
+    if merged_response.hits.is_empty()
+        && !search_responses.is_empty()
+        && search_responses
+            .first()
+            .map_or(true, |res| res.hits.is_empty())
+        && search_responses
+            .last()
+            .map_or(true, |res| res.hits.is_empty())
+    {
+        for res in search_responses.clone() {
+            merged_response.total += res.total;
+            merged_response.scan_size += res.scan_size;
+            merged_response.took += res.took;
+            merged_response.histogram_interval = res.histogram_interval;
+            if !res.function_error.is_empty() {
+                fn_error = res.function_error.clone();
+            }
+        }
+        merged_response.function_error = fn_error;
+        log::info!(
+            "[trace_id {trace_id}] No hits found for merging, skipping merge",
+            trace_id = trace_id
+        );
+        return merged_response;
+    }
+
+    let cache_hits_len = merged_response.hits.len();
+
+    let mut files_cache_ratio = 0;
+    let mut result_cache_len = 0;
+
+    // aggregate search responses
+    for s_resp in search_responses.clone() {
+        merged_response.total += s_resp.total;
+        merged_response.scan_size += s_resp.scan_size;
+        merged_response.took += s_resp.took;
+        files_cache_ratio += s_resp.cached_ratio;
+        merged_response.histogram_interval = s_resp.histogram_interval;
+
+        result_cache_len += s_resp.total;
+
+        if s_resp.hits.is_empty() {
+            continue;
+        }
+
+        if !s_resp.function_error.is_empty() {
+            fn_error = s_resp.function_error.clone();
+        }
+
+        merged_response.hits.extend(s_resp.hits.clone());
+    }
+    sort_response(is_descending, &mut merged_response, ts_column);
+
+    if merged_response.hits.len() > (limit as usize) {
+        merged_response.hits.truncate(limit as usize);
+    }
+    if limit > 0 {
+        merged_response.total = merged_response.hits.len();
+    }
+
+    if !search_responses.is_empty() {
+        merged_response.cached_ratio = files_cache_ratio / search_responses.len();
+    }
+    merged_response.size = merged_response.hits.len() as i64;
+    log::info!(
+        "[trace_id {trace_id}] merged_response.hits.len: {}, result_cache_len: {}",
+        merged_response.hits.len(),
+        result_cache_len
+    );
+    merged_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
+        / ((result_cache_len + cache_hits_len) as f64))
+        as usize;
+
+    if !fn_error.is_empty() {
+        merged_response.function_error = fn_error;
+    }
+    merged_response
 }

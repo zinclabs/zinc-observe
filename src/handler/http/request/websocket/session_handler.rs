@@ -28,9 +28,9 @@ use infra::errors::Error;
 use proto::cluster_rpc::SearchQuery;
 use rand::prelude::SliceRandom;
 use tracing::Instrument;
+
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::enterprise_utils;
-
 use crate::{
     common::meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
     handler::http::request::websocket::utils::{
@@ -396,7 +396,7 @@ impl SessionHandler {
             }
         }
 
-        let merged_response = cache::merge_response(
+        let merged_response = cache::merge_response_v2(
             &c_resp.trace_id,
             &mut cached_responses,
             &mut search_responses,
