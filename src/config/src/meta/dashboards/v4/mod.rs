@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::hash::{Hash, Hasher};
+
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -41,6 +43,27 @@ pub struct Dashboard {
     pub variables: Option<Variables>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_datetime_duration: Option<DateTimeOptions>,
+}
+
+impl From<Dashboard> for super::Dashboard {
+    fn from(value: Dashboard) -> Self {
+        let version: i32 = 4;
+
+        let mut hasher = std::hash::DefaultHasher::new();
+        hasher.write_i32(version);
+        value.hash(&mut hasher);
+        let hash = hasher.finish().to_string();
+
+        Self {
+            v1: None,
+            v2: None,
+            v3: None,
+            v4: Some(value),
+            v5: None,
+            version,
+            hash,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]

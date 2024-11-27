@@ -141,9 +141,9 @@ pub async fn save(
         // Supports only one tab for now
         let tab_id = &dashboard.tabs[0];
         tasks.push(async move {
-            let dashboard = db::dashboards::get(org_id, dash_id, folder).await?;
+            let maybe_dashboard = db::dashboards::get(org_id, dash_id, folder).await?;
             // Check if the tab_id exists
-            if let Some(dashboard) = dashboard.v3 {
+            if let Some(dashboard) = maybe_dashboard.and_then(|d| d.v3) {
                 let mut tab_found = false;
                 for tab in dashboard.tabs {
                     if &tab.tab_id == tab_id {

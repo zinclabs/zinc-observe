@@ -40,6 +40,142 @@ pub struct Dashboard {
     pub hash: String,
 }
 
+impl Dashboard {
+    pub fn dashboard_id(&self) -> Option<&str> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.dashboard_id.as_str()),
+            2 => self.v2.as_ref().map(|inner| inner.dashboard_id.as_str()),
+            3 => self.v3.as_ref().map(|inner| inner.dashboard_id.as_str()),
+            4 => self.v4.as_ref().map(|inner| inner.dashboard_id.as_str()),
+            5 => self.v5.as_ref().map(|inner| inner.dashboard_id.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn set_dashboard_id(&mut self, dashboard_id: String) {
+        match self {
+            Self {
+                version: 1,
+                v1: Some(inner),
+                ..
+            } => inner.dashboard_id = dashboard_id,
+            Self {
+                version: 2,
+                v2: Some(inner),
+                ..
+            } => inner.dashboard_id = dashboard_id,
+            Self {
+                version: 3,
+                v3: Some(inner),
+                ..
+            } => inner.dashboard_id = dashboard_id,
+            Self {
+                version: 4,
+                v4: Some(inner),
+                ..
+            } => inner.dashboard_id = dashboard_id,
+            Self {
+                version: 5,
+                v5: Some(inner),
+                ..
+            } => inner.dashboard_id = dashboard_id,
+            _ => {}
+        };
+    }
+
+    pub fn owner(&self) -> Option<&str> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.owner.as_str()),
+            2 => self.v2.as_ref().map(|inner| inner.owner.as_str()),
+            3 => self.v3.as_ref().map(|inner| inner.owner.as_str()),
+            4 => self.v4.as_ref().map(|inner| inner.owner.as_str()),
+            5 => self.v5.as_ref().map(|inner| inner.owner.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn title(&self) -> Option<&str> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.title.as_str()),
+            2 => self.v2.as_ref().map(|inner| inner.title.as_str()),
+            3 => self.v3.as_ref().map(|inner| inner.title.as_str()),
+            4 => self.v4.as_ref().map(|inner| inner.title.as_str()),
+            5 => self.v5.as_ref().map(|inner| inner.title.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn set_title(&mut self, title: String) {
+        match self {
+            Self {
+                version: 1,
+                v1: Some(inner),
+                ..
+            } => inner.title = title,
+            Self {
+                version: 2,
+                v2: Some(inner),
+                ..
+            } => inner.title = title,
+            Self {
+                version: 3,
+                v3: Some(inner),
+                ..
+            } => inner.title = title,
+            Self {
+                version: 4,
+                v4: Some(inner),
+                ..
+            } => inner.title = title,
+            Self {
+                version: 5,
+                v5: Some(inner),
+                ..
+            } => inner.title = title,
+            _ => {}
+        };
+    }
+
+    pub fn description(&self) -> Option<&str> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.description.as_str()),
+            2 => self.v2.as_ref().map(|inner| inner.description.as_str()),
+            3 => self.v3.as_ref().map(|inner| inner.description.as_str()),
+            4 => self.v4.as_ref().map(|inner| inner.description.as_str()),
+            5 => self.v5.as_ref().map(|inner| inner.description.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn role(&self) -> Option<&str> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.role.as_str()),
+            2 => self.v2.as_ref().map(|inner| inner.role.as_str()),
+            3 => self.v3.as_ref().map(|inner| inner.role.as_str()),
+            4 => self.v4.as_ref().map(|inner| inner.role.as_str()),
+            5 => self.v5.as_ref().map(|inner| inner.role.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Returns the timestamp with timezone of the time at which the dashboard
+    /// was created.
+    ///
+    /// This value is stored in JSON for versions 1-5 of the dashboard. However
+    /// future versions of the dashboard should utilize the `created_at` Unix
+    /// timestamp field in the database to represent the creation timestamp.
+    pub fn created_at_deprecated(&self) -> Option<DateTime<FixedOffset>> {
+        match self.version {
+            1 => self.v1.as_ref().map(|inner| inner.created),
+            2 => self.v2.as_ref().map(|inner| inner.created),
+            3 => self.v3.as_ref().map(|inner| inner.created),
+            4 => self.v4.as_ref().map(|inner| inner.created),
+            5 => self.v5.as_ref().map(|inner| inner.created),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Dashboards {
     pub dashboards: Vec<Dashboard>,

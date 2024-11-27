@@ -88,6 +88,32 @@ pub enum DbError {
     UniqueViolation,
     #[error("SeaORMError# {0}")]
     SeaORMError(String),
+    #[error("error getting dashboard")]
+    GetDashboardError(#[from] GetDashboardError),
+    #[error("PutDashbord# {0}")]
+    PutDashboard(#[from] PutDashboardError),
+}
+
+#[derive(ThisError, Debug)]
+pub enum GetDashboardError {
+    #[error("dashboard in DB has version {0} which cannot be deserialized")]
+    UnsupportedVersion(i32),
+}
+
+#[derive(ThisError, Debug)]
+pub enum PutDashboardError {
+    #[error("error putting dashboard with folder that does not exist")]
+    FolderDoesNotExist,
+    #[error("error putting dashboard with missing dashboard_id")]
+    MissingDashboardId,
+    #[error("error putting dashboard with missing title")]
+    MissingTitle,
+    #[error("error putting dashboard with missing owner")]
+    MissingOwner,
+    #[error("error putting dashboard with missing inner data for version {0}")]
+    MissingInnerData(i32),
+    #[error("error converting created timestamp with timezone to Unix timestamp")]
+    ConvertingCreatedTimestamp,
 }
 
 #[derive(ThisError, Debug)]
@@ -108,6 +134,18 @@ pub enum ErrorCodes {
 impl From<sea_orm::DbErr> for Error {
     fn from(value: sea_orm::DbErr) -> Self {
         Error::DbError(DbError::SeaORMError(value.to_string()))
+    }
+}
+
+impl From<GetDashboardError> for Error {
+    fn from(value: GetDashboardError) -> Self {
+        Error::DbError(value.into())
+    }
+}
+
+impl From<PutDashboardError> for Error {
+    fn from(value: PutDashboardError) -> Self {
+        Error::DbError(value.into())
     }
 }
 

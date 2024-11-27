@@ -177,20 +177,12 @@ size="xs" class="warning" />{{
           class="q-mx-sm current-organization"
         >
           <q-select
-            v-if="Object.keys(selectedOrg).length > 0"
             v-model="selectedOrg"
             borderless
             :options="orgOptions"
             option-label="identifier"
             class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
             @update:model-value="updateOrganization()"
-          />
-          <q-select
-            v-else
-            borderless
-            option-label="identifier"
-            option-value="identifier"
-            class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
           />
         </div>
 
@@ -917,6 +909,28 @@ export default defineComponent({
         store.dispatch("setSelectedOrganization", tempDefaultOrg);
       }
 
+      if (Object.keys(selectedOrg.value).length == 0) {
+        let data = store.state.organizations[0];
+        let optiondata = {
+          label: data.name,
+          id: data.id,
+          identifier: data.identifier,
+          user_email: store.state.userInfo.email,
+          ingest_threshold: data.ingest_threshold,
+          search_threshold: data.search_threshold,
+          subscription_type: data.hasOwnProperty("CustomerBillingObj")
+            ? data.CustomerBillingObj.subscription_type
+            : "",
+          status: data.status,
+          note: data.hasOwnProperty("CustomerBillingObj")
+            ? data.CustomerBillingObj.note
+            : "",
+        };
+        selectedOrg.value = optiondata;
+        useLocalOrganization(optiondata);
+        store.dispatch("setSelectedOrganization", optiondata);
+      }
+
       if (router.currentRoute.value.query.action == "subscribe") {
         router.push({
           name: "plans",
@@ -1057,10 +1071,12 @@ export default defineComponent({
     forceFetchOrganization() {
       mainLayoutMixin.setup().getDefaultOrganization(this.store);
     },
-    changeOrganization() {
-      setTimeout(() => {
+    changeOrganization: {
+      handler() {
         this.setSelectedOrganization();
-      }, 500);
+      },
+      deep: true,
+      immediate: true,
     },
     async changeOrganizationIdentifier() {
       this.isLoading = false;

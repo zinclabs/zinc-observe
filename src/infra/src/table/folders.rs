@@ -15,8 +15,8 @@
 
 use config::meta::folder::Folder;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ModelTrait, QueryFilter,
-    QueryOrder, Set, TryIntoModel,
+    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
+    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 
 use super::entity::folders::{ActiveModel, Column, Entity, Model};
@@ -27,7 +27,7 @@ use crate::{
 
 /// Indicates the type of data that the folder can contain.
 #[derive(Debug, Clone, Copy)]
-enum FolderType {
+pub(crate) enum FolderType {
     Dashboards,
 }
 
@@ -83,6 +83,9 @@ pub async fn put(org_id: &str, folder: Folder) -> Result<Folder, errors::Error> 
         // active record so that Sea ORM will create a new DB record when the
         // active model is saved.
         None => ActiveModel {
+            id: NotSet,          // Set by DB.
+            name: NotSet,        // Can be updated so this is set below.
+            description: NotSet, // Can be updated so this is set below.
             org: Set(org_id.to_owned()),
             // We should probably generate folder_id here for new folders,
             // rather than depending on caller code to generate it.
@@ -91,7 +94,6 @@ pub async fn put(org_id: &str, folder: Folder) -> Result<Folder, errors::Error> 
             // creating different types of folders then we can allow the caller
             // to pass the folder type as a field on the Folder struct.
             r#type: Set::<i16>(FolderType::Dashboards.into()),
-            ..Default::default()
         },
     };
 

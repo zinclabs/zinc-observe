@@ -102,7 +102,11 @@ def test_e2e_createdeletedashboard(create_session, base_url):
     session = create_session
     # Create a dashboard
     org_id = "default"
-    payload = {"description": "pydashboards", "title": "pytestdashboard"}
+    payload = {
+        "description": "pydashboards", 
+        "title": "pytestdashboard",
+        "owner": "user1@alpha1.com",
+    }
 
     resp_create_dashboard = session.post(
         f"{base_url}api/{org_id}/dashboards", json=payload
@@ -120,7 +124,7 @@ def test_e2e_createdeletedashboard(create_session, base_url):
         "dashboardId": "",
         "description": "updatedashboard",
         "role": "",
-        "owner": "root@alpha1.com",
+        "owner": "user2@alpha1.com",
         "created": "2023-10-19T14:08:48.090Z",
         "panels": [],
     }

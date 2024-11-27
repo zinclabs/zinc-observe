@@ -13,10 +13,18 @@ pub struct Model {
     #[sea_orm(column_type = "Text", nullable)]
     pub description: Option<String>,
     pub r#type: i16,
-    pub created_at: DateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::dashboards::Entity")]
+    Dashboards,
+}
+
+impl Related<super::dashboards::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Dashboards.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}
