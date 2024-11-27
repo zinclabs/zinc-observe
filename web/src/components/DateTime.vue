@@ -605,6 +605,10 @@ export default defineComponent({
         if (periodValue) {
           relativeValue.value = parseInt(periodValue);
         }
+
+        if (selectedType.value === "absolute") {
+          selectedType.value = "relative";
+        }
       }
     };
 
