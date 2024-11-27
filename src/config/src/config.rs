@@ -1074,6 +1074,12 @@ pub struct Limit {
         help = "Maximum number of entries in the inverted index cache. Higher values increase memory usage but may improve query performance."
     )]
     pub inverted_index_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
+        default = 0,
+        help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
+    )]
+    pub inverted_index_skip_threshold: usize,
 }
 
 #[derive(EnvConfig)]

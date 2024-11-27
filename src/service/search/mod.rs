@@ -207,6 +207,7 @@ pub async fn search(
                     if matches!(
                         search_type,
                         search::SearchEventType::UI
+                            | search::SearchEventType::Dashboards
                             | search::SearchEventType::Values
                             | search::SearchEventType::Other
                     ) {
@@ -255,6 +256,7 @@ pub async fn search(
                         None
                     },
                     work_group: _work_group,
+                    result_cache_ratio: Some(res.result_cache_ratio),
                     ..Default::default()
                 };
                 let num_fn = if req_query.query_fn.is_empty() { 0 } else { 1 };
@@ -262,7 +264,7 @@ pub async fn search(
                     req_stats,
                     org_id,
                     &stream_name,
-                    StreamType::Logs,
+                    stream_type,
                     UsageType::Search,
                     num_fn,
                     started_at,

@@ -977,6 +977,12 @@ export const convertSQLData = async (
 
           const seriesObj = {
             name: seriesLabel,
+            label: {
+              show:
+                panelSchema.config?.label_option?.position != null,
+              position: panelSchema.config?.label_option?.position || "None",
+              rotate: panelSchema.config?.label_option?.rotate || 0,
+            },
             color:
               getSeriesColor(
                 panelSchema.config.color,

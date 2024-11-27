@@ -508,14 +508,8 @@ impl VisitorMut for ColumnVisitor<'_> {
             for select_item in select.projection.iter_mut() {
                 match select_item {
                     SelectItem::ExprWithAlias { expr, alias } => {
-                        let mut name_visitor = FieldNameVisitor::new();
-                        expr.visit(&mut name_visitor);
-                        if name_visitor.field_names.len() == 1 {
-                            let expr_name =
-                                name_visitor.field_names.iter().next().unwrap().to_string();
-                            self.columns_alias
-                                .insert((expr_name, alias.value.to_string()));
-                        }
+                        self.columns_alias
+                            .insert((expr.to_string(), alias.value.to_string()));
                     }
                     SelectItem::Wildcard(_) => {
                         self.is_wildcard = true;

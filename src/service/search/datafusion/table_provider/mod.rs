@@ -340,11 +340,28 @@ impl TableProvider for NewListingTable {
             return Ok(Arc::new(EmptyExec::new(Arc::new(Schema::empty()))));
         };
 
-        let (parquet_projection, filter_projection) = if self.index_condition.is_some() {
-            (None, projection)
-        } else {
-            (projection, None)
-        };
+        let (parquet_projection, filter_projection) =
+            if let Some(index_condition) = self.index_condition.as_ref() {
+                // get the projection for the filter
+                let mut filter_projection =
+                    index_condition.get_schema_projection(self.schema(), &self.fst_fields);
+                if let Some(v) = projection.as_ref() {
+                    filter_projection.extend(v.iter().copied());
+                }
+                filter_projection.sort();
+                filter_projection.dedup();
+                // regenerate the projection with the filter_projection
+                let projection = projection.as_ref().map(|p| {
+                    p.iter()
+                        .filter_map(|i| filter_projection.iter().position(|f| f == i))
+                        .collect::<Vec<_>>()
+                });
+                (Some(filter_projection), projection)
+            } else {
+                (projection.cloned(), None)
+            };
+        let parquet_projection = parquet_projection.as_ref();
+        let filter_projection = filter_projection.as_ref();
 
         // create the execution plan
         let parquet_exec = self
@@ -372,7 +389,7 @@ impl TableProvider for NewListingTable {
 
         apply_filter(
             self.index_condition.as_ref(),
-            &self.schema(),
+            &projection_exec.schema(),
             &self.fst_fields,
             projection_exec,
             filter_projection,
