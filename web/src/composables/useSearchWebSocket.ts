@@ -65,8 +65,8 @@ const useSearchWebSocket = () => {
     const socket = webSocket.getWebSocketBasedOnSocketId(requestId);
 
     // check state of socket
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      socket.close();
+    if (socket && socket.readyState !== WebSocket.OPEN) {
+      socket?.close();
       return;
     }
 

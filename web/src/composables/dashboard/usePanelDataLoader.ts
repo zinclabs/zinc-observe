@@ -286,15 +286,18 @@ export const usePanelDataLoader = (
   };
 
   const cancelQueryAbort = () => {
-    if (abortController) {
-      abortController?.abort();
-    }
-
-    // loop on state.searchWebSocketRequestIdsAndTraceIds
-    if (state.searchWebSocketRequestIdsAndTraceIds) {
+    if (
+      (window as any)?.use_web_socket &&
+      state.searchWebSocketRequestIdsAndTraceIds
+    ) {
+      // loop on state.searchWebSocketRequestIdsAndTraceIds
       state.searchWebSocketRequestIdsAndTraceIds.forEach((it) => {
         cancelSearchQueryBasedOnRequestId(it.requestId, it.traceId);
       });
+    }
+
+    if (abortController) {
+      abortController?.abort();
     }
   };
 
@@ -533,11 +536,7 @@ export const usePanelDataLoader = (
     }
   };
 
-  const handleHistogramResponse = async (
-    requestId: string,
-    payload: any,
-    searchRes: any,
-  ) => {
+  const handleHistogramResponse = async (payload: any, searchRes: any) => {
     // remove past error detail
     state.errorDetail = "";
     // if there is an function error and which not related to stream range, throw error
@@ -556,6 +555,20 @@ export const usePanelDataLoader = (
     //   return;
     // }
 
+    //  // if order by is desc, append new partition response at end
+    //  if (order_by.toLowerCase() === "desc") {
+    //   state.data[currentQueryIndex] = [
+    //     ...(state.data[currentQueryIndex] ?? []),
+    //     ...searchRes.data.hits,
+    //   ];
+    // } else {
+    //   // else append new partition response at start
+    //   state.data[currentQueryIndex] = [
+    //     ...searchRes.data.hits,
+    //     ...(state.data[currentQueryIndex] ?? []),
+    //   ];
+    // }
+
     state.data[payload?.queryReq?.currentQueryIndex] =
       searchRes?.content?.results?.hits ?? {};
 
@@ -571,7 +584,7 @@ export const usePanelDataLoader = (
     response: any,
   ) => {
     if (response.type === "search_response") {
-      handleHistogramResponse(payload.queryReq, payload.traceId, response);
+      handleHistogramResponse(payload, response);
     }
 
     if (response.type === "error") {
@@ -1090,10 +1103,9 @@ export const usePanelDataLoader = (
                   abortControllerRef,
                 );
               }
+              state.loading = false;
             }
           }
-
-          state.loading = false;
 
           log("logaData: state.data", state.data);
           log("logaData: state.metadata", state.metadata);
