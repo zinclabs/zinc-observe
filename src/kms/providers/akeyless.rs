@@ -28,7 +28,7 @@ pub enum KeyType {
 }
 
 /// This stores the key related info for akeyless
-#[allow_unused]
+#[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct KeyInfo {
     /// name of the key item
@@ -42,7 +42,7 @@ pub struct KeyInfo {
 }
 
 /// This stores the auth related info for akeyless
-#[allow_unused]
+#[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct AuthInfo {
     /// The access id for generating tokens
@@ -65,6 +65,7 @@ impl AuthState for Authenticated {}
 impl AuthState for KeyConfigured {}
 
 /// The builder struct for the Akeyless KMS
+#[allow(unused, private_bounds)]
 pub struct AkeylessBuilder<S: AuthState> {
     /// api endpoint url, must be without trailing /
     base_url: String,
@@ -102,6 +103,7 @@ async fn refresh_token(base: &str, id: &str, key: &str) -> Result<String, Error>
 }
 
 /// public method to get the uninitialized akeyless km builder
+#[allow(private_interfaces)]
 pub fn new_akeyless_builder(base_url: &str) -> AkeylessBuilder<Base> {
     AkeylessBuilder {
         base_url: base_url.to_string(),
@@ -139,7 +141,7 @@ impl AkeylessBuilder<Base> {
 impl AkeylessBuilder<Authenticated> {
     /// validates and sets the key info for the key
     /// to be used for encryption/decryption.
-    async fn set_key(
+    pub async fn set_key(
         self,
         key_name: &str,
         iv: Option<&str>,
@@ -184,7 +186,7 @@ impl AkeylessBuilder<Authenticated> {
                 key_names
             )));
         }
-        let key = items.get(0).unwrap();
+        let key = items.first().unwrap();
 
         // Then we check if the given key is of type aes or not
         // rsa keys generate certs, and cannot be used via api to encrypt/decrypt
@@ -207,13 +209,10 @@ impl AkeylessBuilder<Authenticated> {
         };
 
         // for cbc keys, we need IV, so we check if it present or not
-        match (typ, iv) {
-            (KeyType::AesCbc, None) => {
-                return Err(Error::InvalidKey(format!(
-                    "missing iv, AES CBC key must have IV"
-                )));
-            }
-            _ => {}
+        if let (KeyType::AesCbc, None) = (typ, iv) {
+            return Err(Error::InvalidKey(
+                "missing iv, AES CBC key must have IV".to_string(),
+            ));
         }
 
         let kinfo = KeyInfo {
@@ -235,7 +234,7 @@ impl AkeylessBuilder<Authenticated> {
 /// This is for converting the authenticated, key-configured builder
 /// into the final struct which implements the kms interface
 impl AkeylessBuilder<KeyConfigured> {
-    fn build(self) -> Akeyless {
+    pub fn build(self) -> Akeyless {
         Akeyless {
             base_url: self.base_url,
             auth: self.auth.unwrap(),
