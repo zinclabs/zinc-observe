@@ -785,7 +785,7 @@ pub async fn check_cache_v2(
                 }
             }
             Err(e) => {
-                log::error!("Error parsing sql: {:?}", e);
+                log::error!("[trace_id {}]: Error parsing sql: {:?}", trace_id, e);
                 MultiCachedQueryResponse::default()
             }
         }
