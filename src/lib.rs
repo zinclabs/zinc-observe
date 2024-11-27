@@ -19,6 +19,7 @@ pub mod cli;
 pub mod common;
 pub mod handler;
 pub mod job;
+pub mod kms;
 pub mod router;
 pub mod service;
 
