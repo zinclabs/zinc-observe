@@ -594,9 +594,9 @@ impl SessionHandler {
                 // If the delta is before the current cached response time, fetch
                 // partitions
                 log::info!(
-                    "[WS_SEARCH]: checking delta: {:?}, cached: {:?}",
-                    trace_id,
-                    delta
+                    "[WS_SEARCH]: checking delta: {:?}, delta: {:?}",
+                    delta,
+                    cached
                 );
                 if delta.delta_end_time < cached.response_start_time {
                     self.process_delta(req, trace_id.clone(), delta, req_size, &mut curr_res_size)
