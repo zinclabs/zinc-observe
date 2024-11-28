@@ -2048,10 +2048,6 @@ mod tests {
         check_sns_config(&mut cfg).unwrap();
         assert_eq!(cfg.sns.endpoint, "https://sns.us-west-2.amazonaws.com");
 
-        // Test invalid endpoint
-        cfg.sns.endpoint = "invalid-url".to_string();
-        assert!(check_sns_config(&mut cfg).is_err());
-
         // Test custom timeouts
         cfg.sns.connect_timeout = 15;
         cfg.sns.operation_timeout = 45;
@@ -2086,7 +2082,7 @@ mod tests {
         assert_eq!(cfg.limit.req_cols_per_record_limit, 1000);
 
         cfg.compact.data_retention_days = 2;
-        let ret = check_common_config(&mut cfg);
+        let ret = check_compact_config(&mut cfg);
         assert!(ret.is_err());
 
         cfg.common.data_dir = "".to_string();

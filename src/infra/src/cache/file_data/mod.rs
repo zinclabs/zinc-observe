@@ -220,9 +220,9 @@ mod tests {
         cache.insert(key1.to_string(), 1);
         cache.insert(key2.to_string(), 2);
         cache.contains_key(key1);
-        cache.remove();
-        assert!(cache.contains_key(key1));
-        assert!(!cache.contains_key(key2));
+        cache.remove(); // contains_key() does not mark the key1 as used -> removed
+        assert!(!cache.contains_key(key1));
+        assert!(cache.contains_key(key2));
     }
 
     #[test]
