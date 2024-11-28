@@ -45,11 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-          <q-toggle
-            v-if="!beingUpdated && userRole == 'root'"
-            v-model="existingUser"
-            :label="t('user.isExistingUser')"
-          />
 
           <q-input
             v-if="!beingUpdated"
@@ -68,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           />
 
-          <div v-if="!beingUpdated && !existingUser">
+          <div v-if="!beingUpdated">
             <q-input
               :type="isPwd ? 'password' : 'text'"
               v-model="formData.password"
@@ -98,7 +93,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <q-input
-            v-if="!existingUser"
             v-model="formData.first_name"
             :label="t('user.firstName')"
             color="input-border"
@@ -111,7 +105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <q-input
-            v-if="!existingUser"
             v-model="formData.last_name"
             :label="t('user.lastName')"
             color="input-border"
@@ -122,141 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
           />
-
-          <q-select
-            v-if="
-              (userRole !== 'member' &&
-                store.state.userInfo.email !== formData.email) ||
-              !beingUpdated
-            "
-            v-model="formData.role"
-            :label="t('user.role') + ' *'"
-            :options="roles"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-pt-md q-pb-md showLabelOnTop"
-            emit-value
-            map-options
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required']"
-          />
-
-          <div v-if="beingUpdated">
-            <q-toggle
-              v-model="formData.change_password"
-              :label="t('user.changePassword')"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-pt-md q-pb-sm showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-            />
-
-            <q-input
-              v-if="
-                formData.change_password &&
-                (userRole == 'member' ||
-                  store.state.userInfo.email == formData.email)
-              "
-              :type="isOldPwd ? 'password' : 'text'"
-              v-model="formData.old_password"
-              :label="t('user.oldPassword') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
-            >
-              <template v-slot:append>
-                <q-icon
-                  :name="isOldPwd ? 'visibility_off' : 'visibility'"
-                  class="cursor-pointer"
-                  @click="isOldPwd = !isOldPwd"
-                />
-              </template>
-            </q-input>
-
-            <q-input
-              v-if="formData.change_password"
-              :type="isNewPwd ? 'password' : 'text'"
-              v-model="formData.new_password"
-              :label="t('user.newPassword') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
-            >
-              <template v-slot:append>
-                <q-icon
-                  :name="isNewPwd ? 'visibility_off' : 'visibility'"
-                  class="cursor-pointer"
-                  @click="isNewPwd = !isNewPwd"
-                />
-              </template>
-            </q-input>
-          </div>
-
-          <q-select
-            v-if="!beingUpdated && userRole != 'member'"
-            v-model="formData.organization"
-            :label="t('user.organization') + ' *'"
-            emit-value
-            :options="organizationOptions"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-pt-md q-pb-md showLabelOnTop q-mt-sm"
-            stack-label
-            outlined
-            :loading="loadingOrganizations"
-            filled
-            dense
-            :rules="[(val: any) => !!val || 'Field is required']"
-          />
-
-          <q-input
-            v-if="
-              !beingUpdated &&
-              userRole != 'member' &&
-              formData.organization == 'other'
-            "
-            v-model="formData.other_organization"
-            :label="t('user.otherOrganization')"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-md showLabelOnTop q-mt-sm"
-            stack-label
-            outlined
-            filled
-            dense
-            :rules="[
-              (val: any) =>
-                /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(val) ||
-                'Input must start with a letter and be alphanumeric _ or -',
-            ]"
-          />
-
           <div class="flex justify-center q-mt-lg">
             <q-btn
               v-close-popup="true"
@@ -280,21 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
   </q-card>
-  <q-dialog v-model="logout_confirm" persistent>
-    <q-card>
-      <q-card-section class="row items-center">
-        <q-avatar icon="info" color="primary" text-color="white" />
-        <span class="q-ml-sm"
-          >As you've chosen to change your password, you'll be automatically
-          logged out.</span
-        >
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <q-btn flat label="Ok" color="primary" @click="signout" />
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
 </template>
 
 <script lang="ts">
@@ -312,6 +155,7 @@ import {
   invlidateLoginData,
 } from "@/utils/zincutils";
 import config from "@/aws-exports";
+import service_accounts from "@/services/service_accounts";
 
 const defaultValue: any = () => {
   return {
@@ -320,11 +164,7 @@ const defaultValue: any = () => {
     first_name: "",
     last_name: "",
     email: "",
-    old_password: "",
-    new_password: "",
-    change_password: false,
     organization: "",
-    other_organization: "",
   };
 };
 
@@ -338,20 +178,7 @@ export default defineComponent({
     isUpdated: {
       type: Boolean,
       default: false,
-    },
-    userRole: {
-      type: String,
-      default: "admin",
-    },
-    roles: {
-      type: Array,
-      default: () => [
-        {
-          label: "Admin",
-          value: "admin",
-        },
-      ],
-    },
+    }
   },
   emits: ["update:modelValue", "updated", "cancel:hideform"],
   setup(props) {
@@ -370,37 +197,11 @@ export default defineComponent({
     const loadingOrganizations = ref(true);
     const logout_confirm = ref(false);
 
-
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
     });
 
-    onBeforeMount(() => setOrganizationOptions());
 
-    watch(
-      () => store.state.organizations,
-      () => setOrganizationOptions(),
-      { deep: true }
-    );
-
-    const setOrganizationOptions = () => {
-      organizationOptions.value = [];
-      loadingOrganizations.value = !store.state.organizations.length;
-      store.state.organizations.forEach((org: any) => {
-        organizationOptions.value.push({
-          label: org.name,
-          value: org.identifier,
-        });
-      });
-
-      if (props.userRole == "root") {
-        organizationOptions.value.push({
-          label: "Other",
-          value: "other",
-        });
-      }
-      formData.value.organization = store.state.selectedOrganization.identifier;
-    };
 
     return {
       t,
@@ -431,58 +232,33 @@ export default defineComponent({
     ) {
       this.beingUpdated = true;
       this.formData = this.modelValue;
-      this.formData.change_password = false;
       this.formData.password = "";
     }
   },
   methods: {
-    signout() {
-      if (config.isEnterprise == "true") {
-        invlidateLoginData();
-      }
 
-      const logoutURL = getLogoutURL();
-      this.store.dispatch("logout");
-
-      useLocalCurrentUser("", true);
-      useLocalUserInfo("", true);
-
-      if (config.isCloud == "true") {
-        window.location.href = logoutURL;
-      }
-
-      this.$router.push("/logout");
-    },
     onSubmit() {
       const dismiss = this.$q.notify({
         spinner: true,
         message: "Please wait...",
         timeout: 2000,
       });
-
-      let selectedOrg = this.formData.organization;
+      let selectedOrg = this.store.state.selectedOrganization.identifier;
+      this.formData.organization = this.store.state.selectedOrganization.identifier;
       if (selectedOrg == "other") {
         selectedOrg = encodeURIComponent(this.formData.other_organization);
       }
       if (this.beingUpdated) {
         const userEmail = this.formData.email;
         delete this.formData.email;
+        delete this.formData.password;
+        delete this.formData.change_password
 
-        if (this.formData.change_password == false) {
-          delete this.formData.old_password;
-          delete this.formData.new_password;
-        }
-
-        userServiece
+        service_accounts
           .update(this.formData, selectedOrg, userEmail)
           .then((res: any) => {
-            if (this.formData.change_password == true) {
-              this.logout_confirm = true;
-            } else {
-              dismiss();
               this.formData.email = userEmail;
               this.$emit("updated", res.data, this.formData, "updated");
-            }
           })
           .catch((err: any) => {
             this.$q.notify({
@@ -494,31 +270,7 @@ export default defineComponent({
             this.formData.email = userEmail;
           });
       } else {
-        if (this.existingUser) {
-          const userEmail = this.formData.email;
-
-          userServiece
-            .updateexistinguser(
-              { role: this.formData.role },
-              selectedOrg,
-              userEmail
-            )
-            .then((res: any) => {
-              dismiss();
-              this.formData.email = userEmail;
-              this.$emit("updated", res.data, this.formData, "created");
-            })
-            .catch((err: any) => {
-              this.$q.notify({
-                color: "negative",
-                message: err.response.data.message,
-                timeout: 2000,
-              });
-              dismiss();
-              this.formData.email = userEmail;
-            });
-        } else {
-          userServiece
+          service_accounts
             .create(this.formData, selectedOrg)
             .then((res: any) => {
               dismiss();
@@ -532,7 +284,6 @@ export default defineComponent({
               });
               dismiss();
             });
-        }
       }
     },
   },

@@ -16,6 +16,7 @@
 import { reactive } from "vue";
 import type { Resource } from "@/ts/interfaces";
 import usersService from "@/services/users";
+import service_accounts from "@/services/service_accounts";
 
 const groups = {
   groups: {} as { [key: string]: any },
@@ -44,6 +45,19 @@ const users = {
     });
   },
 };
+const service_accounts_users = {
+  service_accounts_users: [] as any[],
+  getServiceAccounts: (org_identifier: string) => {
+    return new Promise((resolve, reject) => {
+      service_accounts
+        .list(org_identifier)
+        .then((res) => {
+          resolve(res.data.data);
+        })
+        .catch((err) => reject(err));
+    });
+  },
+};
 
 const permissionsState = reactive(Object.assign({}, permissions));
 
@@ -52,6 +66,8 @@ const rolesState = reactive(Object.assign({}, roles));
 const groupsState = reactive(Object.assign({}, groups));
 
 const usersState = reactive(Object.assign({}, users));
+
+const serviceAccountsState = reactive(Object.assign({}, service_accounts_users));
 
 const usePermissions = () => {
   const resetPermissionsState = () => {
@@ -75,6 +91,7 @@ const usePermissions = () => {
     resetGroupsState,
     resetRolesState,
     resetUsersState,
+    serviceAccountsState,
   };
 };
 

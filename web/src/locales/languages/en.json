@@ -270,6 +270,16 @@
     "roles": "Roles",
     "groups": "Groups"
   },
+  "serviceAccounts": {
+    "header":"Service Accounts",
+    "search":"Search Service Account",
+    "refresh":"Refresh Service Token",
+    "showToken":"Show Service Token",
+    "hideToken":"Hide Service Token",
+    "delete":"Delete Service Account",
+    "update":"Update Service Account",
+    "copyToken":"Copy Token"
+  },
   "iam": {
     "users": "Users",
     "groups": "User Groups",
@@ -292,7 +302,8 @@
     "resourceName": "Resource Name",
     "searchRole": "Search Role",
     "searchGroup": "Search Group",
-    "object": "Object"
+    "object": "Object",
+    "serviceAccounts": "Service Accounts"
   },
   "ticket": {
     "header": "Support Tickets",

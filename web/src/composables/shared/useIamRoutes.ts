@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import config from "@/aws-exports";
+import ServiceAccounts from "@/components/iam/serviceAccounts/ServiceAccounts.vue";
 import { routeGuard } from "@/utils/zincutils";
 
 const IdentityAccessManagement = () =>
@@ -46,6 +47,14 @@ const useEnterpriseRoutes = () => {
           path: "users",
           name: "users",
           component: Users,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "serviceAccounts",
+          name: "serviceAccounts",
+          component: ServiceAccounts,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

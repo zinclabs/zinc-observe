@@ -25,12 +25,26 @@ const service_accounts = {
       `/api/${org_identifier}/service_accounts`
     );
   },
+  get_service_token: (
+    org_identifier: string,
+    email_id: string
+  ) => {
+    return http().get(
+      `/api/${org_identifier}/service_accounts/${email_id}`
+    );
+  },
   create: (data: any, org_identifier: string) => {
     return http().post(`/api/${org_identifier}/service_accounts`, data);
   },
   update: (data: any, org_identifier: string, user_email: string) => {
     return http().put(`/api/${org_identifier}/service_accounts/${user_email}`, data);
   },
+  delete: (org_identifier: string, user_email: string) => {
+    return http().delete(`/api/${org_identifier}/service_accounts/${user_email}`);
+  },
+  refresh_token : (org_identifier: string, user_email: string) => {
+    return http().put(`/api/${org_identifier}/service_accounts/${user_email}?rotateToken=true`,{});
+  }
   
 };
 export default service_accounts;
