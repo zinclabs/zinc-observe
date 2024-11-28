@@ -1,0 +1,7 @@
+{
+    "location": "local",
+    "bucket": "my-snapshot-bucket",
+    "basePath": "http://127.0.0.1:9000",
+    "region": "us-east-1",
+    "currentVersion": "example-snapshots"
+}

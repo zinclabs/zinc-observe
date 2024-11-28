@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "description": "zincsearchautomation",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "fetch-snapshots": "tsc && node dist/scripts/fetch.js",
+    "push-snapshots": "tsc && node dist/scripts/push.js"
+  },
   "author": "",
   "license": "ISC",
   "devDependencies": {
