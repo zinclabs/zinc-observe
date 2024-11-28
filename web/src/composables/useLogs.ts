@@ -4928,10 +4928,60 @@ const useLogs = () => {
     }
   };
 
-  const handleSearchError = (requestId: string, response: any) => {
+  const handleSearchError = (requestId: string, request: any, err: any) => {
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
-    //handlePageCountError
+
+    const { error, trace_id } = err.content.meta;
+
+    if (trace_id) removeTraceId(trace_id);
+
+    // const {
+    //   error: responseError,
+    //   message: responseMessage,
+    //   code,
+    //   error_detail,
+    // } = meta.error;
+
+    // Default error message
+    let errorMsg =
+      typeof error === "string" && error
+        ? error
+        : "Error while processing histogram request.";
+
+    // Handle response errors
+    // if (response) {
+    //   errorMsg = responseError || responseMessage || errorMsg;
+    //   searchObj.data.errorDetail = error_detail || "";
+    // } else {
+    //   errorMsg = message || errorMsg;
+    // }
+
+    // // Custom error message based on code
+    // const customMessage = logsErrorMessage(code || "");
+    // if (customMessage) {
+    //   errorMsg = t(customMessage);
+    // }
+
+    // // Handle rate-limiting errors
+    // if (response?.status >= 429) {
+    //   errorMsg = responseMessage || errorMsg;
+    //   searchObj.data.errorDetail = error_detail || "";
+    // }
+
+    // Add Trace ID if available
+    const finalTraceId = trace_id;
+    if (finalTraceId) {
+      const traceIdMsg = ` <br><span class='text-subtitle1'>TraceID: ${finalTraceId}</span>`;
+      errorMsg += traceIdMsg;
+      notificationMsg.value = `${errorMsg} TraceID: ${finalTraceId}`;
+    } else {
+      notificationMsg.value = errorMsg;
+    }
+
+    // Update the error message in the data object
+    searchObj.data.errorMsg = errorMsg;
+    // searchObj.data.errorCode = code || "";
   };
 
   const refreshPagination = (regenrateFlag: boolean = false) => {

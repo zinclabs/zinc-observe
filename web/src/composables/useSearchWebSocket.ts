@@ -46,7 +46,7 @@ const useSearchWebSocket = () => {
 
       webSocket.addErrorHandler(
         requestId,
-        handlers.close.bind(null, requestId, data),
+        handlers.error.bind(null, requestId, data),
       );
       return requestId;
     } catch (e: any) {
