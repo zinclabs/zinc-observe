@@ -3262,7 +3262,11 @@ const useLogs = () => {
         endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
         if (
           currentPage >=
-          searchObj.data.queryResults?.partitionDetail?.paginations?.length - 1
+          (searchObj.communicationMethod === "ws"
+            ? searchObj.data.queryResults?.pagination?.length
+            : searchObj.data.queryResults.partitionDetail?.paginations
+                ?.length || 0) -
+            1
         ) {
           endCount = Math.min(
             startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
@@ -4408,7 +4412,10 @@ const useLogs = () => {
 
   const getDataThroughWebSocket = (isPagination: boolean) => {
     try {
-      if (!isPagination) resetQueryData();
+      if (!isPagination) {
+        resetQueryData();
+        searchObj.data.queryResults = {};
+      }
 
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
