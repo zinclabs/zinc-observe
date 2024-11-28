@@ -20,7 +20,7 @@ use config::{
         search::{Response, SearchPartitionRequest},
         sql::resolve_stream_names,
         stream::StreamType,
-        websocket::SearchResultType,
+        websocket::{ErrorType, SearchEventReq, SearchResultType},
     },
     utils::sql::is_aggregate_query,
 };
@@ -32,10 +32,7 @@ use tracing::Instrument;
 use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
     common::meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
-    handler::http::request::websocket::{
-        session::send_message,
-        utils::{ErrorType, SearchEventReq, WsServerEvents},
-    },
+    handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
     service::search::{
         cache,
         cache::cacher::get_ts_col_order_by,

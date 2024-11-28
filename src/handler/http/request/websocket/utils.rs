@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::websocket::{ErrorType, SearchEventReq};
 use serde::{Deserialize, Serialize};
 
 pub mod enterprise_utils {
@@ -144,16 +145,6 @@ pub enum WsClientEvents {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SearchEventReq {
-    pub trace_id: String,
-    pub payload: config::meta::search::Request,
-    pub time_offset: Option<i64>,
-    pub stream_type: config::meta::stream::StreamType,
-    pub use_cache: bool,
-    pub search_type: config::meta::search::SearchEventType,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(
     tag = "type",
     content = "content",
@@ -165,21 +156,12 @@ pub enum WsServerEvents {
         results: Box<config::meta::search::Response>,
         time_offset: i64,
     },
-    CancelResponse {
-        trace_id: String,
-        is_success: bool,
-    },
+    #[cfg(feature = "enterprise")]
+    CancelResponse { trace_id: String, is_success: bool },
     Error {
         #[serde(flatten)]
         error_type: ErrorType,
     },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(tag = "error_type", content = "meta", rename_all = "snake_case")]
-pub enum ErrorType {
-    SearchError { trace_id: String, error: String },
-    RequestError { request_id: String, error: String },
 }
 
 impl WsServerEvents {

@@ -14,14 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_ws::{MessageStream, Session};
-use config::{get_config, meta::websocket::SearchResultType};
+use config::{
+    get_config,
+    meta::websocket::{ErrorType, SearchResultType},
+};
 use futures::StreamExt;
 use infra::errors::Error;
 use rand::prelude::SliceRandom;
 
 use crate::handler::http::request::websocket::{
     search,
-    utils::{sessions_cache_utils, ErrorType, WsClientEvents, WsServerEvents},
+    utils::{sessions_cache_utils, WsClientEvents, WsServerEvents},
 };
 
 pub async fn run(
