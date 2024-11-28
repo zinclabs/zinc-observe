@@ -737,6 +737,7 @@ export default defineComponent({
           searchObj.data.stream.streamType =
             router.currentRoute.value.query.stream_type;
           searchBarRef.value.dateTimeRef.setRelativeTime(router.currentRoute.value.query.period);
+          searchObj.data.datetime.type = "relative";
           resetSearchObj();
           searchObj.data.queryResults.hits = [];
           searchObj.meta.searchApplied = false;
