@@ -17,7 +17,7 @@ use actix_ws::Session;
 use config::{
     get_config,
     meta::{
-        search::{Response, SearchPartitionRequest},
+        search::{Response, SearchPartitionRequest, SearchPartitionResponse},
         sql::resolve_stream_names,
         stream::StreamType,
         websocket::{ErrorType, SearchEventReq, SearchResultType},
@@ -27,7 +27,7 @@ use config::{
 use infra::errors::Error;
 use proto::cluster_rpc::SearchQuery;
 use tracing::Instrument;
-
+use config::meta::sql::OrderBy;
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
@@ -199,7 +199,7 @@ pub async fn handle_search_request(
         }
         write_results_to_file(c_resp, start_time, end_time, accumulated_results).await?;
     } else {
-        // Single search (non-partitioned)
+        // Single search (non-partitioned) for aggregate queries
         log::info!(
             "[WS_SEARCH] trace_id: {} Non-partitioned search",
             req.trace_id
@@ -211,6 +211,7 @@ pub async fn handle_search_request(
             trace_id: trace_id.clone(),
             results: Box::new(search_res.clone()),
             time_offset: end_time,
+            order_by: None,
         };
         log::info!(
             "[WS_SEARCH] trace_id: {} Sending single search response, hits: {}",
@@ -227,6 +228,7 @@ pub async fn handle_search_request(
 }
 
 async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<Response, Error> {
+    // TODO: retry empty `Response` on error, return `is_partial` true
     SearchService::cache::search(
         &req.trace_id,
         org_id,
@@ -373,7 +375,9 @@ async fn process_delta(
     req.payload.query.start_time = delta.delta_start_time;
     req.payload.query.end_time = delta.delta_end_time;
 
-    let partitions = get_partitions(&req, org_id).await?;
+    let partition_resp = get_partitions(&req, org_id).await?;
+    let partitions = partition_resp.partitions;
+    let order_by = partition_resp.order_by;
 
     if partitions.is_empty() {
         return Ok(());
@@ -411,6 +415,7 @@ async fn process_delta(
                 trace_id: trace_id.clone(),
                 results: Box::new(search_res.clone()),
                 time_offset: end_time,
+                order_by: Some(order_by),
             };
             log::info!(
                 "[WS_SEARCH]: Sending search response for trace_id: {}, delta: {:?}, hits: {}",
@@ -434,7 +439,7 @@ async fn process_delta(
     Ok(())
 }
 
-async fn get_partitions(req: &SearchEventReq, org_id: &str) -> Result<Vec<[i64; 2]>, Error> {
+async fn get_partitions(req: &SearchEventReq, org_id: &str) -> Result<SearchPartitionResponse, Error> {
     let search_payload = req.payload.clone();
     let search_partition_req = SearchPartitionRequest {
         sql: search_payload.query.sql.clone(),
@@ -457,7 +462,7 @@ async fn get_partitions(req: &SearchEventReq, org_id: &str) -> Result<Vec<[i64; 
     ))
     .await?;
 
-    Ok(res.partitions)
+    Ok(res)
 }
 
 async fn send_cached_responses(
@@ -471,6 +476,12 @@ async fn send_cached_responses(
         trace_id
     );
 
+    let order_by = if cached.is_descending {
+        OrderBy::Desc
+    } else {
+        OrderBy::Asc
+    };
+
     // Accumulate the result
     accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
 
@@ -479,6 +490,7 @@ async fn send_cached_responses(
         trace_id: trace_id.to_string(),
         results: Box::new(cached.cached_response.clone()),
         time_offset: cached.response_end_time,
+        order_by: Some(order_by),
     };
     log::info!(
         "[WS_SEARCH]: Sending cached search response for trace_id: {}, hits: {}",
@@ -500,7 +512,9 @@ async fn do_partitioned_search(
     user_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
 ) -> Result<(), Error> {
-    let partitions = get_partitions(req, org_id).await?;
+    let partitions_resp = get_partitions(req, org_id).await?;
+    let partitions = partitions_resp.partitions;
+    let order_by = partitions_resp.order_by;
 
     if partitions.is_empty() {
         return Ok(());
@@ -536,6 +550,7 @@ async fn do_partitioned_search(
                 trace_id: trace_id.to_string(),
                 results: Box::new(search_res.clone()),
                 time_offset: end_time,
+                order_by: Some(order_by),
             };
             send_message(session, ws_search_res.to_json().to_string()).await?;
         }
@@ -548,6 +563,22 @@ async fn do_partitioned_search(
             );
             break;
         }
+    }
+
+    if curr_res_size == 0 {
+        log::info!(
+            "[WS_SEARCH]: No hits found for trace_id: {}, partitions: {:#?}",
+            trace_id,
+            &partitions
+        );
+        // send empty response
+        let ws_search_res = WsServerEvents::SearchResponse {
+            trace_id: trace_id.to_string(),
+            results: Box::new(Response::default()),
+            time_offset: req.payload.query.end_time,
+            order_by: Some(order_by),
+        };
+        send_message(session, ws_search_res.to_json().to_string()).await?;
     }
 
     Ok(())

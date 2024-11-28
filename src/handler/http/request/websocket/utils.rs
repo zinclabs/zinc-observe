@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::websocket::{ErrorType, SearchEventReq};
+use config::meta::sql::OrderBy;
 use serde::{Deserialize, Serialize};
 
 pub mod enterprise_utils {
@@ -155,6 +156,7 @@ pub enum WsServerEvents {
         trace_id: String,
         results: Box<config::meta::search::Response>,
         time_offset: i64,
+        order_by: Option<OrderBy>,
     },
     #[cfg(feature = "enterprise")]
     CancelResponse { trace_id: String, is_success: bool },
