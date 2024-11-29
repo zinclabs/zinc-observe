@@ -1104,8 +1104,8 @@ export const usePanelDataLoader = (
                   pageType,
                   abortControllerRef,
                 );
+                state.loading = false;
               }
-              state.loading = false;
             }
           }
 
