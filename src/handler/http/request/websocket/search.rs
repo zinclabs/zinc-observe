@@ -27,7 +27,6 @@ use config::{
 use infra::errors::Error;
 use proto::cluster_rpc::SearchQuery;
 use tracing::Instrument;
-use config::meta::sql::OrderBy;
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
@@ -211,7 +210,6 @@ pub async fn handle_search_request(
             trace_id: trace_id.clone(),
             results: Box::new(search_res.clone()),
             time_offset: end_time,
-            order_by: None,
         };
         log::info!(
             "[WS_SEARCH] trace_id: {} Sending single search response, hits: {}",
@@ -377,7 +375,6 @@ async fn process_delta(
 
     let partition_resp = get_partitions(&req, org_id).await?;
     let partitions = partition_resp.partitions;
-    let order_by = partition_resp.order_by;
 
     if partitions.is_empty() {
         return Ok(());
@@ -415,7 +412,6 @@ async fn process_delta(
                 trace_id: trace_id.clone(),
                 results: Box::new(search_res.clone()),
                 time_offset: end_time,
-                order_by: Some(order_by),
             };
             log::info!(
                 "[WS_SEARCH]: Sending search response for trace_id: {}, delta: {:?}, hits: {}",
@@ -476,12 +472,6 @@ async fn send_cached_responses(
         trace_id
     );
 
-    let order_by = if cached.is_descending {
-        OrderBy::Desc
-    } else {
-        OrderBy::Asc
-    };
-
     // Accumulate the result
     accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
 
@@ -490,7 +480,6 @@ async fn send_cached_responses(
         trace_id: trace_id.to_string(),
         results: Box::new(cached.cached_response.clone()),
         time_offset: cached.response_end_time,
-        order_by: Some(order_by),
     };
     log::info!(
         "[WS_SEARCH]: Sending cached search response for trace_id: {}, hits: {}",
@@ -514,7 +503,6 @@ async fn do_partitioned_search(
 ) -> Result<(), Error> {
     let partitions_resp = get_partitions(req, org_id).await?;
     let partitions = partitions_resp.partitions;
-    let order_by = partitions_resp.order_by;
 
     if partitions.is_empty() {
         return Ok(());
@@ -550,7 +538,6 @@ async fn do_partitioned_search(
                 trace_id: trace_id.to_string(),
                 results: Box::new(search_res.clone()),
                 time_offset: end_time,
-                order_by: Some(order_by),
             };
             send_message(session, ws_search_res.to_json().to_string()).await?;
         }
@@ -576,7 +563,6 @@ async fn do_partitioned_search(
             trace_id: trace_id.to_string(),
             results: Box::new(Response::default()),
             time_offset: req.payload.query.end_time,
-            order_by: Some(order_by),
         };
         send_message(session, ws_search_res.to_json().to_string()).await?;
     }

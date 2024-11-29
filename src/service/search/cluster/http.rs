@@ -236,6 +236,11 @@ pub async fn search(
         result.response_type = "matrix".to_string();
     }
 
+    // set order by
+    if let Some(&ref order_by) = sql.order_by.first() {
+        result.set_order_by(Some(order_by.1));
+    }
+
     log::info!(
         "[trace_id {trace_id}] search->result: total: {}, took: {} ms, scan_size: {}",
         result.total,

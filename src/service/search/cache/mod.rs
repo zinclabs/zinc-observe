@@ -475,6 +475,9 @@ pub fn merge_response(
         result_cache_len
     );
     cache_response.took_detail = Some(res_took);
+    cache_response.order_by = search_response
+        .first()
+        .and_then(|res| res.order_by.clone());
     cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
         / ((result_cache_len + cache_hits_len) as f64))
         as usize;
@@ -903,6 +906,11 @@ pub fn merge_response_v2(
         merged_response.cached_ratio = files_cache_ratio / search_responses.len();
     }
     merged_response.size = merged_response.hits.len() as i64;
+
+    merged_response.order_by = search_responses
+        .first()
+        .and_then(|res| res.order_by.clone());
+
     log::info!(
         "[trace_id {trace_id}] merged_response.hits.len: {}, result_cache_len: {}",
         merged_response.hits.len(),

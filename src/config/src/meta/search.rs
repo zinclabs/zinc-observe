@@ -202,6 +202,8 @@ pub struct Response {
     pub result_cache_ratio: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub work_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_by: Option<OrderBy>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
@@ -247,6 +249,7 @@ impl Response {
             new_end_time: None,
             result_cache_ratio: 0,
             work_group: None,
+            order_by: None
         }
     }
 
@@ -325,6 +328,10 @@ impl Response {
 
     pub fn set_work_group(&mut self, val: Option<String>) {
         self.work_group = val;
+    }
+
+    pub fn set_order_by(&mut self, val: Option<OrderBy>) {
+        self.order_by = val;
     }
 }
 
