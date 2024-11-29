@@ -31,7 +31,10 @@ use tracing::Instrument;
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
-    common::meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
+    common::{
+        meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
+        utils::websocket::get_search_type_from_ws_req,
+    },
     handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
     service::search::{
         cache,
@@ -40,7 +43,6 @@ use crate::{
         {self as SearchService},
     },
 };
-use crate::common::utils::websocket::get_search_type_from_ws_req;
 
 #[cfg(feature = "enterprise")]
 pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
@@ -128,7 +130,10 @@ pub async fn handle_search_request(
 
     // set search event context
     if req.payload.search_event_context.is_none() && req.search_event_context.is_some() {
-        req.payload.search_event_context = get_search_type_from_ws_req(&req.search_type, req.search_event_context.clone().unwrap());
+        req.payload.search_event_context = get_search_type_from_ws_req(
+            &req.search_type,
+            req.search_event_context.clone().unwrap(),
+        );
     }
 
     if is_partition_request(&req.payload, stream_type, org_id).await {

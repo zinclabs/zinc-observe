@@ -15,5 +15,5 @@ pub struct SearchEventReq {
     pub use_cache: bool,
     pub search_type: crate::meta::search::SearchEventType,
     #[serde(flatten)]
-    pub search_event_context: Option<SearchEventContext>
+    pub search_event_context: Option<SearchEventContext>,
 }
