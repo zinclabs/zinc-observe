@@ -306,9 +306,10 @@ export const usePanelDataLoader = (
     it: any,
     startISOTimestamp: string,
     endISOTimestamp: string,
+    histogramInterval: string | null,
   ) => {
     return {
-      sql: await changeHistogramInterval(query, it?.histogramInterval ?? null),
+      sql: await changeHistogramInterval(query, histogramInterval ?? null),
       query_fn: it.vrlFunctionQuery
         ? b64EncodeUnicode(it.vrlFunctionQuery.trim())
         : null,
@@ -412,6 +413,7 @@ export const usePanelDataLoader = (
                       it,
                       partition[0],
                       partition[1],
+                      histogramInterval,
                     ),
                   },
                   page_type: pageType,
@@ -555,22 +557,19 @@ export const usePanelDataLoader = (
     //   return;
     // }
 
-    //  // if order by is desc, append new partition response at end
-    //  if (order_by.toLowerCase() === "desc") {
-    //   state.data[currentQueryIndex] = [
-    //     ...(state.data[currentQueryIndex] ?? []),
-    //     ...searchRes.data.hits,
-    //   ];
-    // } else {
-    //   // else append new partition response at start
-    //   state.data[currentQueryIndex] = [
-    //     ...searchRes.data.hits,
-    //     ...(state.data[currentQueryIndex] ?? []),
-    //   ];
-    // }
-
-    state.data[payload?.queryReq?.currentQueryIndex] =
-      searchRes?.content?.results?.hits ?? {};
+    // if order by is desc, append new partition response at end
+    if (searchRes?.content?.results?.order_by?.toLowerCase() === "desc") {
+      state.data[payload?.queryReq?.currentQueryIndex] = [
+        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+        ...(searchRes?.content?.results?.hits ?? {}),
+      ];
+    } else {
+      // else append new partition response at start
+      state.data[payload?.queryReq?.currentQueryIndex] = [
+        ...(searchRes?.content?.results?.hits ?? {}),
+        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+      ];
+    }
 
     // update result metadata
     state.resultMetaData[payload?.queryReq?.currentQueryIndex] =
@@ -608,11 +607,14 @@ export const usePanelDataLoader = (
             payload.queryReq.it,
             payload.queryReq.startISOTimestamp,
             payload.queryReq.endISOTimestamp,
+            null,
           ),
         },
         stream_type: payload.pageType,
         search_type: "dashboards",
         use_cache: (window as any).use_cache ?? true,
+        dashboard_id: dashboardId?.value,
+        folder_id: folderId?.value,
       },
     });
   };
