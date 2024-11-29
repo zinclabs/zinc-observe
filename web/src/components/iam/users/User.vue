@@ -1,4 +1,3 @@
-//users 
 <!-- Copyright 2023 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
@@ -333,7 +332,6 @@ export default defineComponent({
       await getRoles(store.state.selectedOrganization.identifier)
         .then((res) => {
           customRoles.value = res.data;
-          console.warn(customRoles.value)
         })
         .catch((err) => {
           console.log(err);

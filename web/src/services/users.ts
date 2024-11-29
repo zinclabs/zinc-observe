@@ -57,14 +57,19 @@ const users = {
     sort_by: string,
     desc: boolean,
     name: string,
-    org_identifier: string
+    org_identifier: string,
+    queryParams?: { list_all?: boolean } 
   ) => {
     if (config.isCloud === "true") {
       return http().get(
         `/api/${org_identifier}/org_users?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
       );
     } else {
-      return http().get(`/api/${org_identifier}/users`);
+      let url = `/api/${org_identifier}/users`;
+      if (queryParams?.list_all !== undefined) {
+        url += `?list_all=${queryParams.list_all}`;
+      }
+      return http().get(url);
     }
   },
   getRefreshToken: () => {

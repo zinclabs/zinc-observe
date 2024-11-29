@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="col q-pr-xs">
     <div
       data-test="iam-users-selection-filters"
-      class="flex justify-start bordered q-px-md q-py-sm"
+      class="flex justify-start items-center bordered q-px-md q-py-sm"
       :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
       :style="{
         'box-shadow':
@@ -73,13 +73,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           filled
           dense
           class="q-ml-auto q-mb-xs no-border"
-          placeholder="Search"
+          placeholder="Search User"
         >
           <template #prepend>
             <q-icon name="search" class="cursor-pointer" />
           </template>
         </q-input>
       </div>
+
+      <div
+          class="q-mx-sm current-organization"
+        >
+        <q-select
+          v-if="
+            store.state.selectedOrganization.identifier ===
+              store.state.zoConfig.meta_org &&
+            usersDisplay == 'all'
+          "
+          v-model="selectedOrg"
+          borderless
+          use-input
+          input-debounce="300"
+          :options="orgList"
+          option-label="label"
+          option-value="value"
+          class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
+          @filter="filterOrganizations"
+          @update:model-value="updateOrganization"
+          placeholder="Select Organization"
+          virtual-scroll
+        />
+
+        </div>
     </div>
     <div data-test="iam-users-selection-table" class="q-px-md">
       <div
@@ -134,7 +159,6 @@ import { useStore } from "vuex";
 
 // show selected users in the table
 // Add is_selected to the user object
-
 const props = defineProps({
   groupUsers: {
     type: Array,
@@ -161,7 +185,9 @@ const rows: Ref<any[]> = ref([]);
 const usersDisplay = ref("selected");
 
 const store = useStore();
-
+const selectedOrg = ref(null);
+const orgOptions = ref([{ label: "All", value: "all" }]);
+const orgList = ref([...orgOptions.value]);
 const usersDisplayOptions = [
   {
     label: "All",
@@ -172,7 +198,15 @@ const usersDisplayOptions = [
     value: "selected",
   },
 ];
-
+const filterOrganizations = (val: string, update: (fn: () => void) => void) => {
+  // Filter logic
+  update(() => {
+    const needle = val.toLowerCase();
+    orgList.value = orgOptions.value.filter((org) =>
+      org.label.toLowerCase().includes(needle)
+    );
+  });
+};
 const { t } = useI18n();
 
 const userSearchKey = ref("");
@@ -200,13 +234,41 @@ const columns = [
     align: "left",
     sortable: true,
   },
+  {
+    name: "organization",
+    field: "org",
+    label: "Organizations",
+    align: "left",
+    sortable: true,
+  },
 ];
 
 onBeforeMount(async () => {
+  console.warn("before mount");
+  
   groupUsersMap.value = new Set(props.groupUsers);
   await getchOrgUsers();
   updateUserTable(usersDisplay.value);
+
+  if (store.state.organizations.length > 0) {
+    orgOptions.value.push(
+      ...store.state.organizations.map(data => ({
+        label: data.name,
+        id: data.id,
+        identifier: data.identifier,
+        user_email: store.state.userInfo.email,
+        ingest_threshold: data.ingest_threshold,
+        search_threshold: data.search_threshold,
+        subscription_type: data.CustomerBillingObj?.subscription_type || "",
+        status: data.status,
+        note: data.CustomerBillingObj?.note || "",
+      }))
+    );
+  }
+
+  selectedOrg.value = orgOptions.value[0]; // Default to "All"
 });
+
 
 watch(
   () => props.groupUsers,
@@ -235,20 +297,40 @@ const updateUserTable = async (value: string) => {
   }
 };
 
+const updateOrganization = () => {
+  if (selectedOrg.value.value === "all") {
+    // Show all users when "All" is selected
+    rows.value =
+      usersDisplay.value === "all"
+        ? users.value
+        : users.value.filter((user) => user.isInGroup);
+  } else {
+    // Filter users based on selected organization or root role
+    rows.value = users.value.filter((user) => {
+      const isRootRole = user.role === "root"; // Check if user has "root" role
+      console.warn(user)
+      const matchesOrg = user.org.includes(selectedOrg.value.label); // Match organization name
+      return isRootRole || matchesOrg; // Include if "root" or matches org
+    });
+  }
+};
+
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
   return new Promise(async (resolve) => {
     const data: any = await usersState.getOrgUsers(
-      store.state.selectedOrganization.identifier
+      store.state.selectedOrganization.identifier , { list_all: true }
     );
 
     usersState.users = cloneDeep(
-      data.map((user: any, index: number) => {
+      data.map((user: any, index: number) => {  
         return {
           email: user.email,
           "#": index + 1,
           isInGroup: groupUsersMap.value.has(user.email),
+          org: user.orgs?.length > 0 ? user.orgs.map((org) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
+          role:user.role
         };
       })
     );
@@ -259,6 +341,8 @@ const getchOrgUsers = async () => {
           "#": index + 1,
           email: user.email,
           isInGroup: groupUsersMap.value.has(user.email),
+          org: user.org,
+          role:user.role
         };
       }
     );

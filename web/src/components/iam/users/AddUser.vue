@@ -45,15 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-          <!-- <q-toggle
-            v-if="!beingUpdated && userRole == 'root'"
-            v-model="existingUser"
-            :label="t('user.isExistingUser')"
-          /> -->
           <p class="q-pt-sm">Organization : <strong>{{formData.organization}}</strong></p>
           <p  class="q-pt-sm" v-if="!existingUser">Email : <strong>{{formData.email}}</strong></p>
-          <p  class="q-pt-sm" v-if="!existingUser">Role : <strong>{{formData.role}}</strong></p>
-          <p  class="q-pt-sm" v-if="!existingUser">Custom Role : <strong>{{formData.custom_role}}</strong></p>
+          <p  class="q-pt-sm" v-if="(!existingUser && !beingUpdated)">Role : <strong>{{formData.role}}</strong></p>
           <q-input
             v-if="existingUser && !beingUpdated"
             v-model="formData.email"
@@ -126,14 +120,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dense
           />
           <q-select
-            v-if="existingUser && (
+            v-if="(existingUser || beingUpdated) && (
               (userRole !== 'member' &&
-                store.state.userInfo.email !== formData.email) ||
-              !beingUpdated
+                store.state.userInfo.email !== formData.email) 
+              
             )"
             v-model="formData.role"
             :label="t('user.role') + ' *'"
-            :options="roles"
+            :options="combinedRoles"
             color="input-border"
             bg-color="input-bg"
             class="q-pt-md q-pb-md showLabelOnTop"
@@ -144,26 +138,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required']"
-          />
-         
-          <q-select
-            v-if="existingUser && (
-              (userRole !== 'member' &&
-                store.state.userInfo.email !== formData.email) ||
-              !beingUpdated
-            )"
-            v-model="formData.custom_role"
-            :label="t('user.customRole')"
-            :options="customRoles"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-pt-md q-pb-md showLabelOnTop"
-            emit-value
-            map-options
-            stack-label
-            outlined
-            filled
-            dense
           />
 
           <div v-if="beingUpdated">
@@ -375,12 +349,7 @@ export default defineComponent({
     },
     customRoles: {
       type: Array,
-      default: () => [
-        {
-          label: "Admin",
-          value: "admin",
-        },
-      ],
+      default: () => [],
     },
   },
   emits: ["update:modelValue", "updated", "cancel:hideform"],
@@ -402,7 +371,6 @@ export default defineComponent({
 
 
     onActivated(() => {
-      console.warn(props.customRoles)
       formData.value.organization = store.state.selectedOrganization.identifier;
     });
 
@@ -460,6 +428,7 @@ export default defineComponent({
       this.modelValue.email != undefined &&
       this.modelValue.email != ""
     ) {
+      this.existingUser = false;
       this.beingUpdated = true;
       this.formData = this.modelValue;
       this.formData.change_password = false;
@@ -532,7 +501,6 @@ export default defineComponent({
             .updateexistinguser(
               { 
                 role: this.formData.role,
-                custom_role: this.formData.custom_role
               },
               selectedOrg,
               userEmail
@@ -540,14 +508,6 @@ export default defineComponent({
             .then((res: any) => {
               dismiss();
               this.formData.email = userEmail;
-              // if(res.data.code === 422){
-              //   this.$q.notify({
-              //     color: "positive",
-              //     message: "User added successfully.",
-              //   });
-              //   this.existingUser = false;
-              // }
-              // else{
                 this.existingUser = true;
                 this.$emit("updated", res.data, this.formData, "created");
               // }
@@ -563,7 +523,6 @@ export default defineComponent({
                 this.existingUser = false;
               }
               else{
-                console.warn(err)
                 this.$q.notify({
                   color: "negative",
                   message: err.response.data.message,
@@ -590,6 +549,11 @@ export default defineComponent({
             });
         }
       }
+    },
+  },
+  computed: {
+    combinedRoles() {
+      return [...this.roles, ...this.customRoles];
     },
   },
 });
