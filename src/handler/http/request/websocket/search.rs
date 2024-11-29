@@ -40,6 +40,7 @@ use crate::{
         {self as SearchService},
     },
 };
+use crate::common::utils::websocket::get_search_type_from_ws_req;
 
 #[cfg(feature = "enterprise")]
 pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
@@ -124,6 +125,11 @@ pub async fn handle_search_request(
     } else {
         req.payload.query.size
     };
+
+    // set search event context
+    if req.payload.search_event_context.is_none() && req.search_event_context.is_some() {
+        req.payload.search_event_context = get_search_type_from_ws_req(&req.search_type, req.search_event_context.clone().unwrap());
+    }
 
     if is_partition_request(&req.payload, stream_type, org_id).await {
         log::info!(

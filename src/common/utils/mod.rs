@@ -20,3 +20,4 @@ pub mod jwt;
 pub mod redirect_response;
 pub mod stream;
 pub mod zo_logger;
+pub mod websocket;

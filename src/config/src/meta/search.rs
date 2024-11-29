@@ -56,7 +56,7 @@ pub struct Request {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
-    #[serde(default, flatten)]
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
 }
@@ -794,6 +794,7 @@ pub struct SearchEventContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub derived_stream_key: Option<String>,
     #[serde(default)]
+    #[serde(rename = "report_id")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub report_key: Option<String>,
     #[serde(default)]
@@ -803,9 +804,11 @@ pub struct SearchEventContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dashboard_name: Option<String>,
     #[serde(default)]
+    #[serde(rename = "folder_id")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dashboard_folder_id: Option<String>,
     #[serde(default)]
+    #[serde(rename = "folder_name")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dashboard_folder_name: Option<String>,
 }
