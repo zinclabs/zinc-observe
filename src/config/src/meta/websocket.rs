@@ -15,10 +15,3 @@ pub struct SearchEventReq {
     pub use_cache: bool,
     pub search_type: crate::meta::search::SearchEventType,
 }
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(tag = "error_type", content = "meta", rename_all = "snake_case")]
-pub enum ErrorType {
-    SearchError { trace_id: String, error: String },
-    RequestError { request_id: String, error: String },
-}

@@ -237,7 +237,7 @@ pub async fn search(
     }
 
     // set order by
-    if let Some(&ref order_by) = sql.order_by.first() {
+    if let Some(order_by) = sql.order_by.first() {
         result.set_order_by(Some(order_by.1));
     }
 

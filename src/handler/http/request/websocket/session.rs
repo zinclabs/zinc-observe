@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_ws::{MessageStream, Session};
-use config::{
-    get_config,
-    meta::websocket::{ErrorType, SearchResultType},
-};
+use config::{get_config, meta::websocket::SearchResultType};
 use futures::StreamExt;
 use infra::errors::Error;
 use rand::prelude::SliceRandom;
@@ -111,12 +108,11 @@ pub async fn handle_text_message(
                                     search_req.trace_id,
                                     e
                                 );
-                            let err_res = WsServerEvents::Error {
-                                error_type: ErrorType::SearchError {
-                                    trace_id: search_req.trace_id.clone(),
-                                    error: e.to_string(),
-                                },
-                            };
+                            let err_res = WsServerEvents::error_response(
+                                e,
+                                Some(search_req.trace_id),
+                                Some(req_id.to_string()),
+                            );
                             let _ = send_message(session, err_res.to_json().to_string()).await;
                             let session = session.clone();
                             let _ = session.close(None).await;
@@ -160,12 +156,7 @@ pub async fn handle_text_message(
                 msg,
                 e
             );
-            let err_res = WsServerEvents::Error {
-                error_type: ErrorType::RequestError {
-                    request_id: req_id.to_string(),
-                    error: e.to_string(),
-                },
-            };
+            let err_res = WsServerEvents::error_response(e.into(), Some(req_id.to_string()), None);
             let _ = send_message(session, err_res.to_json().to_string()).await;
             let session = session.clone();
             let _ = session.close(None).await;

@@ -20,13 +20,14 @@ use config::{
         search::{Response, SearchPartitionRequest, SearchPartitionResponse},
         sql::resolve_stream_names,
         stream::StreamType,
-        websocket::{ErrorType, SearchEventReq, SearchResultType},
+        websocket::{SearchEventReq, SearchResultType},
     },
     utils::sql::is_aggregate_query,
 };
 use infra::errors::Error;
 use proto::cluster_rpc::SearchQuery;
 use tracing::Instrument;
+
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
@@ -98,12 +99,8 @@ pub async fn handle_search_request(
     let stream_names = match resolve_stream_names(&req.payload.query.sql) {
         Ok(v) => v.clone(),
         Err(e) => {
-            let err_res = WsServerEvents::Error {
-                error_type: ErrorType::SearchError {
-                    trace_id: trace_id.clone(),
-                    error: e.to_string(),
-                },
-            };
+            let err_res =
+                WsServerEvents::error_response(Error::Message(e.to_string()), Some(trace_id), None);
             send_message(session, err_res.to_json().to_string()).await?;
             return Ok(());
         }
@@ -115,12 +112,7 @@ pub async fn handle_search_request(
         if let Err(e) =
             enterprise_utils::check_permissions(&stream_name, stream_type, &user_id, &org_id).await
         {
-            let err_res = WsServerEvents::Error {
-                error_type: ErrorType::SearchError {
-                    trace_id: trace_id.clone(),
-                    error: e.to_string(),
-                },
-            };
+            let err_res = WsServerEvents::error_response(Error::Message(e), Some(trace_id), None);
             send_message(session, err_res.to_json().to_string()).await?;
             return Ok(());
         }
@@ -435,7 +427,10 @@ async fn process_delta(
     Ok(())
 }
 
-async fn get_partitions(req: &SearchEventReq, org_id: &str) -> Result<SearchPartitionResponse, Error> {
+async fn get_partitions(
+    req: &SearchEventReq,
+    org_id: &str,
+) -> Result<SearchPartitionResponse, Error> {
     let search_payload = req.payload.clone();
     let search_partition_req = SearchPartitionRequest {
         sql: search_payload.query.sql.clone(),

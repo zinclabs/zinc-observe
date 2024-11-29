@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::websocket::{ErrorType, SearchEventReq};
+use actix_web::http::StatusCode;
+use config::meta::websocket::SearchEventReq;
+use infra::{errors, errors::Error};
 use serde::{Deserialize, Serialize};
 
 pub mod enterprise_utils {
@@ -159,13 +161,39 @@ pub enum WsServerEvents {
     #[cfg(feature = "enterprise")]
     CancelResponse { trace_id: String, is_success: bool },
     Error {
-        #[serde(flatten)]
-        error_type: ErrorType,
+        code: u16,
+        message: String,
+        error_detail: Option<String>,
+        trace_id: Option<String>,
+        request_id: Option<String>,
     },
 }
 
 impl WsServerEvents {
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("Failed to serialize WsServerEvents")
+    }
+
+    pub fn error_response(
+        err: Error,
+        request_id: Option<String>,
+        trace_id: Option<String>,
+    ) -> Self {
+        match err {
+            errors::Error::ErrorCode(code) => Self::Error {
+                code: code.get_code(),
+                message: code.get_message(),
+                error_detail: Some(code.get_error_detail()),
+                trace_id: trace_id.clone(),
+                request_id: request_id.clone(),
+            },
+            _ => Self::Error {
+                code: StatusCode::INTERNAL_SERVER_ERROR.into(),
+                message: err.to_string(),
+                error_detail: None,
+                trace_id,
+                request_id,
+            },
+        }
     }
 }

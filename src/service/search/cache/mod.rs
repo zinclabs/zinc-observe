@@ -105,6 +105,7 @@ pub async fn search(
         org_id, stream_type, stream_name, hashed_query
     );
     let mut c_resp: MultiCachedQueryResponse = if use_cache {
+        // cache layer
         check_cache(
             trace_id,
             &rpc_req,
@@ -431,6 +432,7 @@ pub fn merge_response(
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
+        // Todo: fix its percentage `cached_ratio`
         files_cache_ratio += res.cached_ratio;
         cache_response.histogram_interval = res.histogram_interval;
 
@@ -475,9 +477,7 @@ pub fn merge_response(
         result_cache_len
     );
     cache_response.took_detail = Some(res_took);
-    cache_response.order_by = search_response
-        .first()
-        .and_then(|res| res.order_by.clone());
+    cache_response.order_by = search_response.first().and_then(|res| res.order_by);
     cache_response.result_cache_ratio = (((cache_hits_len as f64) * 100_f64)
         / ((result_cache_len + cache_hits_len) as f64))
         as usize;
@@ -878,6 +878,7 @@ pub fn merge_response_v2(
         merged_response.total += s_resp.total;
         merged_response.scan_size += s_resp.scan_size;
         merged_response.took += s_resp.took;
+        // TODO: fix its percentage `cached_ratio`
         files_cache_ratio += s_resp.cached_ratio;
         merged_response.histogram_interval = s_resp.histogram_interval;
 
@@ -886,6 +887,8 @@ pub fn merge_response_v2(
         if s_resp.hits.is_empty() {
             continue;
         }
+
+        // TODO: took_detail
 
         if !s_resp.function_error.is_empty() {
             fn_error = s_resp.function_error.clone();
@@ -907,9 +910,7 @@ pub fn merge_response_v2(
     }
     merged_response.size = merged_response.hits.len() as i64;
 
-    merged_response.order_by = search_responses
-        .first()
-        .and_then(|res| res.order_by.clone());
+    merged_response.order_by = search_responses.first().and_then(|res| res.order_by);
 
     log::info!(
         "[trace_id {trace_id}] merged_response.hits.len: {}, result_cache_len: {}",
