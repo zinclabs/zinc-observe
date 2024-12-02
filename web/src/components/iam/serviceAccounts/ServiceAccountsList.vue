@@ -415,7 +415,7 @@ export default defineComponent({
       confirmDelete.value = true;
       deleteUserEmail = props.row.email;
     };
-    const getServiceToken = async (row, fromColum = true) =>{
+    const getServiceToken = async (row:any, fromColum = true) =>{
       if(fromColum){ row.isLoading = true;
       row.isTokenVisible = !row.isTokenVisible;
       if(row.token){
@@ -590,7 +590,7 @@ export default defineComponent({
         });
     };
 
-    const refreshServiceToken = async (row,fromColum = true) =>{
+    const refreshServiceToken = async (row:any,fromColum = true) =>{
       if(fromColum) row.isLoading = true;
       await service_accounts.refresh_token(store.state.selectedOrganization.identifier,row.email).then((res)=>{
           row.token = res.data.token;
@@ -612,7 +612,7 @@ export default defineComponent({
       });
 
     }
-    const  copyToClipboard = (text) => {
+    const  copyToClipboard = (text:string) => {
       navigator.clipboard.writeText(text).then(() => {
         $q.notify({
             type: "positive",
@@ -628,7 +628,7 @@ export default defineComponent({
       });
     }
 
-    const downloadTokenAsFile = (token) => {
+    const downloadTokenAsFile = (token:string) => {
       const blob = new Blob([token], { type: "text/plain" });
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
