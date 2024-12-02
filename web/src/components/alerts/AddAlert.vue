@@ -1507,42 +1507,6 @@ export default defineComponent({
         console.log('error in validation')
       });
     },
-
-    async testSubmit () {
-      const dismiss = this.q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
-      const payload = this.getAlertPayload();
-      callAlert = alertsService.create(
-            this.store.state.selectedOrganization.identifier,
-            payload.stream_name,
-            payload.stream_type,
-            payload
-          );
-          callAlert
-            .then((res: { data: any }) => {
-              this.formData = defaultValue();;
-
-              this.$emit("update:list");
-              this.addAlertForm.resetValidation();
-              dismiss();
-              this.q.notify({
-                type: "positive",
-                message: `Alert saved successfully.`,
-              });
-            })
-            .catch((err: any) => {
-              console.log('alert saved error')
-              dismiss();
-              this.q.notify({
-                type: "negative",
-                message:
-                  err.response?.data?.error || err.response?.data?.message,
-              });
-            });
-    }
     
 
   },
