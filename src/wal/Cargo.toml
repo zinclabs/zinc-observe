@@ -9,6 +9,7 @@ config.workspace = true
 bytes.workspace = true
 byteorder.workspace = true
 crc32fast = "1.2.0"
+log.workspace = true
 parking_lot.workspace = true
 snap.workspace = true
 snafu.workspace = true

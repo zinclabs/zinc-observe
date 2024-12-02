@@ -19,7 +19,7 @@ use actix_web::{http, web, HttpResponse};
 use config::{
     ider,
     meta::{
-        dashboards::Dashboards,
+        dashboards::{Dashboards, ListDashboardsParams},
         folder::{Folder, DEFAULT_FOLDER},
     },
     utils::json,
@@ -31,9 +31,8 @@ use crate::{
         meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
     },
-    service::db,
+    service::db::{self},
 };
-
 pub mod reports;
 
 #[tracing::instrument(skip(body))]
@@ -118,8 +117,8 @@ pub async fn update_dashboard(
 }
 
 #[tracing::instrument]
-pub async fn list_dashboards(org_id: &str, folder_id: &str) -> Result<HttpResponse, io::Error> {
-    let resp = match db::dashboards::list(org_id, folder_id).await {
+pub async fn list_dashboards(params: ListDashboardsParams) -> Result<HttpResponse, io::Error> {
+    let resp = match db::dashboards::list(params).await {
         Ok(dashboards) => HttpResponse::Ok().json(Dashboards { dashboards }),
         Err(error) => HttpResponse::InternalServerError().json(MetaHttpResponse::error(
             http::StatusCode::INTERNAL_SERVER_ERROR.into(),

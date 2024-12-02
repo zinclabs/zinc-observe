@@ -26,7 +26,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use tantivy::{directory::OwnedBytes, Directory, ReloadPolicy};
 
-use super::{caching_directory::CachingDirectory, FOOTER_CACHE};
+use super::{caching_directory::CachingDirectory, EMPTY_FILE_EXT, FOOTER_CACHE};
 
 const FOOTER_CACHE_VERSION: u32 = 1;
 const FOOTER_VERSION_LEN: usize = 4;
@@ -44,10 +44,21 @@ impl FooterCache {
     }
 
     pub(crate) fn get_slice(&self, path: &Path, byte_range: Range<usize>) -> Option<OwnedBytes> {
-        self.data
-            .read()
-            .get(path)
-            .and_then(|map| map.get(&byte_range).cloned())
+        let r = self.data.read();
+        let r = r.get(path)?;
+        // fast path: check exactly range
+        if let Some(v) = r.get(&byte_range) {
+            return Some(v.clone());
+        }
+        // slow path: find if any range include this range and then return the slice
+        for (range, bytes) in r.iter() {
+            if range.start <= byte_range.start && range.end >= byte_range.end {
+                return Some(
+                    bytes.slice(byte_range.start - range.start..byte_range.end - range.start),
+                );
+            }
+        }
+        None
     }
 
     pub(crate) fn put_slice(&self, path: PathBuf, byte_range: Range<usize>, bytes: OwnedBytes) {
@@ -69,6 +80,13 @@ impl FooterCache {
         let mut metadata = FooterCacheMeta::new();
         // write data
         for (path, slice_data) in r.iter() {
+            let ext = path
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default();
+            if EMPTY_FILE_EXT.contains(&ext) {
+                continue;
+            }
             for (range, bytes) in slice_data.iter() {
                 let offset = buf.len();
                 buf.extend_from_slice(bytes);
@@ -106,13 +124,22 @@ impl FooterCache {
         // parse footer data
         let mut data = HashMap::new();
         for (path, items) in metadata.files.iter() {
+            // TODO: remove it later, just for debug
+            let path = PathBuf::from(path);
+            let ext = path
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default();
+            if EMPTY_FILE_EXT.contains(&ext) {
+                continue;
+            }
             let mut slice_data = HashMap::new();
             for item in items.iter() {
                 let range = item.start as usize..(item.start + item.len) as usize;
                 let data = bytes.slice(item.offset as usize..(item.offset + item.len) as usize);
                 slice_data.insert(range, data);
             }
-            data.insert(PathBuf::from(path), slice_data);
+            data.insert(path, slice_data);
         }
         Ok(Self {
             data: RwLock::new(data),

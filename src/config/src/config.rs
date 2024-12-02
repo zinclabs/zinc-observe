@@ -753,6 +753,12 @@ pub struct Common {
     )]
     pub inverted_index_tantivy_mode: String,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle inverted index count optimizer."
+    )]
+    pub inverted_index_count_optimizer_enabled: bool,
+    #[env_config(
         name = "ZO_FULL_TEXT_SEARCH_TYPE",
         default = "eq",
         help = "Search through full text fields with either 'contains' , 'eq' or 'prefix' match."

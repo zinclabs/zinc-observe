@@ -21,6 +21,7 @@ use config::{
         stream::FileKey,
     },
     metrics,
+    utils::inverted_index::convert_parquet_idx_file_name_to_tantivy_file,
 };
 use infra::file_list as infra_file_list;
 use opentelemetry::global;
@@ -102,8 +103,22 @@ impl Event for Eventer {
                 if LOCAL_NODE.name.ne(&node_name) {
                     continue; // not this node
                 }
-                if let Err(e) = infra::cache::file_data::download("download", &item.key).await {
+                // cache parquet
+                if let Err(e) =
+                    infra::cache::file_data::download("cache_latest_file", &item.key).await
+                {
                     log::error!("Failed to cache file data: {}", e);
+                }
+                // cache index for the parquet
+                if item.meta.index_size > 0 {
+                    if let Some(ttv_file) = convert_parquet_idx_file_name_to_tantivy_file(&item.key)
+                    {
+                        if let Err(e) =
+                            infra::cache::file_data::download("cache_latest_file", &ttv_file).await
+                        {
+                            log::error!("Failed to cache file data: {}", e);
+                        }
+                    }
                 }
             }
         }

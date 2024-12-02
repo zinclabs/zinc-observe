@@ -167,6 +167,14 @@ impl Writer {
     }
 }
 
+impl Drop for Writer {
+    fn drop(&mut self) {
+        if let Err(e) = self.close() {
+            log::error!("failed to close wal file: {}", e);
+        }
+    }
+}
+
 /// A [`HasherWrapper`] acts as a [`Write`] decorator, recording the crc
 /// checksum of the data wrote to the inner [`Write`] implementation.
 struct HasherWrapper<W> {

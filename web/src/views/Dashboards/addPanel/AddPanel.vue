@@ -563,7 +563,7 @@ export default defineComponent({
 
         Object.assign(
           dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData))
+          JSON.parse(JSON.stringify(panelData ?? {})),
         );
 
         // check if vrl function exists
@@ -636,6 +636,18 @@ export default defineComponent({
 
       // console.time("AddPanel:loadDashboard:after");
       currentDashboardData.data = data;
+
+      if (
+        !currentDashboardData?.data ||
+        typeof currentDashboardData.data !== "object" ||
+        !Object.keys(currentDashboardData.data).length
+      ) {
+        window.removeEventListener("beforeunload", beforeUnloadHandler);
+        forceSkipBeforeUnloadListener = true;
+        goBack();
+        return;
+      }
+
       // if variables data is null, set it to empty list
       if (
         !(
@@ -814,7 +826,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder,
-          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+          tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
         },
       });
     };
@@ -843,7 +855,18 @@ export default defineComponent({
       return;
     };
 
+    // this is used to set to true, when we know we have to force the navigation
+    // in cases where org is changed, we need to force a nvaigation, without warning
+    let forceSkipBeforeUnloadListener = false;
+
     onBeforeRouteLeave((to, from, next) => {
+      // check if it is a force navigation, then allow
+      if(forceSkipBeforeUnloadListener) {
+        next()
+        return;
+      }
+
+      // else continue to warn user
       if (from.path === "/dashboards/add_panel" && isPanelConfigChanged.value) {
         const confirmMessage = t("dashboard.unsavedMessage");
         if (window.confirm(confirmMessage)) {

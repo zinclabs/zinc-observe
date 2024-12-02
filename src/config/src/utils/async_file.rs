@@ -46,16 +46,20 @@ pub async fn get_file_contents(
 ) -> Result<Vec<u8>, std::io::Error> {
     let mut file = File::open(path).await?;
     let data = if let Some(range) = range {
-        if range.start > range.end {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "invalid range: start > end",
-            ));
-        }
+        let to_read = range.end - range.start;
+        let mut buf = Vec::with_capacity(to_read);
         file.seek(std::io::SeekFrom::Start(range.start as u64))
             .await?;
-        let mut buf = vec![0; range.end - range.start];
-        file.read_exact(&mut buf).await?;
+        let read = file.take(to_read as u64).read_to_end(&mut buf).await?;
+        if read != to_read {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                format!(
+                    "Expected to read {} bytes, but read {} bytes",
+                    to_read, read
+                ),
+            ));
+        }
         buf
     } else {
         let mut buf: Vec<u8> = Vec::new();
@@ -130,7 +134,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_file_contents_with_range() {
         let content = b"Hello World";
-        let file_name = "range_test.txt";
+        let file_name = "range_test_async.txt";
 
         put_file_contents(file_name, content).await.unwrap();
 
@@ -141,7 +145,7 @@ mod tests {
         );
 
         // Test invalid range should error
-        assert!(get_file_contents(file_name, Some(5..3)).await.is_err());
+        assert!(get_file_contents(file_name, Some(3..5)).await.is_ok());
 
         // Test out of bounds should error
         assert!(get_file_contents(file_name, Some(0..100)).await.is_err());

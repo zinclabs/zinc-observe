@@ -48,9 +48,11 @@ pub async fn save(
                     anyhow::anyhow!("Atleast one alert destination email is required"),
                 ));
             }
+            let mut lowercase_emails = vec![];
             for email in destination.emails.iter() {
+                let email = email.trim().to_lowercase();
                 // Check if the email is part of the org
-                match user::get(Some(org_id), email).await {
+                match user::get(Some(org_id), &email).await {
                     Ok(user) => {
                         if user.is_none() {
                             return Err((
@@ -66,6 +68,7 @@ pub async fn save(
                         ));
                     }
                 }
+                lowercase_emails.push(email);
             }
             if !config::get_config().smtp.smtp_enabled {
                 return Err((
@@ -73,6 +76,7 @@ pub async fn save(
                     anyhow::anyhow!("SMTP not configured"),
                 ));
             }
+            destination.emails = lowercase_emails;
         }
         DestinationType::Sns => {
             if destination.sns_topic_arn.is_none() || destination.aws_region.is_none() {

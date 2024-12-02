@@ -441,6 +441,7 @@ export default defineComponent({
       return router.push({
         path: "/dashboards/add_panel",
         query: {
+          org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
           tab: route.query.tab ?? props.dashboardData.panels[0]?.tabId,

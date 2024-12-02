@@ -20,7 +20,7 @@ use config::{
     get_config, ider,
     meta::stream::{PartitionTimeLevel, StreamParams, StreamType},
     metrics,
-    utils::asynchronism::file::get_file_contents,
+    utils::async_file::get_file_contents,
     FILE_EXT_JSON,
 };
 use hashbrown::HashMap;

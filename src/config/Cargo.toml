@@ -62,6 +62,7 @@ sqlparser.workspace = true
 sqlx.workspace = true
 svix-ksuid.workspace = true
 sysinfo.workspace = true
+tantivy.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true

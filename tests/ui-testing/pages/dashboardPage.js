@@ -23,6 +23,7 @@ export class DashboardPage {
     await this.page.waitForSelector('[data-test="menu-link-\\/dashboards-item"]');
     await this.dashboardsMenuItem.click();
     await this.page.waitForTimeout(5000);
+    await expect(this.page.getByRole('main')).toContainText('Dashboards');
   }
   async createDashboard() {
     await this.page.waitForSelector('[data-test="dashboard-add"]');

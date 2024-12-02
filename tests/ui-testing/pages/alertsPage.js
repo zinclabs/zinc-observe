@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import{CommomnLocator} from '../pages/CommonLocator';
+
 import{ dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator } from '../pages/CommonLocator.js';
 
 export  class AlertPage {

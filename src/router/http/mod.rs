@@ -15,6 +15,8 @@
 
 mod ws_proxy;
 
+use std::collections::HashMap;
+
 use ::config::{
     get_config,
     meta::cluster::{Role, RoleGroup},
@@ -23,8 +25,9 @@ use ::config::{
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
 use crate::{
-    common::infra::cluster,
+    common::{infra::cluster, utils::http::get_search_type_from_request},
     router::http::ws_proxy::{convert_to_websocket_url, ws_proxy},
+
 };
 
 const QUERIER_ROUTES: [&str; 19] = [
@@ -269,7 +272,16 @@ async fn get_url(path: &str) -> URLDetails {
 
     let nodes = if is_querier_path {
         node_type = Role::Querier;
-        let nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive)).await;
+        let query_str = path[path.find("?").unwrap_or(path.len())..].to_string();
+        let node_group = web::Query::<HashMap<String, String>>::from_query(&query_str)
+            .map(|query_params| {
+                get_search_type_from_request(&query_params)
+                    .unwrap_or(None)
+                    .map(RoleGroup::from)
+                    .unwrap_or(RoleGroup::Interactive)
+            })
+            .unwrap_or(RoleGroup::Interactive);
+        let nodes = cluster::get_cached_online_querier_nodes(Some(node_group)).await;
         if is_fixed_querier_route(path) && nodes.is_some() && !nodes.as_ref().unwrap().is_empty() {
             nodes.map(|v| v.into_iter().take(1).collect())
         } else {

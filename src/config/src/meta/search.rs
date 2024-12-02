@@ -921,7 +921,7 @@ pub struct MultiStreamRequest {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_type: Option<SearchEventType>,
-    #[serde(default, flatten)]
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
     #[serde(default)]

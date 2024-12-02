@@ -197,7 +197,7 @@ function findDashboard(dashboardId: string, store: any, folderId: any) {
 
 export const getTabDataFromTabId = (dashboardData: any, tabId: any) => {
   // find tab from tabId
-  return dashboardData.tabs.find((tab: any) => tab.tabId == tabId);
+  return dashboardData?.tabs?.find((tab: any) => tab.tabId == tabId);
 };
 
 const getMaxIAndMaxYFromTab = (tab: any) => {
@@ -575,7 +575,7 @@ export const getPanel = async (
     // find tab from tabId
     const tab = getTabDataFromTabId(currentDashboard, tabId);
 
-    const paneldata = tab.panels?.find((it: any) => it.id == panelId);
+    const paneldata = tab?.panels?.find((it: any) => it?.id == panelId);
     return paneldata;
   } catch (error) {
     throw error;

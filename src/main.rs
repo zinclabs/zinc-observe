@@ -258,6 +258,7 @@ async fn main() -> Result<(), anyhow::Error> {
             // flush distinct values
             _ = metadata::close().await;
             // flush WAL cache to disk
+            _ = ingester::flush_all().await;
             common_infra::wal::flush_all_to_disk().await;
             // flush compact offset cache to disk disk
             _ = db::compact::files::sync_cache_to_db().await;

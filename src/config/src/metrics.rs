@@ -618,24 +618,6 @@ pub static MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static SPAN_DURATION_MILLISECONDS: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new("span_duration_milliseconds", "span duration milliseconds")
-            .namespace(NAMESPACE)
-            .buckets(SPAN_METRICS_BUCKET.to_vec())
-            .const_labels(create_const_labels()),
-        &[
-            "organization",
-            "stream",
-            "service_name",
-            "operation_name",
-            "status_code",
-            "span_kind",
-        ],
-    )
-    .expect("Metric created")
-});
-
 // metrics for query manager
 pub static QUERY_RUNNING_NUMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -885,9 +867,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(MEMORY_USAGE.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(SPAN_DURATION_MILLISECONDS.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_DISK_RESULT_CACHE_USED_BYTES.clone()))

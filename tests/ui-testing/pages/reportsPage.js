@@ -29,6 +29,7 @@ export class ReportsPage {
   async navigateToReports() {
     await this.homeMenu.hover();
     await this.reportsMenu.click();
+    await expect(this.page.locator('[data-test="report-list-title"]')).toContainText('Reports');
     await this.scheduledTab.click();
   }
   async createReport(dashboardName) {
@@ -63,7 +64,7 @@ export class ReportsPage {
     await this.page
       .locator(`[data-test="report-list-${reportName}-delete-report"]`)
       .click();
-    await this.page.locator('[data-test="confirm-button"]').click();
+    await this.page.locator('[data-test="confirm-button"]','visible').click();
   }
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds

@@ -15,6 +15,7 @@
 
 use std::{
     cmp::{max, min},
+    fs,
     ops::Range,
     path::{Path, PathBuf},
 };
@@ -26,14 +27,14 @@ use config::{
     meta::inverted_index::InvertedIndexTantivyMode,
     metrics,
     utils::{
-        asynchronism::file::*,
+        file::*,
         hash::{gxhash, Sum64},
     },
     RwAHashMap, FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER,
 };
 use hashbrown::HashMap;
 use once_cell::sync::Lazy;
-use tokio::{fs, sync::RwLock};
+use tokio::sync::RwLock;
 
 use super::CacheStrategy;
 use crate::{cache::meta::ResultCacheMeta, storage};
@@ -47,11 +48,31 @@ static FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     files
 });
 
+// read only
+static FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
+    let cfg = get_config();
+    let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
+    for _ in 0..cfg.disk_cache.bucket_num {
+        files.push(FileData::new(FileType::DATA));
+    }
+    files
+});
+
 static RESULT_FILES: Lazy<Vec<RwLock<FileData>>> = Lazy::new(|| {
     let cfg = get_config();
     let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
     for _ in 0..cfg.disk_cache.bucket_num {
         files.push(RwLock::new(FileData::new(FileType::RESULT)));
+    }
+    files
+});
+
+// read only
+static RESULT_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
+    let cfg = get_config();
+    let mut files = Vec::with_capacity(cfg.disk_cache.bucket_num);
+    for _ in 0..cfg.disk_cache.bucket_num {
+        files.push(FileData::new(FileType::RESULT));
     }
     files
 });
@@ -117,15 +138,18 @@ impl FileData {
 
     async fn get(&self, file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
-        match get_file_contents(&file_path, range).await {
+        tokio::task::spawn_blocking(move || match get_file_contents(&file_path, range) {
             Ok(data) => Some(Bytes::from(data)),
             Err(_) => None,
-        }
+        })
+        .await
+        .ok()
+        .flatten()
     }
 
     async fn get_size(&self, file: &str) -> Option<usize> {
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
-        match get_file_len(&file_path).await {
+        match get_file_len(&file_path) {
             Ok(v) => Some(v as usize),
             Err(_) => None,
         }
@@ -150,8 +174,8 @@ impl FileData {
         self.data.insert(file.to_string(), data_size);
         // write file into local disk
         let file_path = format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file);
-        fs::create_dir_all(Path::new(&file_path).parent().unwrap()).await?;
-        put_file_contents(&file_path, &data).await?;
+        fs::create_dir_all(Path::new(&file_path).parent().unwrap())?;
+        put_file_contents(&file_path, &data)?;
         // metrics
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
@@ -198,7 +222,7 @@ impl FileData {
                 self.choose_multi_dir(key.as_str()),
                 key
             );
-            if let Err(e) = fs::remove_file(&file_path).await {
+            if let Err(e) = fs::remove_file(&file_path) {
                 log::error!(
                     "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
                     file_path,
@@ -211,7 +235,7 @@ impl FileData {
                 && file_path.ends_with(FILE_EXT_TANTIVY)
             {
                 let file_path = file_path.replace(FILE_EXT_TANTIVY, FILE_EXT_TANTIVY_FOLDER);
-                if let Err(e) = fs::remove_dir_all(&file_path).await {
+                if let Err(e) = fs::remove_dir_all(&file_path) {
                     log::error!(
                         "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
                         file_path,
@@ -274,7 +298,7 @@ impl FileData {
             return Ok(());
         };
         self.cur_size -= data_size;
-        log::info!(
+        log::debug!(
             "[trace_id {trace_id}] File disk cache remove file done, released {} bytes",
             data_size
         );
@@ -286,7 +310,7 @@ impl FileData {
             self.choose_multi_dir(key.as_str()),
             key
         );
-        if let Err(e) = fs::remove_file(&file_path).await {
+        if let Err(e) = fs::remove_file(&file_path) {
             log::error!(
                 "[trace_id {trace_id}] File disk cache gc remove file: {}, error: {}",
                 file_path,
@@ -344,6 +368,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         let root_dir = file.read().await.root_dir.clone();
         std::fs::create_dir_all(&root_dir).expect("create cache dir success");
     }
+    // trigger read only files
+    for file in FILES_READER.iter() {
+        let root_dir = file.root_dir.clone();
+        std::fs::create_dir_all(&root_dir).expect("create cache dir success");
+    }
 
     tokio::task::spawn(async move {
         log::info!("Loading disk cache start");
@@ -382,9 +411,9 @@ pub async fn get(file: &str, range: Option<Range<usize>>) -> Option<Bytes> {
     }
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
-        FILES[idx].read().await
+        FILES_READER.get(idx).unwrap()
     } else {
-        RESULT_FILES[idx].read().await
+        RESULT_FILES_READER.get(idx).unwrap()
     };
     files.get(file, range).await
 }
@@ -396,9 +425,9 @@ pub async fn get_size(file: &str) -> Option<usize> {
     }
     let idx = get_bucket_idx(file);
     let files = if file.starts_with("files") {
-        FILES[idx].read().await
+        FILES_READER.get(idx).unwrap()
     } else {
-        RESULT_FILES[idx].read().await
+        RESULT_FILES_READER.get(idx).unwrap()
     };
     files.get_size(file).await
 }
@@ -477,7 +506,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         log::error!("load disk cache error: {}", e);
                     }
                 } else {
-                    let meta = match get_file_meta(&fp).await {
+                    let meta = match get_file_meta(&fp) {
                         Ok(m) => m,
                         Err(e) => {
                             log::error!("get file meta error: {}", e);
@@ -563,6 +592,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
             }
         }
     }
+
     // write all data from result_cache to QUERY_RESULT_CACHE
     QUERY_RESULT_CACHE.write().await.extend(result_cache);
     Ok(())

@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
           </div>
-          <div style="font-size: 14px;" class="note-message" >
+          <div v-if="selectedNodeType == 'output'" style="font-size: 14px;" class="note-message" >
           <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
             </div>
         </div>
@@ -289,7 +289,7 @@ watch(selected, (newValue:any) => {
 
 watch(() => dynamic_stream_name.value,
 ()=>{
-  if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== ""){
+  if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== "" && selectedNodeType.value === 'output'){
     const regex = /^[a-zA-Z0-9_]*\{[a-zA-Z0-9_]+\}[a-zA-Z0-9_]*$/;
     // Check if there is any value between {{ stream_name }}
       if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {

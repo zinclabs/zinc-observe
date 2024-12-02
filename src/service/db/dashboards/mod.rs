@@ -15,7 +15,7 @@
 
 use actix_web::web;
 use config::{
-    meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion},
+    meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, DashboardVersion, ListDashboardsParams},
     utils::json,
 };
 use infra::table::dashboards;
@@ -71,8 +71,8 @@ pub(crate) async fn put(
 }
 
 #[tracing::instrument]
-pub(crate) async fn list(org_id: &str, folder_id: &str) -> Result<Vec<Dashboard>, anyhow::Error> {
-    let ds = dashboards::list(org_id, folder_id).await?;
+pub(crate) async fn list(params: ListDashboardsParams) -> Result<Vec<Dashboard>, anyhow::Error> {
+    let ds = dashboards::list(params).await?;
     Ok(ds)
 }
 

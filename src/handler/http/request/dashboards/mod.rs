@@ -16,7 +16,8 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
-use config::meta::dashboards::MoveDashboard;
+use config::meta::dashboards::{ListDashboardsParams, MoveDashboard};
+use serde::Deserialize;
 
 use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::dashboards};
 
@@ -96,6 +97,54 @@ async fn update_dashboard(
     dashboards::update_dashboard(&org_id, &dashboard_id, &folder, body, hash).await
 }
 
+/// HTTP URL query component that contains parameters for listing dashboards.
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[into_params(style = Form, parameter_in = Query)]
+pub struct ListQuery {
+    /// Optional folder ID filter parameter
+    ///
+    /// If neither `folder` nor any other filter parameter are set then this
+    /// will search for all dashboards in the "default" folder.
+    ///
+    /// If `folder` is not set and another filter parameter, such as `title`, is
+    /// set then this will search for dashboards in all folders.
+    folder: Option<String>,
+
+    /// The optional case-insensitive title substring with which to filter
+    /// dashboards.
+    title: Option<String>,
+}
+
+impl ListQuery {
+    pub fn into(self, org_id: &str) -> ListDashboardsParams {
+        match self {
+            Self {
+                folder: Some(f),
+                title: Some(t),
+            } => ListDashboardsParams::new(org_id)
+                .with_folder_id(&f)
+                .where_title_contains(&t),
+            Self {
+                folder: None,
+                title: Some(t),
+            } => ListDashboardsParams::new(org_id).where_title_contains(&t),
+            Self {
+                folder: Some(f),
+                title: None,
+            } => ListDashboardsParams::new(org_id).with_folder_id(&f),
+            Self {
+                folder: None,
+                title: None,
+            } => {
+                // To preserve backwards-compatability when no filter parameters
+                // are given we will list the contents of the default folder.
+                ListDashboardsParams::new(org_id)
+                    .with_folder_id(config::meta::folder::DEFAULT_FOLDER)
+            }
+        }
+    }
+}
+
 /// ListDashboards
 #[utoipa::path(
     context_path = "/api",
@@ -106,6 +155,7 @@ async fn update_dashboard(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ListQuery
     ),
     responses(
         (status = StatusCode::OK, body = Dashboards),
@@ -113,8 +163,12 @@ async fn update_dashboard(
 )]
 #[get("/{org_id}/dashboards")]
 async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let folder = get_folder(req);
-    dashboards::list_dashboards(&org_id.into_inner(), &folder).await
+    let Ok(query) = web::Query::<ListQuery>::from_query(req.query_string()) else {
+        return Ok(HttpResponse::BadRequest().into());
+    };
+
+    let params = query.into_inner().into(&org_id.into_inner());
+    dashboards::list_dashboards(params).await
 }
 
 /// GetDashboard

@@ -30,7 +30,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let (tx, rx) = mpsc::channel::<FileKey>(cfg.limit.file_merge_thread_num);
+    let (tx, rx) = mpsc::channel::<FileKey>(cfg.limit.file_merge_thread_num * 2);
     let rx = Arc::new(Mutex::new(rx));
     // start merge workers
     for _ in 0..cfg.limit.file_merge_thread_num {

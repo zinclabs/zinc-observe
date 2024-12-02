@@ -28,7 +28,6 @@ pub const CONCURRENT_REQUESTS: usize = 1000;
 pub const MULTI_PART_UPLOAD_DATA_SIZE: f64 = 100.0;
 
 pub static DEFAULT: Lazy<Box<dyn ObjectStore>> = Lazy::new(default);
-pub static LOCAL_CACHE: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_cache);
 pub static LOCAL_WAL: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_wal);
 
 /// Returns the default object store based on the configuration.
@@ -50,12 +49,6 @@ fn default() -> Box<dyn ObjectStore> {
     } else {
         Box::<remote::Remote>::default()
     }
-}
-
-fn local_cache() -> Box<dyn ObjectStore> {
-    let cfg = get_config();
-    std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
-    Box::new(local::Local::new(&cfg.common.data_cache_dir, true))
 }
 
 fn local_wal() -> Box<dyn ObjectStore> {

@@ -200,3 +200,44 @@ pub fn datetime_now() -> DateTime<FixedOffset> {
         "BUG", // This can't possibly fail. Can it?
     ))
 }
+
+/// Parameters for listing dashboards.
+#[derive(Debug, Clone)]
+pub struct ListDashboardsParams {
+    /// The org ID surrogate key with which to filter dashboards.
+    pub org_id: String,
+
+    /// The optional folder ID surrogate key with which to filter dashboards.
+    pub folder_id: Option<String>,
+
+    /// The optional case-insensitive title substring with which to filter
+    /// dashboards.
+    pub title_pat: Option<String>,
+}
+
+impl ListDashboardsParams {
+    /// Returns new parameters to list dashboards for the given org ID surrogate
+    /// key.
+    pub fn new(org_id: &str) -> Self {
+        Self {
+            org_id: org_id.to_string(),
+            folder_id: None,
+            title_pat: None,
+        }
+    }
+
+    /// Filter dashboards by the given folder ID surrogate key.
+    pub fn with_folder_id(mut self, folder_id: &str) -> Self {
+        self.folder_id = Some(folder_id.to_string());
+        self
+    }
+
+    /// Filter dashboards by the case-insensitive title pattern.
+    ///
+    /// Listed dashboards will only include dashboards with a title that
+    /// contains the case-insitive title pattern.
+    pub fn where_title_contains(mut self, title_pat: &str) -> Self {
+        self.title_pat = Some(title_pat.to_string());
+        self
+    }
+}

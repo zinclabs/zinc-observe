@@ -534,6 +534,15 @@ export default defineComponent({
         route.query.folder ?? "default",
       );
 
+      if (
+        !currentDashboardData?.data ||
+        typeof currentDashboardData.data !== "object" ||
+        !Object.keys(currentDashboardData.data).length
+      ) {
+        goBackToDashboardList();
+        return;
+      }
+
       // set selected tab from query params
       const selectedTab = currentDashboardData?.data?.tabs?.find(
         (tab: any) => tab.tabId === route.query.tab,
@@ -683,7 +692,6 @@ export default defineComponent({
       return router.push({
         path: "/dashboards",
         query: {
-          dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
         },
       });
@@ -694,6 +702,7 @@ export default defineComponent({
       return router.push({
         path: "/dashboards/add_panel",
         query: {
+          org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
           tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,

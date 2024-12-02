@@ -30,6 +30,7 @@ use config::{
     },
     utils::json,
 };
+use datafusion::physical_plan::union::UnionExec;
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use hashbrown::HashMap;
 use infra::{
@@ -50,6 +51,7 @@ use crate::service::{
                 NewEmptyExecVisitor, ReplaceTableScanExec,
             },
             exec::{prepare_datafusion_context, register_udf},
+            plan::tantivy_count_exec::TantivyCountExec,
             table_provider::uniontable::NewUnionTable,
         },
         index::IndexCondition,
@@ -175,7 +177,7 @@ pub async fn search(
         use_inverted_index: req.index_info.use_inverted_index,
     });
 
-    let idx_optimze_rule: Option<InvertedIndexOptimizeMode> =
+    let mut idx_optimize_rule: Option<InvertedIndexOptimizeMode> =
         req.index_info.index_optimize_mode.clone().map(|x| x.into());
 
     // get all tables
@@ -184,11 +186,12 @@ pub async fn search(
     let file_stats_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
 
     // search in object storage
+    let mut tantivy_file_list = Vec::new();
     if !req.search_info.file_id_list.is_empty() {
         let stream_settings = infra::schema::get_settings(&org_id, stream_name, stream_type)
             .await
             .unwrap_or_default();
-        let (file_list, file_list_took) = get_file_list_by_ids(
+        let (mut file_list, file_list_took) = get_file_list_by_ids(
             &trace_id,
             &org_id,
             stream_type,
@@ -207,6 +210,23 @@ pub async fn search(
             file_list_took,
         );
 
+        if physical_plan.name() == "AggregateExec"
+            && physical_plan.schema().fields().len() == 1
+            && matches!(
+                idx_optimize_rule,
+                Some(InvertedIndexOptimizeMode::SimpleCount)
+            )
+        {
+            let (tantivy_files, datafusion_files) = split_file_list_by_time_range(
+                file_list,
+                req.search_info.start_time,
+                req.search_info.end_time,
+            );
+            tantivy_file_list = tantivy_files;
+            file_list = datafusion_files;
+            idx_optimize_rule = None;
+        }
+
         let (tbls, stats) = match super::storage::search(
             query_params.clone(),
             schema_latest.clone(),
@@ -215,7 +235,7 @@ pub async fn search(
             file_stats_cache.clone(),
             index_condition.clone(),
             fst_fields.clone(),
-            idx_optimze_rule,
+            idx_optimize_rule,
         )
         .await
         {
@@ -305,6 +325,17 @@ pub async fn search(
     let mut rewriter = ReplaceTableScanExec::new(union_exec);
     physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
 
+    if !tantivy_file_list.is_empty() {
+        scan_stats.add(&collect_stats(&tantivy_file_list));
+        let tantivy_exec = Arc::new(TantivyCountExec::new(
+            query_params,
+            physical_plan.schema(),
+            tantivy_file_list,
+            index_condition.unwrap(),
+        ));
+        physical_plan = Arc::new(UnionExec::new(vec![physical_plan, tantivy_exec as _]));
+    }
+
     log::info!(
         "[trace_id {trace_id}] flight->search: generated physical plan, took: {} ms",
         start.elapsed().as_millis()
@@ -385,4 +416,29 @@ fn generate_index_condition(index_condition: &str) -> Result<Option<IndexConditi
     } else {
         None
     })
+}
+
+// if the file in the [start_time, end_time], it will be in tantivy group
+// otherwise it will be in the datafusion group
+// (tantivy group, datafusion group)
+fn split_file_list_by_time_range(
+    file_list: Vec<FileKey>,
+    start_time: i64,
+    end_time: i64,
+) -> (Vec<FileKey>, Vec<FileKey>) {
+    file_list.into_iter().partition(|file| {
+        file.meta.min_ts >= start_time && file.meta.max_ts <= end_time && file.meta.index_size > 0
+    })
+}
+
+fn collect_stats(files: &[FileKey]) -> ScanStats {
+    let mut scan_stats = ScanStats::new();
+    scan_stats.files = files.len() as i64;
+    for file in files.iter() {
+        scan_stats.idx_scan_size += file.meta.index_size;
+        scan_stats.records += file.meta.records;
+        scan_stats.original_size += file.meta.original_size;
+        scan_stats.compressed_size += file.meta.compressed_size;
+    }
+    scan_stats
 }
