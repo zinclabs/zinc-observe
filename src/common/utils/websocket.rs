@@ -35,7 +35,7 @@ pub(crate) fn update_histogram_interval_in_query(
     sql: &str,
     histogram_interval: i64,
 ) -> Result<String, Error> {
-    let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, &sql)
+    let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
         .map_err(|e| Error::Message(e.to_string()))?
         .pop()
         .unwrap();
