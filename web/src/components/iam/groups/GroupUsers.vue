@@ -185,8 +185,8 @@ const rows: Ref<any[]> = ref([]);
 const usersDisplay = ref("selected");
 
 const store = useStore();
-const selectedOrg = ref(null);
 const orgOptions = ref([{ label: "All", value: "all" }]);
+const selectedOrg = ref(orgOptions.value[0]);
 const orgList = ref([...orgOptions.value]);
 const usersDisplayOptions = [
   {
@@ -243,16 +243,14 @@ const columns = [
   },
 ];
 
-onBeforeMount(async () => {
-  console.warn("before mount");
-  
+onBeforeMount(async () => {  
   groupUsersMap.value = new Set(props.groupUsers);
   await getchOrgUsers();
   updateUserTable(usersDisplay.value);
 
   if (store.state.organizations.length > 0) {
     orgOptions.value.push(
-      ...store.state.organizations.map(data => ({
+      ...store.state.organizations.map((data:any) => ({
         label: data.name,
         id: data.id,
         identifier: data.identifier,
@@ -277,6 +275,7 @@ watch(
     groupUsersMap.value = new Set(props.groupUsers);
     await getchOrgUsers();
     updateUserTable(usersDisplay.value);
+    selectedOrg.value = orgOptions.value[0];
   },
   {
     deep: true,
@@ -329,7 +328,7 @@ const getchOrgUsers = async () => {
           email: user.email,
           "#": index + 1,
           isInGroup: groupUsersMap.value.has(user.email),
-          org: user.orgs?.length > 0 ? user.orgs.map((org) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
+          org: user.orgs?.length > 0 ? user.orgs.map((org:{ org_name: string }) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
           role:user.role
         };
       })
