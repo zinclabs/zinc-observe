@@ -33,7 +33,7 @@ use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
-        utils::websocket::get_search_type_from_ws_req,
+        utils::websocket::{get_search_type_from_ws_req, update_histogram_interval_in_query},
     },
     handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
     service::search::{
@@ -136,6 +136,21 @@ pub async fn handle_search_request(
         );
     }
 
+    // create new sql query with histogram interval
+    let sql = Sql::new(&req.payload.query.clone().into(), org_id, stream_type).await?;
+    if let Some(interval) = sql.histogram_interval {
+        // modify the sql query statement to include the histogram interval
+        let updated_query = update_histogram_interval_in_query(&sql.sql, interval)?;
+        req.payload.query.sql = updated_query;
+        log::info!(
+            "[WS_SEARCH] trace_id: {}; Updated query {}; with histogram interval: {}",
+            trace_id,
+            req.payload.query.sql,
+            interval
+        );
+    }
+
+    // start search
     if is_partition_request(&req.payload, stream_type, org_id).await {
         log::info!(
             "[WS_SEARCH] trace_id: {} Partitioned search, req_size: {}",
