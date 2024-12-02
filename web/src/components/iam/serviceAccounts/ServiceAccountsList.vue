@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #top="scope">
         <div
           class="q-table__title full-width q-mb-md"
-          data-test="user-title-text"
+          data-test="service-accounts-title-text"
         >
           {{ t("serviceAccounts.header") }}
         </div>
@@ -157,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               no-caps
               icon="add"
               dense
-              :label="t(`user.add`)"
+              :label="t(`serviceAccounts.add`)"
               @click="addRoutePush({})"
             />
           </div>
@@ -302,7 +302,7 @@ import { computed, nextTick } from "vue";
 import { getRoles } from "@/services/iam";
 import service_accounts from "@/services/service_accounts";
 export default defineComponent({
-  name: "UserPageOpenSource",
+  name: "ServiceAccountsList",
   components: { QTablePagination,  NoData,AddServiceAccount},
   emits: [],
   setup(props, { emit }) {

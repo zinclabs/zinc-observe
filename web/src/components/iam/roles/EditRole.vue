@@ -58,6 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :added-users="addedUsers"
           :removed-users="removedUsers"
         />
+        <GroupServiceAccounts
+          data-test="edit-role-users-section"
+          v-show="activeTab === 'serviceAccounts'"
+          :groupUsers="roleUsers"
+          :activeTab="activeTab"
+          :added-users="addedUsers"
+          :removed-users="removedUsers"
+        />
 
         <div
           v-show="activeTab === 'permissions'"
@@ -341,6 +349,7 @@ import { getGroups, getRoles } from "@/services/iam";
 import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
 import { nextTick } from "vue";
+import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue")
@@ -410,6 +419,10 @@ const tabs = [
   {
     value: "users",
     label: "Users",
+  },
+  {
+    value: "serviceAccounts",
+    label: "Service Accounts",
   },
 ];
 

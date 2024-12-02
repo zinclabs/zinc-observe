@@ -63,35 +63,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           />
 
-          <div v-if="!beingUpdated">
-            <q-input
-              :type="isPwd ? 'password' : 'text'"
-              v-model="formData.password"
-              :label="t('user.password') + ' *'"
-              color="input-border"
-              bg-color="input-bg"
-              class="q-py-md showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-              :rules="[
-                (val: any) => !!val || 'Field is required',
-                (val: any) =>
-                  (val && val.length >= 8) ||
-                  'Password must be at least 8 characters long',
-              ]"
-            >
-              <template v-slot:append>
-                <q-icon
-                  :name="isPwd ? 'visibility_off' : 'visibility'"
-                  class="cursor-pointer"
-                  @click="isPwd = !isPwd"
-                />
-              </template>
-            </q-input>
-          </div>
-
           <q-input
             v-model="formData.first_name"
             :label="t('user.firstName')"
@@ -190,9 +161,6 @@ export default defineComponent({
     const existingUser = ref(false);
     const beingUpdated: any = ref(false);
     const userForm: any = ref(null);
-    const isPwd: any = ref(true);
-    const isNewPwd: any = ref(true);
-    const isOldPwd: any = ref(true);
     let organizationOptions: any = ref([]);
     const loadingOrganizations = ref(true);
     const logout_confirm = ref(false);
@@ -211,9 +179,6 @@ export default defineComponent({
       formData,
       beingUpdated,
       userForm,
-      isPwd,
-      isNewPwd,
-      isOldPwd,
       organizationOptions,
       existingUser,
       getImageURL,
@@ -232,7 +197,6 @@ export default defineComponent({
     ) {
       this.beingUpdated = true;
       this.formData = this.modelValue;
-      this.formData.password = "";
     }
   },
   methods: {
@@ -251,9 +215,6 @@ export default defineComponent({
       if (this.beingUpdated) {
         const userEmail = this.formData.email;
         delete this.formData.email;
-        delete this.formData.password;
-        delete this.formData.change_password
-
         service_accounts
           .update(this.formData, selectedOrg, userEmail)
           .then((res: any) => {

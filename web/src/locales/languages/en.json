@@ -278,7 +278,8 @@
     "hideToken":"Hide Service Token",
     "delete":"Delete Service Account",
     "update":"Update Service Account",
-    "copyToken":"Copy Token"
+    "copyToken":"Copy Token",
+    "add":"Add service Account"
   },
   "iam": {
     "users": "Users",

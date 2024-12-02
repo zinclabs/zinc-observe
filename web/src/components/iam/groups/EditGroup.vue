@@ -50,6 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :added-roles="addedRoles"
         :removed-roles="removedRoles"
       />
+      <GroupServiceAccounts
+      v-show="activeTab === 'serviceAccounts'"
+        :groupUsers="groupDetails.users"
+        :activeTab="activeTab"
+        :added-users="addedUsers"
+        :removed-users="removedUsers"
+      />
     </div>
     <div
       class="flex justify-end q-px-md q-py-sm full-width"
@@ -96,6 +103,7 @@ import { getGroup, updateGroup } from "@/services/iam";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import { useQuasar } from "quasar";
+import GroupServiceAccounts from "./GroupServiceAccounts.vue";
 
 onBeforeMount(() => {
   getGroupDetails();
@@ -134,6 +142,10 @@ const tabs = [
     value: "users",
     label: "Users",
   },
+  {
+    value: "serviceAccounts",
+    label: "Service Accounts",
+  },
 ];
 
 const getGroupDetails = () => {
@@ -142,6 +154,7 @@ const getGroupDetails = () => {
 
   getGroup(groupName, store.state.selectedOrganization.identifier)
     .then((res) => {
+      console.log(res,'res in get group')
       groupDetails.value = {
         ...res.data,
         group_name: res.data.name,
