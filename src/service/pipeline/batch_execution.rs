@@ -242,20 +242,7 @@ impl ExecutablePipeline {
             log::debug!("[Pipeline]: starts result collecting job");
             let mut count: usize = 0;
             let mut results = HashMap::new();
-            while let Some((idx, mut stream_params, record)) = result_receiver.recv().await {
-                if stream_params.stream_name.contains("{") {
-                    match resolve_stream_name(&stream_params.stream_name, &record) {
-                        Ok(stream_name) => {
-                            stream_params.stream_name = stream_name.into();
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[Pipeline]: dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped."
-                            );
-                            continue;
-                        }
-                    }
-                }
+            while let Some((idx, stream_params, record)) = result_receiver.recv().await {
                 results
                     .entry(stream_params)
                     .or_insert(Vec::new())
@@ -528,9 +515,36 @@ async fn process_node(
                         };
                     }
 
-                    if let Err(send_err) = result_sender
-                        .send((idx, stream_params.clone(), record))
-                        .await
+                    let mut destination_stream = stream_params.clone();
+                    if destination_stream.stream_name.contains("{") {
+                        match resolve_stream_name(&destination_stream.stream_name, &record) {
+                            Ok(stream_name) if !stream_name.is_empty() => {
+                                destination_stream.stream_name = stream_name.into();
+                            }
+                            resolve_res => {
+                                let err_msg = if let Err(e) = resolve_res {
+                                    format!("Dynamic stream name detected in destination, but failed to resolve due to {e}. Record dropped")
+                                } else {
+                                    "Dynamic Stream Name resolved to empty. Record dropped"
+                                        .to_string()
+                                };
+                                log::error!("{err_msg}");
+                                if let Err(send_err) = error_sender
+                                    .send((node.id.to_string(), node.node_type(), err_msg))
+                                    .await
+                                {
+                                    log::error!(
+                                        "[Pipeline]: LeafNode failed sending errors for collection caused by: {send_err}"
+                                    );
+                                    break;
+                                }
+                                continue;
+                            }
+                        }
+                    }
+
+                    if let Err(send_err) =
+                        result_sender.send((idx, destination_stream, record)).await
                     {
                         log::error!(
                             "[Pipeline]: LeafNode errors sending result for collection caused by: {send_err}"
