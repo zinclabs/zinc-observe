@@ -119,3 +119,13 @@
   outline-width: 0px;
   outline-style: none;
 }
+
+:root {
+  --menu-font-size: 0.73em;
+}
+
+@media (min-width: 768px) and (max-width: 1204px) {
+  :root {
+    --menu-font-size: 0.65em;
+  }
+}
