@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             path: link,
             exact: false,
             query: {
-              org_identifier: store.state.selectedOrganization?.identifier,
+              org_identifier: store?.state?.selectedOrganization?.identifier,
             },
           }
         : ''
@@ -80,7 +80,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="child.pin"
             :data-test="`menu-link-${child.link}-pin-item`"
             side
-            @click.stop="handleMenuTogglePin(child)"
           >
             <q-icon name="push_pin" color="grey"
 size="xs" />
