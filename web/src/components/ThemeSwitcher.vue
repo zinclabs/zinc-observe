@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-btn class="round-button" round flat size="xs">
-    <q-icon :name="DarkModeIcon" size="xs"></q-icon>
+    <q-icon :name="DarkModeIcon" size="xs" class="icon-theme-switcher"></q-icon>
   </q-btn>
 </template>
 

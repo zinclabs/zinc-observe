@@ -120,12 +120,54 @@
   outline-style: none;
 }
 
+.organizationlist {
+  .q-field__native, .q-select__dropdown-icon {
+    color: $white;
+  }
+
+  .q-select__dropdown-icon {
+    margin-top: 4px;
+  }
+}
+
+.q-menu {
+  .q-item__label {
+    color: $white !important;
+  }
+}
+
+.body--light {
+  .q-menu {
+    background-color: $white;
+  }
+
+  .q-item__label {
+    color: $dark !important;
+  }
+
+  .header-menu-bar {
+    background-color: $menu-background;
+    color: $white;
+
+    .q-item__label, .selected-lang-label, .icon-ley-arrow-right, .icon-theme-switcher {
+      color: $white !important;
+    }
+  }
+
+  .custom-logo-text {
+    color: $white !important;
+  }
+}
+
 :root {
   --menu-font-size: 0.73em;
+  --logo-width: 150px;
 }
 
 @media (min-width: 768px) and (max-width: 1204px) {
   :root {
     --menu-font-size: 0.65em;
+    --logo-width: 30px;
   }
 }
+

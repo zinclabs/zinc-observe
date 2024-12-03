@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
               store.state.zoConfig?.custom_logo_text != ''
             "
-            class="text-h6 text-bold q-pa-none cursor-pointer"
+            class="text-h6 text-bold q-pa-none cursor-pointer custom-logo-text"
             @click="goToHome"
             >{{ store.state.zoConfig.custom_logo_text }}</span
           >
@@ -110,8 +110,7 @@ size="xs" class="warning" />{{
           >
         </div>
         <div data-test="navbar-organizations-icon-select" class="q-mx-xs">
-          <q-icon name="business"
-size="xs" style="display: inline-block" />
+          <q-icon name="business" color="white" size="xs" style="display: inline-block" />
         </div>
         <div
           data-test="navbar-organizations-select"
@@ -120,13 +119,16 @@ size="xs" style="display: inline-block" />
           <q-select
             v-model="selectedOrg"
             behavior="menu"
+            menu-class="organization-menu"
+            id="organizations"
             borderless
             dense
             input-debounce="300"
             :options="orgOptions"
             option-label="identifier"
-            class="q-px-none q-py-none q-mx-none q-my-none organizationlist"
+            class="q-px-none q-py-none q-mx-none q-my-none organizationlist text-white"
             @update:model-value="updateOrganization()"
+            @popup-show="setDynamicMenuClass"
           >
             <template v-slot:no-option>
               <q-item>
@@ -143,7 +145,7 @@ size="xs" style="display: inline-block" />
 flat dense :ripple="false" padding="none">
             <div class="row items-center no-wrap">
               <q-icon name="help"
-size="sm" color="blue-grey-5"></q-icon>
+size="sm" color="blue-grey-1"></q-icon>
             </div>
 
             <q-menu
@@ -152,6 +154,7 @@ size="sm" color="blue-grey-5"></q-icon>
               self="top right"
               transition-show="jump-down"
               transition-hide="jump-up"
+              class="header-menu-bar"
             >
               <q-list style="min-width: 120px">
                 <div
@@ -203,7 +206,7 @@ size="sm" color="blue-grey-5"></q-icon>
 flat dense :ripple="false" padding="none">
             <div class="row items-center no-wrap">
               <q-icon name="settings" size="sm"
-color="blue-grey-5"></q-icon>
+color="blue-grey-1"></q-icon>
             </div>
 
             <q-menu
@@ -212,6 +215,7 @@ color="blue-grey-5"></q-icon>
               self="top right"
               transition-show="jump-down"
               transition-hide="jump-up"
+              class="header-menu-bar"
             >
               <q-list style="min-width: 120px">
                 <q-item clickable @click="router.push({ name: 'settings' })">
@@ -232,7 +236,7 @@ flat dense :ripple="false" padding="none">
               <q-icon
                 :name="user.picture ? user.picture : 'account_circle'"
                 size="sm"
-                color="blue-grey-5"
+                color="blue-grey-1"
               ></q-icon>
             </div>
 
@@ -242,6 +246,7 @@ flat dense :ripple="false" padding="none">
               self="top right"
               transition-show="jump-down"
               transition-hide="jump-up"
+              class="header-menu-bar"
             >
               <q-list style="min-width: 250px">
                 <q-item>
@@ -249,7 +254,6 @@ flat dense :ripple="false" padding="none">
                     <q-icon
                       :name="user.picture ? user.picture : 'account_circle'"
                       size="xs"
-                      color="blue-grey-5"
                     ></q-icon>
                   </q-item-section>
                   <q-item-section>
@@ -261,12 +265,11 @@ flat dense :ripple="false" padding="none">
                   </q-item-section>
                 </q-item>
                 <q-separator />
-                <q-item clickable @click="themeSwitcherRef?.toggleDarkMode()">
+                <q-item clickable @click="themeSwitcherRef?.toggleDarkMode()" v-close-popup>
                   <q-item-section avatar>
                     <q-icon
                       name="contrast"
                       size="xs"
-                      color="blue-grey-5"
                     ></q-icon>
                   </q-item-section>
                   <q-item-section>
@@ -285,7 +288,7 @@ flat dense :ripple="false" padding="none">
                 >
                   <q-item-section avatar>
                     <q-icon size="xs"
-name="settings" color="blue-grey-5" />
+name="settings" />
                   </q-item-section>
                   <q-item-section>
                     <q-item-label>{{ t("menu.settings") }}</q-item-label>
@@ -298,7 +301,6 @@ name="settings" color="blue-grey-5" />
                       size="xs"
                       name="language"
                       class="padding-none"
-                      color="blue-grey-5"
                     />
                   </q-item-section>
                   <q-item-section>
@@ -312,13 +314,13 @@ name="settings" color="blue-grey-5" />
                         :name="selectedLanguage.icon"
                         class="padding-none"
                       />
-                      <span class="cursor-pointer vertical-bottom q-mt-sm">{{
+                      <span class="cursor-pointer vertical-bottom q-mt-sm selected-lang-label">{{
                         selectedLanguage.label
                       }}</span>
                     </div>
                   </q-item-section>
                   <q-item-section side style="padding-left: 0px">
-                    <q-icon name="keyboard_arrow_right" />
+                    <q-icon class="icon-ley-arrow-right" name="keyboard_arrow_right" />
                   </q-item-section>
 
                   <q-menu
@@ -326,6 +328,7 @@ name="settings" color="blue-grey-5" />
                     anchor="top end"
                     self="top start"
                     data-test="language-dropdown-item"
+                    class="header-menu-bar text-white"
                   >
                     <q-list>
                       <q-item
@@ -365,7 +368,6 @@ name="settings" color="blue-grey-5" />
                       size="xs"
                       name="exit_to_app"
                       class="padding-none"
-                      color="blue-grey-5"
                     />
                   </q-item-section>
                   <q-item-section>
@@ -538,6 +540,34 @@ export default defineComponent({
     changeLanguage(item: { code: string; label: string; icon: string }) {
       setLanguage(item.code);
       window.location.reload();
+    },
+    setDynamicMenuClass() {
+      // Find the input element within the QSelect component
+      const inputElement = document.querySelector('#organizations').querySelector('.q-select__focus-target');
+      console.log(inputElement.getAttribute('aria-controls'));
+      if (inputElement) {
+        // Extract the ID of the input element
+        const inputId = inputElement.getAttribute('aria-controls');
+
+        // Find the menu element using the `menu-class` class
+        console.log('#'+inputId)
+        setTimeout(() => {
+          const menuElement = document.querySelector('#'+inputId);
+          console.log(menuElement)
+
+          if (menuElement) {
+            // Apply a dynamic class based on the input's ID
+            menuElement.classList.add(`header-menu-bar`);
+          }
+        }, 10);
+        // const menuElement = document.querySelector('#'+inputId);
+        // console.log(menuElement)
+
+        // if (menuElement) {
+        //   // Apply a dynamic class based on the input's ID
+        //   menuElement.classList.add(`header-menu-bar`);
+        // }
+      }
     },
   },
   setup() {
@@ -753,7 +783,7 @@ export default defineComponent({
         if (store?.state?.theme == "dark") {
           imagePath = imagePath + "_dark.svg";
         } else {
-          imagePath = imagePath + "_light.svg";
+          imagePath = imagePath + "_dark.svg";
         }
       }
       return getImageURL("images/common/" + imagePath);
@@ -1256,7 +1286,7 @@ export default defineComponent({
   .appLogo {
     margin-left: 0;
     margin-right: 0;
-    width: auto;
+    width: var(--logo-width);
     max-width: 150px;
     cursor: pointer;
 
