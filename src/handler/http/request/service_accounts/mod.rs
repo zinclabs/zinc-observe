@@ -106,7 +106,7 @@ pub async fn save(
         ("org_id" = String, Path, description = "Organization name"),
         ("email_id" = String, Path, description = "Service Account email id"),
     ),
-    request_body(content = ServiceAccountRequest, description = "Service Account data", content_type = "application/json"),
+    request_body(content = UpdateServiceAccountRequest, description = "Service Account data", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
     )
@@ -120,7 +120,15 @@ pub async fn update(
 ) -> Result<HttpResponse, Error> {
     let (org_id, email_id) = params.into_inner();
     let email_id = email_id.trim().to_string();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let query = match web::Query::<HashMap<String, String>>::from_query(req.query_string()) {
+        Ok(query) => query,
+        Err(e) => {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("Invalid query string: {}", e),
+            ));
+        }
+    };
 
     let rotate_token = match query.get("rotateToken") {
         Some(s) => match s.to_lowercase().as_str() {
@@ -216,7 +224,7 @@ pub async fn delete(
     )
 )]
 #[get("/{org_id}/service_accounts/{email_id}")]
-async fn get_api_token(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
+pub async fn get_api_token(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org, user_id) = path.into_inner();
     let org_id = Some(org.as_str());
     match crate::service::organization::get_passcode(org_id, &user_id).await {

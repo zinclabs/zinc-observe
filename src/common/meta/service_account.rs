@@ -25,7 +25,7 @@ pub struct ServiceAccountRequest {
     pub last_name: String,
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct APIToken {
     pub token: String,
     pub user: String,
