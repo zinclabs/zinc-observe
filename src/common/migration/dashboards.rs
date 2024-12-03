@@ -13,8 +13,78 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::db as infra_db;
+use config::meta::{
+    dashboards::Dashboard,
+    stream::{DistinctField, StreamSettings, StreamType},
+};
+use hashbrown::HashMap;
+use infra::{
+    db as infra_db,
+    schema::get_settings,
+    table::{
+        dashboards,
+        distinct_values::{self, DistinctFieldRecord, OriginType},
+    },
+};
 
+use crate::service::{db::dashboards::get_query_variables, stream::save_stream_settings};
+
+type SettingsCache = HashMap<(String, String, StreamType), StreamSettings>;
+
+/// This takes query variables from the dashboard and inserts them
+/// in the distinct_values table as well as the stream settings
+async fn add_distinct_from_dashboard(
+    org_id: &str,
+    dashboard: &Dashboard,
+    settings_cache: &mut SettingsCache,
+) -> Result<(), anyhow::Error> {
+    let dashboard_id = dashboard
+        .dashboard_id()
+        .ok_or_else(|| anyhow::anyhow!("Dashboard ID is missing"))?;
+
+    let variables = get_query_variables(Some(dashboard));
+
+    for ((stream, stype), fields) in variables {
+        let cache_key = (org_id.to_string(), stream.clone(), stype);
+
+        let stream_settings = match settings_cache.get_mut(&cache_key) {
+            Some(s) => s,
+            None => {
+                let settings = get_settings(org_id, &stream, stype)
+                    .await
+                    .unwrap_or_default();
+                settings_cache.insert(cache_key.clone(), settings);
+                settings_cache.get_mut(&cache_key).unwrap()
+            }
+        };
+
+        for f in fields {
+            let record = DistinctFieldRecord::new(
+                OriginType::Dashboard,
+                dashboard_id,
+                org_id,
+                &stream,
+                stype.to_string(),
+                &f,
+            );
+
+            let temp = DistinctField {
+                name: f,
+                added_ts: chrono::Utc::now().timestamp_micros(),
+            };
+
+            if !stream_settings.distinct_value_fields.contains(&temp) {
+                stream_settings.distinct_value_fields.push(temp);
+            }
+
+            distinct_values::add(record).await?;
+        }
+    }
+    Ok(())
+}
+
+// due to the order we init the resources, this migration will always run after
+// the sea-orm migrations, so we can be certain that dashboard folders are migrated here.
 pub async fn run() -> Result<(), anyhow::Error> {
     // load dashboards list
     let db = infra_db::get_db().await;
@@ -24,10 +94,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         let local_key = key.strip_prefix('/').unwrap_or(&key);
         let len = local_key.split('/').collect::<Vec<&str>>().len();
         if len > 3 {
-            // println!(
-            // "Skip dashboard migration as it is already part of folder: {}",
-            // key
-            // );
             continue;
         }
         let new_key = key.replace("/dashboard/", "/dashboard/default/");
@@ -40,6 +106,39 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 println!("Failed to migrate dashboard: {}", new_key);
             }
         }
+    }
+
+    if distinct_values::len().await? > 0 {
+        log::info!("dashboard distinct values migration already done.");
+    } else {
+        let dashboards = dashboards::list_all().await?;
+        let mut settings_cache: SettingsCache = HashMap::new();
+
+        for (org, dashboard) in dashboards {
+            match add_distinct_from_dashboard(&org, &dashboard, &mut settings_cache).await {
+                Ok(_) => log::info!(
+                    "dashboard {} migrated for distinct values",
+                    dashboard.dashboard_id().unwrap()
+                ),
+                Err(e) => log::error!(
+                    "failed to process variables from dashboard {} for distinct values : {e}",
+                    dashboard.dashboard_id().unwrap()
+                ),
+            }
+        }
+
+        for ((org_id, stream, stype), settings) in settings_cache {
+            match save_stream_settings(&org_id, &stream, stype, settings).await {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!(
+                        "failed to save updated stream settings when migrating for distinct values {org_id}/{stream} {stype} :{e} "
+                    );
+                }
+            }
+        }
+
+        log::info!("dashboard distinct value migration completed");
     }
 
     Ok(())

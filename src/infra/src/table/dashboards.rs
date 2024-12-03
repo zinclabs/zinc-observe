@@ -113,6 +113,17 @@ pub async fn list(params: ListDashboardsParams) -> Result<Vec<Dashboard>, errors
     Ok(dashboards)
 }
 
+/// Lists all dashboards belonging to the given org and folder.
+pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let dashboards = list_all_models(client)
+        .await?
+        .into_iter()
+        .map(|(org, db)| Ok((org, Dashboard::try_from(db)?)))
+        .collect::<Result<_, errors::Error>>()?;
+    Ok(dashboards)
+}
+
 /// Creates a new dashboard or updates an existing dashboard in the database.
 /// Returns the new or updated dashboard.
 pub async fn put(
@@ -299,6 +310,31 @@ async fn list_models(
         .await?
         .into_iter()
         .flat_map(|(_, ds)| ds)
+        .collect();
+    Ok(dashboards)
+}
+
+/// Lists all dashboard ORM models that belong to the given org and folder.
+async fn list_all_models(
+    db: &DatabaseConnection,
+) -> Result<Vec<(String, dashboards::Model)>, sea_orm::DbErr> {
+    let query = folders::Entity::find()
+        .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()));
+
+    // Apply ordering. Confusingly, it is necessary to apply the ordering BEFORE
+    // adding a join to the query builder. If we don't do this then Sea ORM will
+    // always sort on the join key (folder.id) before any other sorting
+    // conditions.
+    let query = query.order_by(dashboards::Column::Title, sea_orm::Order::Asc);
+
+    // Left join on dashboards table.
+    let query = query.find_with_related(dashboards::Entity);
+
+    let dashboards = query
+        .all(db)
+        .await?
+        .into_iter()
+        .flat_map(|(folder, ds)| ds.into_iter().map(move |d| (folder.org.clone(), d)))
         .collect();
     Ok(dashboards)
 }

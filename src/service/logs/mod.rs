@@ -42,7 +42,10 @@ use infra::schema::{unwrap_partition_time_level, SchemaCache};
 use super::{
     db::organization::get_org_setting,
     ingestion::{evaluate_trigger, write_file, TriggerAlertData},
-    metadata::{distinct_values::DvItem, write, MetadataItem, MetadataType},
+    metadata::{
+        distinct_values::{DvItem, DISTINCT_STREAM_PREFIX},
+        write, MetadataItem, MetadataType,
+    },
     schema::stream_schema_exists,
 };
 use crate::{
@@ -268,6 +271,10 @@ async fn write_logs(
     )
     .await;
 
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, StreamType::Logs)
+        .await
+        .unwrap_or_default();
+
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let mut partition_time_level = PartitionTimeLevel::from(cfg.limit.logs_file_retention.as_str());
     if stream_schema.has_partition_keys {
@@ -431,18 +438,25 @@ async fn write_logs(
         // end check for alert triggers
 
         // get distinct_value items
-        let mut to_add_distinct_values = vec![];
-        for field in DISTINCT_FIELDS.iter() {
+        let mut map = Map::new();
+        for field in DISTINCT_FIELDS.iter().chain(
+            stream_settings
+                .distinct_value_fields
+                .iter()
+                .map(|f| &f.name),
+        ) {
             if let Some(val) = record_val.get(field) {
-                to_add_distinct_values.push(MetadataItem::DistinctValues(DvItem {
-                    stream_type: StreamType::Logs,
-                    stream_name: stream_name.to_string(),
-                    field_name: field.to_string(),
-                    field_value: val.as_str().unwrap().to_string(),
-                    filter_name: "".to_string(),
-                    filter_value: "".to_string(),
-                }));
+                map.insert(field.clone(), val.clone());
             }
+        }
+
+        if !map.is_empty() {
+            // add distinct values
+            distinct_values.push(MetadataItem::DistinctValues(DvItem {
+                stream_type: StreamType::Logs,
+                stream_name: stream_name.to_string(),
+                value: map,
+            }));
         }
 
         // get hour key
@@ -482,9 +496,6 @@ async fn write_logs(
                 );
             }
         }
-
-        // add distinct values
-        distinct_values.extend(to_add_distinct_values);
     }
 
     // write data to wal
@@ -501,7 +512,7 @@ async fn write_logs(
     }
 
     // send distinct_values
-    if !distinct_values.is_empty() {
+    if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {
         if let Err(e) = write(org_id, MetadataType::DistinctValues, distinct_values).await {
             log::error!("Error while writing distinct values: {}", e);
         }

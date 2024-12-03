@@ -68,7 +68,7 @@ const DATAFUSION_MIN_PARTITION: usize = 2; // CPU cores
 
 pub async fn merge_parquet_files(
     stream_type: StreamType,
-    stream_name: &str,
+    _stream_name: &str,
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
@@ -82,14 +82,6 @@ pub async fn merge_parquet_files(
         format!(
             "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {} DESC) ORDER BY {} DESC",
             cfg.common.column_timestamp, cfg.common.column_timestamp
-        )
-    } else if cfg.limit.distinct_values_hourly
-        && stream_type == StreamType::Metadata
-        && stream_name == "distinct_values"
-    {
-        format!(
-            "SELECT MIN({}) AS {}, SUM(count) as count, field_name, field_value, filter_name, filter_value, stream_name, stream_type FROM tbl GROUP BY field_name, field_value, filter_name, filter_value, stream_name, stream_type ORDER BY {} DESC",
-            cfg.common.column_timestamp, cfg.common.column_timestamp, cfg.common.column_timestamp
         )
     } else {
         format!(

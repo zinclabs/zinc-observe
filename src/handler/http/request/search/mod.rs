@@ -46,6 +46,7 @@ use crate::{
         },
     },
     service::{
+        metadata::distinct_values::DISTINCT_STREAM_PREFIX,
         search as SearchService,
         self_reporting::{http_report_metrics, report_request_usage_stats},
     },
@@ -54,6 +55,57 @@ use crate::{
 pub mod job;
 pub mod multi_streams;
 pub mod saved_view;
+
+async fn can_use_distinct_stream(
+    org: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    fields: &[String],
+    query_sql: &str,
+    start_time: i64,
+) -> bool {
+    if !matches!(stream_type, StreamType::Logs | StreamType::Traces) {
+        return false;
+    }
+
+    let stream_settings = infra::schema::get_settings(org, stream_name, stream_type)
+        .await
+        .unwrap_or_default();
+
+    // all fields which are requested must be in the distinct stream
+    let all_fields_distinct = fields.iter().all(|f| {
+        if DISTINCT_FIELDS.contains(f) {
+            return true;
+        }
+        stream_settings
+            .distinct_value_fields
+            .iter()
+            .any(|entry| entry.name == *f && entry.added_ts <= start_time)
+    });
+
+    // all the fields used in the query sent must be in the distinct stream
+    let query_fields: Vec<_> = match config::meta::sql::Sql::new(query_sql) {
+        // if sql is invalid, we let it follow the original search and fail
+        Err(_) => return false,
+        Ok(sql) => sql
+            .fields
+            .into_iter()
+            .filter(|f| f != "_timestamp")// _timestamp is hardcoded in queries
+            .collect(),
+    };
+
+    let all_query_fields_distinct = query_fields.iter().all(|f| {
+        if DISTINCT_FIELDS.contains(f) {
+            return true;
+        }
+        stream_settings
+            .distinct_value_fields
+            .iter()
+            .any(|entry| entry.name == *f && entry.added_ts <= start_time)
+    });
+
+    all_fields_distinct && all_query_fields_distinct
+}
 
 /// SearchStreamData
 #[utoipa::path(
@@ -661,19 +713,10 @@ pub async fn values(
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
+
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
         Err(e) => return Ok(meta::http::HttpResponse::bad_request(e)),
-    };
-
-    let fields = match query.get("fields") {
-        Some(v) => v.split(',').map(|s| s.to_string()).collect::<Vec<_>>(),
-        None => return Ok(MetaHttpResponse::bad_request("fields is empty")),
-    };
-
-    let query_sql = match query.get("sql") {
-        None => "".to_string(),
-        Some(v) => base64::decode_url(v).unwrap_or("".to_string()),
     };
 
     let user_id = in_req
@@ -693,60 +736,12 @@ pub async fn values(
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
-    if fields.len() == 1
-        && DISTINCT_FIELDS.contains(&fields[0])
-        && !query_sql.to_lowercase().contains(" where ")
-    {
-        if let Some(v) = query.get("filter") {
-            if !v.is_empty() {
-                let column = v.splitn(2, '=').collect::<Vec<_>>();
-                if DISTINCT_FIELDS.contains(&column[0].to_string()) {
-                    // has filter and the filter can be used to distinct_values
-                    return values_v2(
-                        &org_id,
-                        stream_type,
-                        &stream_name,
-                        &fields[0],
-                        Some((column[0], column[1])),
-                        &query,
-                        &user_id,
-                        trace_id,
-                        http_span,
-                    )
-                    .await;
-                }
-            } else {
-                // no filter
-                return values_v2(
-                    &org_id,
-                    stream_type,
-                    &stream_name,
-                    &fields[0],
-                    None,
-                    &query,
-                    &user_id,
-                    trace_id,
-                    http_span,
-                )
-                .await;
-            }
-        } else {
-            // no filter
-            return values_v2(
-                &org_id,
-                stream_type,
-                &stream_name,
-                &fields[0],
-                None,
-                &query,
-                &user_id,
-                trace_id,
-                http_span,
-            )
-            .await;
-        }
-    }
-
+    // originally there was v1 which would to a full stream search
+    // and v2 which would do search on a distinct values stream iff
+    // the queried fields configured accordingly.
+    // Now we simply check if the fields in query are in the distinct stream or not,
+    // and change the search stream to the distinct stream, so we don't need any separate
+    // v2 fucntion.
     values_v1(
         &org_id,
         stream_type,
@@ -759,7 +754,10 @@ pub async fn values(
     .await
 }
 
-/// search in original data
+// If all fields requested in the query AND fields from the
+// sql query in the query are stored in distinct stream,
+// this will search on the distinct stream, otherwise
+// just search on the original data
 async fn values_v1(
     org_id: &str,
     stream_type: StreamType,
@@ -797,7 +795,12 @@ async fn values_v1(
             if v.is_empty() {
                 default_sql
             } else {
-                format!("{} WHERE {v}", default_sql)
+                let columns = v.splitn(2, '=').collect::<Vec<_>>();
+                if columns.len() < 2 {
+                    return Ok(MetaHttpResponse::bad_request("Invalid filter format"));
+                }
+                let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
+                format!("{} WHERE {} IN ('{}')", default_sql, columns[0], vals)
             }
         }
     };
@@ -868,6 +871,17 @@ async fn values_v1(
         (start_time, end_time)
     };
 
+    // check if we can use the distinct stream for this query
+    let use_distinct_stream = can_use_distinct_stream(
+        org_id,
+        stream_name,
+        stream_type,
+        &fields,
+        &query_sql,
+        start_time,
+    )
+    .await;
+
     let regions = query.get("regions").map_or(vec![], |regions| {
         regions
             .split(',')
@@ -932,13 +946,26 @@ async fn values_v1(
         } else {
             sql_where.clone()
         };
+
+        let distinct_prefix = if use_distinct_stream {
+            format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str())
+        } else {
+            "".to_owned()
+        };
+
+        let actual_stream_type = if use_distinct_stream {
+            StreamType::Metadata
+        } else {
+            stream_type
+        };
+
         let sql = if no_count {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
+                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_key ASC"
             )
         } else {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
+                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
             )
         };
         let mut req = req.clone();
@@ -947,7 +974,7 @@ async fn values_v1(
         let search_res = SearchService::cache::search(
             &trace_id,
             org_id,
-            stream_type,
+            actual_stream_type,
             Some(user_id.to_string()),
             &req,
             use_cache,
@@ -1054,249 +1081,6 @@ async fn values_v1(
             None
         },
         work_group: get_work_group(work_group_set),
-        ..Default::default()
-    };
-    let num_fn = req.query.query_fn.is_some() as u16;
-    report_request_usage_stats(
-        req_stats,
-        org_id,
-        stream_name,
-        stream_type,
-        UsageType::SearchTopNValues,
-        num_fn,
-        started_at,
-    )
-    .await;
-
-    Ok(HttpResponse::Ok().json(resp))
-}
-
-/// search in distinct data
-#[allow(clippy::too_many_arguments)]
-async fn values_v2(
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    field: &str,
-    filter: Option<(&str, &str)>,
-    query: &web::Query<HashMap<String, String>>,
-    user_id: &str,
-    trace_id: String,
-    http_span: Span,
-) -> Result<HttpResponse, Error> {
-    let start = std::time::Instant::now();
-    let started_at = Utc::now().timestamp_micros();
-
-    let no_count = match query.get("no_count") {
-        None => false,
-        Some(v) => {
-            let v = v.to_lowercase();
-            v == "true" || v == "1"
-        }
-    };
-    let mut query_sql = if no_count {
-        format!(
-            "SELECT field_value AS zo_sql_key FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
-            stream_type, stream_name, field
-        )
-    } else {
-        format!(
-            "SELECT field_value AS zo_sql_key, SUM(count) as zo_sql_num FROM distinct_values WHERE stream_type='{}' AND stream_name='{}' AND field_name='{}'",
-            stream_type, stream_name, field
-        )
-    };
-    if let Some((key, val)) = filter {
-        let val = val.split(',').collect::<Vec<_>>().join("','");
-        query_sql = format!(
-            "{} AND filter_name='{}' AND filter_value IN ('{}')",
-            query_sql, key, val
-        );
-    }
-    if let Some(val) = query.get("keyword") {
-        let val = val.trim();
-        if !val.is_empty() {
-            query_sql = format!("{} AND field_value ILIKE '%{}%'", query_sql, val);
-        }
-    }
-
-    let size = query
-        .get("size")
-        .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
-    // If this is a enrichment table, we need to get the start_time and end_time from the stats
-    let stats = if stream_type.eq(&StreamType::EnrichmentTables) {
-        Some(stats::get_stream_stats(org_id, stream_name, stream_type))
-    } else {
-        None
-    };
-    let start_time = if stream_type.eq(&StreamType::EnrichmentTables) {
-        stats.as_ref().unwrap().doc_time_min
-    } else {
-        query
-            .get("start_time")
-            .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
-    };
-
-    if start_time == 0 {
-        return Ok(MetaHttpResponse::bad_request("start_time is empty"));
-    }
-    let end_time = if stream_type.eq(&StreamType::EnrichmentTables) {
-        stats.as_ref().unwrap().doc_time_max
-    } else {
-        query
-            .get("end_time")
-            .map_or(0, |v| v.parse::<i64>().unwrap_or(0))
-    };
-    if end_time == 0 {
-        return Ok(MetaHttpResponse::bad_request("end_time is empty"));
-    }
-    let (start_time, end_time) = if start_time == end_time {
-        (start_time - 1, end_time + 1)
-    } else {
-        (start_time, end_time)
-    };
-    if no_count {
-        query_sql = format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC LIMIT {size}")
-    } else {
-        query_sql = format!("{query_sql} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC LIMIT {size}")
-    }
-
-    let regions = query.get("regions").map_or(vec![], |regions| {
-        regions
-            .split(',')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>()
-    });
-    let clusters = query.get("clusters").map_or(vec![], |clusters| {
-        clusters
-            .split(',')
-            .filter(|s| !s.is_empty())
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>()
-    });
-
-    let timeout = query
-        .get("timeout")
-        .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
-
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[org_id])
-        .inc();
-
-    // get a local search queue lock
-    #[cfg(not(feature = "enterprise"))]
-    let locker = SearchService::QUEUE_LOCKER.clone();
-    #[cfg(not(feature = "enterprise"))]
-    let locker = locker.lock().await;
-    #[cfg(not(feature = "enterprise"))]
-    if !get_config().common.feature_query_queue_enabled {
-        drop(locker);
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let took_wait = start.elapsed().as_millis() as usize;
-    #[cfg(feature = "enterprise")]
-    let took_wait = 0;
-    log::info!(
-        "http search value_v2 API wait in queue took: {} ms",
-        took_wait
-    );
-    metrics::QUERY_PENDING_NUMS
-        .with_label_values(&[org_id])
-        .dec();
-
-    // search
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql: query_sql,
-            from: 0,
-            size: 0,
-            start_time,
-            end_time,
-            sort_by: None,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions,
-        clusters,
-        timeout,
-        search_type: Some(SearchEventType::Values),
-        search_event_context: None,
-    };
-    let search_res = SearchService::search(
-        &trace_id,
-        org_id,
-        StreamType::Metadata,
-        Some(user_id.to_string()),
-        &req,
-    )
-    .instrument(http_span)
-    .await;
-
-    let resp_search = match search_res {
-        Ok(res) => res,
-        Err(err) => {
-            http_report_metrics(start, org_id, stream_type, stream_name, "500", "_values/v2");
-            log::error!("search values error: {:?}", err);
-            return Ok(match err {
-                errors::Error::ErrorCode(code) => match code {
-                    errors::ErrorCodes::SearchCancelQuery(_) => HttpResponse::TooManyRequests()
-                        .json(meta::http::HttpResponse::error_code_with_trace_id(
-                            code,
-                            Some(trace_id),
-                        )),
-                    _ => HttpResponse::InternalServerError().json(
-                        meta::http::HttpResponse::error_code_with_trace_id(code, Some(trace_id)),
-                    ),
-                },
-                _ => HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err.to_string(),
-                )),
-            });
-        }
-    };
-
-    let mut resp = config::meta::search::Response::default();
-    let mut hit_values: Vec<json::Value> = Vec::new();
-    let mut field_value: json::Map<String, json::Value> = json::Map::new();
-    field_value.insert("field".to_string(), json::Value::String(field.to_string()));
-    field_value.insert("values".to_string(), json::Value::Array(resp_search.hits));
-    hit_values.push(json::Value::Object(field_value));
-
-    resp.total = 1;
-    resp.hits = hit_values;
-    resp.size = size;
-    resp.scan_size = resp_search.scan_size;
-    resp.took = start.elapsed().as_millis() as usize;
-    resp.cached_ratio = resp_search.cached_ratio;
-
-    let time = start.elapsed().as_secs_f64();
-    http_report_metrics(start, org_id, stream_type, stream_name, "200", "_values/v2");
-
-    let req_stats = RequestStats {
-        records: resp.hits.len() as i64,
-        response_time: time,
-        size: resp.scan_size as f64,
-        request_body: Some(req.query.sql),
-        user_email: Some(user_id.to_string()),
-        min_ts: Some(start_time),
-        max_ts: Some(end_time),
-        cached_ratio: Some(resp.cached_ratio),
-        search_type: Some(SearchEventType::Values),
-        trace_id: Some(trace_id),
-        took_wait_in_queue: if resp.took_detail.is_some() {
-            let resp_took = resp.took_detail.as_ref().unwrap();
-            // Consider only the cluster wait queue duration
-            Some(resp_took.cluster_wait_queue)
-        } else {
-            None
-        },
-        work_group: resp_search.work_group,
         ..Default::default()
     };
     let num_fn = req.query.query_fn.is_some() as u16;

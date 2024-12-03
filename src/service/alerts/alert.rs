@@ -39,7 +39,7 @@ use config::{
     SMTP_CLIENT,
 };
 use cron::Schedule;
-use lettre::{message::SinglePart, AsyncTransport, Message};
+use lettre::{message::MultiPart, AsyncTransport, Message};
 
 use crate::{
     common::{
@@ -588,7 +588,9 @@ pub async fn send_email_notification(
         email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
     }
 
-    let email = email.singlepart(SinglePart::html(msg)).unwrap();
+    let email = email
+        .multipart(MultiPart::alternative_plain_html(msg.clone(), msg))
+        .unwrap();
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
