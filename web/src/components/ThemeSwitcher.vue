@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn class="round-button" round flat @click="toggleDarkMode">
-    <q-icon :name="DarkModeIcon"></q-icon>
+  <q-btn class="round-button" round flat size="xs">
+    <q-icon :name="DarkModeIcon" size="xs"></q-icon>
   </q-btn>
 </template>
 
@@ -24,10 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch, onMounted, computed, defineComponent } from "vue";
 import { useQuasar } from "quasar";
 import { useStore } from "vuex";
-import {
-  outlinedDarkMode,
-  outlinedLightMode,
-} from "@quasar/extras/material-icons-outlined";
+import { matDarkMode, matLightMode } from "@quasar/extras/material-icons";
 
 export default defineComponent({
   setup() {
@@ -36,8 +33,8 @@ export default defineComponent({
     const darkMode = ref(false);
 
     const DarkModeIcons = {
-      light: outlinedLightMode,
-      dark: outlinedDarkMode,
+      light: matLightMode,
+      dark: matDarkMode,
     };
 
     onMounted(() => {
@@ -60,7 +57,7 @@ export default defineComponent({
     });
     watch(
       () => store.state.theme,
-      () => {}
+      () => {},
     );
 
     const setTheme = (theme: any) => {
@@ -78,8 +75,8 @@ export default defineComponent({
       darkMode,
       DarkModeIcon,
       toggleDarkMode,
-      outlinedDarkMode,
-      outlinedLightMode,
+      matDarkMode,
+      matLightMode,
     };
   },
 });

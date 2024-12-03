@@ -15,9 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-item
+  <q-btn
+    v-if="!childrens.length"
     :data-test="`menu-link-${link}-item`"
     v-ripple="true"
+    dense
     :to="
       !external
         ? {
@@ -29,27 +31,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }
         : ''
     "
-    clickable
+    class="menu-btn"
     :class="{
-      'ql-item-mini': mini,
       'q-router-link--active':
         router.currentRoute.value.path.indexOf(link) == 0 && link != '/',
       'q-link-function': title == 'Functions',
     }"
     :target="target"
     @click="external ? openWebPage(link) : ''"
-  >
-    <q-item-section v-if="icon" avatar>
-      <q-icon :name="icon" />
-    </q-item-section>
-    <q-item-section v-else-if="iconComponent" avatar>
-      <q-icon><component :is="iconComponent" /></q-icon>
-    </q-item-section>
+    >{{ title }}
+  </q-btn>
+  <q-btn v-else dense flat class="menu-btn"
+:label="title">
+    <q-menu
+      fit
+      anchor="bottom right"
+      self="top right"
+      transition-show="flip-right"
+      transition-hide="flip-left"
+    >
+      <q-list>
+        <q-item
+          v-for="(child, index) in childrens"
+          v-ripple="true"
+          v-close-popup="true"
+          :data-test="`menu-link-${child.link}-item`"
+          clickable
+          :to="
+            !child.external
+              ? {
+                  path: child.link,
+                  exact: false,
+                  query: {
+                    org_identifier:
+                      store.state.selectedOrganization?.identifier,
+                  },
+                }
+              : ''
+          "
+          :target="child.target"
+          @click="child.external ? openWebPage(child.link) : ''"
+        >
+          <q-item-section>
+            <q-item-label>{{ child.title }}</q-item-label>
+          </q-item-section>
 
-    <q-item-section>
-      {{ title }}
-    </q-item-section>
-  </q-item>
+          <q-item-section
+            v-if="child.pin"
+            :data-test="`menu-link-${child.link}-pin-item`"
+            side
+            @click.stop="handleMenuTogglePin(child)"
+          >
+            <q-icon name="push_pin" color="grey"
+size="xs" />
+          </q-item-section>
+        </q-item>
+      </q-list>
+    </q-menu>
+  </q-btn>
 </template>
 
 <script lang="ts">
@@ -99,6 +138,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+
+    childrens: {
+      type: Array,
+      default: () => [],
+    },
   },
   setup() {
     const store = useStore();
@@ -117,42 +161,26 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
-.q-item {
-  padding: 3px 8px;
-  margin: 0 8px;
-  border-radius: 6px;
+.menu-btn {
+  color: $text-color;
+  margin-right: 5px;
+  font-size: var(--menu-font-size);
+  padding: 0px 5px;
+  text-transform: capitalize;
 
-  /* Overriding default height */
-  min-height: 30px;
+  &::before {
+    border: 0px;
+  }
 
   &.q-router-link--active {
     background-color: $primary;
-    color: white;
-
-    &::before {
-      content: " ";
-      width: 10px;
-      height: 40px;
-      position: absolute;
-      left: -30px;
-      top: 0;
-      background-color: inherit;
-      border-radius: 6px;
-    }
-  }
-
-  &.ql-item-mini {
-    margin: 0;
-
-    &::before {
-      display: none;
-    }
+    color: $white;
   }
 }
 
-.q-item__section--avatar {
-  margin: 0;
-  padding: 0;
-  min-width: 40px;
+.dark-mode {
+  .menu-btn {
+    color: $white;
+  }
 }
 </style>

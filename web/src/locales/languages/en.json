@@ -156,11 +156,14 @@
     "openapi": "OpenAPI",
     "docs": "Docs",
     "billings": "Billing",
-    "rum": "Real User Monitoring",
+    "rum": "RUM",
     "settings": "Management",
     "iam": "IAM",
     "report": "Reports",
-    "pipeline": "Pipelines"
+    "pipeline": "Pipelines",
+    "more": "More",
+    "language": "Language",
+    "theme": "Theme"
   },
   "rum": {
     "title": "Real User Monitoring",
