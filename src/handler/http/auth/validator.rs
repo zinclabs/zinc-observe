@@ -729,12 +729,9 @@ pub(crate) async fn check_permissions(
     user_id: &str,
     auth_info: AuthExtractor,
     role: UserRole,
-    is_external: bool,
+    _is_external: bool,
 ) -> bool {
-    if !is_external && !role.eq(&UserRole::ServiceAccount) {
-        return true;
-    }
-    if !get_o2_config().openfga.enabled {
+    if !get_o2_config().openfga.enabled || role.eq(&UserRole::Root) {
         return true;
     }
 
@@ -744,17 +741,6 @@ pub(crate) async fn check_permissions(
     } else {
         object_str
     };
-    // let role = match role {
-    //     Some(role) => {
-    //         if role.eq(&UserRole::Root) {
-    //             // root user should have access to everything , bypass check in openfga
-    //             return true;
-    //         } else {
-    //             format!("{role}")
-    //         }
-    //     }
-    //     None => "".to_string(),
-    // };
     let org_id = if auth_info.org_id.eq("organizations") {
         user_id
     } else {

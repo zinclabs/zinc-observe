@@ -157,14 +157,6 @@ pub async fn update(
         };
     };
     let service_account = service_account.into_inner();
-    if service_account.eq(&UpdateServiceAccountRequest::default()) {
-        return Ok(
-            HttpResponse::BadRequest().json(meta::http::HttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Please specify appropriate fields to update service account".to_string(),
-            )),
-        );
-    }
 
     let user = UpdateUser {
         change_password: false,
