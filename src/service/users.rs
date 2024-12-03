@@ -540,7 +540,7 @@ pub async fn list_users(org_id: &str, role: Option<UserRole>) -> Result<HttpResp
 
     #[cfg(feature = "enterprise")]
     {
-        if !org_id.eq(DEFAULT_ORG) {
+        if !org_id.eq(DEFAULT_ORG) && role.is_none() {
             let root = ROOT_USER.get("root").unwrap();
             let root_user = root.value();
             let mut enterprise_user_list = user_list;
