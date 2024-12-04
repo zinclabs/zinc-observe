@@ -982,6 +982,8 @@ export default defineComponent({
             orgSettings?.data?.data?.trace_id_field_name ?? "traceId",
           toggle_ingestion_logs:
             orgSettings?.data?.data?.toggle_ingestion_logs ?? false,
+          enable_websocket_search:
+            orgSettings?.data?.data?.enable_websocket_search ?? false,
         });
       } catch (error) {}
       return;

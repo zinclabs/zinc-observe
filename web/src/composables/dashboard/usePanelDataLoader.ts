@@ -287,7 +287,8 @@ export const usePanelDataLoader = (
 
   const cancelQueryAbort = () => {
     if (
-      (window as any)?.use_web_socket &&
+      store?.state?.organizationData?.organizationSettings
+        ?.enable_websocket_search === true &&
       state.searchWebSocketRequestIdsAndTraceIds
     ) {
       // loop on state.searchWebSocketRequestIdsAndTraceIds
@@ -1084,7 +1085,10 @@ export const usePanelDataLoader = (
 
               state.metadata.queries[panelQueryIndex] = metadata;
 
-              if ((window as any).use_web_socket) {
+              if (
+                store?.state?.organizationData?.organizationSettings
+                  ?.enable_websocket_search === true
+              ) {
                 await getDataThroughWebSocket(
                   query,
                   it,
