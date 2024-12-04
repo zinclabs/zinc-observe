@@ -124,6 +124,8 @@ pub struct OrganizationSettingPayload {
     pub span_id_field_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub toggle_ingestion_logs: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_websocket_search: Option<bool>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
