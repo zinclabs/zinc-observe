@@ -40,7 +40,7 @@ pub mod enterprise_utils {
         };
 
         // Check if the user is a root user (has all permissions)
-        if is_root_user(&user_id) {
+        if is_root_user(user_id) {
             return Ok(());
         }
 
@@ -71,7 +71,7 @@ pub mod enterprise_utils {
             };
 
             let has_permission = crate::handler::http::auth::validator::check_permissions(
-                &user_id,
+                user_id,
                 auth_extractor,
                 Some(user.role),
             )

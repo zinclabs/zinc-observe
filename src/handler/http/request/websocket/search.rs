@@ -34,7 +34,8 @@ use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
         utils::websocket::{
-            calc_queried_range, get_search_type_from_ws_req, update_histogram_interval_in_query,
+            calc_queried_range, calc_result_cache_ratio, get_search_type_from_ws_req,
+            update_histogram_interval_in_query,
         },
     },
     handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
@@ -115,7 +116,7 @@ pub async fn handle_search_request(
     #[cfg(feature = "enterprise")]
     for stream_name in stream_names.iter() {
         if let Err(e) =
-            enterprise_utils::check_permissions(&stream_name, stream_type, &user_id, &org_id).await
+            enterprise_utils::check_permissions(stream_name, stream_type, user_id, org_id).await
         {
             let err_res = WsServerEvents::error_response(Error::Message(e), Some(trace_id), None);
             send_message(session, err_res.to_json().to_string()).await?;
@@ -173,7 +174,7 @@ pub async fn handle_search_request(
 
     if is_partition_request(&req.payload, stream_type, org_id).await {
         log::info!(
-            "[WS_SEARCH] trace_id: {}, Cached search, req_size: {}",
+            "[WS_SEARCH] trace_id: {}, Searching Cache, req_size: {}",
             req.trace_id,
             req_size
         );
@@ -195,13 +196,6 @@ pub async fn handle_search_request(
             trace_id,
             cached_resp.len(),
             cached_hits,
-        );
-
-        log::info!(
-            "[WS_SEARCH]: trace_id: {}, deltas_len: {}, deltas to query {:?}",
-            trace_id,
-            deltas.len(),
-            deltas
         );
 
         // handle cache responses and deltas
@@ -338,6 +332,15 @@ async fn handle_cache_responses_and_deltas(
 
     let mut remaining_query_range = max_query_range as f64; // hours
     let mut is_search_err = false;
+
+    log::info!(
+        "[WS_SEARCH] trace_id: {}, Handling cache response and deltas, deltas_len: {}, cache_start_time: {}, cache_end_time: {}, deltas: {:?}",
+        trace_id,
+        deltas.len(),
+        cached_resp.first().map(|c| c.response_start_time).unwrap_or_default(),
+        cached_resp.last().map(|c| c.response_end_time).unwrap_or_default(),
+        deltas
+    );
 
     // Process cached responses and deltas in sorted order
     while cached_resp_iter.peek().is_some() || delta_iter.peek().is_some() {
@@ -502,7 +505,7 @@ async fn process_delta(
             req.payload.query.size -= *curr_res_size;
         }
 
-        let search_res = do_search(&req, org_id, user_id).await?;
+        let mut search_res = do_search(&req, org_id, user_id).await?;
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
@@ -520,16 +523,22 @@ async fn process_delta(
             // Accumulate the result
             accumulated_results.push(SearchResultType::Search(search_res.clone()));
 
+            // calc `result_cache_ratio`
+            let result_cache_ratio = calc_result_cache_ratio(accumulated_results);
+            search_res.result_cache_ratio = result_cache_ratio;
+
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
                 results: Box::new(search_res.clone()),
                 time_offset: end_time,
             };
             log::info!(
-                "[WS_SEARCH]: Sending search response for trace_id: {}, delta: {:?}, hits: {}",
+                "[WS_SEARCH]: Sending search response for trace_id: {}, delta: {:?}, hits: {}, result_cache_ratio: {}, accumulated_results len: {}",
                 trace_id,
                 delta,
-                search_res.hits.len()
+                search_res.hits.len(),
+                result_cache_ratio,
+                accumulated_results.len()
             );
             send_message(session, ws_search_res.to_json().to_string()).await?;
         }
@@ -596,8 +605,14 @@ async fn send_cached_responses(
         trace_id
     );
 
+    let mut cached = cached.clone();
+
     // Accumulate the result
     accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
+
+    // calc `result_cache_ratio`
+    let result_cache_ratio = calc_result_cache_ratio(accumulated_results);
+    cached.cached_response.result_cache_ratio = result_cache_ratio;
 
     // Send the cached response
     let ws_search_res = WsServerEvents::SearchResponse {
@@ -606,9 +621,11 @@ async fn send_cached_responses(
         time_offset: cached.response_end_time,
     };
     log::info!(
-        "[WS_SEARCH]: Sending cached search response for trace_id: {}, hits: {}",
+        "[WS_SEARCH]: Sending cached search response for trace_id: {}, hits: {}, result_cache_ratio: {}, accumulated_result len: {}",
         trace_id,
-        cached.cached_response.hits.len()
+        cached.cached_response.hits.len(),
+        result_cache_ratio,
+        accumulated_results.len()
     );
     send_message(session, ws_search_res.to_json().to_string()).await?;
 

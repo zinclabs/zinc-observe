@@ -1,6 +1,9 @@
 use std::ops::ControlFlow;
 
-use config::meta::search::{SearchEventContext, SearchEventType};
+use config::meta::{
+    search::{SearchEventContext, SearchEventType},
+    websocket::SearchResultType,
+};
 use infra::errors::Error;
 use sqlparser::{
     ast::{visit_statements_mut, Expr, FunctionArguments, Statement},
@@ -102,6 +105,23 @@ fn update_histogram_in_expr(expr: &mut Expr, histogram_interval: i64) {
             }
         }
     }
+}
+
+/// Calculates the ratio of cache hits to search hits in the accumulated search results.
+pub fn calc_result_cache_ratio(accumulated_results: &[SearchResultType]) -> usize {
+    let (search_hits, cache_hits) =
+        accumulated_results
+            .iter()
+            .fold((0, 0), |(search_hits, cache_hits), result| match result {
+                SearchResultType::Search(s) => (search_hits + s.hits.len(), cache_hits),
+                SearchResultType::Cached(c) => (search_hits, cache_hits + c.hits.len()),
+            });
+
+    let total_hits = search_hits + cache_hits;
+    if total_hits == 0 {
+        return 0; // avoid division by zero
+    }
+    ((cache_hits as f64 / total_hits as f64) * 100.0).round() as usize
 }
 
 #[cfg(test)]
