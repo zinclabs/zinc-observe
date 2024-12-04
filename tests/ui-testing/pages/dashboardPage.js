@@ -63,7 +63,8 @@ export class DashboardPage {
     await expect(this.page.locator('[data-test="dashboard-apply"]')).toBeVisible();
     await this.page.locator('[data-test="dashboard-apply"]').click();
     await this.page.waitForTimeout(5000);
-  } async deleteDashboard() {
+  } 
+  async deleteDashboard() {
     await this.page.reload();
     await this.page.waitForTimeout(2000);
     await this.page.locator("//td[contains(text(),'" + this.dashboardName + "')]/following-sibling::td[@class='q-td text-center']/child::button[@data-test='dashboard-delete']").click({ force: true });
@@ -95,6 +96,20 @@ export class DashboardPage {
   async verifyDateTime(startTime, endTime) {
     await expect(this.page.locator(this.dateTimeButton)).toContainText(`${startTime} - ${endTime}`);
   }
+
+  async dashboardPageDefaultMultiOrg() {
+    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();    
+    await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+}
+
+async dashboardPageURLValidation() {
+ await expect(this.page).toHaveURL(/defaulttestmulti/);
+}
+
+async dashboardURLValidation() {
+  await expect(this.page).toHaveURL(/dashboard/);
+}
+
   async signOut() {
     await this.profileButton.click();
     await this.signOutButton.click();

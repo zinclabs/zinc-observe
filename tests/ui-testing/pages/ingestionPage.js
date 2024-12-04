@@ -72,6 +72,39 @@ export class IngestionPage {
     }
   }
 
-  
+  async ingestionMultiOrg() {
+    const orgId = "defaulttestmulti";
+    const streamName = "e2e_automate";
+    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
+    const headers = {
+      "Authorization": `Basic ${basicAuthCredentials}`,
+      "Content-Type": "application/json",
+    };
+    const fetchResponse = await fetch(
+      `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
+      {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(logsdata),
+      }
+    );
+    try {
+      const response = await fetchResponse;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const jsonData = await response.json();
+        console.log(response.status);
+        console.log(response.url);
+        // Process JSON data here
+      } else {
+        const textData = await response.text();
+        console.log("Response is not JSON:", textData);
+        // Handle the non-JSON response here
+      }
+    } catch (error) {
+      console.error("Failed to parse JSON response:", error);
+    }
+  }
+
   
 }

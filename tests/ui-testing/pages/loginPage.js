@@ -11,6 +11,16 @@ export class LoginPage {
     await this.page.goto(process.env["ZO_BASE_URL"]);
     console.log("ZO_BASE_URL", process.env["ZO_BASE_URL"]);
   }
+
+  async loginAsInternalUser() {
+  
+    await this.page.getByText('Login as internal user').click();
+    await this.page.waitForURL(process.env["ZO_BASE_URL"] + "/web/", {
+       waitUntil: "networkidle",
+       });
+    
+  }
+
   async login() {
     await this.userIdInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
     const waitForLogin = this.page.waitForResponse(
@@ -24,10 +34,6 @@ export class LoginPage {
       waitUntil: "networkidle",
     });
   
-    // await this.page
-    //   .locator('[data-test="navbar-organizations-select"]')
-    //   .getByText("arrow_drop_down")
-    //   .click();
-    // await this.page.getByRole("option", { name: "default", exact: true }).click();
+    
   }
 }

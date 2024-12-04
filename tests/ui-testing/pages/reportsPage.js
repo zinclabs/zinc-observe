@@ -3,11 +3,12 @@ import {
   dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator,
   Past30SecondsValue
 } from '../pages/CommonLocator.js';
+
 export class ReportsPage {
   constructor(page) {
     this.page = page;
     this.homeMenu = page.locator("[name ='home']");
-    this.reportsMenu = page.locator("[name='reports']");
+    this.reportsMenu = page.locator('[data-test="menu-link-\\/reports-item"]');
     this.scheduledTab = page.locator("[title='Scheduled']");
     this.addReportButton = page.locator('[data-test="report-list-add-report-btn"]');
     this.reportNameInput = page.locator("[aria-label='Name *']");
@@ -26,12 +27,38 @@ export class ReportsPage {
     this.profileButton = page.locator('button').filter({ hasText: (process.env["ZO_ROOT_USER_EMAIL"]) });
     this.signOutButton = page.getByText('Sign Out');
   }
+  
   async navigateToReports() {
     await this.homeMenu.hover();
     await this.reportsMenu.click();
     await expect(this.page.locator('[data-test="report-list-title"]')).toContainText('Reports');
     await this.scheduledTab.click();
   }
+
+  async goToReports() {
+   
+    await this.reportsMenu.click();
+    await expect(this.page.locator('[data-test="report-list-title"]')).toContainText('Reports');
+ 
+  }
+
+  async reportsPageDefaultMultiOrg() {
+    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();    
+    await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+}
+
+async reportsPageURLValidation() {
+ await expect(this.page).toHaveURL(/defaulttestmulti/);
+}
+
+async reportsURLValidation() {
+  await expect(this.page).toHaveURL(/report/);
+}
+
+
+
+
+
   async createReport(dashboardName) {
     await this.page.waitForSelector('[data-test="report-list-add-report-btn"]');
     await this.addReportButton.click();

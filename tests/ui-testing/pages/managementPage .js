@@ -24,6 +24,26 @@ export
         await this.managementMenuItem.click({ force: true });
     }
 
+    async goToManagement() {
+        await this.page.waitForSelector('[data-test="menu-link-/settings/-item"]');
+        await this.managementMenuItem.click({ force: true });
+        await expect(this.page.getByRole('main')).toContainText('Management');
+    }
+
+    async managementPageDefaultMultiOrg() {
+        await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+        await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+    }
+
+    async managementPageURLValidation() {
+        await expect(this.page).toHaveURL(/defaulttestmulti/);
+    }
+
+    async managementURLValidation() {
+        await expect(this.page).toHaveURL(/settings/);
+    }
+
+
     async updateCustomLogoText(text) {
         await this.submitButton.waitFor({ state: 'visible' });
         await this.submitButton.click({ force: true });

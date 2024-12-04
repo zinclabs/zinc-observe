@@ -166,7 +166,7 @@ async fn permitted_folders(
         return Err(FolderError::PermittedFoldersMissingUser);
     };
     let stream_list = crate::handler::http::auth::validator::list_objects_for_user(
-        &org_id, user_id, "GET", "dfolder",
+        org_id, user_id, "GET", "dfolder",
     )
     .await
     .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;

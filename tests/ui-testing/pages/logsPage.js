@@ -59,8 +59,28 @@ export class LogsPage {
     await this.page.locator(this.homeButton).hover();
     await this.logsMenuItem.click();
     await this.page.waitForTimeout(3000);
+   // await expect(this.page.locator('[data-test="logs-search-no-stream-selected-text"]')).toContainText('info Select a stream and press \'Run query\' to continue. Additionally, you can apply additional filters and adjust the date range to enhance search.');
+  }
+
+  async validateLogsPage() {
     await expect(this.page.locator('[data-test="logs-search-no-stream-selected-text"]')).toContainText('info Select a stream and press \'Run query\' to continue. Additionally, you can apply additional filters and adjust the date range to enhance search.');
   }
+
+  async logsPageDefaultMultiOrg() {
+
+    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    await this.page.waitForTimeout(2000);
+    await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+  
+
+
+}
+
+async logsPageURLValidation() {
+
+    await expect(this.page).toHaveURL(/defaulttestmulti/);
+
+}
 
   async selectIndexAndStream() {
     // Select index and stream

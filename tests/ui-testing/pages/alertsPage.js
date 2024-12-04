@@ -2,7 +2,7 @@ import { expect } from '@playwright/test';
 
 import{ dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator } from '../pages/CommonLocator.js';
 
-export  class AlertPage {
+export  class AlertsPage {
     constructor(page) {
       this.page = page;
       this.alertMenu = this.page.locator('[data-test="menu-link-\\/alerts-item"]');
@@ -24,9 +24,23 @@ export  class AlertPage {
 
   async navigateToAlerts() {
     await this.alertMenu.click();
+    await expect(this.page.locator('[data-test="alerts-list-title"]')).toContainText('Alerts');
   }
 
-  async createAlert() {
+  async alertsPageDefaultMultiOrg() {
+    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();    
+    await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+}
+
+async alertsPageURLValidation() {
+ await expect(this.page).toHaveURL(/defaulttestmulti/);
+}
+
+async alertsURLValidation() {
+  await expect(this.page).toHaveURL(/alerts/);
+}
+
+  async createAlerts() {
     await this.addAlertButton.click();
     await this.sqlOption.click();
     await this.addTimeRangeButton.click();

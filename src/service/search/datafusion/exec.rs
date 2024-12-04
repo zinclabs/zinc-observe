@@ -229,26 +229,10 @@ pub async fn prepare_datafusion_context(
     #[cfg(not(feature = "enterprise"))]
     let (memory_size, target_partition) = (cfg.memory_cache.datafusion_max_size, target_partitions);
     #[cfg(feature = "enterprise")]
-    let (mut memory_size, mut target_partition) =
-        (cfg.memory_cache.datafusion_max_size, target_partitions);
+    let (target_partition, memory_size) = (target_partitions, cfg.memory_cache.datafusion_max_size);
     #[cfg(feature = "enterprise")]
-    if let Some(wg) = _work_group {
-        if let Ok(wg) = WorkGroup::from_str(&wg) {
-            let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
-                DataFusionError::Execution(format!("Failed to get dynamic resource: {}", e))
-            })?;
-            if get_o2_config().search_group.cpu_limit_enabled {
-                target_partition = target_partition * cpu as usize / 100;
-            }
-            memory_size = memory_size * mem as usize / 100;
-            log::debug!(
-                "[datafusion:{}] target_partition: {}, memory_size: {}",
-                wg,
-                target_partition,
-                memory_size
-            );
-        }
-    }
+    let (target_partition, memory_size) =
+        get_cpu_and_mem_limit(_work_group.clone(), target_partition, memory_size).await?;
 
     let session_config = create_session_config(sorted_by_time, target_partition)?;
     let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
@@ -354,7 +338,7 @@ pub async fn create_parquet_table(
     fst_fields: Vec<String>,
 ) -> Result<Arc<dyn TableProvider>> {
     let cfg = get_config();
-    let mut target_partitions = if session.target_partitions == 0 {
+    let target_partitions = if session.target_partitions == 0 {
         cfg.limit.cpu_num
     } else {
         std::cmp::max(
@@ -362,9 +346,16 @@ pub async fn create_parquet_table(
             session.target_partitions,
         )
     };
-    if target_partitions == 0 {
-        target_partitions = DATAFUSION_MIN_PARTITION;
-    }
+
+    #[cfg(feature = "enterprise")]
+    let (target_partitions, _) =
+        get_cpu_and_mem_limit(session.work_group.clone(), target_partitions, 0).await?;
+
+    let target_partitions = if target_partitions == 0 {
+        DATAFUSION_MIN_PARTITION
+    } else {
+        target_partitions
+    };
 
     // Configure listing options
     let file_format = ParquetFormat::default();
@@ -435,4 +426,30 @@ pub async fn create_parquet_table(
         table = table.with_cache(file_stat_cache);
     }
     Ok(Arc::new(table))
+}
+
+#[cfg(feature = "enterprise")]
+async fn get_cpu_and_mem_limit(
+    work_group: Option<String>,
+    mut target_partitions: usize,
+    mut memory_size: usize,
+) -> Result<(usize, usize)> {
+    if let Some(wg) = work_group {
+        if let Ok(wg) = WorkGroup::from_str(&wg) {
+            let (cpu, mem) = wg.get_dynamic_resource().await.map_err(|e| {
+                DataFusionError::Execution(format!("Failed to get dynamic resource: {}", e))
+            })?;
+            if get_o2_config().search_group.cpu_limit_enabled {
+                target_partitions = target_partitions * cpu as usize / 100;
+            }
+            memory_size = memory_size * mem as usize / 100;
+            log::debug!(
+                "[datafusion:{}] target_partition: {}, memory_size: {}",
+                wg,
+                target_partitions,
+                memory_size
+            );
+        }
+    }
+    Ok((target_partitions, memory_size))
 }

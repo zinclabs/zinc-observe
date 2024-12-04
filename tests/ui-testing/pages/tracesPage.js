@@ -1,6 +1,6 @@
 // tracesPage.js
 import { expect } from '@playwright/test';
-import{CommomnLocator} from '../pages/CommonLocator';
+
 import{ dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../pages/CommonLocator.js';
 
 
@@ -22,8 +22,53 @@ class TracesPage {
   }
 
   async navigateToTraces() {
+
     await this.tracesMenuItem.click();
   }
+
+  async validateTracesPage() {
+
+    await expect(this.page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]')).toContainText('Syntax Guide');
+  await expect(this.page.locator('[data-test="logs-search-bar"]')).toContainText('Reset Filters');
+
+  }
+
+  async tracesPageDefaultOrg() {
+
+    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    await this.page.getByText('default', { exact: true }).click();
+
+
+}
+
+async tracesPageDefaultMultiOrg() {
+
+
+
+    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
+    // await this.page.pause();
+    // await this.page.waitForTimeout(5000);
+
+    await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+
+
+    // await validateUrlContains(this.page, 'path');
+
+
+}
+
+async tracesPageURLValidation() {
+
+    await expect(this.page).toHaveURL(/defaulttestmulti/);
+
+}
+
+async tracesURLValidation() {
+
+    await expect(this.page).toHaveURL(/traces/);
+
+}
+
 
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
