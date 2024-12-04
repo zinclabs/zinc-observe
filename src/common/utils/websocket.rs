@@ -42,7 +42,6 @@ pub(crate) fn get_search_type_from_ws_req(
 ///
 /// # Returns
 /// - `f64`: The effective queried range in hours, reduced by the cache ratio.
-///
 pub(crate) fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ratio: usize) -> f64 {
     let range = (end_time - start_time) as f64 / 3_600_000_000.0; // convert microseconds to hours
     range * (1.0 - result_cache_ratio as f64 / 100.0)
@@ -141,16 +140,25 @@ mod tests {
 
         // Expected partition duration
         let partition_duration = (end_time - start_time) as f64 / 3_600_000_000.0; // Convert microseconds to hours
-        assert!((partition_duration - 0.0333).abs() < 0.0001, "Partition duration should be approximately 0.0333 hours");
+        assert!(
+            (partition_duration - 0.0333).abs() < 0.0001,
+            "Partition duration should be approximately 0.0333 hours"
+        );
 
         // Calculate the queried range
         let queried_range = calc_queried_range(start_time, end_time, result_cache_ratio);
-        assert!((queried_range - partition_duration).abs() < f64::EPSILON, "Queried range should equal partition duration when cache ratio is 0");
+        assert!(
+            (queried_range - partition_duration).abs() < f64::EPSILON,
+            "Queried range should equal partition duration when cache ratio is 0"
+        );
 
         // Update the remaining query range
         remaining_query_range -= queried_range;
 
         // Check the updated remaining query range
-        assert!((remaining_query_range - (4.0 - queried_range)).abs() < f64::EPSILON, "Updated remaining query range should be correct");
+        assert!(
+            (remaining_query_range - (4.0 - queried_range)).abs() < f64::EPSILON,
+            "Updated remaining query range should be correct"
+        );
     }
 }

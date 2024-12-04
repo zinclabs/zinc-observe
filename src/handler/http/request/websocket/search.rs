@@ -329,6 +329,7 @@ async fn handle_cache_responses_and_deltas(
     let mut curr_res_size = 0; // number of records
 
     let mut remaining_query_range = max_query_range as f64; // hours
+    let mut is_search_err = false;
 
     // Process cached responses and deltas in sorted order
     while cached_resp_iter.peek().is_some() || delta_iter.peek().is_some() {
@@ -341,7 +342,7 @@ async fn handle_cache_responses_and_deltas(
                 cached.response_end_time,
             );
             if delta.delta_end_time < cached.response_start_time {
-                process_delta(
+                let delta = process_delta(
                     session,
                     req,
                     trace_id.clone(),
@@ -353,7 +354,12 @@ async fn handle_cache_responses_and_deltas(
                     user_id,
                     &mut remaining_query_range,
                 )
-                .await?;
+                .await;
+
+                if delta.is_err() {
+                    is_search_err = true;
+                    break;
+                }
                 delta_iter.next(); // Move to the next delta after processing
             } else {
                 // Send cached response
@@ -362,7 +368,7 @@ async fn handle_cache_responses_and_deltas(
             }
         } else if let Some(&delta) = delta_iter.peek() {
             // Process remaining deltas
-            process_delta(
+            let delta = process_delta(
                 session,
                 req,
                 trace_id.clone(),
@@ -374,7 +380,11 @@ async fn handle_cache_responses_and_deltas(
                 user_id,
                 &mut remaining_query_range,
             )
-            .await?;
+            .await;
+            if delta.is_err() {
+                is_search_err = true;
+                break;
+            }
             delta_iter.next(); // Move to the next delta after processing
         } else if let Some(cached) = cached_resp_iter.next() {
             // Process remaining cached responses
@@ -389,6 +399,20 @@ async fn handle_cache_responses_and_deltas(
                 req_size
             );
             break;
+        }
+    }
+
+    if is_search_err {
+        log::info!(
+            "[WS_SEARCH] trace_id: {} Search error occurred, stopping search",
+            trace_id
+        );
+        if let Err(e) = send_partial_search_resp(session, &trace_id).await {
+            log::error!(
+                "[WS_SEARCH] trace_id: {} Failed to send partial search response: {:?}",
+                trace_id,
+                e
+            );
         }
     }
 
@@ -451,7 +475,8 @@ async fn process_delta(
 
         if !search_res.hits.is_empty() {
             // for every partition, compute the queried range omitting the result cache ratio
-            let queried_range = calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+            let queried_range =
+                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
             *remaining_query_range -= queried_range;
 
             // Accumulate the result
@@ -591,12 +616,19 @@ async fn do_partitioned_search(
             req.payload.query.size -= curr_res_size;
         }
 
-        let search_res = do_search(&req, org_id, user_id).await?;
+        let search_res = if let Ok(res) = do_search(&req, org_id, user_id).await {
+            res
+        } else {
+            // send partial search response if search fails
+            send_partial_search_resp(session, trace_id).await?;
+            break;
+        };
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
             // for every partition, compute the queried range omitting the result cache ratio
-            let queried_range = calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+            let queried_range =
+                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
             remaining_query_range -= queried_range;
 
             // Accumulate the result
@@ -647,6 +679,26 @@ async fn do_partitioned_search(
 
     Ok(())
 }
+
+async fn send_partial_search_resp(session: &mut Session, trace_id: &str) -> Result<(), Error> {
+    let mut s_resp = Response::default();
+    s_resp.is_partial = true;
+
+    let ws_search_res = WsServerEvents::SearchResponse {
+        trace_id: trace_id.to_string(),
+        results: Box::new(s_resp),
+        time_offset: 0,
+    };
+    log::info!(
+        "[WS_SEARCH]: trace_id: {} Sending partial search response",
+        trace_id
+    );
+
+    send_message(session, ws_search_res.to_json().to_string()).await?;
+
+    Ok(())
+}
+
 async fn write_results_to_file(
     c_resp: MultiCachedQueryResponse,
     start_time: i64,
