@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-close-popup="true"
             round
             flat
-            icon="img:/src/assets/images/common/close_icon.svg"
+            icon="close"
             @click="router.replace({ name: 'organizations' })"
           />
         </div>
@@ -196,6 +196,7 @@ export default defineComponent({
       );
     },
     onSubmit() {
+      this.organizationData.name = this.organizationData.name.trim();
       const dismiss = this.$q.notify({
         spinner: true,
         message: "Please wait...",
@@ -222,7 +223,7 @@ export default defineComponent({
         callOrganization
           .then((res: { data: any }) => {
             const data = res.data;
-            if (res.data.data.status == "active") {
+            // if (res.data.data.status == "active") {
               this.organizationData = {
                 id: "",
                 name: "",
@@ -232,10 +233,11 @@ export default defineComponent({
               this.$emit("updated");
               this.addOrganizationForm.resetValidation();
               dismiss();
-            } else {
-              this.proPlanRequired = true;
-              this.proPlanMsg = res.data.message;
-              this.newOrgIdentifier = res.data.identifier;
+              // Handle sub during billing imprelementaion
+              // } else {
+              // this.proPlanRequired = true;
+              // this.proPlanMsg = res.data.message;
+              // this.newOrgIdentifier = res.data.identifier;
               // this.store.state.dispatch("setSelectedOrganization", {
               //   identifier: data.identifier,
               //   name: data.name,
@@ -247,15 +249,15 @@ export default defineComponent({
               //   subscription_type: "Free-Plan-USD-Monthly",
               // });
               // window.location.href = `/organizations?org_identifier=${data.data.identifier}&action=subscribe`;
-              this.router.push({
-                name: "organizations",
-                query: {
-                  org_identifier: data.data.identifier,
-                  action: "subscribe",
-                  update_org: Date.now(),
-                },
-              });
-            }
+              // this.router.push({
+              //   name: "organizations",
+              //   query: {
+              //     org_identifier: data.data.identifier,
+              //     action: "subscribe",
+              //     update_org: Date.now(),
+              //   },
+              // });
+            // }
           })
           .catch((err: any) => {
             this.$q.notify({

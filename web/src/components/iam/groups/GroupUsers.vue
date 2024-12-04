@@ -151,12 +151,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import AppTable from "@/components/AppTable.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
-import { watch } from "vue";
+import { watch, computed } from "vue";
 import type { Ref } from "vue";
 import { ref, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-
 // show selected users in the table
 // Add is_selected to the user object
 const props = defineProps({
@@ -217,31 +216,42 @@ const groupUsersMap = ref(new Set());
 
 const { usersState } = usePermissions();
 
-const columns = [
-  {
-    name: "select",
-    field: "",
-    label: "",
-    align: "left",
-    sortable: true,
-    slot: true,
-    slotName: "select",
-  },
-  {
-    name: "email",
-    field: "email",
-    label: t("iam.userName"),
-    align: "left",
-    sortable: true,
-  },
-  {
-    name: "organization",
-    field: "org",
-    label: "Organizations",
-    align: "left",
-    sortable: true,
-  },
-];
+
+
+const columns = computed(() => {
+  const baseColumns = [
+    {
+      name: "select",
+      field: "",
+      label: "",
+      align: "left",
+      sortable: true,
+      slot: true,
+      slotName: "select",
+    },
+    {
+      name: "email",
+      field: "email",
+      label: t("iam.userName"),
+      align: "left",
+      sortable: true,
+    },
+  ];
+
+  // Add "Organizations" column only if the selected organization is "meta"
+  if (selectedOrg.value?.label === store.state.zoConfig.meta_org) {
+    baseColumns.push({
+      name: "organization",
+      field: "org",
+      label: "Organizations",
+      align: "left",
+      sortable: true,
+    });
+  }
+
+  return baseColumns;
+});
+
 
 onBeforeMount(async () => {  
   groupUsersMap.value = new Set(props.groupUsers);
@@ -307,7 +317,6 @@ const updateOrganization = () => {
     // Filter users based on selected organization or root role
     rows.value = users.value.filter((user) => {
       const isRootRole = user.role === "root"; // Check if user has "root" role
-      console.warn(user)
       const matchesOrg = user.org.includes(selectedOrg.value.label); // Match organization name
       return isRootRole || matchesOrg; // Include if "root" or matches org
     });
