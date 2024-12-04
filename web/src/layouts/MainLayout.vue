@@ -265,7 +265,7 @@ flat dense :ripple="false" padding="none">
                   </q-item-section>
                 </q-item>
                 <q-separator />
-                <q-item clickable @click="themeSwitcherRef?.toggleDarkMode()" v-close-popup>
+                <q-item clickable @click="toggleMode" v-close-popup>
                   <q-item-section avatar>
                     <q-icon
                       name="contrast"
@@ -568,6 +568,9 @@ export default defineComponent({
         //   menuElement.classList.add(`header-menu-bar`);
         // }
       }
+    },
+    toggleMode() {
+      this.$refs.themeSwitcherRef.toggleDarkMode();
     },
   },
   setup() {
