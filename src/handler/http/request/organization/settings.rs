@@ -92,6 +92,11 @@ async fn create(
         data.toggle_ingestion_logs = toggle_ingestion_logs;
     }
 
+    if let Some(enable_websocket_search) = settings.enable_websocket_search {
+        field_found = true;
+        data.enable_websocket_search = enable_websocket_search;
+    }
+
     if !field_found {
         return Ok(MetaHttpResponse::bad_request("No valid field found"));
     }
