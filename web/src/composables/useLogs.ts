@@ -1464,11 +1464,10 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
-
       // get websocket enable config from store
       searchObj.communicationMethod =
         store?.state?.organizationData?.organizationSettings
-          ?.enable_websocket_search === true
+          ?.enable_websocket_search === true || (window as any).use_web_socket
           ? "ws"
           : "http";
 
