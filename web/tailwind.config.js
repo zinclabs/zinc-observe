@@ -1,5 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 
+import typography from "@tailwindcss/typography";
+
 // eslint-disable-next-line no-undef
 export default {
   prefix: "tw-",
@@ -19,5 +21,5 @@ export default {
       },
     },
   },
-  plugins: [require("@tailwindcss/typography")],
+  plugins: [typography],
 };

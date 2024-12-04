@@ -485,6 +485,14 @@ pub struct Grpc {
     pub max_message_size: usize,
     #[env_config(name = "ZO_GRPC_CONNECT_TIMEOUT", default = 5)] // in seconds
     pub connect_timeout: u64,
+    #[env_config(name = "ZO_GRPC_TLS_ENABLED", default = false)]
+    pub tls_enabled: bool,
+    #[env_config(name = "ZO_GRPC_TLS_CERT_DOMAIN", default = "")]
+    pub tls_cert_domain: String,
+    #[env_config(name = "ZO_GRPC_TLS_CERT_PATH", default = "")]
+    pub tls_cert_path: String,
+    #[env_config(name = "ZO_GRPC_TLS_KEY_PATH", default = "")]
+    pub tls_key_path: String,
 }
 
 #[derive(EnvConfig)]
@@ -1489,6 +1497,11 @@ pub fn init() -> Config {
         panic!("common config error: {e}");
     }
 
+    // check grpc config
+    if let Err(e) = check_grpc_config(&mut cfg) {
+        panic!("common config error: {e}");
+    }
+
     // check data path config
     if let Err(e) = check_path_config(&mut cfg) {
         panic!("data path config error: {e}");
@@ -1648,6 +1661,17 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         ));
     }
 
+    Ok(())
+}
+
+fn check_grpc_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.grpc.tls_enabled
+        && (cfg.grpc.tls_cert_domain.is_empty()
+            || cfg.grpc.tls_cert_path.is_empty()
+            || cfg.grpc.tls_key_path.is_empty())
+    {
+        return Err(anyhow::anyhow!("ZO_GRPC_TLS_CERT_DOMAIN, ZO_GRPC_TLS_CERT_PATH and ZO_GRPC_TLS_KEY_PATH must be set when ZO_GRPC_TLS_ENABLED is true"));
+    }
     Ok(())
 }
 

@@ -434,7 +434,7 @@ export default defineComponent({
       // ignore case
       timezone.value =
         timezoneOptions.find(
-          (tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase()
+          (tz) => tz.toLowerCase() === props.initialTimezone?.toLowerCase(),
         ) || currentTimezone;
 
       // call onTimezoneChange to set the timezone in the store
@@ -553,19 +553,16 @@ export default defineComponent({
           saveDate("absolute");
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     watch(
+      () => props.defaultType,
       () => {
-        props.defaultType;
-      },
-      () => {
-        if (props.defaultType == "absolute") {
-          selectedType.value = "absolute";
+        if (props.defaultType !== selectedType.value) {
+          selectedType.value = props.defaultType;
         }
       },
-      { deep: true }
     );
 
     const setRelativeDate = (period, value) => {
@@ -735,6 +732,10 @@ export default defineComponent({
       return periodMapping[relativePeriod.value];
     });
 
+    function isValidDateTimeString(dateStr: string, timeStr: string): boolean {
+      return !isNaN(Date.parse(`${dateStr} ${timeStr}`));
+    }
+
     const getConsumableDateTime = () => {
       if (selectedType.value == "relative") {
         let period = getPeriodLabel.value.toLowerCase();
@@ -746,13 +747,19 @@ export default defineComponent({
           periodValue = periodValue * 7;
         }
 
-        const subtractObject = '{"' + period + '":' + periodValue + "}";
+        const subtractObject = {};
+
+        if (period && periodValue) subtractObject[period] = periodValue;
+        else {
+          console.error("getConsumableDateTime: Invalid relative period");
+          subtractObject["Minutes"] = 15;
+        }
 
         const endTimeStamp = new Date();
 
         const startTimeStamp = date.subtractFromDate(
           endTimeStamp,
-          JSON.parse(subtractObject)
+          subtractObject,
         );
 
         return {
@@ -768,21 +775,41 @@ export default defineComponent({
           };
         }
 
+        const startDateStr =
+          selectedDate.value.from + " " + selectedTime.value.startTime;
+        if (
+          !isValidDateTimeString(
+            selectedDate.value.from,
+            selectedTime.value.startTime,
+          )
+        ) {
+          console.error(`Invalid start date/time: ${startDateStr}`);
+          return new Date();
+        }
+
+        const endDateStr =
+          selectedDate.value.to + " " + selectedTime.value.endTime;
+        if (
+          !isValidDateTimeString(
+            selectedDate.value.to,
+            selectedTime.value.endTime,
+          )
+        ) {
+          console.error(`Invalid end date/time: ${endDateStr}`);
+          return new Date();
+        }
+
         let start, end;
         if (!selectedDate.value?.from && !selectedTime.value?.startTime) {
           start = new Date();
         } else {
-          start = new Date(
-            selectedDate.value.from + " " + selectedTime.value.startTime
-          );
+          start = new Date(startDateStr);
         }
 
         if (selectedDate.value?.to == "" && selectedTime.value?.endTime == "") {
           end = new Date();
         } else {
-          end = new Date(
-            selectedDate.value.to + " " + selectedTime.value.endTime
-          );
+          end = new Date(endDateStr);
         }
 
         if (
@@ -877,8 +904,8 @@ export default defineComponent({
       }
       update(() => {
         const value = val.toLowerCase();
-        filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1
+        filteredOptions = options.filter((column: any) =>
+          column.toLowerCase().includes(value),
         );
       });
       return filteredOptions;
@@ -888,7 +915,7 @@ export default defineComponent({
       const formattedDate = timestampToTimezoneDate(
         new Date().getTime(),
         store.state.timezone,
-        "yyyy/MM/dd"
+        "yyyy/MM/dd",
       );
       return date >= "1999/01/01" && date <= formattedDate;
     };
@@ -981,7 +1008,7 @@ export default defineComponent({
                 if (relativePeriodsMaxValue.value[periodUnits[i]] > -1) {
                   setRelativeDate(
                     periodUnits[i],
-                    relativeDates[periodUnits[i]][0]
+                    relativeDates[periodUnits[i]]?.[0] ?? relativeDates["m"][0], // fallback to 15 minutes,
                   );
                   break;
                 }

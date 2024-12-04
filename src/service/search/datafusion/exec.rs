@@ -173,6 +173,14 @@ pub fn create_session_config(
     if sorted_by_time {
         config = config.set_bool("datafusion.execution.split_file_groups_by_statistics", true);
     }
+
+    // When set to true, skips verifying that the schema produced by planning the input of
+    // `LogicalPlan::Aggregate` exactly matches the schema of the input plan.
+    config = config.set_bool(
+        "datafusion.execution.skip_physical_aggregate_schema_check",
+        true,
+    );
+
     Ok(config)
 }
 

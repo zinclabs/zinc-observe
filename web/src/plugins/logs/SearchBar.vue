@@ -1234,7 +1234,7 @@ export default defineComponent({
 
     const getColumnNames = (parsedSQL: any) => {
       const columnData = parsedSQL?.columns;
-      const columnNames = [];
+      let columnNames = [];
       for (const item of columnData) {
         if (item.expr.type === "column_ref") {
           columnNames.push(item.expr.column?.expr?.value);

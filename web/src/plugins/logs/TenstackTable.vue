@@ -490,12 +490,6 @@ watch(
   },
 );
 
-const tableCellClass = computed(() => [
-  hasDefaultSourceColumn.value && !props.wrap ? "tw-table-cell" : "tw-block",
-  !props.wrap && "tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap",
-  props.wrap && "tw-break-words",
-]);
-
 const table = useVueTable({
   get data() {
     return tableRows.value || [];
@@ -544,6 +538,23 @@ onMounted(() => {
 
 const hasDefaultSourceColumn = computed(
   () => props.defaultColumns && columnOrder.value.includes("source"),
+);
+
+const tableCellClass = ref<string[]>([]);
+
+watch(
+  () => [hasDefaultSourceColumn.value, props.wrap],
+  () => {
+    tableCellClass.value = [
+      hasDefaultSourceColumn.value && !props.wrap
+        ? "tw-table-cell"
+        : "tw-block",
+      !props.wrap
+        ? "tw-overflow-hidden tw-text-ellipsis tw-whitespace-nowrap"
+        : "",
+      props.wrap ? "tw-break-words" : "",
+    ];
+  },
 );
 
 const updateTableWidth = async () => {

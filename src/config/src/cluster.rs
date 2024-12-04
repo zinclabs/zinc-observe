@@ -39,7 +39,7 @@ pub fn load_local_node() -> Node {
         role_group: load_role_group(),
         name: cfg.common.instance_name.clone(),
         http_addr: format!("http://127.0.0.1:{}", cfg.http.port),
-        grpc_addr: format!("http://127.0.0.1:{}", cfg.grpc.port),
+        grpc_addr: format!("{}://127.0.0.1:{}", get_grpc_schema(), cfg.grpc.port),
         cpu_num: cfg.limit.cpu_num as u64,
         status: NodeStatus::Online,
         scheduled: true,
@@ -90,6 +90,15 @@ pub fn get_local_node_ip() -> String {
         }
     }
     String::new()
+}
+
+pub fn get_grpc_schema() -> String {
+    let cfg = get_config();
+    if cfg.grpc.tls_enabled {
+        "https".to_string()
+    } else {
+        "http".to_string()
+    }
 }
 
 #[inline(always)]
