@@ -18,7 +18,7 @@ use config::{
     get_config,
     meta::{
         search::{Response, SearchPartitionRequest, SearchPartitionResponse},
-        sql::resolve_stream_names,
+        sql::{resolve_stream_names, OrderBy},
         stream::StreamType,
         websocket::{SearchEventReq, SearchResultType},
     },
@@ -151,6 +151,7 @@ pub async fn handle_search_request(
             interval
         );
     }
+    let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
 
     // start search
     // get the max query range from the stream settings
@@ -215,6 +216,7 @@ pub async fn handle_search_request(
                 org_id,
                 user_id,
                 max_query_range,
+                &order_by,
             )
             .await?;
         } else {
@@ -265,7 +267,6 @@ pub async fn handle_search_request(
 }
 
 async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<Response, Error> {
-    // TODO: retry empty `Response` on error, return `is_partial` true
     SearchService::cache::search(
         &req.trace_id,
         org_id,
@@ -317,12 +318,18 @@ async fn handle_cache_responses_and_deltas(
     trace_id: String,
     req_size: i64,
     cached_resp: Vec<CachedQueryResponse>,
-    deltas: Vec<QueryDelta>,
+    mut deltas: Vec<QueryDelta>,
     accumulated_results: &mut Vec<SearchResultType>,
     org_id: &str,
     user_id: &str,
     max_query_range: i64,
+    order_by: &OrderBy,
 ) -> Result<(), Error> {
+    // reverse the deltas if order_by is descending
+    if let OrderBy::Desc = order_by {
+        deltas = deltas.into_iter().rev().collect::<Vec<QueryDelta>>();
+    }
+
     // Initialize iterators for deltas and cached responses
     let mut delta_iter = deltas.iter().peekable();
     let mut cached_resp_iter = cached_resp.iter().peekable();
@@ -341,7 +348,33 @@ async fn handle_cache_responses_and_deltas(
                 cached.response_start_time,
                 cached.response_end_time,
             );
-            if delta.delta_end_time < cached.response_start_time {
+            if *order_by == OrderBy::Asc && delta.delta_end_time < cached.response_start_time {
+                log::info!(
+                    "[WS_SEARCH] trace_id: {} Processing delta before cached response",
+                    trace_id
+                );
+                let delta = process_delta(
+                    session,
+                    req,
+                    trace_id.clone(),
+                    delta,
+                    req_size,
+                    accumulated_results,
+                    &mut curr_res_size,
+                    org_id,
+                    user_id,
+                    &mut remaining_query_range,
+                )
+                .await;
+
+                if delta.is_err() {
+                    is_search_err = true;
+                    break;
+                }
+                delta_iter.next(); // Move to the next delta after processing
+            } else if *order_by == OrderBy::Desc
+                && delta.delta_end_time > cached.response_start_time
+            {
                 let delta = process_delta(
                     session,
                     req,
@@ -368,6 +401,10 @@ async fn handle_cache_responses_and_deltas(
             }
         } else if let Some(&delta) = delta_iter.peek() {
             // Process remaining deltas
+            log::info!(
+                "[WS_SEARCH] trace_id: {} Processing remaining delta",
+                trace_id
+            );
             let delta = process_delta(
                 session,
                 req,
@@ -681,8 +718,10 @@ async fn do_partitioned_search(
 }
 
 async fn send_partial_search_resp(session: &mut Session, trace_id: &str) -> Result<(), Error> {
-    let mut s_resp = Response::default();
-    s_resp.is_partial = true;
+    let s_resp = Response {
+        is_partial: true,
+        ..Default::default()
+    };
 
     let ws_search_res = WsServerEvents::SearchResponse {
         trace_id: trace_id.to_string(),
