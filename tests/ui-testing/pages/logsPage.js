@@ -43,7 +43,7 @@ export class LogsPage {
     this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
     this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
 
-    this.profileButton = page.locator('button').filter({ hasText: (process.env["ZO_ROOT_USER_EMAIL"]) });
+    this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
     this.signOutButton = page.getByText('Sign Out');
 
   }

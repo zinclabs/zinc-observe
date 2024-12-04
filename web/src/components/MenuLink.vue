@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
     clickable
     :class="{
-      'ql-item-mini': mini,
       'q-router-link--active':
         router.currentRoute.value.path.indexOf(link) == 0 && link != '/',
       'q-link-function': title == 'Functions',
@@ -41,13 +40,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <q-item-section v-if="icon" avatar>
       <q-icon :name="icon" />
+      <q-item-label>{{ title }}</q-item-label>
     </q-item-section>
     <q-item-section v-else-if="iconComponent" avatar>
       <q-icon><component :is="iconComponent" /></q-icon>
-    </q-item-section>
-
-    <q-item-section>
-      {{ title }}
+      <q-item-label>{{ title }}</q-item-label>
     </q-item-section>
   </q-item>
 </template>

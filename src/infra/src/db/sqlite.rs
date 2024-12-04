@@ -272,6 +272,13 @@ impl super::Db for SqliteDb {
             }
             return Err(e.into());
         }
+        // need commit it first to avoid the deadlock of insert and update
+        if let Err(e) = tx.commit().await {
+            log::error!("[SQLITE] commit put meta error: {}", e);
+            return Err(e.into());
+        }
+
+        let mut tx = client.begin().await?;
         if let Err(e) = sqlx::query(
             r#"UPDATE meta SET value = $1 WHERE module = $2 AND key1 = $3 AND key2 = $4 AND start_dt = $5;"#
         )

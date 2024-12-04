@@ -1648,8 +1648,6 @@ export default defineComponent({
 </script>
 
 <style lang="scss">
-$navbarHeight: 64px;
-
 .logPage {
   height: calc(100vh - $navbarHeight);
   min-height: calc(100vh - $navbarHeight) !important;

@@ -166,7 +166,14 @@ impl super::Db for MysqlDb {
             }
             return Err(e.into());
         }
+        // need commit it first to avoid the deadlock of insert and update
+        if let Err(e) = tx.commit().await {
+            log::error!("[MYSQL] commit put meta error: {}", e);
+            return Err(e.into());
+        }
+
         DB_QUERY_NUMS.with_label_values(&["update", "meta"]).inc();
+        let mut tx = pool.begin().await?;
         if let Err(e) = sqlx::query(
               r#"UPDATE meta SET value = ? WHERE module = ? AND key1 = ? AND key2 = ? AND start_dt = ?;"#
             )

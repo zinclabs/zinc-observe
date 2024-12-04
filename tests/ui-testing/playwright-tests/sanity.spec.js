@@ -593,7 +593,7 @@ test.describe("Sanity testcases", () => {
 
   test("should change settings successfully", async ({ page }) => {
     await page.waitForTimeout(2000);
-    await page.locator('[data-test="menu-link-\\/settings\\/-item"]').click();
+    await page.locator('[data-test="menu-link-settings-item"]').click();
     await page.waitForTimeout(2000);
     await page.getByText("General SettingsScrape").click();
     await page.getByRole("tab", { name: "General Settings" }).click();

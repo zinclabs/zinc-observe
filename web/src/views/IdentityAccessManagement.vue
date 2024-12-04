@@ -1,6 +1,6 @@
 <template>
   <q-page data-test="iam-page" class="q-pa-none" style="min-height: inherit">
-    <div class="flex no-wrap" style="height: calc(100vh - 60px) !important">
+    <div class="flex no-wrap" style="height: calc(100vh - 50px) !important">
       <div style="width: 160px" class="iam-tabs">
         <route-tabs
           ref="iamRouteTabsRef"

@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="splitterModel"
       unit="px"
       :limits="[200, 500]"
-      style="height: calc(100vh - 122px)"
+      style="height: calc(100vh - 112px)"
       data-test="dashboard-splitter"
     >
       <template v-slot:before>

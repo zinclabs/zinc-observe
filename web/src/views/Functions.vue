@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-splitter
       v-model="splitterModel"
       unit="px"
-      style="min-height: calc(100vh - 57px)"
+      style="min-height: calc(100vh - 47px)"
     >
       <template v-slot:before>
         <div class="functions-tabs">

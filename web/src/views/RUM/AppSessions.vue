@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="isLoading.length">
               <div
                 class="q-pb-lg flex items-center justify-center text-center"
-                style="height: calc(100vh - 200px)"
+                style="height: calc(100vh - 190px)"
               >
                 <div>
                   <q-spinner-hourglass
