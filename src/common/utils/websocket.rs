@@ -30,9 +30,21 @@ pub(crate) fn get_search_type_from_ws_req(
     }
 }
 
-/// Calculate the actual queried range for a search request omitting the result cache ratio.
+/// Calculates the actual queried range for a search request, adjusted for the result cache ratio.
+///
+/// This function computes the effective queried time range in hours by considering the total time
+/// range (in microseconds) and reducing it based on the percentage of results cached.
+///
+/// # Parameters
+/// - `start_time` (`i64`): Start time in microseconds since the epoch.
+/// - `end_time` (`i64`): End time in microseconds since the epoch.
+/// - `result_cache_ratio` (`usize`): Percentage of results cached (0 to 100).
+///
+/// # Returns
+/// - `f64`: The effective queried range in hours, reduced by the cache ratio.
+///
 pub(crate) fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ratio: usize) -> f64 {
-    let range = (end_time - start_time) as f64 / 3600000.0; // hours
+    let range = (end_time - start_time) as f64 / 3_600_000_000.0; // convert microseconds to hours
     range * (1.0 - result_cache_ratio as f64 / 100.0)
 }
 
@@ -117,5 +129,28 @@ mod tests {
         let expected = "SELECT histogram(_timestamp, '3600 seconds') AS 'x_axis_1', count(gold_medals) AS 'y_axis_1', count(silver_medals) AS 'y_axis_2', count(total_medals) AS 'y_axis_3' FROM 'default' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC";
 
         assert_eq!(sql, expected);
+    }
+
+    #[test]
+    fn test_calc_queried_range() {
+        // Provided values
+        let start_time: i64 = 1733290663000000;
+        let end_time: i64 = 1733290783000000;
+        let result_cache_ratio: usize = 0; // No caching
+        let mut remaining_query_range = 4.0; // Initial remaining query range in hours
+
+        // Expected partition duration
+        let partition_duration = (end_time - start_time) as f64 / 3_600_000_000.0; // Convert microseconds to hours
+        assert!((partition_duration - 0.0333).abs() < 0.0001, "Partition duration should be approximately 0.0333 hours");
+
+        // Calculate the queried range
+        let queried_range = calc_queried_range(start_time, end_time, result_cache_ratio);
+        assert!((queried_range - partition_duration).abs() < f64::EPSILON, "Queried range should equal partition duration when cache ratio is 0");
+
+        // Update the remaining query range
+        remaining_query_range -= queried_range;
+
+        // Check the updated remaining query range
+        assert!((remaining_query_range - (4.0 - queried_range)).abs() < f64::EPSILON, "Updated remaining query range should be correct");
     }
 }

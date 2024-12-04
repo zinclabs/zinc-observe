@@ -172,7 +172,7 @@ pub async fn handle_search_request(
 
     if is_partition_request(&req.payload, stream_type, org_id).await {
         log::info!(
-            "[WS_SEARCH] trace_id: {} Partitioned search, req_size: {}",
+            "[WS_SEARCH] trace_id: {}, Cached search, req_size: {}",
             req.trace_id,
             req_size
         );
@@ -451,8 +451,8 @@ async fn process_delta(
 
         if !search_res.hits.is_empty() {
             // for every partition, compute the queried range omitting the result cache ratio
-            *remaining_query_range -=
-                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+            let queried_range = calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+            *remaining_query_range -= queried_range;
 
             // Accumulate the result
             accumulated_results.push(SearchResultType::Search(search_res.clone()));
@@ -596,8 +596,8 @@ async fn do_partitioned_search(
 
         if !search_res.hits.is_empty() {
             // for every partition, compute the queried range omitting the result cache ratio
-            remaining_query_range -=
-                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+            let queried_range = calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+            remaining_query_range -= queried_range;
 
             // Accumulate the result
             accumulated_results.push(SearchResultType::Search(search_res.clone()));
