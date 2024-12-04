@@ -187,13 +187,14 @@ pub async fn handle_search_request(
         deltas.sort();
         deltas.dedup();
 
+        let cached_hits = cached_resp
+            .iter()
+            .fold(0, |acc, c| acc + c.cached_response.hits.len());
         log::info!(
             "[WS_SEARCH] trace_id: {}, found cache responses len:{}, with hits: {}",
             trace_id,
             cached_resp.len(),
-            cached_resp
-                .iter()
-                .fold(0, |acc, c| acc + c.cached_response.hits.len()),
+            cached_hits,
         );
 
         log::info!(
@@ -204,7 +205,7 @@ pub async fn handle_search_request(
         );
 
         // handle cache responses and deltas
-        if !cached_resp.is_empty() {
+        if !cached_resp.is_empty() && cached_hits > 0 {
             handle_cache_responses_and_deltas(
                 session,
                 &req,

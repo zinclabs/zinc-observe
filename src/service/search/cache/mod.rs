@@ -768,15 +768,6 @@ pub async fn check_cache_v2(
             &mut should_exec_query,
         )
         .await;
-
-        // TODO: calc `result_cache_ratio` for ws responses based
-        let mut _cache_hits_len = 0;
-        for res in resp.cached_response.iter() {
-            if !res.cached_response.hits.is_empty() {
-                _cache_hits_len += res.cached_response.hits.len();
-            }
-        }
-
         resp.is_aggregate = is_aggregate;
         resp.trace_id = trace_id.to_string();
         resp.file_path = file_path;
