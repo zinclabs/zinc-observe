@@ -124,22 +124,13 @@ impl FooterCache {
         // parse footer data
         let mut data = HashMap::new();
         for (path, items) in metadata.files.iter() {
-            // TODO: remove it later, just for debug
-            let path = PathBuf::from(path);
-            let ext = path
-                .extension()
-                .and_then(|s| s.to_str())
-                .unwrap_or_default();
-            if EMPTY_FILE_EXT.contains(&ext) {
-                continue;
-            }
             let mut slice_data = HashMap::new();
             for item in items.iter() {
                 let range = item.start as usize..(item.start + item.len) as usize;
                 let data = bytes.slice(item.offset as usize..(item.offset + item.len) as usize);
                 slice_data.insert(range, data);
             }
-            data.insert(path, slice_data);
+            data.insert(PathBuf::from(path), slice_data);
         }
         Ok(Self {
             data: RwLock::new(data),

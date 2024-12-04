@@ -137,7 +137,7 @@ pub async fn search(
     };
 
     // 2. get inverted index file list
-    let (_use_inverted_index, idx_file_list, idx_scan_size, _idx_took) =
+    let (use_ttv_inverted_index, idx_file_list, idx_scan_size, _idx_took) =
         get_inverted_index_file_lists(
             &trace_id,
             &req,
@@ -147,6 +147,7 @@ pub async fn search(
         )
         .await?;
     scan_stats.idx_scan_size = idx_scan_size as i64;
+    req.set_use_inverted_index(use_ttv_inverted_index);
 
     // get nodes
     let node_group = req
@@ -252,15 +253,17 @@ async fn get_inverted_index_file_lists(
     match_terms: &[String],
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = config::get_config();
-    let use_inverted_index =
-        req.use_inverted_index && cfg.common.inverted_index_search_format == "parquet";
+    let inverted_index_type = cfg.common.inverted_index_search_format.clone();
+    let use_inverted_index = req.use_inverted_index;
+    let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
+    let use_ttv_inverted_index = use_inverted_index && inverted_index_type == "tantivy";
     log::info!(
         "[trace_id {trace_id}] flight->follower_leader: use_inverted_index with parquet format {}",
-        use_inverted_index
+        use_parquet_inverted_index
     );
 
-    if !use_inverted_index {
-        return Ok((false, vec![], 0, 0));
+    if !use_parquet_inverted_index {
+        return Ok((use_ttv_inverted_index, vec![], 0, 0));
     }
 
     // construct partition filters
@@ -296,5 +299,10 @@ async fn get_inverted_index_file_lists(
         idx_took,
     );
 
-    Ok((true, idx_file_list, idx_scan_size, idx_took))
+    Ok((
+        use_ttv_inverted_index,
+        idx_file_list,
+        idx_scan_size,
+        idx_took,
+    ))
 }

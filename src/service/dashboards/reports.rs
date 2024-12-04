@@ -32,6 +32,7 @@ use config::{
 };
 use cron::Schedule;
 use futures::{future::try_join_all, StreamExt};
+use infra::table;
 use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
     AsyncTransport, Message,
@@ -141,7 +142,7 @@ pub async fn save(
         // Supports only one tab for now
         let tab_id = &dashboard.tabs[0];
         tasks.push(async move {
-            let maybe_dashboard = db::dashboards::get(org_id, dash_id, folder).await?;
+            let maybe_dashboard = table::dashboards::get(org_id, folder, dash_id).await?;
             // Check if the tab_id exists
             if let Some(dashboard) = maybe_dashboard.and_then(|d| d.v3) {
                 let mut tab_found = false;

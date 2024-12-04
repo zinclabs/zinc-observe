@@ -530,12 +530,29 @@ pub struct UpdateStreamSettings {
     #[serde(default)]
     pub defined_schema_fields: UpdateStringSettingsArray,
     #[serde(default)]
+    pub distinct_value_fields: UpdateStringSettingsArray,
+    #[serde(default)]
     pub max_query_range: Option<i64>,
     #[serde(default)]
     pub store_original_data: Option<bool>,
     #[serde(default)]
     pub approx_partition: Option<bool>,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+/// WARNING: this implements Eq trait based only on the name,
+/// so the timestamp will not be considered when comparing two entries
+pub struct DistinctField {
+    pub name: String,
+    pub added_ts: i64,
+}
+
+impl PartialEq for DistinctField {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+impl Eq for DistinctField {}
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
 pub struct StreamSettings {
@@ -564,6 +581,11 @@ pub struct StreamSettings {
     pub store_original_data: bool,
     #[serde(default)]
     pub approx_partition: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub distinct_value_fields: Vec<DistinctField>,
+    #[serde(default)]
+    pub index_setting_timestamp: i64,
 }
 
 impl Serialize for StreamSettings {
@@ -588,6 +610,7 @@ impl Serialize for StreamSettings {
         state.serialize_field("max_query_range", &self.max_query_range)?;
         state.serialize_field("store_original_data", &self.store_original_data)?;
         state.serialize_field("approx_partition", &self.approx_partition)?;
+        state.serialize_field("distinct_value_fields", &self.distinct_value_fields)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
@@ -703,6 +726,20 @@ impl From<&str> for StreamSettings {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
+        let mut distinct_value_fields = Vec::new();
+        let fields = settings.get("distinct_value_fields");
+        if let Some(value) = fields {
+            let v: Vec<_> = value.as_array().unwrap().iter().collect();
+            for item in v {
+                distinct_value_fields.push(json::from_value(item.clone()).unwrap())
+            }
+        }
+
+        let index_setting_timestamp = settings
+            .get("index_setting_timestamp")
+            .and_then(|v| v.as_i64())
+            .unwrap_or_default();
+
         Self {
             partition_time_level,
             partition_keys,
@@ -715,6 +752,8 @@ impl From<&str> for StreamSettings {
             defined_schema_fields,
             store_original_data,
             approx_partition,
+            distinct_value_fields,
+            index_setting_timestamp,
         }
     }
 }

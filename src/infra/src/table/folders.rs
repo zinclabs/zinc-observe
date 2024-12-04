@@ -58,6 +58,12 @@ pub async fn get(org_id: &str, folder_id: &str) -> Result<Option<Folder>, errors
     Ok(folder)
 }
 
+/// Checks if the folder with the given ID exists.
+pub async fn exists(org_id: &str, folder_id: &str) -> Result<bool, errors::Error> {
+    let exists = get(org_id, folder_id).await?.is_some();
+    Ok(exists)
+}
+
 /// Lists all dashboard folders.
 pub async fn list_dashboard_folders(org_id: &str) -> Result<Vec<Folder>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;

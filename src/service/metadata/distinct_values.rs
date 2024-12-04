@@ -25,7 +25,7 @@ use arrow_schema::{DataType, Field, Schema};
 use config::{
     get_config,
     meta::stream::StreamType,
-    utils::{json, schema_ext::SchemaExt},
+    utils::{json, schema::infer_json_schema_from_map, schema_ext::SchemaExt},
     FxIndexMap,
 };
 use infra::{
@@ -34,6 +34,7 @@ use infra::{
 };
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use tokio::{
     sync::{mpsc, RwLock},
     time,
@@ -49,7 +50,7 @@ use crate::{
 };
 
 const CHANNEL_SIZE: usize = 10240;
-const STREAM_NAME: &str = "distinct_values";
+pub const DISTINCT_STREAM_PREFIX: &str = "distinct_values";
 
 pub(crate) static INSTANCE: Lazy<DistinctValues> = Lazy::new(DistinctValues::new);
 
@@ -65,10 +66,7 @@ pub struct DistinctValues {
 pub struct DvItem {
     pub stream_type: StreamType,
     pub stream_name: String,
-    pub field_name: String,
-    pub field_value: String,
-    pub filter_name: String,
-    pub filter_value: String,
+    pub value: Map<String, Value>,
 }
 
 #[derive(Debug)]
@@ -151,6 +149,8 @@ fn handle_channel() -> Arc<mpsc::Sender<DvEvent>> {
 
 impl Metadata for DistinctValues {
     fn generate_schema(&self) -> Arc<Schema> {
+        // distinct values will always have _timestamp and
+        // count, rest will be dynamically determined
         Arc::new(Schema::new(vec![
             Field::new(
                 get_config().common.column_timestamp.as_str(),
@@ -158,14 +158,9 @@ impl Metadata for DistinctValues {
                 false,
             ),
             Field::new("count", DataType::Int64, false),
-            Field::new("stream_name", DataType::Utf8, false),
-            Field::new("stream_type", DataType::Utf8, false),
-            Field::new("field_name", DataType::Utf8, false),
-            Field::new("field_value", DataType::Utf8, true),
-            Field::new("filter_name", DataType::Utf8, true),
-            Field::new("filter_value", DataType::Utf8, true),
         ]))
     }
+
     async fn write(&self, org_id: &str, data: Vec<MetadataItem>) -> Result<()> {
         let mut group_items: FxIndexMap<DvItem, u32> = FxIndexMap::default();
         for item in data {
@@ -191,24 +186,39 @@ impl Metadata for DistinctValues {
 
         // write to wal
         let timestamp = chrono::Utc::now().timestamp_micros();
-        let schema = self.generate_schema();
-        let schema_key = schema.hash_key();
+        let default_schema = self.generate_schema();
+
+        // transpose the table
+        let mut table: HashMap<_, Vec<(Map<String, Value>, u32)>> = HashMap::new();
         for (org_id, items) in new_table {
+            for (item, count) in items {
+                let key = (org_id.clone(), item.stream_name, item.stream_type);
+                let entry = table.entry(key).or_default();
+                entry.push((item.value, count));
+            }
+        }
+
+        for ((org_id, stream_name, stream_type), items) in table {
             if items.is_empty() {
                 continue;
             }
 
+            let distinct_stream_name = format!(
+                "{}_{}_{}",
+                DISTINCT_STREAM_PREFIX,
+                stream_type.as_str(),
+                stream_name
+            );
             // check for schema
-            let db_schema = infra::schema::get(&org_id, STREAM_NAME, StreamType::Metadata)
-                .await
-                .unwrap();
+            let db_schema =
+                infra::schema::get(&org_id, &distinct_stream_name, StreamType::Metadata).await?;
             let mut _is_new = false;
             if db_schema.fields().is_empty() {
                 _is_new = true;
-                let schema = schema.as_ref().clone();
+                let schema = default_schema.as_ref().clone();
                 if let Err(e) = service::db::schema::merge(
                     &org_id,
-                    STREAM_NAME,
+                    &distinct_stream_name,
                     StreamType::Metadata,
                     &schema,
                     Some(timestamp),
@@ -219,6 +229,36 @@ impl Metadata for DistinctValues {
                 }
             }
 
+            let inferred_schema =
+                infer_json_schema_from_map(items.iter().map(|(v, _)| v), stream_type)?;
+
+            let mut schema_key = db_schema.hash_key();
+            let mut schema = inferred_schema;
+            if _is_new || db_schema.fields.ne(&schema.fields) {
+                match service::db::schema::merge(
+                    &org_id,
+                    &distinct_stream_name,
+                    StreamType::Metadata,
+                    &schema,
+                    Some(timestamp),
+                )
+                .await
+                {
+                    Err(e) => {
+                        log::error!(
+                            "[DISTINCT_VALUES] error while updating schema for {org_id}/{stream_name} : {e}"
+                        );
+                        schema_key = schema.hash_key()
+                    }
+                    Ok(None) => schema_key = schema.hash_key(),
+                    Ok(Some((s, _))) => {
+                        schema_key = s.hash_key();
+                        schema = s;
+                    }
+                }
+            }
+
+            let schema = Arc::new(schema);
             let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
             for (item, count) in items {
                 let mut data = json::to_value(item).unwrap();
@@ -248,10 +288,14 @@ impl Metadata for DistinctValues {
                 hour_buf.records_size += data_size;
             }
 
-            let writer =
-                ingester::get_writer(0, &org_id, &StreamType::Metadata.to_string(), STREAM_NAME)
-                    .await;
-            _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
+            let writer = ingester::get_writer(
+                0,
+                &org_id,
+                &StreamType::Metadata.to_string(),
+                &distinct_stream_name,
+            )
+            .await;
+            _ = ingestion::write_file(&writer, &distinct_stream_name, buf).await;
             if let Err(e) = writer.sync().await {
                 log::error!("[DISTINCT_VALUES] error while syncing writer: {}", e);
             }
@@ -266,7 +310,7 @@ impl Metadata for DistinctValues {
                 if _is_new && get_o2_config().openfga.enabled {
                     set_ownership_if_not_exists(
                         &org_id,
-                        &format!("{}:{}", StreamType::Metadata, STREAM_NAME),
+                        &format!("{}:{}", StreamType::Metadata, distinct_stream_name),
                     )
                     .await;
                 }

@@ -26,7 +26,7 @@ use datafusion::{
     physical_plan::{displayable, visit_execution_plan},
 };
 use hashbrown::HashMap;
-use infra::errors::{Error, Result};
+use infra::errors::{Error, ErrorCodes, Result};
 use o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes;
 use proto::cluster_rpc::{self};
 use tracing::{info_span, Instrument};
@@ -135,7 +135,12 @@ pub async fn search(
     let data = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
-        Err(err) => Err(Error::Message(err.to_string())),
+        Err(err) => match err {
+            DataFusionError::ResourcesExhausted(err) => Err(Error::ErrorCode(
+                ErrorCodes::SearchCancelQuery(err.to_string()),
+            )),
+            _ => Err(Error::Message(err.to_string())),
+        },
     };
     let (data, mut scan_stats, partial_err) = match data {
         Ok(v) => v,

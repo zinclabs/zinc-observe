@@ -38,7 +38,7 @@ use datafusion::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     dist_lock,
-    errors::{Error, Result},
+    errors::{Error, ErrorCodes, Result},
     file_list::FileId,
 };
 use proto::cluster_rpc::{self, SearchQuery};
@@ -298,7 +298,12 @@ pub async fn search(
     let (data, mut scan_stats, partial_err): (Vec<RecordBatch>, ScanStats, String) = match task {
         Ok(Ok(data)) => Ok(data),
         Ok(Err(err)) => Err(err),
-        Err(err) => Err(Error::Message(err.to_string())),
+        Err(err) => match err {
+            DataFusionError::ResourcesExhausted(err) => Err(Error::ErrorCode(
+                ErrorCodes::SearchCancelQuery(err.to_string()),
+            )),
+            _ => Err(Error::Message(err.to_string())),
+        },
     }?;
 
     log::info!("[trace_id {trace_id}] flight->search: search finished");

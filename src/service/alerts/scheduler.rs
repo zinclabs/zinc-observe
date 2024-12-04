@@ -455,7 +455,10 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         );
         trigger_data_stream.start_time = alert_start_time;
         trigger_data_stream.end_time = alert_end_time;
-        match alert.send_notification(&data, end_time, start_time).await {
+        match alert
+            .send_notification(&data, end_time, start_time, now)
+            .await
+        {
             Ok((success_msg, err_msg)) => {
                 let success_msg = success_msg.trim().to_owned();
                 let err_msg = err_msg.trim().to_owned();

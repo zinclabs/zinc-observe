@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::utils::file::set_permission;
-use infra::file_list as infra_file_list;
+use infra::{file_list as infra_file_list, table};
 
 use crate::{
     cli::data::{
@@ -172,7 +172,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::alerts::alert::reset().await?;
                 }
                 "dashboard" => {
-                    db::dashboards::reset().await?;
+                    table::dashboards::delete_all().await?;
                 }
                 "report" => {
                     db::dashboards::reports::reset().await?;

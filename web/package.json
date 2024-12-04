@@ -60,7 +60,7 @@
     "vue": "^3.4.31",
     "vue-drag-resize": "^1.5.4",
     "vue-draggable-next": "^2.2.1",
-    "vue-i18n": "^9.13.1",
+    "vue-i18n": "^9.14.2",
     "vue-router": "^4.4.0",
     "vue3-grid-layout": "^1.0.0",
     "vuex": "^4.1.0"

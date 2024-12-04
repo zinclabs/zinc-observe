@@ -13,15 +13,37 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::collections::HashMap;
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
-use config::meta::dashboards::{ListDashboardsParams, MoveDashboard};
+use config::{
+    meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, ListDashboardsParams, MoveDashboard},
+    utils::json,
+};
 use serde::Deserialize;
 
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::dashboards};
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    service::dashboards::{self, DashboardError},
+};
 
 pub mod reports;
+
+impl From<DashboardError> for HttpResponse {
+    fn from(value: DashboardError) -> Self {
+        match value {
+            DashboardError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            DashboardError::DashboardNotFound => MetaHttpResponse::not_found("Dashboard not found"),
+            DashboardError::UpdateMissingHash => MetaHttpResponse::internal_error("Request to update existing dashboard with missing or invalid hash value. BUG"),
+            DashboardError::UpdateConflictingHash => MetaHttpResponse::conflict("Conflict: Failed to save due to concurrent changes. Please refresh the page after backing up your work to avoid losing changes."),
+            DashboardError::PutMissingTitle => MetaHttpResponse::internal_error("Dashboard should have title"),
+            DashboardError::MoveMissingFolderParam => MetaHttpResponse::bad_request("Please specify from & to folder from dashboard movement"),
+            DashboardError::MoveDestinationFolderNotFound => MetaHttpResponse::not_found("Folder not found"),
+            DashboardError::CreateFolderNotFound => MetaHttpResponse::not_found("Folder not found"),
+            DashboardError::CreateDefaultFolder => MetaHttpResponse::internal_error("Error saving default folder"),
+        }
+    }
+}
 
 /// CreateDashboard
 #[utoipa::path(
@@ -52,14 +74,17 @@ pub async fn create_dashboard(
     path: web::Path<String>,
     body: web::Bytes,
     req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+) -> impl Responder {
     let org_id = path.into_inner();
     let folder = get_folder(req);
-    let resp = match dashboards::create_dashboard(&org_id, &folder, body).await {
-        Ok(resp) => resp,
-        Err(_) => HttpResponse::InternalServerError().into(),
+    let dashboard = match parse_dashboard(body) {
+        Ok(dashboard) => dashboard,
+        Err(err) => return MetaHttpResponse::bad_request(err),
     };
-    Ok(resp)
+    match dashboards::create_dashboard(&org_id, &folder, dashboard).await {
+        Ok(dashboard) => HttpResponse::Ok().json(dashboard),
+        Err(err) => err.into(),
+    }
 }
 
 /// UpdateDashboard
@@ -94,7 +119,14 @@ async fn update_dashboard(
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
-    dashboards::update_dashboard(&org_id, &dashboard_id, &folder, body, hash).await
+    let dashboard = match parse_dashboard(body) {
+        Ok(dashboard) => dashboard,
+        Err(err) => return MetaHttpResponse::bad_request(err),
+    };
+    match dashboards::update_dashboard(&org_id, &dashboard_id, &folder, dashboard, hash).await {
+        Ok(dashboard) => HttpResponse::Ok().json(dashboard),
+        Err(err) => err.into(),
+    }
 }
 
 /// HTTP URL query component that contains parameters for listing dashboards.
@@ -164,11 +196,16 @@ impl ListQuery {
 #[get("/{org_id}/dashboards")]
 async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
     let Ok(query) = web::Query::<ListQuery>::from_query(req.query_string()) else {
-        return Ok(HttpResponse::BadRequest().into());
+        return MetaHttpResponse::bad_request("Error parsing query parameters");
     };
-
     let params = query.into_inner().into(&org_id.into_inner());
-    dashboards::list_dashboards(params).await
+    match dashboards::list_dashboards(params).await {
+        Ok(dashboards) => {
+            let list = config::meta::dashboards::Dashboards { dashboards };
+            HttpResponse::Ok().json(list)
+        }
+        Err(err) => err.into(),
+    }
 }
 
 /// GetDashboard
@@ -192,7 +229,10 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
 async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     let folder = get_folder(req);
-    dashboards::get_dashboard(&org_id, &dashboard_id, &folder).await
+    match dashboards::get_dashboard(&org_id, &dashboard_id, &folder).await {
+        Ok(dashboard) => HttpResponse::Ok().json(dashboard),
+        Err(err) => err.into(),
+    }
 }
 
 /// DeleteDashboard
@@ -217,7 +257,13 @@ async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> i
 async fn delete_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     let folder_id = get_folder(req);
-    dashboards::delete_dashboard(&org_id, &dashboard_id, &folder_id).await
+    match dashboards::delete_dashboard(&org_id, &dashboard_id, &folder_id).await {
+        Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Dashboard deleted".to_string(),
+        )),
+        Err(err) => err.into(),
+    }
 }
 
 /// MoveDashboard
@@ -249,26 +295,58 @@ async fn delete_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -
 async fn move_dashboard(
     path: web::Path<(String, String)>,
     folder: web::Json<MoveDashboard>,
-) -> Result<HttpResponse, Error> {
+) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    if folder.from.is_empty() || folder.to.is_empty() {
-        return Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::BAD_REQUEST.into(),
-                "Please specify from & to folder from dashboard movement".to_string(),
-            )),
-        );
-    };
-
-    let resp =
-        match dashboards::move_dashboard(&org_id, &dashboard_id, &folder.from, &folder.to).await {
-            Ok(resp) => resp,
-            Err(_) => HttpResponse::InternalServerError().into(),
-        };
-    Ok(resp)
+    match dashboards::move_dashboard(&org_id, &dashboard_id, &folder.from, &folder.to).await {
+        Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Dashboard moved".to_string(),
+        )),
+        Err(err) => err.into(),
+    }
 }
 
 fn get_folder(req: HttpRequest) -> String {
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     crate::common::utils::http::get_folder(&query)
+}
+
+/// Parses the bytes into a dashboard with the given version.
+fn parse_dashboard(bytes: web::Bytes) -> Result<Dashboard, serde_json::Error> {
+    let d_version: DashboardVersion = json::from_slice(&bytes)?;
+    let version = d_version.version;
+
+    let dash = match version {
+        1 => {
+            let inner: v1::Dashboard = json::from_slice(&bytes)?;
+            inner.into()
+        }
+        2 => {
+            let inner: v2::Dashboard = json::from_slice(&bytes)?;
+            inner.into()
+        }
+        3 => {
+            let inner: v3::Dashboard = json::from_slice(&bytes)?;
+            inner.into()
+        }
+        4 => {
+            let inner: v4::Dashboard = json::from_slice(&bytes)?;
+            inner.into()
+        }
+        _ => {
+            let inner: v5::Dashboard = json::from_slice(&bytes)?;
+            inner.into()
+        }
+    };
+    Ok(dash)
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct DashboardVersion {
+    #[serde(default = "default_version")]
+    pub version: i32,
+}
+
+fn default_version() -> i32 {
+    1
 }

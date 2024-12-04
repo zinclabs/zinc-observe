@@ -250,6 +250,13 @@ pub fn unwrap_stream_settings(schema: &Schema) -> Option<StreamSettings> {
         .map(|v| StreamSettings::from(v.as_str()))
 }
 
+pub fn unwrap_stream_created_at(schema: &Schema) -> Option<i64> {
+    schema
+        .metadata()
+        .get("created_at")
+        .and_then(|v| v.parse().ok())
+}
+
 pub fn unwrap_partition_time_level(
     level: Option<PartitionTimeLevel>,
     stream_type: StreamType,
@@ -309,6 +316,29 @@ pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec
             fields
         }
         None => vec![],
+    }
+}
+
+pub fn get_stream_setting_index_setting_timestamp(
+    settings: &Option<StreamSettings>,
+    created_at: Option<i64>,
+) -> i64 {
+    let created_at = match created_at {
+        Some(created_at) => created_at,
+        None => {
+            log::warn!("created_at not found in schema metadata");
+            Utc::now().timestamp_micros()
+        }
+    };
+    match settings {
+        Some(settings) => {
+            if settings.index_setting_timestamp > 0 {
+                settings.index_setting_timestamp
+            } else {
+                created_at
+            }
+        }
+        None => created_at,
     }
 }
 

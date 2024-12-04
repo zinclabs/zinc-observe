@@ -1290,6 +1290,12 @@ pub struct Nats {
         To update this, delete and recreate the bucket."
     )]
     pub history: i64,
+    #[env_config(
+        name = "ZO_NATS_DELIVER_POLICY",
+        default = "all",
+        help = "The point in the stream from which to receive messages, default is: all, valid option is: all, last, new."
+    )]
+    pub deliver_policy: String,
     #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
     #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]

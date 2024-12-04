@@ -39,7 +39,7 @@ use config::{
     SMTP_CLIENT,
 };
 use cron::Schedule;
-use lettre::{message::SinglePart, AsyncTransport, Message};
+use lettre::{message::MultiPart, AsyncTransport, Message};
 
 use crate::{
     common::{
@@ -339,8 +339,9 @@ pub async fn trigger(
             ));
         }
     };
+    let now = Utc::now().timestamp_micros();
     alert
-        .send_notification(&[], Utc::now().timestamp_micros(), None)
+        .send_notification(&[], now, None, now)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }
@@ -362,6 +363,7 @@ pub trait AlertExt: Sync + Send + 'static {
         rows: &[Map<String, Value>],
         rows_end_time: i64,
         start_time: Option<i64>,
+        evaluation_timestamp: i64,
     ) -> Result<(String, String), anyhow::Error>;
 }
 
@@ -398,13 +400,23 @@ impl AlertExt for Alert {
         rows: &[Map<String, Value>],
         rows_end_time: i64,
         start_time: Option<i64>,
+        evaluation_timestamp: i64,
     ) -> Result<(String, String), anyhow::Error> {
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
         let mut no_of_error = 0;
         for dest in self.destinations.iter() {
             let dest = destinations::get_with_template(&self.org_id, dest).await?;
-            match send_notification(self, &dest, rows, rows_end_time, start_time).await {
+            match send_notification(
+                self,
+                &dest,
+                rows,
+                rows_end_time,
+                start_time,
+                evaluation_timestamp,
+            )
+            .await
+            {
                 Ok(resp) => {
                     success_message =
                         format!("{success_message} destination {} {resp};", dest.name);
@@ -441,19 +453,25 @@ pub async fn send_notification(
     rows: &[Map<String, Value>],
     rows_end_time: i64,
     start_time: Option<i64>,
+    evaluation_timestamp: i64,
 ) -> Result<String, anyhow::Error> {
     let rows_tpl_val = if alert.row_template.is_empty() {
         vec!["".to_string()]
     } else {
         process_row_template(&alert.row_template, alert, rows)
     };
+    let is_email = dest.destination_type == DestinationType::Email;
     let msg: String = process_dest_template(
         &dest.template.body,
         alert,
         rows,
         &rows_tpl_val,
-        rows_end_time,
-        start_time,
+        ProcessTemplateOptions {
+            rows_end_time,
+            start_time,
+            evaluation_timestamp,
+            is_email,
+        },
     )
     .await;
 
@@ -463,8 +481,12 @@ pub async fn send_notification(
             alert,
             rows,
             &rows_tpl_val,
-            rows_end_time,
-            start_time,
+            ProcessTemplateOptions {
+                rows_end_time,
+                start_time,
+                evaluation_timestamp,
+                is_email,
+            },
         )
         .await
     } else {
@@ -566,7 +588,9 @@ pub async fn send_email_notification(
         email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
     }
 
-    let email = email.singlepart(SinglePart::html(msg)).unwrap();
+    let email = email
+        .multipart(MultiPart::alternative_plain_html(msg.clone(), msg))
+        .unwrap();
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
@@ -631,7 +655,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
             } else {
                 value.to_string()
             };
-            process_variable_replace(&mut resp, key, &VarValue::Str(&value));
+            process_variable_replace(&mut resp, key, &VarValue::Str(&value), false);
 
             // calculate start and end time
             if key == &get_config().common.column_timestamp {
@@ -703,7 +727,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
 
         if let Some(attrs) = &alert.context_attributes {
             for (key, value) in attrs.iter() {
-                process_variable_replace(&mut resp, key, &VarValue::Str(value));
+                process_variable_replace(&mut resp, key, &VarValue::Str(value), false);
             }
         }
 
@@ -713,15 +737,27 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
     rows_tpl
 }
 
+struct ProcessTemplateOptions {
+    pub rows_end_time: i64,
+    pub start_time: Option<i64>,
+    pub evaluation_timestamp: i64,
+    pub is_email: bool,
+}
+
 async fn process_dest_template(
     tpl: &str,
     alert: &Alert,
     rows: &[Map<String, Value>],
     rows_tpl_val: &[String],
-    rows_end_time: i64,
-    start_time: Option<i64>,
+    options: ProcessTemplateOptions,
 ) -> String {
     let cfg = get_config();
+    let ProcessTemplateOptions {
+        rows_end_time,
+        start_time,
+        evaluation_timestamp,
+        is_email,
+    } = options;
     // format values
     let alert_count = rows.len();
     let mut vars = HashMap::with_capacity(rows.len());
@@ -767,6 +803,14 @@ async fn process_dest_template(
     let alert_end_time_str = if alert_end_time > 0 {
         Local
             .timestamp_nanos(alert_end_time * 1000)
+            .format("%Y-%m-%dT%H:%M:%S")
+            .to_string()
+    } else {
+        String::from("N/A")
+    };
+    let evaluation_timestamp_str = if evaluation_timestamp > 0 {
+        Local
+            .timestamp_nanos(evaluation_timestamp * 1000)
             .format("%Y-%m-%dT%H:%M:%S")
             .to_string()
     } else {
@@ -890,7 +934,9 @@ async fn process_dest_template(
         .replace("{alert_count}", &alert_count.to_string())
         .replace("{alert_start_time}", &alert_start_time_str)
         .replace("{alert_end_time}", &alert_end_time_str)
-        .replace("{alert_url}", &alert_url);
+        .replace("{alert_url}", &alert_url)
+        .replace("{alert_trigger_time}", &evaluation_timestamp.to_string())
+        .replace("{alert_trigger_time_str}", &evaluation_timestamp_str);
 
     if let Some(contidion) = &alert.query_condition.promql_condition {
         resp = resp
@@ -898,26 +944,26 @@ async fn process_dest_template(
             .replace("{alert_promql_value}", &contidion.value.to_string());
     }
 
-    process_variable_replace(&mut resp, "rows", &VarValue::Vector(rows_tpl_val));
+    process_variable_replace(&mut resp, "rows", &VarValue::Vector(rows_tpl_val), is_email);
     for (key, value) in vars.iter() {
         if resp.contains(&format!("{{{key}}}")) {
             let val = value.iter().cloned().collect::<Vec<_>>();
-            process_variable_replace(&mut resp, key, &VarValue::Str(&val.join(", ")));
+            process_variable_replace(&mut resp, key, &VarValue::Str(&val.join(", ")), is_email);
         }
     }
     if let Some(attrs) = &alert.context_attributes {
         for (key, value) in attrs.iter() {
-            process_variable_replace(&mut resp, key, &VarValue::Str(value));
+            process_variable_replace(&mut resp, key, &VarValue::Str(value), is_email);
         }
     }
 
     resp
 }
 
-fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue) {
+fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue, is_email: bool) {
     let pattern = "{".to_owned() + var_name + "}";
     if tpl.contains(&pattern) {
-        *tpl = tpl.replace(&pattern, &var_val.to_string_with_length(0));
+        *tpl = tpl.replace(&pattern, &var_val.to_string_with_length(0, is_email));
         return;
     }
     let pattern = "{".to_owned() + var_name + ":";
@@ -929,7 +975,7 @@ fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue
             if len > 0 {
                 *tpl = tpl.replace(
                     &tpl[start..p + end + 1],
-                    &var_val.to_string_with_length(len),
+                    &var_val.to_string_with_length(len, is_email),
                 );
             }
         }
@@ -1078,7 +1124,7 @@ impl VarValue<'_> {
         }
     }
 
-    fn to_string_with_length(&self, n: usize) -> String {
+    fn to_string_with_length(&self, n: usize, is_email: bool) -> String {
         let n = if n > 0 && n < self.len() {
             n
         } else {
@@ -1086,7 +1132,7 @@ impl VarValue<'_> {
         };
         match self {
             VarValue::Str(v) => format_variable_value(v.chars().take(n).collect()),
-            VarValue::Vector(v) => v[0..n].join("\\n"),
+            VarValue::Vector(v) => v[0..n].join(if is_email { "" } else { "\\n" }),
         }
     }
 }
