@@ -681,7 +681,7 @@ async fn do_partitioned_search(
         }
 
         // Stop if `remaining_query_range` is less than 0
-        if remaining_query_range <= 0.00 {
+        if remaining_query_range < 0.00 {
             log::info!(
                 "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
                 trace_id
