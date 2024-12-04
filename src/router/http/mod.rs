@@ -27,7 +27,6 @@ use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 use crate::{
     common::{infra::cluster, utils::http::get_search_type_from_request},
     router::http::ws_proxy::{convert_to_websocket_url, ws_proxy},
-
 };
 
 const QUERIER_ROUTES: [&str; 19] = [

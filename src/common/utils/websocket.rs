@@ -30,6 +30,12 @@ pub(crate) fn get_search_type_from_ws_req(
     }
 }
 
+/// Calculate the actual queried range for a search request omitting the result cache ratio.
+pub(crate) fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ratio: usize) -> f64 {
+    let range = (end_time - start_time) as f64 / 3600000.0; // hours
+    range * (1.0 - result_cache_ratio as f64 / 100.0)
+}
+
 /// Updates the `HISTOGRAM` function in a SQL query to include or modify the interval.
 pub(crate) fn update_histogram_interval_in_query(
     sql: &str,

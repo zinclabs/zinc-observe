@@ -33,7 +33,9 @@ use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
-        utils::websocket::{get_search_type_from_ws_req, update_histogram_interval_in_query},
+        utils::websocket::{
+            calc_queried_range, get_search_type_from_ws_req, update_histogram_interval_in_query,
+        },
     },
     handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
     service::search::{
@@ -111,7 +113,7 @@ pub async fn handle_search_request(
 
     // Check permissions for each stream
     #[cfg(feature = "enterprise")]
-    for stream_name in stream_names {
+    for stream_name in stream_names.iter() {
         if let Err(e) =
             enterprise_utils::check_permissions(&stream_name, stream_type, &user_id, &org_id).await
         {
@@ -151,6 +153,23 @@ pub async fn handle_search_request(
     }
 
     // start search
+    // get the max query range from the stream settings
+    let stream_name = if let Some(stream) = stream_names.first() {
+        stream
+    } else {
+        let err_res = WsServerEvents::error_response(
+            Error::Message("No stream name found in the query".to_string()),
+            Some(trace_id),
+            None,
+        );
+        send_message(session, err_res.to_json().to_string()).await?;
+        return Ok(());
+    };
+    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
+        .await
+        .unwrap();
+    let max_query_range = stream_settings.max_query_range; // hours
+
     if is_partition_request(&req.payload, stream_type, org_id).await {
         log::info!(
             "[WS_SEARCH] trace_id: {} Partitioned search, req_size: {}",
@@ -195,6 +214,7 @@ pub async fn handle_search_request(
                 accumulated_results,
                 org_id,
                 user_id,
+                max_query_range,
             )
             .await?;
         } else {
@@ -211,6 +231,7 @@ pub async fn handle_search_request(
                 org_id,
                 user_id,
                 accumulated_results,
+                max_query_range,
             )
             .await?;
         }
@@ -300,11 +321,14 @@ async fn handle_cache_responses_and_deltas(
     accumulated_results: &mut Vec<SearchResultType>,
     org_id: &str,
     user_id: &str,
+    max_query_range: i64,
 ) -> Result<(), Error> {
     // Initialize iterators for deltas and cached responses
     let mut delta_iter = deltas.iter().peekable();
     let mut cached_resp_iter = cached_resp.iter().peekable();
-    let mut curr_res_size = 0;
+    let mut curr_res_size = 0; // number of records
+
+    let mut remaining_query_range = max_query_range as f64; // hours
 
     // Process cached responses and deltas in sorted order
     while cached_resp_iter.peek().is_some() || delta_iter.peek().is_some() {
@@ -327,6 +351,7 @@ async fn handle_cache_responses_and_deltas(
                     &mut curr_res_size,
                     org_id,
                     user_id,
+                    &mut remaining_query_range,
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -347,6 +372,7 @@ async fn handle_cache_responses_and_deltas(
                 &mut curr_res_size,
                 org_id,
                 user_id,
+                &mut remaining_query_range,
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -381,6 +407,7 @@ async fn process_delta(
     curr_res_size: &mut i64,
     org_id: &str,
     user_id: &str,
+    remaining_query_range: &mut f64,
 ) -> Result<(), Error> {
     log::info!(
         "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
@@ -423,6 +450,10 @@ async fn process_delta(
         );
 
         if !search_res.hits.is_empty() {
+            // for every partition, compute the queried range omitting the result cache ratio
+            *remaining_query_range -=
+                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+
             // Accumulate the result
             accumulated_results.push(SearchResultType::Search(search_res.clone()));
 
@@ -438,6 +469,15 @@ async fn process_delta(
                 search_res.hits.len()
             );
             send_message(session, ws_search_res.to_json().to_string()).await?;
+        }
+
+        // Stop if `remaining_query_range` is less than 0
+        if *remaining_query_range <= 0.00 {
+            log::info!(
+                "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
+                trace_id
+            );
+            break;
         }
 
         // Stop if reached the request result size
@@ -513,6 +553,7 @@ async fn send_cached_responses(
 }
 
 // Do partitioned search without cache
+#[allow(clippy::too_many_arguments)]
 async fn do_partitioned_search(
     session: &mut Session,
     req: &SearchEventReq,
@@ -521,9 +562,12 @@ async fn do_partitioned_search(
     org_id: &str,
     user_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
+    max_query_range: i64, // hours
 ) -> Result<(), Error> {
     let partitions_resp = get_partitions(req, org_id).await?;
     let partitions = partitions_resp.partitions;
+
+    let mut remaining_query_range = max_query_range as f64; // hours
 
     if partitions.is_empty() {
         return Ok(());
@@ -551,6 +595,10 @@ async fn do_partitioned_search(
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
+            // for every partition, compute the queried range omitting the result cache ratio
+            remaining_query_range -=
+                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
+
             // Accumulate the result
             accumulated_results.push(SearchResultType::Search(search_res.clone()));
 
@@ -561,6 +609,15 @@ async fn do_partitioned_search(
                 time_offset: end_time,
             };
             send_message(session, ws_search_res.to_json().to_string()).await?;
+        }
+
+        // Stop if `remaining_query_range` is less than 0
+        if remaining_query_range <= 0.00 {
+            log::info!(
+                "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
+                trace_id
+            );
+            break;
         }
 
         // Stop if reached the requested result size
