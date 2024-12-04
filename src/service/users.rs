@@ -40,24 +40,26 @@ pub async fn post_user(
     usr_req: UserRequest,
     initiator_id: &str,
 ) -> Result<HttpResponse, Error> {
-    let initiator_user = db::user::get(Some(org_id), initiator_id).await;
     let cfg = get_config();
-
-    let Ok(initiator_user) = initiator_user else {
-        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            http::StatusCode::UNAUTHORIZED.into(),
-            "Not Allowed".to_string(),
-        )));
+    let is_allowed = if is_root_user(initiator_id) {
+        true
+    } else {
+        let initiator_user = db::user::get(Some(org_id), initiator_id).await;
+        let Ok(initiator_user) = initiator_user else {
+            return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+                http::StatusCode::UNAUTHORIZED.into(),
+                "Not Allowed".to_string(),
+            )));
+        };
+        let Some(initiator_user) = initiator_user else {
+            return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
+                http::StatusCode::UNAUTHORIZED.into(),
+                "Not Allowed".to_string(),
+            )));
+        };
+        initiator_user.role.eq(&UserRole::Admin)
     };
-    let Some(initiator_user) = initiator_user else {
-        return Ok(HttpResponse::Unauthorized().json(MetaHttpResponse::error(
-            http::StatusCode::UNAUTHORIZED.into(),
-            "Not Allowed".to_string(),
-        )));
-    };
 
-    // For non-enterprise, it is only Admin or Root user
-    let is_allowed = is_root_user(initiator_id) || initiator_user.role.eq(&UserRole::Admin);
     #[cfg(feature = "enterprise")]
     let is_allowed = if get_o2_config().openfga.enabled {
         // Permission already checked through RBAC
