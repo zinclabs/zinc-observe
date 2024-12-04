@@ -286,6 +286,7 @@ export const usePanelDataLoader = (
   };
 
   const cancelQueryAbort = () => {
+    // check if websocket search is enabled from organization settings
     if (
       store?.state?.organizationData?.organizationSettings
         ?.enable_websocket_search === true &&
@@ -1085,6 +1086,7 @@ export const usePanelDataLoader = (
 
               state.metadata.queries[panelQueryIndex] = metadata;
 
+              // check if websocket search is enabled from organization settings
               if (
                 store?.state?.organizationData?.organizationSettings
                   ?.enable_websocket_search === true

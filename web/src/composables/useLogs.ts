@@ -1464,9 +1464,13 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
-      searchObj.communicationMethod = (window as any).use_web_socket
-        ? "ws"
-        : "http";
+
+      // get websocket enable config from store
+      searchObj.communicationMethod =
+        store?.state?.organizationData?.organizationSettings
+          ?.enable_websocket_search === true
+          ? "ws"
+          : "http";
 
       if (searchObj.communicationMethod === "ws") {
         getDataThroughWebSocket(isPagination);
