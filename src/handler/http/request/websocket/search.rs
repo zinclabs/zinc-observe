@@ -170,7 +170,14 @@ pub async fn handle_search_request(
     let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
         .await
         .unwrap();
-    let max_query_range = stream_settings.max_query_range; // hours
+    // TODO: revisit `max_query_range` to handle the below if condition in a better way
+    // `max_query_range` is used initialize `remaining_query_range`
+    // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
+    let max_query_range = if stream_settings.max_query_range == 0 {
+        i64::MAX
+    } else {
+        stream_settings.max_query_range
+    }; // hours
 
     if is_partition_request(&req.payload, stream_type, org_id).await {
         log::info!(

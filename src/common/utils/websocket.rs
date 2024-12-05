@@ -46,6 +46,7 @@ pub(crate) fn get_search_type_from_ws_req(
 /// # Returns
 /// - `f64`: The effective queried range in hours, reduced by the cache ratio.
 pub(crate) fn calc_queried_range(start_time: i64, end_time: i64, result_cache_ratio: usize) -> f64 {
+    let result_cache_ratio = result_cache_ratio.min(100); // ensure ratio in between 0 and 100
     let range = (end_time - start_time) as f64 / 3_600_000_000.0; // convert microseconds to hours
     range * (1.0 - result_cache_ratio as f64 / 100.0)
 }
