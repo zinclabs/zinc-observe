@@ -644,3 +644,15 @@ impl From<HTTPType> for meta_destinations::HTTPType {
         }
     }
 }
+
+impl From<Template> for meta_templates::Template {
+    fn from(value: Template) -> Self {
+        Self {
+            name: value.name,
+            body: value.body,
+            is_default: value.is_default,
+            template_type: value.template_type.into(),
+            title: value.title,
+        }
+    }
+}

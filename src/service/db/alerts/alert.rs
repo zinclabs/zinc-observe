@@ -20,7 +20,7 @@ use config::{
     utils::json,
 };
 
-use super::json as db_alerts;
+use super::json as db_json;
 use crate::{common::infra::config::STREAM_ALERTS, service::db};
 
 pub async fn get(
@@ -39,7 +39,7 @@ pub async fn get(
         let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
         value = match db::get(&key).await {
             Ok(val) => {
-                let db_model: Option<db_alerts::Alert> = json::from_slice(&val)?;
+                let db_model: Option<db_json::Alert> = json::from_slice(&val)?;
                 db_model.map(|a| a.into())
             }
             Err(_) => None,
@@ -58,7 +58,7 @@ pub async fn set(
     let is_realtime = alert.is_real_time;
     let schedule_key = format!("{stream_type}/{stream_name}/{}", alert.name);
     let key = format!("/alerts/{org_id}/{}", &schedule_key);
-    let db_model: db_alerts::Alert = alert.into();
+    let db_model: db_json::Alert = alert.into();
     match db::put(
         &key,
         json::to_vec(&db_model).unwrap().into(),
@@ -170,8 +170,8 @@ pub async fn list(
     let ret = db::list_values(&key).await?;
     let mut items: Vec<Alert> = Vec::with_capacity(ret.len());
     for item_value in ret {
-        let json_val = json::from_slice(&item_value)?;
-        items.push(json_val)
+        let json_val: db_json::Alert = json::from_slice(&item_value)?;
+        items.push(json_val.into())
     }
     items.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(items)
@@ -195,7 +195,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let stream_key = item_key[0..item_key.rfind('/').unwrap()].to_string();
-                let item_value: Alert = if config::get_config().common.meta_store_external {
+                let item_value: db_json::Alert = if config::get_config().common.meta_store_external
+                {
                     match db::get(&ev.key).await {
                         Ok(val) => match json::from_slice(&val) {
                             Ok(val) => val,
@@ -212,6 +213,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 } else {
                     json::from_slice(&ev.value.unwrap()).unwrap()
                 };
+                let item_value: Alert = item_value.into();
                 let mut cacher = STREAM_ALERTS.write().await;
                 let group = cacher.entry(stream_key.to_string()).or_default();
                 if group.contains(&item_value) {
@@ -249,8 +251,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let new_key = item_key.strip_prefix(key).unwrap();
-        let alert: Alert = match json::from_slice(&item_value) {
-            Ok(v) => v,
+        let alert: Alert = match json::from_slice::<db_json::Alert>(&item_value) {
+            Ok(v) => v.into(),
             Err(_) => {
                 // HACK: for old version, write it back to up
                 let data: json::Value = json::from_slice(&item_value).unwrap();

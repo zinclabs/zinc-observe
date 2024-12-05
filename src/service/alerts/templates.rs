@@ -64,10 +64,11 @@ pub async fn save(
         }
     }
 
-    match db::alerts::templates::set(org_id, &mut template).await {
+    let template_name = template.name.clone();
+    match db::alerts::templates::set(org_id, template).await {
         Ok(_) => {
             if name.is_empty() {
-                set_ownership(org_id, "templates", Authz::new(&template.name)).await;
+                set_ownership(org_id, "templates", Authz::new(&template_name)).await;
             }
             Ok(())
         }

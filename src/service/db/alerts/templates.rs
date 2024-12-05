@@ -18,6 +18,7 @@ use std::sync::Arc;
 use config::{meta::alerts::templates::Template, utils::json};
 use itertools::Itertools;
 
+use super::json as db_json;
 use crate::{
     common::{infra::config::ALERTS_TEMPLATES, meta::organization::DEFAULT_ORG},
     service::db,
@@ -35,18 +36,22 @@ pub async fn get(org_id: &str, name: &str) -> Result<Template, anyhow::Error> {
 
     let key = format!("/templates/{org_id}/{name}");
     if let Ok(val) = db::get(&key).await {
-        return Ok(json::from_slice(&val).unwrap());
+        let db_model: db_json::Template = json::from_slice(&val).unwrap();
+        return Ok(db_model.into());
     }
     let key = format!("/templates/{DEFAULT_ORG}/{name}");
-    Ok(json::from_slice(&db::get(&key).await?).unwrap())
+    let val = &db::get(&key).await?;
+    let db_model: db_json::Template = json::from_slice(val).unwrap();
+    Ok(db_model.into())
 }
 
-pub async fn set(org_id: &str, template: &mut Template) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, mut template: Template) -> Result<(), anyhow::Error> {
     template.is_default = Some(org_id == DEFAULT_ORG);
     let key = format!("/templates/{org_id}/{}", template.name);
+    let db_model: db_json::Template = template.into();
     Ok(db::put(
         &key,
-        json::to_vec(template).unwrap().into(),
+        json::to_vec(&db_model).unwrap().into(),
         db::NEED_WATCH,
         None,
     )
@@ -76,8 +81,9 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, anyhow::Error> {
     let ret = db::list_values(key.as_str()).await?;
     let mut items = Vec::new();
     for item_value in ret {
-        let json_val: Template = json::from_slice(&item_value).unwrap();
-        items.push(json_val);
+        let json_val: db_json::Template = json::from_slice(&item_value).unwrap();
+        let template: Template = json_val.into();
+        items.push(template);
     }
     items.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(items)
@@ -102,8 +108,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let item_value: Template = if config::get_config().common.meta_store_external {
                     match db::get(&ev.key).await {
-                        Ok(val) => match json::from_slice(&val) {
-                            Ok(val) => val,
+                        Ok(val) => match json::from_slice::<db_json::Template>(&val) {
+                            Ok(val) => val.into(),
                             Err(e) => {
                                 log::error!("Error getting value: {}", e);
                                 continue;
@@ -115,7 +121,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         }
                     }
                 } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
+                    // This assumes that templates stored in events can be
+                    // deserialized using the same logic as templates stored in
+                    // events. If that ever changes we would need to use
+                    // different deserialization logic.
+                    let db_model: db_json::Template = json::from_slice(&ev.value.unwrap()).unwrap();
+                    db_model.into()
                 };
                 ALERTS_TEMPLATES.insert(item_key.to_owned(), item_value);
             }
@@ -134,8 +145,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        let json_val: Template = json::from_slice(&item_value).unwrap();
-        ALERTS_TEMPLATES.insert(item_key.to_owned(), json_val);
+        let json_val: db_json::Template = json::from_slice(&item_value).unwrap();
+        let template: Template = json_val.into();
+        ALERTS_TEMPLATES.insert(item_key.to_owned(), template);
     }
     log::info!("Alert templates Cached");
     Ok(())

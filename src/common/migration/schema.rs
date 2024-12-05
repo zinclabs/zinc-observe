@@ -46,6 +46,7 @@ use crate::{
 
 const SCHEMA_MIGRATION_KEY: &str = "/migration/schema_versions/status";
 const META_MIGRATION_VERSION_KEY: &str = "/migration/meta/version";
+const DEFAULT_ORG: &str = "default";
 
 pub async fn run() -> Result<(), anyhow::Error> {
     match upgrade_schema_row_per_version().await {
@@ -387,7 +388,7 @@ async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
             #[cfg(feature = "enterprise")]
             get_ownership_tuple(keys[0], "templates", &temp.name, &mut write_tuples);
             // First create an alert copy with formatted template name
-            match db::alerts::templates::set(keys[0], &mut temp).await {
+            match set_template_in_meta(keys[0], &mut temp).await {
                 // Delete template with unsupported template name
                 Ok(_) => {
                     if let Err(e) = db::alerts::templates::delete(keys[0], temp_name).await {
@@ -446,7 +447,7 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
 
         if need_update {
             // Create a new destination copy with formatted destination name
-            match db::alerts::destinations::set(keys[0], &dest).await {
+            match set_destination_in_meta(keys[0], &dest).await {
                 // Delete destination with unsupported destination name
                 Ok(_) => {
                     // New destination created, delete the old one
@@ -562,7 +563,7 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Inserts the alert in the meta table if it doesn't already exist or updates
+/// Inserts the alert into the meta table if it doesn't already exist or updates
 /// it if it does already exist.
 ///
 /// This function previously existed in the service::db module. However the
@@ -630,4 +631,46 @@ async fn set_alert_in_meta(
         }
         Err(e) => Err(anyhow::anyhow!("Error save alert {schedule_key}: {}", e)),
     }
+}
+
+/// Inserts the destination into the meta table if it doesn't already exist or
+/// updates it if it does already exist.
+///
+/// This function previously existed in the service::db module. However the
+/// logic in that module needs to be able to change and evolve over time,
+/// whereas the logic inside this migration needs be immutable to maintain
+/// consistent behavior. Therefore this function has been copied into this
+/// module.
+async fn set_destination_in_meta(
+    org_id: &str,
+    destination: &Destination,
+) -> Result<(), anyhow::Error> {
+    let key = format!("/destinations/{org_id}/{}", destination.name);
+    Ok(db::put(
+        &key,
+        json::to_vec(destination).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await?)
+}
+
+/// Inserts the template into the meta table if it doesn't already exist or
+/// updates it if it does already exist.
+///
+/// This function previously existed in the service::db module. However the
+/// logic in that module needs to be able to change and evolve over time,
+/// whereas the logic inside this migration needs be immutable to maintain
+/// consistent behavior. Therefore this function has been copied into this
+/// module.
+async fn set_template_in_meta(org_id: &str, template: &mut Template) -> Result<(), anyhow::Error> {
+    template.is_default = Some(org_id == DEFAULT_ORG);
+    let key = format!("/templates/{org_id}/{}", template.name);
+    Ok(db::put(
+        &key,
+        json::to_vec(template).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await?)
 }

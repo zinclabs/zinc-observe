@@ -18,6 +18,7 @@ use std::sync::Arc;
 use config::{meta::alerts::destinations::Destination, utils::json};
 use itertools::Itertools;
 
+use super::json as db_json;
 use crate::{common::infra::config::ALERTS_DESTINATIONS, service::db};
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error> {
@@ -28,15 +29,16 @@ pub async fn get(org_id: &str, name: &str) -> Result<Destination, anyhow::Error>
 
     let key = format!("/destinations/{org_id}/{name}");
     let val = db::get(&key).await?;
-    let dest: Destination = json::from_slice(&val)?;
-    Ok(dest)
+    let db_model: db_json::Destination = json::from_slice(&val)?;
+    Ok(db_model.into())
 }
 
-pub async fn set(org_id: &str, destination: &Destination) -> Result<(), anyhow::Error> {
+pub async fn set(org_id: &str, destination: Destination) -> Result<(), anyhow::Error> {
     let key = format!("/destinations/{org_id}/{}", destination.name);
+    let db_model: db_json::Destination = destination.into();
     Ok(db::put(
         &key,
-        json::to_vec(destination).unwrap().into(),
+        json::to_vec(&db_model).unwrap().into(),
         db::NEED_WATCH,
         None,
     )
@@ -64,7 +66,8 @@ pub async fn list(org_id: &str) -> Result<Vec<Destination>, anyhow::Error> {
     let key = format!("/destinations/{org_id}/");
     let mut items: Vec<Destination> = Vec::new();
     for item_value in db::list_values(&key).await? {
-        let dest: Destination = json::from_slice(&item_value)?;
+        let db_model: db_json::Destination = json::from_slice(&item_value)?;
+        let dest = db_model.into();
         items.push(dest)
     }
     items.sort_by(|a, b| a.name.cmp(&b.name));
@@ -88,24 +91,26 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         match ev {
             db::Event::Put(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Destination = if config::get_config().common.meta_store_external {
-                    match db::get(&ev.key).await {
-                        Ok(val) => match json::from_slice(&val) {
-                            Ok(val) => val,
+                let item_value: db_json::Destination =
+                    if config::get_config().common.meta_store_external {
+                        match db::get(&ev.key).await {
+                            Ok(val) => match json::from_slice(&val) {
+                                Ok(val) => val,
+                                Err(e) => {
+                                    log::error!("Error getting value: {}", e);
+                                    continue;
+                                }
+                            },
                             Err(e) => {
                                 log::error!("Error getting value: {}", e);
                                 continue;
                             }
-                        },
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
                         }
-                    }
-                } else {
-                    json::from_slice(&ev.value.unwrap()).unwrap()
-                };
-                ALERTS_DESTINATIONS.insert(item_key.to_owned(), item_value);
+                    } else {
+                        json::from_slice(&ev.value.unwrap()).unwrap()
+                    };
+                let dest = item_value.into();
+                ALERTS_DESTINATIONS.insert(item_key.to_owned(), dest);
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
@@ -122,8 +127,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
     let ret = db::list(key).await?;
     for (item_key, item_value) in ret {
         let item_key = item_key.strip_prefix(key).unwrap();
-        let json_val: Destination = json::from_slice(&item_value).unwrap();
-        ALERTS_DESTINATIONS.insert(item_key.to_owned(), json_val);
+        let json_val: db_json::Destination = json::from_slice(&item_value).unwrap();
+        let dest = json_val.into();
+        ALERTS_DESTINATIONS.insert(item_key.to_owned(), dest);
     }
     log::info!("Alert destinations Cached");
     Ok(())

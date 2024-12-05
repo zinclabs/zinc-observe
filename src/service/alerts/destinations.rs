@@ -143,10 +143,11 @@ pub async fn save(
         }
     }
 
-    match db::alerts::destinations::set(org_id, &destination).await {
+    let destination_name = destination.name.clone();
+    match db::alerts::destinations::set(org_id, destination).await {
         Ok(_) => {
             if name.is_empty() {
-                set_ownership(org_id, "destinations", Authz::new(&destination.name)).await;
+                set_ownership(org_id, "destinations", Authz::new(&destination_name)).await;
             }
             Ok(())
         }
