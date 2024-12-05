@@ -4604,7 +4604,7 @@ const useLogs = () => {
       searchAggData.hasAggregation = false;
       if (searchObj.meta.sqlMode == true) {
         if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
-          searchAggData.total = response.content.total;
+          searchAggData.total = response.content?.results?.total;
           searchAggData.hasAggregation = true;
           searchObj.meta.resultGrid.showPagination = false;
         }
