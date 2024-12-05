@@ -525,14 +525,8 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
             // updating the destinations of the alert.
             alert.destinations = destinations;
             // First create an alert copy with formatted alert name
-            match db::alerts::alert::set(
-                keys[0],
-                StreamType::from(keys[1]),
-                keys[2],
-                &alert,
-                create,
-            )
-            .await
+            match set_alert_in_meta(keys[0], StreamType::from(keys[1]), keys[2], &alert, create)
+                .await
             {
                 // Delete alert with unsupported alert name
                 Ok(_) => {
@@ -566,4 +560,74 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
         add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
+}
+
+/// Inserts the alert in the meta table if it doesn't already exist or updates
+/// it if it does already exist.
+///
+/// This function previously existed in the service::db module. However the
+/// logic in that module needs to be able to change and evolve over time,
+/// whereas the logic inside this migration needs be immutable to maintain
+/// consistent behavior. Therefore this function has been copied into this
+/// module.
+async fn set_alert_in_meta(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    alert: &Alert,
+    create: bool,
+) -> Result<(), anyhow::Error> {
+    let schedule_key = format!("{stream_type}/{stream_name}/{}", alert.name);
+    let key = format!("/alerts/{org_id}/{}", &schedule_key);
+    match db::put(
+        &key,
+        json::to_vec(alert).unwrap().into(),
+        db::NEED_WATCH,
+        None,
+    )
+    .await
+    {
+        Ok(_) => {
+            let trigger = db::scheduler::Trigger {
+                org: org_id.to_string(),
+                module_key: schedule_key.clone(),
+                next_run_at: chrono::Utc::now().timestamp_micros(),
+                is_realtime: alert.is_real_time,
+                is_silenced: false,
+                ..Default::default()
+            };
+            if create {
+                match db::scheduler::push(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+                        Ok(())
+                    }
+                }
+            } else if db::scheduler::exists(
+                org_id,
+                db::scheduler::TriggerModule::Alert,
+                &schedule_key,
+            )
+            .await
+            {
+                match db::scheduler::update_trigger(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to update trigger for alert {schedule_key}: {}", e);
+                        Ok(())
+                    }
+                }
+            } else {
+                match db::scheduler::push(trigger).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+                        Ok(())
+                    }
+                }
+            }
+        }
+        Err(e) => Err(anyhow::anyhow!("Error save alert {schedule_key}: {}", e)),
+    }
 }

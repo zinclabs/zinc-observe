@@ -220,10 +220,11 @@ pub async fn save(
     // }
 
     // save the alert
-    match db::alerts::alert::set(org_id, stream_type, stream_name, &alert, create).await {
+    let alert_name = alert.name.clone();
+    match db::alerts::alert::set(org_id, stream_type, stream_name, alert, create).await {
         Ok(_) => {
             if name.is_empty() {
-                set_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
+                set_ownership(org_id, "alerts", Authz::new(&alert_name)).await;
             }
             Ok(())
         }
@@ -319,7 +320,7 @@ pub async fn enable(
         }
     };
     alert.enabled = value;
-    db::alerts::alert::set(org_id, stream_type, stream_name, &alert, false)
+    db::alerts::alert::set(org_id, stream_type, stream_name, alert, false)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }

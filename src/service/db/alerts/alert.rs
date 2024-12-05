@@ -20,6 +20,7 @@ use config::{
     utils::json,
 };
 
+use super::json as db_alerts;
 use crate::{common::infra::config::STREAM_ALERTS, service::db};
 
 pub async fn get(
@@ -37,7 +38,10 @@ pub async fn get(
     if value.is_none() {
         let key = format!("/alerts/{org_id}/{stream_type}/{stream_name}/{name}");
         value = match db::get(&key).await {
-            Ok(val) => json::from_slice(&val)?,
+            Ok(val) => {
+                let db_model: Option<db_alerts::Alert> = json::from_slice(&val)?;
+                db_model.map(|a| a.into())
+            }
             Err(_) => None,
         }
     }
@@ -48,14 +52,16 @@ pub async fn set(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    alert: &Alert,
+    alert: Alert,
     create: bool,
 ) -> Result<(), anyhow::Error> {
+    let is_realtime = alert.is_real_time;
     let schedule_key = format!("{stream_type}/{stream_name}/{}", alert.name);
     let key = format!("/alerts/{org_id}/{}", &schedule_key);
+    let db_model: db_alerts::Alert = alert.into();
     match db::put(
         &key,
-        json::to_vec(alert).unwrap().into(),
+        json::to_vec(&db_model).unwrap().into(),
         db::NEED_WATCH,
         None,
     )
@@ -66,7 +72,7 @@ pub async fn set(
                 org: org_id.to_string(),
                 module_key: schedule_key.clone(),
                 next_run_at: chrono::Utc::now().timestamp_micros(),
-                is_realtime: alert.is_real_time,
+                is_realtime,
                 is_silenced: false,
                 ..Default::default()
             };

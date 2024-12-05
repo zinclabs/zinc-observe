@@ -15,5 +15,6 @@
 
 pub mod alert;
 pub mod destinations;
+pub mod json;
 pub mod realtime_triggers;
 pub mod templates;
