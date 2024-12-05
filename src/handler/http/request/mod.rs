@@ -21,6 +21,7 @@ pub mod enrichment_table;
 #[allow(deprecated)]
 pub mod folders;
 pub mod functions;
+pub mod keys;
 pub mod kv;
 pub mod logs;
 pub mod metrics;
