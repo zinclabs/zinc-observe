@@ -16,9 +16,15 @@
 use std::io::Error;
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
-use config::meta::alerts::templates::Template;
 
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::templates};
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::models::alerts::{
+        requests::{SaveTemplateRequestBody, UpdateTemplateRequestBody},
+        responses::{GetTemplateResponseBody, ListTemplatesResponseBody},
+    },
+    service::alerts::templates,
+};
 
 /// CreateTemplate
 #[utoipa::path(
@@ -31,7 +37,7 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alert
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
-    request_body(content = Template, description = "Template data", content_type = "application/json"),    
+    request_body(content = SaveTemplateRequestBody, description = "Template data", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
@@ -40,10 +46,10 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alert
 #[post("/{org_id}/alerts/templates")]
 pub async fn save_template(
     path: web::Path<String>,
-    tmpl: web::Json<Template>,
+    req_body: web::Json<SaveTemplateRequestBody>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let tmpl = tmpl.into_inner();
+    let tmpl = req_body.into_inner().into();
     match templates::save(&org_id, "", tmpl, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert template saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
@@ -62,7 +68,7 @@ pub async fn save_template(
         ("org_id" = String, Path, description = "Organization name"),
         ("template_name" = String, Path, description = "Template name"),
       ),
-    request_body(content = Template, description = "Template data", content_type = "application/json"),    
+    request_body(content = UpdateTemplateRequestBody, description = "Template data", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
@@ -71,10 +77,10 @@ pub async fn save_template(
 #[put("/{org_id}/alerts/templates/{template_name}")]
 pub async fn update_template(
     path: web::Path<(String, String)>,
-    tmpl: web::Json<Template>,
+    req_body: web::Json<UpdateTemplateRequestBody>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    let tmpl = tmpl.into_inner();
+    let tmpl = req_body.into_inner().into();
     match templates::save(&org_id, &name, tmpl, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert template updated")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
@@ -94,7 +100,7 @@ pub async fn update_template(
         ("template_name" = String, Path, description = "Template name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Template),
+        (status = 200, description = "Success",  content_type = "application/json", body = GetTemplateResponseBody),
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
@@ -102,7 +108,10 @@ pub async fn update_template(
 async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     match templates::get(&org_id, &name).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Ok(data) => {
+            let resp_body: GetTemplateResponseBody = data.into();
+            Ok(MetaHttpResponse::json(resp_body))
+        }
         Err(e) => Ok(MetaHttpResponse::not_found(e)),
     }
 }
@@ -119,7 +128,7 @@ async fn get_template(path: web::Path<(String, String)>) -> Result<HttpResponse,
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Template>),
+        (status = 200, description = "Success", content_type = "application/json", body = ListTemplatesResponseBody),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
@@ -153,7 +162,10 @@ async fn list_templates(path: web::Path<String>, _req: HttpRequest) -> Result<Ht
     }
 
     match templates::list(&org_id, _permitted).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Ok(data) => {
+            let resp_body: ListTemplatesResponseBody = data.into();
+            Ok(MetaHttpResponse::json(resp_body))
+        }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }

@@ -13,11 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! This module contains models that can be serialized and deserialized as JSON
-//! for HTTP responses and requests.
-
-pub mod alerts;
-pub mod dashboards;
-pub mod folders;
-pub mod search;
-pub mod stream;
+pub mod alert;
+pub mod destinations;
+pub mod requests;
+pub mod responses;
+pub mod templates;

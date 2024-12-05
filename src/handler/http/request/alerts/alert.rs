@@ -26,6 +26,13 @@ use crate::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::{auth::UserEmail, http::get_stream_type_from_request},
     },
+    handler::http::models::alerts::{
+        requests::{SaveAlertRequestBody, UpdateAlertRequestBody},
+        responses::{
+            EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody,
+            ListStreamAlertsResponseBody,
+        },
+    },
     service::alerts::alert,
 };
 
@@ -41,7 +48,7 @@ use crate::{
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = String, Path, description = "Stream name"),
       ),
-    request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
+    request_body(content = SaveAlertRequestBody, description = "Alert data", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
@@ -50,13 +57,13 @@ use crate::{
 #[post("/{org_id}/{stream_name}/alerts")]
 pub async fn save_alert(
     path: web::Path<(String, String)>,
-    alert: web::Json<Alert>,
+    req_body: web::Json<SaveAlertRequestBody>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name) = path.into_inner();
 
     // Hack for frequency: convert minutes to seconds
-    let mut alert = alert.into_inner();
+    let mut alert: Alert = req_body.into_inner().into();
     alert.trigger_condition.frequency *= 60;
     alert.owner = Some(user_email.user_id.clone());
     alert.last_edited_by = Some(user_email.user_id);
@@ -83,7 +90,7 @@ pub async fn save_alert(
         ("stream_name" = String, Path, description = "Stream name"),
         ("alert_name" = String, Path, description = "Alert name"),
       ),
-    request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
+    request_body(content = UpdateAlertRequestBody, description = "Alert data", content_type = "application/json"),    
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
@@ -92,13 +99,13 @@ pub async fn save_alert(
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}")]
 pub async fn update_alert(
     path: web::Path<(String, String, String)>,
-    alert: web::Json<Alert>,
+    alert: web::Json<UpdateAlertRequestBody>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
     let (org_id, stream_name, name) = path.into_inner();
 
     // Hack for frequency: convert minutes to seconds
-    let mut alert = alert.into_inner();
+    let mut alert: Alert = alert.into_inner().into();
     alert.trigger_condition.frequency *= 60;
     alert.last_edited_by = Some(user_email.user_id);
     alert.updated_at = Some(datetime_now());
@@ -121,7 +128,7 @@ pub async fn update_alert(
         ("stream_name" = String, Path, description = "Stream name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = ListStreamAlertsResponseBody),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
@@ -164,9 +171,8 @@ async fn list_stream_alerts(
                 alert.trigger_condition.frequency /= 60;
             }
 
-            let mut mapdata = HashMap::new();
-            mapdata.insert("list", data);
-            Ok(MetaHttpResponse::json(mapdata))
+            let resp_body: ListStreamAlertsResponseBody = data.into();
+            Ok(MetaHttpResponse::json(resp_body))
         }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -184,7 +190,7 @@ async fn list_stream_alerts(
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success", content_type = "application/json", body = ListAlertsResponseBody),
     )
 )]
 #[get("/{org_id}/alerts")]
@@ -246,9 +252,8 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpRe
                 alert.trigger_condition.frequency /= 60;
             }
 
-            let mut mapdata = HashMap::new();
-            mapdata.insert("list", data);
-            Ok(MetaHttpResponse::json(mapdata))
+            let resp_body: ListAlertsResponseBody = data.into();
+            Ok(MetaHttpResponse::json(resp_body))
         }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
@@ -268,7 +273,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpRe
         ("alert_name" = String, Path, description = "Alert name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Alert),
+        (status = 200, description = "Success",  content_type = "application/json", body = GetAlertResponseBody),
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
@@ -286,14 +291,15 @@ async fn get_alert(
         }
     };
     match alert::get(&org_id, stream_type, &stream_name, &name).await {
-        Ok(mut data) => {
+        Ok(Some(mut data)) => {
             // Hack for frequency: convert seconds to minutes
-            if let Some(ref mut data) = data {
-                data.trigger_condition.frequency /= 60;
-            }
-            Ok(MetaHttpResponse::json(data))
+            data.trigger_condition.frequency /= 60;
+
+            let resp_body: GetAlertResponseBody = data.into();
+            Ok(MetaHttpResponse::json(resp_body))
         }
-        Err(e) => Ok(MetaHttpResponse::not_found(e)),
+        Ok(None) => Ok(MetaHttpResponse::not_found("")),
+        Err(_) => Ok(MetaHttpResponse::internal_error("")),
     }
 }
 
@@ -353,7 +359,7 @@ async fn delete_alert(
         ("value" = bool, Query, description = "Enable or disable alert"),
     ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = HttpResponse),
+        (status = 200, description = "Success",  content_type = "application/json", body = EnableAlertResponseBody),
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
@@ -375,10 +381,12 @@ async fn enable_alert(
         Some(v) => v.parse::<bool>().unwrap_or_default(),
         None => false,
     };
-    let mut resp = HashMap::new();
-    resp.insert("enabled".to_string(), enable);
+
     match alert::enable(&org_id, stream_type, &stream_name, &name, enable).await {
-        Ok(_) => Ok(MetaHttpResponse::json(resp)),
+        Ok(_) => {
+            let resp_body = EnableAlertResponseBody { enabled: enable };
+            Ok(MetaHttpResponse::json(resp_body))
+        }
         Err(e) => match e {
             (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
             (_, e) => Ok(MetaHttpResponse::internal_error(e)),

@@ -16,9 +16,15 @@
 use std::io::Error;
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
-use config::meta::alerts::destinations::Destination;
 
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alerts::destinations};
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::models::alerts::{
+        requests::{SaveDestinationRequestBody, UpdateDestinationRequestBody},
+        responses::{GetDestinationResponseBody, ListDestinationsResponseBody},
+    },
+    service::alerts::destinations,
+};
 
 /// CreateDestination
 #[utoipa::path(
@@ -31,7 +37,7 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alert
     params(
         ("org_id" = String, Path, description = "Organization name"),
       ),
-    request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
+    request_body(content = SaveDestinationRequestBody, description = "Destination data", content_type = "application/json"),  
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
@@ -40,10 +46,10 @@ use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::alert
 #[post("/{org_id}/alerts/destinations")]
 pub async fn save_destination(
     path: web::Path<String>,
-    dest: web::Json<Destination>,
+    req_body: web::Json<SaveDestinationRequestBody>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let dest = dest.into_inner();
+    let dest = req_body.into_inner().into();
     match destinations::save(&org_id, "", dest, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
         Err(e) => match e {
@@ -65,7 +71,7 @@ pub async fn save_destination(
         ("org_id" = String, Path, description = "Organization name"),
         ("destination_name" = String, Path, description = "Destination name"),
       ),
-    request_body(content = Destination, description = "Destination data", content_type = "application/json"),  
+    request_body(content = UpdateDestinationRequestBody, description = "Destination data", content_type = "application/json"),  
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
@@ -74,10 +80,10 @@ pub async fn save_destination(
 #[put("/{org_id}/alerts/destinations/{destination_name}")]
 pub async fn update_destination(
     path: web::Path<(String, String)>,
-    dest: web::Json<Destination>,
+    req_body: web::Json<UpdateDestinationRequestBody>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
-    let dest = dest.into_inner();
+    let dest = req_body.into_inner().into();
     match destinations::save(&org_id, &name, dest, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert destination saved")),
         Err(e) => match e {
@@ -100,7 +106,7 @@ pub async fn update_destination(
         ("destination_name" = String, Path, description = "Destination name"),
       ),
     responses(
-        (status = 200, description = "Success",  content_type = "application/json", body = Destination),
+        (status = 200, description = "Success",  content_type = "application/json", body = GetDestinationResponseBody),
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse), 
     )
 )]
@@ -108,7 +114,10 @@ pub async fn update_destination(
 async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpResponse, Error> {
     let (org_id, name) = path.into_inner();
     match destinations::get(&org_id, &name).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Ok(data) => {
+            let resp_body: GetDestinationResponseBody = data.into();
+            Ok(MetaHttpResponse::json(resp_body))
+        }
         Err(e) => Ok(MetaHttpResponse::not_found(e)),
     }
 }
@@ -125,7 +134,7 @@ async fn get_destination(path: web::Path<(String, String)>) -> Result<HttpRespon
         ("org_id" = String, Path, description = "Organization name"),
       ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Vec<Destination>),
+        (status = 200, description = "Success", content_type = "application/json", body = ListDestinationsResponseBody),
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
@@ -162,7 +171,10 @@ async fn list_destinations(
     }
 
     match destinations::list(&org_id, _permitted).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
+        Ok(data) => {
+            let resp_body: ListDestinationsResponseBody = data.into();
+            Ok(MetaHttpResponse::json(resp_body))
+        }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
