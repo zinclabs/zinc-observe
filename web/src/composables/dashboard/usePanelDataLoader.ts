@@ -1089,7 +1089,7 @@ export const usePanelDataLoader = (
               // check if websocket search is enabled from organization settings
               if (
                 store?.state?.organizationData?.organizationSettings
-                  ?.enable_websocket ||
+                  ?.enable_websocket_search === true ||
                 (window as any).use_web_socket
               ) {
                 await getDataThroughWebSocket(
