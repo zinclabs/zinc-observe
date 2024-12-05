@@ -17,18 +17,16 @@ use chrono::{DateTime, FixedOffset};
 use config::meta::{
     alerts as meta_alerts,
     alerts::{destinations as meta_destinations, templates as meta_templates},
+    search as meta_search, stream as meta_stream,
 };
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use utoipa::ToSchema;
-
-use crate::handler::http::models::{search::SearchEventType, stream::StreamType};
 
 // This module defines the schema used to serialize and deserialize alerts as
 // JSON objects for storage in the database.
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Alert {
     #[serde(default)]
     pub name: String,
@@ -64,13 +62,12 @@ pub struct Alert {
     #[serde(default)]
     pub owner: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = String, format = DateTime)]
     pub updated_at: Option<DateTime<FixedOffset>>,
     #[serde(default)]
     pub last_edited_by: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct TriggerCondition {
     pub period: i64, // 10 minutes
     #[serde(default)]
@@ -91,13 +88,13 @@ pub struct TriggerCondition {
     pub tolerance_in_secs: Option<i64>,
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct CompareHistoricData {
     #[serde(rename = "offSet")]
     pub offset: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum FrequencyType {
     #[serde(rename = "cron")]
     Cron,
@@ -106,7 +103,7 @@ pub enum FrequencyType {
     Minutes,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct QueryCondition {
     #[serde(default)]
     #[serde(rename = "type")]
@@ -124,14 +121,14 @@ pub struct QueryCondition {
     pub multi_time_range: Option<Vec<CompareHistoricData>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Aggregation {
     pub group_by: Option<Vec<String>>,
     pub function: AggFunction,
     pub having: Condition,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum AggFunction {
     #[serde(rename = "avg")]
     Avg,
@@ -157,7 +154,7 @@ pub enum AggFunction {
     P99,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum QueryType {
     #[default]
     #[serde(rename = "custom")]
@@ -168,17 +165,16 @@ pub enum QueryType {
     PromQL,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Condition {
     pub column: String,
     pub operator: Operator,
-    #[schema(value_type = Object)]
     pub value: JsonValue,
     #[serde(default)]
     pub ignore_case: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Operator {
     #[serde(rename = "=")]
     EqualTo,
@@ -202,7 +198,7 @@ impl Default for Operator {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Destination {
     #[serde(default)]
     pub name: String,
@@ -230,7 +226,7 @@ pub struct Destination {
     pub destination_type: DestinationType,
 }
 
-#[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone, ToSchema)]
+#[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone)]
 pub enum DestinationType {
     #[default]
     #[serde(rename = "http")]
@@ -241,7 +237,7 @@ pub enum DestinationType {
     Sns,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum HTTPType {
     #[default]
     #[serde(rename = "post")]
@@ -252,7 +248,7 @@ pub enum HTTPType {
     GET,
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Template {
     #[serde(default)]
     pub name: String,
@@ -267,6 +263,34 @@ pub struct Template {
     pub template_type: DestinationType,
     #[serde(default)]
     pub title: String,
+}
+
+#[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchEventType {
+    UI,
+    Dashboards,
+    Reports,
+    Alerts,
+    Values,
+    Other,
+    RUM,
+    DerivedStream,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum StreamType {
+    #[default]
+    Logs,
+    Metrics,
+    Traces,
+    #[serde(rename = "enrichment_tables")]
+    EnrichmentTables,
+    #[serde(rename = "file_list")]
+    Filelist,
+    Metadata,
+    Index,
 }
 
 // Translation functions from models in the config::meta module to database JSON
@@ -463,6 +487,35 @@ impl From<meta_templates::Template> for Template {
     }
 }
 
+impl From<meta_search::SearchEventType> for SearchEventType {
+    fn from(value: meta_search::SearchEventType) -> Self {
+        match value {
+            meta_search::SearchEventType::UI => Self::UI,
+            meta_search::SearchEventType::Dashboards => Self::Dashboards,
+            meta_search::SearchEventType::Reports => Self::Reports,
+            meta_search::SearchEventType::Alerts => Self::Alerts,
+            meta_search::SearchEventType::Values => Self::Values,
+            meta_search::SearchEventType::Other => Self::Other,
+            meta_search::SearchEventType::RUM => Self::RUM,
+            meta_search::SearchEventType::DerivedStream => Self::DerivedStream,
+        }
+    }
+}
+
+impl From<meta_stream::StreamType> for StreamType {
+    fn from(value: meta_stream::StreamType) -> Self {
+        match value {
+            meta_stream::StreamType::Logs => Self::Logs,
+            meta_stream::StreamType::Metrics => Self::Metrics,
+            meta_stream::StreamType::Traces => Self::Traces,
+            meta_stream::StreamType::EnrichmentTables => Self::EnrichmentTables,
+            meta_stream::StreamType::Filelist => Self::Filelist,
+            meta_stream::StreamType::Metadata => Self::Metadata,
+            meta_stream::StreamType::Index => Self::Index,
+        }
+    }
+}
+
 // Translation functions from database JSON models to models in the config::meta
 // module.
 
@@ -653,6 +706,35 @@ impl From<Template> for meta_templates::Template {
             is_default: value.is_default,
             template_type: value.template_type.into(),
             title: value.title,
+        }
+    }
+}
+
+impl From<SearchEventType> for meta_search::SearchEventType {
+    fn from(value: SearchEventType) -> Self {
+        match value {
+            SearchEventType::UI => Self::UI,
+            SearchEventType::Dashboards => Self::Dashboards,
+            SearchEventType::Reports => Self::Reports,
+            SearchEventType::Alerts => Self::Alerts,
+            SearchEventType::Values => Self::Values,
+            SearchEventType::Other => Self::Other,
+            SearchEventType::RUM => Self::RUM,
+            SearchEventType::DerivedStream => Self::DerivedStream,
+        }
+    }
+}
+
+impl From<StreamType> for meta_stream::StreamType {
+    fn from(value: StreamType) -> Self {
+        match value {
+            StreamType::Logs => Self::Logs,
+            StreamType::Metrics => Self::Metrics,
+            StreamType::Traces => Self::Traces,
+            StreamType::EnrichmentTables => Self::EnrichmentTables,
+            StreamType::Filelist => Self::Filelist,
+            StreamType::Metadata => Self::Metadata,
+            StreamType::Index => Self::Index,
         }
     }
 }

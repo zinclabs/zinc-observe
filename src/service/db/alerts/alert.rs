@@ -116,13 +116,14 @@ pub async fn set_without_updating_trigger(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-    alert: &Alert,
+    alert: Alert,
 ) -> Result<String, anyhow::Error> {
     let schedule_key = format!("{stream_type}/{stream_name}/{}", alert.name);
     let key = format!("/alerts/{org_id}/{}", &schedule_key);
+    let db_model: db_json::Alert = alert.into();
     match db::put(
         &key,
-        json::to_vec(alert).unwrap().into(),
+        json::to_vec(&db_model).unwrap().into(),
         db::NEED_WATCH,
         None,
     )
@@ -277,9 +278,10 @@ pub async fn cache() -> Result<(), anyhow::Error> {
                     destinations,
                     ..Default::default()
                 };
+                let db_model: db_json::Alert = alert.clone().into();
                 _ = db::put(
                     &item_key,
-                    json::to_vec(&alert).unwrap().into(),
+                    json::to_vec(&db_model).unwrap().into(),
                     db::NO_NEED_WATCH,
                     None,
                 )

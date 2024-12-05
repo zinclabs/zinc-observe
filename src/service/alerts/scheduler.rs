@@ -315,7 +315,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                         &org_id,
                         stream_type,
                         stream_name,
-                        &alert,
+                        alert,
                     )
                     .await
                     {
@@ -583,7 +583,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         &org_id,
         stream_type,
         stream_name,
-        &old_alert,
+        old_alert,
     )
     .await
     {

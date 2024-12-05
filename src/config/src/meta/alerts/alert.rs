@@ -15,53 +15,33 @@
 
 use chrono::{DateTime, FixedOffset};
 use hashbrown::HashMap;
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 
 use crate::meta::{
     alerts::{QueryCondition, TriggerCondition},
     stream::StreamType,
 };
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug)]
 pub struct Alert {
-    #[serde(default)]
     pub name: String,
-    #[serde(default)]
     pub org_id: String,
-    #[serde(default)]
     pub stream_type: StreamType,
-    #[serde(default)]
     pub stream_name: String,
-    #[serde(default)]
     pub is_real_time: bool,
-    #[serde(default)]
     pub query_condition: QueryCondition,
-    #[serde(default)]
     pub trigger_condition: TriggerCondition,
     pub destinations: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub context_attributes: Option<HashMap<String, String>>,
-    #[serde(default)]
     pub row_template: String,
-    #[serde(default)]
     pub description: String,
-    #[serde(default)]
     pub enabled: bool,
-    #[serde(default)]
     /// Timezone offset in minutes.
     /// The negative secs means the Western Hemisphere
     pub tz_offset: i32,
-    #[serde(default)]
     pub last_triggered_at: Option<i64>,
-    #[serde(default)]
     pub last_satisfied_at: Option<i64>,
-    #[serde(default)]
     pub owner: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = String, format = DateTime)]
     pub updated_at: Option<DateTime<FixedOffset>>,
-    #[serde(default)]
     pub last_edited_by: Option<String>,
 }
 

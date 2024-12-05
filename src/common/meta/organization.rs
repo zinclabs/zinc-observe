@@ -53,7 +53,6 @@ pub struct OrganizationResponse {
     pub data: Vec<OrgDetails>,
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
 pub struct OrgSummary {
     pub streams: StreamSummary,
     pub functions: Vec<Transform>,
