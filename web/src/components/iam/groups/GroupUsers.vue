@@ -239,7 +239,7 @@ const columns = computed(() => {
   ];
 
   // Add "Organizations" column only if the selected organization is "meta"
-  if (selectedOrg.value?.label === store.state.zoConfig.meta_org) {
+  if (store.state.selectedOrganization.identifier === store.state.zoConfig.meta_org) {
     baseColumns.push({
       name: "organization",
       field: "org",
