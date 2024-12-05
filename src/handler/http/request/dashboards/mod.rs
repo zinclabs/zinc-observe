@@ -16,14 +16,14 @@
 use std::collections::HashMap;
 
 use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse, Responder};
-use config::{
-    meta::dashboards::{v1, v2, v3, v4, v5, Dashboard, ListDashboardsParams, MoveDashboard},
-    utils::json,
-};
-use serde::Deserialize;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
+    handler::http::models::dashboards::{
+        CreateDashboardRequestBody, CreateDashboardResponseBody, GetDashboardResponseBody,
+        ListDashboardsQuery, ListDashboardsResponseBody, MoveDashboardRequestBody,
+        UpdateDashboardRequestBody, UpdateDashboardResponseBody,
+    },
     service::dashboards::{self, DashboardError},
 };
 
@@ -57,7 +57,7 @@ impl From<DashboardError> for HttpResponse {
         ("org_id" = String, Path, description = "Organization name"),
     ),
     request_body(
-        content = Dashboard,
+        content = CreateDashboardRequestBody,
         description = "Dashboard details",
         example = json!({
             "title": "Network Traffic Overview",
@@ -65,26 +65,28 @@ impl From<DashboardError> for HttpResponse {
         }),
     ),
     responses(
-        (status = StatusCode::CREATED, description = "Dashboard created", body = Dashboard),
+        (status = StatusCode::CREATED, description = "Dashboard created", body = CreateDashboardResponseBody),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Internal Server Error", body = HttpResponse),
     ),
 )]
 #[post("/{org_id}/dashboards")]
 pub async fn create_dashboard(
     path: web::Path<String>,
-    body: web::Bytes,
+    req_body: web::Json<CreateDashboardRequestBody>,
     req: HttpRequest,
 ) -> impl Responder {
     let org_id = path.into_inner();
     let folder = get_folder(req);
-    let dashboard = match parse_dashboard(body) {
+    let dashboard = match req_body.into_inner().try_into() {
         Ok(dashboard) => dashboard,
-        Err(err) => return MetaHttpResponse::bad_request(err),
+        Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
     };
-    match dashboards::create_dashboard(&org_id, &folder, dashboard).await {
-        Ok(dashboard) => HttpResponse::Ok().json(dashboard),
-        Err(err) => err.into(),
-    }
+    let saved = match dashboards::create_dashboard(&org_id, &folder, dashboard).await {
+        Ok(saved) => saved,
+        Err(err) => return err.into(),
+    };
+    let resp_body: CreateDashboardResponseBody = saved.into();
+    MetaHttpResponse::json(resp_body)
 }
 
 /// UpdateDashboard
@@ -100,11 +102,11 @@ pub async fn create_dashboard(
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
     request_body(
-        content = Dashboard,
+        content = UpdateDashboardRequestBody,
         description = "Dashboard details",
     ),
     responses(
-        (status = StatusCode::OK, description = "Dashboard updated", body = HttpResponse),
+        (status = StatusCode::OK, description = "Dashboard updated", body = UpdateDashboardResponseBody),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
         (status = StatusCode::INTERNAL_SERVER_ERROR, description = "Failed to update the dashboard", body = HttpResponse),
     ),
@@ -112,69 +114,26 @@ pub async fn create_dashboard(
 #[put("/{org_id}/dashboards/{dashboard_id}")]
 async fn update_dashboard(
     path: web::Path<(String, String)>,
-    body: web::Bytes,
+    req_body: web::Json<UpdateDashboardRequestBody>,
     req: HttpRequest,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let folder = crate::common::utils::http::get_folder(&query);
     let hash = query.get("hash").map(|h| h.as_str());
-    let dashboard = match parse_dashboard(body) {
+
+    let dashboard = match req_body.into_inner().try_into() {
         Ok(dashboard) => dashboard,
-        Err(err) => return MetaHttpResponse::bad_request(err),
+        Err(_) => return MetaHttpResponse::bad_request("Error parsing request body"),
     };
-    match dashboards::update_dashboard(&org_id, &dashboard_id, &folder, dashboard, hash).await {
-        Ok(dashboard) => HttpResponse::Ok().json(dashboard),
-        Err(err) => err.into(),
-    }
-}
-
-/// HTTP URL query component that contains parameters for listing dashboards.
-#[derive(Debug, Deserialize, utoipa::IntoParams)]
-#[into_params(style = Form, parameter_in = Query)]
-pub struct ListQuery {
-    /// Optional folder ID filter parameter
-    ///
-    /// If neither `folder` nor any other filter parameter are set then this
-    /// will search for all dashboards in the "default" folder.
-    ///
-    /// If `folder` is not set and another filter parameter, such as `title`, is
-    /// set then this will search for dashboards in all folders.
-    folder: Option<String>,
-
-    /// The optional case-insensitive title substring with which to filter
-    /// dashboards.
-    title: Option<String>,
-}
-
-impl ListQuery {
-    pub fn into(self, org_id: &str) -> ListDashboardsParams {
-        match self {
-            Self {
-                folder: Some(f),
-                title: Some(t),
-            } => ListDashboardsParams::new(org_id)
-                .with_folder_id(&f)
-                .where_title_contains(&t),
-            Self {
-                folder: None,
-                title: Some(t),
-            } => ListDashboardsParams::new(org_id).where_title_contains(&t),
-            Self {
-                folder: Some(f),
-                title: None,
-            } => ListDashboardsParams::new(org_id).with_folder_id(&f),
-            Self {
-                folder: None,
-                title: None,
-            } => {
-                // To preserve backwards-compatability when no filter parameters
-                // are given we will list the contents of the default folder.
-                ListDashboardsParams::new(org_id)
-                    .with_folder_id(config::meta::folder::DEFAULT_FOLDER)
-            }
-        }
-    }
+    let saved = match dashboards::update_dashboard(&org_id, &dashboard_id, &folder, dashboard, hash)
+        .await
+    {
+        Ok(saved) => saved,
+        Err(err) => return err.into(),
+    };
+    let resp_body: UpdateDashboardResponseBody = saved.into();
+    MetaHttpResponse::json(resp_body)
 }
 
 /// ListDashboards
@@ -187,25 +146,24 @@ impl ListQuery {
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ListQuery
+        ListDashboardsQuery
     ),
     responses(
-        (status = StatusCode::OK, body = Dashboards),
+        (status = StatusCode::OK, body = ListDashboardsResponseBody),
     ),
 )]
 #[get("/{org_id}/dashboards")]
 async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Responder {
-    let Ok(query) = web::Query::<ListQuery>::from_query(req.query_string()) else {
+    let Ok(query) = web::Query::<ListDashboardsQuery>::from_query(req.query_string()) else {
         return MetaHttpResponse::bad_request("Error parsing query parameters");
     };
     let params = query.into_inner().into(&org_id.into_inner());
-    match dashboards::list_dashboards(params).await {
-        Ok(dashboards) => {
-            let list = config::meta::dashboards::Dashboards { dashboards };
-            HttpResponse::Ok().json(list)
-        }
-        Err(err) => err.into(),
-    }
+    let dashboards = match dashboards::list_dashboards(params).await {
+        Ok(dashboards) => dashboards,
+        Err(err) => return err.into(),
+    };
+    let resp_body: ListDashboardsResponseBody = dashboards.into();
+    MetaHttpResponse::json(resp_body)
 }
 
 /// GetDashboard
@@ -221,7 +179,7 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
     responses(
-        (status = StatusCode::OK, body = Dashboard),
+        (status = StatusCode::OK, body = GetDashboardResponseBody),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = HttpResponse),
     ),
 )]
@@ -229,10 +187,12 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
 async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
     let folder = get_folder(req);
-    match dashboards::get_dashboard(&org_id, &dashboard_id, &folder).await {
-        Ok(dashboard) => HttpResponse::Ok().json(dashboard),
-        Err(err) => err.into(),
-    }
+    let dashboard = match dashboards::get_dashboard(&org_id, &dashboard_id, &folder).await {
+        Ok(dashboard) => dashboard,
+        Err(err) => return err.into(),
+    };
+    let resp_body: GetDashboardResponseBody = dashboard.into();
+    MetaHttpResponse::json(resp_body)
 }
 
 /// DeleteDashboard
@@ -279,7 +239,7 @@ async fn delete_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -
         ("dashboard_id" = String, Path, description = "Dashboard ID"),
     ),
      request_body(
-        content = MoveDashboard,
+        content = MoveDashboardRequestBody,
         description = "MoveDashboard details",
         example = json!({
             "from": "Source folder id",
@@ -294,10 +254,10 @@ async fn delete_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -
 #[put("/{org_id}/folders/dashboards/{dashboard_id}")]
 async fn move_dashboard(
     path: web::Path<(String, String)>,
-    folder: web::Json<MoveDashboard>,
+    req_body: web::Json<MoveDashboardRequestBody>,
 ) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    match dashboards::move_dashboard(&org_id, &dashboard_id, &folder.from, &folder.to).await {
+    match dashboards::move_dashboard(&org_id, &dashboard_id, &req_body.from, &req_body.to).await {
         Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
             "Dashboard moved".to_string(),
@@ -309,44 +269,4 @@ async fn move_dashboard(
 fn get_folder(req: HttpRequest) -> String {
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     crate::common::utils::http::get_folder(&query)
-}
-
-/// Parses the bytes into a dashboard with the given version.
-fn parse_dashboard(bytes: web::Bytes) -> Result<Dashboard, serde_json::Error> {
-    let d_version: DashboardVersion = json::from_slice(&bytes)?;
-    let version = d_version.version;
-
-    let dash = match version {
-        1 => {
-            let inner: v1::Dashboard = json::from_slice(&bytes)?;
-            inner.into()
-        }
-        2 => {
-            let inner: v2::Dashboard = json::from_slice(&bytes)?;
-            inner.into()
-        }
-        3 => {
-            let inner: v3::Dashboard = json::from_slice(&bytes)?;
-            inner.into()
-        }
-        4 => {
-            let inner: v4::Dashboard = json::from_slice(&bytes)?;
-            inner.into()
-        }
-        _ => {
-            let inner: v5::Dashboard = json::from_slice(&bytes)?;
-            inner.into()
-        }
-    };
-    Ok(dash)
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct DashboardVersion {
-    #[serde(default = "default_version")]
-    pub version: i32,
-}
-
-fn default_version() -> i32 {
-    1
 }

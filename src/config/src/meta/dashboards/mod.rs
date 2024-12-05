@@ -176,24 +176,12 @@ impl Dashboard {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
-pub struct Dashboards {
-    pub dashboards: Vec<Dashboard>,
-}
-
 pub mod reports;
 pub mod v1;
 pub mod v2;
 pub mod v3;
 pub mod v4;
 pub mod v5;
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct MoveDashboard {
-    pub from: String,
-    pub to: String,
-}
 
 pub fn datetime_now() -> DateTime<FixedOffset> {
     Utc::now().with_timezone(&FixedOffset::east_opt(0).expect(

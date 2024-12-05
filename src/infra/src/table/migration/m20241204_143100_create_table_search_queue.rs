@@ -44,7 +44,7 @@ fn create_table_stmt() -> TableCreateStatement {
         .col(ColumnDef::new(SearchQueue::WorkGroup).string_len(16).not_null())
         .col(ColumnDef::new(SearchQueue::UserId).string_len(256).not_null())
         // Identifier of the user that owns the dashboard.
-        .col(ColumnDef::new(SearchQueue::TraceId).string_len(32).not_null())
+        .col(ColumnDef::new(SearchQueue::TraceId).string_len(64).not_null())
         .col(
             ColumnDef::new(SearchQueue::CreatedAt)
                 .big_integer()

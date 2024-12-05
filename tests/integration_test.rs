@@ -30,7 +30,7 @@ mod tests {
                 destinations::{Destination, DestinationType},
                 Operator, QueryCondition, TriggerCondition,
             },
-            dashboards::{v1, Dashboard, Dashboards},
+            dashboards::{v1, Dashboard},
         },
         utils::json,
     };
@@ -176,7 +176,7 @@ mod tests {
         {
             let board = e2e_create_dashboard().await;
             let list = e2e_list_dashboards().await;
-            assert_eq!(list.dashboards[0], board.clone());
+            assert_eq!(list[0], board.clone());
 
             let board = e2e_update_dashboard(
                 v1::Dashboard {
@@ -192,7 +192,7 @@ mod tests {
                 board
             );
             e2e_delete_dashboard(&board.v1.unwrap().dashboard_id).await;
-            assert!(e2e_list_dashboards().await.dashboards.is_empty());
+            assert!(e2e_list_dashboards().await.is_empty());
         }
 
         // alert
@@ -863,7 +863,7 @@ mod tests {
         json::from_slice(&body).unwrap()
     }
 
-    async fn e2e_list_dashboards() -> Dashboards {
+    async fn e2e_list_dashboards() -> Vec<Dashboard> {
         let auth = setup();
         let app = test::init_service(
             App::new()
@@ -881,8 +881,17 @@ mod tests {
             .append_header(auth)
             .to_request();
 
+        // Try to parse the response body as a list of dashboards.
         let body = test::call_and_read_body(&app, req).await;
-        json::from_slice(&body).unwrap()
+        let mut body_json: json::Value = json::from_slice(&body).unwrap();
+        let list_json = body_json
+            .as_object_mut()
+            .unwrap()
+            .remove("dashboards")
+            .unwrap();
+        let dashboards: Vec<Dashboard> = json::from_value(list_json).unwrap();
+
+        dashboards
     }
 
     async fn e2e_update_dashboard(dashboard: v1::Dashboard, hash: String) -> Dashboard {
