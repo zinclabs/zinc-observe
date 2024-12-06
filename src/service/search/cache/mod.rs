@@ -611,22 +611,22 @@ pub async fn write_results_v2(
     is_aggregate: bool,
     is_descending: bool,
 ) {
-    let local_resp = res.clone();
-    // let remove_hit = if is_descending {
-    //     local_resp.hits.last()
-    // } else {
-    //     local_resp.hits.first()
-    // };
+    let mut local_resp = res.clone();
+    let remove_hit = if is_descending {
+        local_resp.hits.last()
+    } else {
+        local_resp.hits.first()
+    };
 
-    // if !local_resp.hits.is_empty() && remove_hit.is_some() {
-    //     let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
+    if !local_resp.hits.is_empty() && remove_hit.is_some() {
+        let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
 
-    //     if let Some(ts_value) = ts_value_to_remove {
-    //         local_resp
-    //             .hits
-    //             .retain(|hit| hit.get(ts_column) != Some(&ts_value));
-    //     }
-    // }
+        if let Some(ts_value) = ts_value_to_remove {
+            local_resp
+                .hits
+                .retain(|hit| hit.get(ts_column) != Some(&ts_value));
+        }
+    }
 
     if local_resp.hits.is_empty() {
         log::info!(
