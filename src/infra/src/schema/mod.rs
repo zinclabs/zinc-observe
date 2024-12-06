@@ -319,7 +319,7 @@ pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec
     }
 }
 
-pub fn get_stream_setting_index_setting_timestamp(
+pub fn get_stream_setting_index_updated_at(
     settings: &Option<StreamSettings>,
     created_at: Option<i64>,
 ) -> i64 {
@@ -332,8 +332,8 @@ pub fn get_stream_setting_index_setting_timestamp(
     };
     match settings {
         Some(settings) => {
-            if settings.index_setting_timestamp > 0 {
-                settings.index_setting_timestamp
+            if settings.index_updated_at > 0 {
+                settings.index_updated_at
             } else {
                 created_at
             }

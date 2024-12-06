@@ -1209,7 +1209,7 @@ pub fn is_use_inverted_index(sql: &Arc<Sql>) -> (bool, Vec<(String, String)>) {
         && sql.use_inverted_index
         && cfg.common.inverted_index_enabled
         && !cfg.common.feature_query_without_index
-        && (sql.match_items.is_some() || !index_terms.is_empty());
+        && (sql.index_condition.is_some() || sql.match_items.is_some() || !index_terms.is_empty());
 
     (use_inverted_index, index_terms)
 }

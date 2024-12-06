@@ -155,7 +155,7 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
     loop {
         // run every 1 hour at least
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.old_data_interval,
+            get_config().compact.old_data_interval + 1,
         ))
         .await;
         log::debug!("[COMPACTOR] Running generate merge job for old data");
@@ -169,7 +169,7 @@ async fn run_generate_old_data_job() -> Result<(), anyhow::Error> {
 async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), anyhow::Error> {
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.interval,
+            get_config().compact.interval + 2,
         ))
         .await;
         log::debug!("[COMPACTOR] Running data merge");
@@ -183,7 +183,7 @@ async fn run_merge(tx: mpsc::Sender<(MergeSender, MergeBatch)>) -> Result<(), an
 async fn run_retention() -> Result<(), anyhow::Error> {
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.interval + 1,
+            get_config().compact.interval + 3,
         ))
         .await;
         log::debug!("[COMPACTOR] Running data retention");
@@ -197,7 +197,7 @@ async fn run_retention() -> Result<(), anyhow::Error> {
 async fn run_delay_deletion() -> Result<(), anyhow::Error> {
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(
-            get_config().compact.interval + 2,
+            get_config().compact.interval + 4,
         ))
         .await;
         log::debug!("[COMPACTOR] Running data delay deletion");

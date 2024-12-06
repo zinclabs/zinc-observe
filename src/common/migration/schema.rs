@@ -66,7 +66,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
     };
 
     // get lock
-    let locker = infra::dist_lock::lock(SCHEMA_MIGRATION_KEY, 0, None).await?;
+    let locker = infra::dist_lock::lock(SCHEMA_MIGRATION_KEY, 0).await?;
 
     // after get lock, need check again
     match upgrade_schema_row_per_version().await {
@@ -250,7 +250,7 @@ pub async fn migrate_resource_names() -> Result<(), anyhow::Error> {
         return Ok(()); // Resource name migration already done
     }
     // slow path
-    let locker = infra::dist_lock::lock(META_MIGRATION_VERSION_KEY, 0, None).await?;
+    let locker = infra::dist_lock::lock(META_MIGRATION_VERSION_KEY, 0).await?;
     match need_meta_resource_name_migration().await {
         Ok(true) => {
             log::info!("Starting migration of unsupported resource names");

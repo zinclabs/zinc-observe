@@ -158,8 +158,8 @@ pub async fn print_consistent_hash() -> HashMap<String, HashMap<String, Vec<u64>
     map
 }
 
-/// Register and keepalive the node to cluster
-pub async fn register_and_keepalive() -> Result<()> {
+/// Register and keep alive the node to cluster
+pub async fn register_and_keep_alive() -> Result<()> {
     let cfg = get_config();
     if cfg.common.local_mode {
         if !LOCAL_NODE.is_single_node() {
@@ -176,8 +176,8 @@ pub async fn register_and_keepalive() -> Result<()> {
     }
 
     match cfg.common.cluster_coordinator.as_str().into() {
-        MetaStore::Nats => nats::register_and_keepalive().await?,
-        _ => etcd::register_and_keepalive().await?,
+        MetaStore::Nats => nats::register_and_keep_alive().await?,
+        _ => etcd::register_and_keep_alive().await?,
     };
 
     // check node heatbeat
@@ -522,7 +522,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cluster() {
-        register_and_keepalive().await.unwrap();
+        register_and_keep_alive().await.unwrap();
         set_online(false).await.unwrap();
         leave().await.unwrap();
         assert!(get_cached_online_nodes().await.is_some());

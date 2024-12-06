@@ -29,8 +29,8 @@ use infra::{
 };
 use tokio::task;
 
-/// Register and keepalive the node to cluster
-pub(crate) async fn register_and_keepalive() -> Result<()> {
+/// Register and keep alive the node to cluster
+pub(crate) async fn register_and_keep_alive() -> Result<()> {
     if let Err(e) = register().await {
         log::error!("[CLUSTER] register failed: {}", e);
         return Err(e);
@@ -45,7 +45,7 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
                 break;
             }
         }
-        // after the node is online, keepalive
+        // after the node is online, keep alive
         let ttl_keep_alive = min(10, (get_config().limit.node_heartbeat_ttl / 2) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
@@ -58,7 +58,7 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
                         break;
                     }
                     Err(e) => {
-                        log::error!("[CLUSTER] keepalive failed: {}", e);
+                        log::error!("[CLUSTER] keep alive failed: {}", e);
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                         continue;
                     }
@@ -74,8 +74,7 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
 async fn register() -> Result<()> {
     let cfg = get_config();
     // 1. create a cluster lock for node register
-    let locker =
-        dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64, None).await?;
+    let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64).await?;
 
     // 2. watch node list
     task::spawn(async move { super::watch_node_list().await });

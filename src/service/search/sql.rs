@@ -51,6 +51,10 @@ use sqlparser::{
 };
 
 use super::{
+    datafusion::udf::match_all_udf::{
+        FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
+        MATCH_ALL_UDF_NAME,
+    },
     index::{get_index_condition_from_expr, IndexCondition},
     request::Request,
     utils::{is_field, is_value, split_conjunction, trim_quotes},
@@ -283,7 +287,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, used_inverted_index: {}, index_condition: {:?}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, match_items: {:?}, equal_items: {:?}, prefix_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, use_inverted_index: {}, index_condition: {:?}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -835,10 +839,13 @@ impl VisitorMut for MatchVisitor {
     fn pre_visit_expr(&mut self, expr: &mut Expr) -> ControlFlow<Self::Break> {
         if let Expr::Function(func) = expr {
             let name = func.name.to_string().to_lowercase();
-            if name == "match_all" || name == "match_all_raw" || name == "match_all_raw_ignore_case"
+            if name == MATCH_ALL_UDF_NAME
+                || name == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
+                || name == MATCH_ALL_RAW_UDF_NAME
+                || name == FUZZY_MATCH_ALL_UDF_NAME
             {
                 if let FunctionArguments::List(list) = &func.args {
-                    if list.args.len() == 1 {
+                    if !list.args.is_empty() {
                         let value = trim_quotes(list.args[0].to_string().as_str());
                         match &mut self.match_items {
                             Some(items) => items.push(value),
@@ -1334,7 +1341,10 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
             pattern: _,
             escape_char: _,
         } => checking_inverted_index_inner(index_fields, expr),
-        Expr::Function(f) => f.name.to_string().to_lowercase() == "match_all",
+        Expr::Function(f) => {
+            let f = f.name.to_string().to_lowercase();
+            f == MATCH_ALL_UDF_NAME || f == FUZZY_MATCH_ALL_UDF_NAME
+        }
         _ => false,
     }
 }

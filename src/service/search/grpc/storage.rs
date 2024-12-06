@@ -722,7 +722,7 @@ async fn search_tantivy_index(
 
     let tantivy_searcher = tantivy_reader.searcher();
     let tantivy_schema = tantivy_index.schema();
-    let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).unwrap();
+    let fts_field = tantivy_schema.get_field(INDEX_FIELD_NAME_FOR_ALL).ok();
 
     // generate the tantivy query
     let condition: IndexCondition = index_condition.ok_or(anyhow::anyhow!(

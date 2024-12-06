@@ -62,7 +62,7 @@ pub async fn update_stats_from_file_list() -> Result<Option<(i64, i64)>, anyhow:
 
 async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
     let lock_key = "/compact/stream_stats/offset".to_string();
-    let locker = dist_lock::lock(&lock_key, 0, None).await?;
+    let locker = dist_lock::lock(&lock_key, 0).await?;
     // check the working node for the organization again, maybe other node locked it
     // first
     let (offset, node) = db::compact::stats::get_offset().await;

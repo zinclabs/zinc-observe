@@ -21,7 +21,7 @@ use config::{
     meta::stream::{
         DistinctField, StreamParams, StreamSettings, StreamStats, StreamType, UpdateStreamSettings,
     },
-    utils::json,
+    utils::{json, time::now_micros},
     SIZE_IN_MB, SQL_FULL_TEXT_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::Schema;
@@ -348,7 +348,7 @@ pub async fn update_stream_settings(
                 settings
                     .index_fields
                     .extend(update_settings.index_fields.add);
-                settings.index_setting_timestamp = chrono::Utc::now().timestamp_micros();
+                settings.index_updated_at = now_micros();
             }
 
             if !update_settings.index_fields.remove.is_empty() {
@@ -447,6 +447,7 @@ pub async fn update_stream_settings(
                 settings
                     .full_text_search_keys
                     .extend(update_settings.full_text_search_keys.add);
+                settings.index_updated_at = now_micros();
             }
 
             if !update_settings.full_text_search_keys.remove.is_empty() {

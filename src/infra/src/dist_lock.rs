@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use hashbrown::HashSet;
-
 use crate::{
     db::{etcd, nats},
     errors::Result,
@@ -41,12 +39,11 @@ pub async fn lock_with_trace_id(
     trace_id: &str,
     key: &str,
     wait_ttl: u64,
-    node_ids: Option<HashSet<String>>,
 ) -> Result<Option<Locker>> {
-    let lock = lock(key, wait_ttl, node_ids).await;
+    let lock = lock(key, wait_ttl).await;
     match lock {
         Ok(lock) => {
-            log::info!("[trace_id {trace_id}] fetch lock with key: {key}");
+            log::debug!("[trace_id {trace_id}] fetch lock with key: {key}");
             Ok(lock)
         }
         Err(e) => Err(e),
@@ -61,7 +58,7 @@ pub async fn unlock_with_trace_id(trace_id: &str, locker: &Option<Locker>) -> Re
     let unlock = unlock(locker).await;
     match unlock {
         Ok(_) => {
-            log::info!(
+            log::debug!(
                 "[trace_id {trace_id}] release lock with key: {:?}",
                 locker.as_ref().map(|l| l.key()).unwrap_or_default()
             );
@@ -73,11 +70,7 @@ pub async fn unlock_with_trace_id(trace_id: &str, locker: &Option<Locker>) -> Re
 
 /// lock key in etcd, wait_ttl is 0 means wait forever
 #[inline(always)]
-pub async fn lock(
-    key: &str,
-    wait_ttl: u64,
-    node_ids: Option<HashSet<String>>,
-) -> Result<Option<Locker>> {
+pub async fn lock(key: &str, wait_ttl: u64) -> Result<Option<Locker>> {
     let cfg = config::get_config();
     if cfg.common.local_mode {
         return Ok(None);
@@ -85,7 +78,7 @@ pub async fn lock(
     match cfg.common.cluster_coordinator.as_str() {
         "nats" => {
             let mut lock = nats::Locker::new(key);
-            lock.lock(wait_ttl, node_ids).await?;
+            lock.lock(wait_ttl).await?;
             Ok(Some(Locker(LockerStore::Nats(lock))))
         }
         _ => {

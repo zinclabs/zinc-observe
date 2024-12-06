@@ -120,7 +120,7 @@ mod tests {
         });
 
         // register node
-        openobserve::common::infra::cluster::register_and_keepalive()
+        openobserve::common::infra::cluster::register_and_keep_alive()
             .await
             .unwrap();
         // init config

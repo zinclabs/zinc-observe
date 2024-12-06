@@ -25,8 +25,12 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-use crate::service::search::datafusion::udf::match_all_udf::{
-    MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME, MATCH_ALL_UDF_NAME,
+use crate::service::search::datafusion::udf::{
+    fuzzy_match_udf,
+    match_all_udf::{
+        FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
+        MATCH_ALL_UDF_NAME,
+    },
 };
 
 /// Optimization rule that rewrite match_all() to str_match()
@@ -91,6 +95,7 @@ fn is_match_all(expr: &Expr) -> bool {
             func.name().to_lowercase() == MATCH_ALL_UDF_NAME
                 || func.name() == MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME
                 || func.name() == MATCH_ALL_RAW_UDF_NAME
+                || func.name() == FUZZY_MATCH_ALL_UDF_NAME
         }
         _ => false,
     }
@@ -121,7 +126,7 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                 {
                     let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
                         return Err(DataFusionError::Internal(format!(
-                            "Unexpected argument type for match_all() function: {:?}",
+                            "Unexpected argument type for match_all() keyword: {:?}",
                             args[0]
                         )));
                     };
@@ -135,6 +140,38 @@ impl TreeNodeRewriter for MatchToFullTextMatch {
                             escape_char: None,
                             case_insensitive: name != MATCH_ALL_RAW_UDF_NAME,
                         });
+                        expr_list.push(new_expr);
+                    }
+                    if expr_list.is_empty() {
+                        return Err(DataFusionError::Internal(
+                            infra::errors::ErrorCodes::FullTextSearchFieldNotFound.to_string(),
+                        ));
+                    }
+                    let new_expr = disjunction(expr_list).unwrap();
+                    Ok(Transformed::yes(new_expr))
+                } else if name == FUZZY_MATCH_ALL_UDF_NAME {
+                    let Expr::Literal(ScalarValue::Utf8(Some(item))) = args[0].clone() else {
+                        return Err(DataFusionError::Internal(format!(
+                            "Unexpected argument type for fuzzy_match_all() keyword: {:?}",
+                            args[0]
+                        )));
+                    };
+                    let Expr::Literal(ScalarValue::Int64(Some(distance))) = args[1].clone() else {
+                        return Err(DataFusionError::Internal(format!(
+                            "Unexpected argument type for fuzzy_match_all() distance: {:?}",
+                            args[1]
+                        )));
+                    };
+                    let mut expr_list = Vec::with_capacity(self.fields.len());
+                    let item = Expr::Literal(ScalarValue::Utf8(Some(item.to_string())));
+                    let distance = Expr::Literal(ScalarValue::Int64(Some(distance)));
+                    let fuzzy_expr = fuzzy_match_udf::FUZZY_MATCH_UDF.clone();
+                    for field in self.fields.iter() {
+                        let new_expr = fuzzy_expr.call(vec![
+                            Expr::Column(Column::new_unqualified(field)),
+                            item.clone(),
+                            distance.clone(),
+                        ]);
                         expr_list.push(new_expr);
                     }
                     if expr_list.is_empty() {
@@ -266,6 +303,7 @@ mod tests {
         ctx.register_udf(match_all_udf::MATCH_ALL_RAW_UDF.clone());
         ctx.register_udf(match_all_udf::MATCH_ALL_UDF.clone());
         ctx.register_udf(match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
+        ctx.register_udf(match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
 
         for item in sqls {
             let df = ctx.sql(item.0).await.unwrap();

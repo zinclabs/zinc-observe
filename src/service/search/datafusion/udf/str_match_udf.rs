@@ -29,38 +29,38 @@ use datafusion::{
 };
 use once_cell::sync::Lazy;
 
-/// Implementation of match_range
-pub(crate) static MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+/// Implementation of str_match
+pub(crate) static STR_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
-        super::MATCH_UDF_NAME,
+        super::STR_MATCH_UDF_NAME,
         // expects two string
         vec![DataType::Utf8, DataType::Utf8],
         // returns boolean
         DataType::Boolean,
         Volatility::Stable,
-        match_expr_impl(false),
+        str_match_expr_impl(false),
     )
 });
 
-/// Implementation of match_ignore_case
-pub(crate) static MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+/// Implementation of str_match_ignore_case
+pub(crate) static STR_MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
-        super::MATCH_UDF_IGNORE_CASE_NAME,
+        super::STR_MATCH_UDF_IGNORE_CASE_NAME,
         // expects two string
         vec![DataType::Utf8, DataType::Utf8],
         // returns boolean
         DataType::Boolean,
         Volatility::Stable,
-        match_expr_impl(true),
+        str_match_expr_impl(true),
     )
 });
 
-/// match function for datafusion
-pub fn match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
+/// str_match function for datafusion
+pub fn str_match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementation {
     Arc::new(move |args: &[ColumnarValue]| {
         if args.len() != 2 {
             return Err(DataFusionError::SQL(
-                ParserError::ParserError("match UDF expects two string".to_string()),
+                ParserError::ParserError("str_match UDF expects two string".to_string()),
                 None,
             ));
         }
@@ -114,7 +114,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_match_udf() {
+    async fn test_str_match_udf() {
         let sql = "select * from t where str_match(log, 'a') and str_match_ignore_case(city, 'ny')";
 
         // define a schema.
@@ -138,8 +138,8 @@ mod tests {
         // declare a new context. In spark API, this corresponds to a new spark
         // SQLsession
         let ctx = SessionContext::new();
-        ctx.register_udf(MATCH_UDF.clone());
-        ctx.register_udf(MATCH_IGNORE_CASE_UDF.clone());
+        ctx.register_udf(STR_MATCH_UDF.clone());
+        ctx.register_udf(STR_MATCH_IGNORE_CASE_UDF.clone());
 
         // declare a table in memory. In spark API, this corresponds to
         // createDataFrame(...).

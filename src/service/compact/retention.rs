@@ -88,7 +88,7 @@ pub async fn delete_all(
     stream_name: &str,
 ) -> Result<(), anyhow::Error> {
     let lock_key = format!("/compact/retention/{org_id}/{stream_type}/{stream_name}");
-    let locker = dist_lock::lock(&lock_key, 0, None).await?;
+    let locker = dist_lock::lock(&lock_key, 0).await?;
     let node = db::compact::retention::get_stream(org_id, stream_type, stream_name, None).await;
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         log::warn!("[COMPACT] stream {org_id}/{stream_type}/{stream_name} is deleting by {node}");
@@ -182,7 +182,7 @@ pub async fn delete_by_date(
     date_range: (&str, &str),
 ) -> Result<(), anyhow::Error> {
     let lock_key = format!("/compact/retention/{org_id}/{stream_type}/{stream_name}");
-    let locker = dist_lock::lock(&lock_key, 0, None).await?;
+    let locker = dist_lock::lock(&lock_key, 0).await?;
     let node =
         db::compact::retention::get_stream(org_id, stream_type, stream_name, Some(date_range))
             .await;

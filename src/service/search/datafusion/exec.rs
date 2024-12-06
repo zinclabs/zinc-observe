@@ -262,8 +262,9 @@ pub async fn prepare_datafusion_context(
 }
 
 pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
-    ctx.register_udf(super::udf::match_udf::MATCH_UDF.clone());
-    ctx.register_udf(super::udf::match_udf::MATCH_IGNORE_CASE_UDF.clone());
+    ctx.register_udf(super::udf::str_match_udf::STR_MATCH_UDF.clone());
+    ctx.register_udf(super::udf::str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone());
+    ctx.register_udf(super::udf::fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEX_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEX_NOT_MATCH_UDF.clone());
     ctx.register_udf(super::udf::regexp_udf::REGEXP_MATCH_TO_FIELDS_UDF.clone());
@@ -284,6 +285,7 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
+    ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::percentile_cont::PercentileCont::new(),
     ));

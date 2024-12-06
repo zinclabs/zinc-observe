@@ -189,7 +189,7 @@ async fn main() -> Result<(), anyhow::Error> {
         let _guard = rt.enter();
         rt.block_on(async move {
             // it must be initialized before the server starts
-            if let Err(e) = cluster::register_and_keepalive().await {
+            if let Err(e) = cluster::register_and_keep_alive().await {
                 job_init_tx.send(false).ok();
                 panic!("cluster init failed: {}", e);
             }

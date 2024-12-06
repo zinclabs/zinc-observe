@@ -142,7 +142,7 @@ async fn audit_middleware(
     next.call(req).await
 }
 
-async fn check_keepalive(
+async fn check_keep_alive(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
@@ -331,7 +331,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
                 super::auth::validator::oo_validator,
             ))
             .wrap(cors.clone())
-            .wrap(from_fn(check_keepalive))
+            .wrap(from_fn(check_keep_alive))
             .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
             .service(users::list)
             .service(users::save)

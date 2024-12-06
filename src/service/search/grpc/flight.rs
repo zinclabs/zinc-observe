@@ -36,7 +36,7 @@ use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
     schema::{
-        get_stream_setting_fts_fields, get_stream_setting_index_setting_timestamp,
+        get_stream_setting_fts_fields, get_stream_setting_index_updated_at,
         unwrap_stream_created_at, unwrap_stream_settings,
     },
 };
@@ -155,8 +155,7 @@ pub async fn search(
             }
         })
         .collect_vec();
-    let index_setting_timestamp =
-        get_stream_setting_index_setting_timestamp(&stream_settings, stream_created_at);
+    let index_updated_at = get_stream_setting_index_updated_at(&stream_settings, stream_created_at);
 
     // construct partition filters
     let search_partition_keys: Vec<(String, String)> = req
@@ -227,7 +226,7 @@ pub async fn search(
                 file_list,
                 req.search_info.start_time,
                 req.search_info.end_time,
-                index_setting_timestamp,
+                index_updated_at,
             );
             tantivy_file_list = tantivy_files;
             file_list = datafusion_files;
@@ -432,12 +431,12 @@ fn split_file_list_by_time_range(
     file_list: Vec<FileKey>,
     start_time: i64,
     end_time: i64,
-    index_setting_timestamp: i64,
+    index_updated_at: i64,
 ) -> (Vec<FileKey>, Vec<FileKey>) {
     file_list.into_iter().partition(|file| {
         file.meta.min_ts >= start_time
             && file.meta.max_ts <= end_time
-            && file.meta.min_ts > index_setting_timestamp
+            && file.meta.min_ts > index_updated_at
             && file.meta.index_size > 0
     })
 }

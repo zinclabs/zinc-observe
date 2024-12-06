@@ -28,8 +28,8 @@ use infra::{
     errors::{Error, Result},
 };
 
-/// Register and keepalive the node to cluster
-pub(crate) async fn register_and_keepalive() -> Result<()> {
+/// Register and keep alive the node to cluster
+pub(crate) async fn register_and_keep_alive() -> Result<()> {
     if let Err(e) = register().await {
         log::error!("[CLUSTER] register failed: {}", e);
         return Err(e);
@@ -44,7 +44,7 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
                 break;
             }
         }
-        // after the node is online, keepalive
+        // after the node is online, keep alive
         let mut need_online_again = false;
         let ttl = get_config().limit.node_heartbeat_ttl;
         loop {
@@ -54,13 +54,13 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
 
             if need_online_again {
                 if let Err(e) = set_online(true).await {
-                    log::error!("[CLUSTER] keepalive failed: {}", e);
+                    log::error!("[CLUSTER] keep alive failed: {}", e);
                     continue;
                 }
             }
 
             let lease_id = unsafe { LOCAL_NODE_KEY_LEASE_ID };
-            let ret = etcd::keepalive_lease_id(lease_id, ttl, is_offline).await;
+            let ret = etcd::keep_alive_lease_id(lease_id, ttl, is_offline).await;
             if ret.is_ok() {
                 break;
             }
@@ -75,7 +75,7 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
             {
                 break;
             }
-            log::error!("[CLUSTER] keepalive lease id expired or revoked, set node online again.");
+            log::error!("[CLUSTER] keep alive lease id expired or revoked, set node online again.");
             // set node online again
             need_online_again = true;
         }
@@ -88,8 +88,7 @@ pub(crate) async fn register_and_keepalive() -> Result<()> {
 async fn register() -> Result<()> {
     let cfg = get_config();
     // 1. create a cluster lock for node register
-    let locker =
-        dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64, None).await?;
+    let locker = dist_lock::lock("/nodes/register", cfg.limit.node_heartbeat_ttl as u64).await?;
 
     // 2. watch node list
     tokio::task::spawn(async move { super::watch_node_list().await });

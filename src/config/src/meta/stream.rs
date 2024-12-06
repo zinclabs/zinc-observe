@@ -585,7 +585,7 @@ pub struct StreamSettings {
     #[serde(default)]
     pub distinct_value_fields: Vec<DistinctField>,
     #[serde(default)]
-    pub index_setting_timestamp: i64,
+    pub index_updated_at: i64,
 }
 
 impl Serialize for StreamSettings {
@@ -606,11 +606,12 @@ impl Serialize for StreamSettings {
         state.serialize_field("full_text_search_keys", &self.full_text_search_keys)?;
         state.serialize_field("index_fields", &self.index_fields)?;
         state.serialize_field("bloom_filter_fields", &self.bloom_filter_fields)?;
+        state.serialize_field("distinct_value_fields", &self.distinct_value_fields)?;
         state.serialize_field("data_retention", &self.data_retention)?;
         state.serialize_field("max_query_range", &self.max_query_range)?;
         state.serialize_field("store_original_data", &self.store_original_data)?;
         state.serialize_field("approx_partition", &self.approx_partition)?;
-        state.serialize_field("distinct_value_fields", &self.distinct_value_fields)?;
+        state.serialize_field("index_updated_at", &self.index_updated_at)?;
 
         match self.defined_schema_fields.as_ref() {
             Some(fields) => {
@@ -735,8 +736,8 @@ impl From<&str> for StreamSettings {
             }
         }
 
-        let index_setting_timestamp = settings
-            .get("index_setting_timestamp")
+        let index_updated_at = settings
+            .get("index_updated_at")
             .and_then(|v| v.as_i64())
             .unwrap_or_default();
 
@@ -753,7 +754,7 @@ impl From<&str> for StreamSettings {
             store_original_data,
             approx_partition,
             distinct_value_fields,
-            index_setting_timestamp,
+            index_updated_at,
         }
     }
 }

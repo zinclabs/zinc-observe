@@ -52,7 +52,7 @@ pub async fn init() {
         return;
     }
     // enable keep alive for auth token
-    tokio::task::spawn(async move { keepalive_connection().await });
+    tokio::task::spawn(async move { keep_alive_connection().await });
 }
 
 pub struct Etcd {
@@ -159,7 +159,7 @@ impl super::Db for Etcd {
     ) -> Result<()> {
         // acquire lock and update
         let lock_key = format!("/meta{key}/{}", start_dt.unwrap_or_default());
-        let locker = match dist_lock::lock(&lock_key, 0, None).await {
+        let locker = match dist_lock::lock(&lock_key, 0).await {
             Ok(v) => v,
             Err(e) => {
                 return Err(Error::Message(format!(
@@ -538,7 +538,7 @@ pub async fn connect() -> etcd_client::Client {
         .expect("Etcd connect failed")
 }
 
-pub async fn keepalive_connection() -> Result<()> {
+pub async fn keep_alive_connection() -> Result<()> {
     loop {
         if cluster::is_offline() {
             break;
@@ -564,7 +564,7 @@ pub async fn keepalive_connection() -> Result<()> {
     Ok(())
 }
 
-pub async fn keepalive_lease_id<F>(id: i64, ttl: i64, stopper: F) -> Result<()>
+pub async fn keep_alive_lease_id<F>(id: i64, ttl: i64, stopper: F) -> Result<()>
 where
     F: Fn() -> bool,
 {
