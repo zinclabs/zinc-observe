@@ -1035,8 +1035,12 @@ const useLogs = () => {
     }
   }
 
-  const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !parsedSQL?.limit || parsedSQL?.limit.value?.length == 0;
+  const isLimitQuery = (parsedSQL: any = null) => {
+    return parsedSQL?.limit && parsedSQL?.limit.value?.length > 0;
+  };
+
+  const isDistinctQuery = (parsedSQL: any = null) => {
+    return parsedSQL?.distinct?.type === "DISTINCT";
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -1064,9 +1068,10 @@ const useLogs = () => {
         return;
       }
 
+      // In Limit we don't need to get partitions, as we directly hit search request with query limit
       if (
         !searchObj.meta.sqlMode ||
-        (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL))
+        (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL))
       ) {
         const partitionQueryReq: any = {
           sql: queryReq.query.sql,
@@ -1285,6 +1290,8 @@ const useLogs = () => {
       let remainingRecords = rowsPerPage;
       let lastPartitionSize = 0;
 
+      console.log("partitionDetail", partitionDetail);
+
       if (
         partitionDetail.paginations.length <= currentPage + 3 ||
         regenrateFlag
@@ -1307,7 +1314,7 @@ const useLogs = () => {
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
-              (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
+              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL)))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
@@ -1603,7 +1610,9 @@ const useLogs = () => {
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
-              (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
+              (searchObj.meta.sqlMode &&
+                !isLimitQuery(parsedSQL) &&
+                !isDistinctQuery(parsedSQL)))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&
@@ -1678,9 +1687,29 @@ const useLogs = () => {
           }
           await generateHistogramData();
           refreshPartitionPagination(true);
-        } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
+        } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
             "Histogram is not available for limit queries.",
+          );
+        } else if (searchObj.meta.sqlMode && isDistinctQuery(parsedSQL)) {
+          let aggFlag = false;
+          if (parsedSQL) {
+            aggFlag = hasAggregation(parsedSQL?.columns);
+          }
+          if (
+            queryReq.query.from == 0 &&
+            searchObj.data.queryResults.hits.length > 0 &&
+            !aggFlag
+          ) {
+            setTimeout(async () => {
+              searchObjDebug["pagecountStartTime"] = performance.now();
+              // TODO : check the page count request
+              getPageCount(queryReq);
+              searchObjDebug["pagecountEndTime"] = performance.now();
+            }, 0);
+          }
+          resetHistogramWithError(
+            "Histogram is not available for DISTINCT queries.",
           );
         } else {
           let aggFlag = false;
@@ -1886,6 +1915,7 @@ const useLogs = () => {
           "UI",
         )
         .then(async (res) => {
+          console.log(searchObj.data.queryResults.partitionDetail);
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
@@ -4381,7 +4411,7 @@ const useLogs = () => {
     cancelQuery,
     reorderSelectedFields,
     resetHistogramWithError,
-    isNonAggregatedQuery,
+    isLimitQuery,
     extractTimestamps,
     getFilterExpressionByFieldType,
     setSelectedStreams,
