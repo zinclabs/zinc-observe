@@ -4943,7 +4943,7 @@ const useLogs = () => {
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
 
-    const { error, trace_id } = err.content.meta;
+    const { message, trace_id, code, error_detail } = err.content;
 
     if (trace_id) removeTraceId(trace_id);
 
@@ -4956,26 +4956,22 @@ const useLogs = () => {
 
     // Default error message
     let errorMsg =
-      typeof error === "string" && error
-        ? JSON.stringify(error)
+      typeof message === "string" && message
+        ? JSON.stringify(message)
         : "Error while processing histogram request.";
 
     // Handle response errors
-    // if (response) {
-    //   errorMsg = responseError || responseMessage || errorMsg;
-    //   searchObj.data.errorDetail = error_detail || "";
-    // } else {
-    //   errorMsg = message || errorMsg;
-    // }
+    searchObj.data.errorDetail = error_detail || "";
 
-    // // Custom error message based on code
-    // const customMessage = logsErrorMessage(code || "");
-    // if (customMessage) {
-    //   errorMsg = t(customMessage);
-    // }
+    // Custom error message based on code
+    const customMessage = logsErrorMessage(code || "");
+    if (customMessage) {
+      errorMsg = t(customMessage);
+    }
 
-    // // Handle rate-limiting errors
-    // if (response?.status >= 429) {
+    // Check how can we handle this
+    // Handle rate-limiting errors
+    // if (err?.status >= 429) {
     //   errorMsg = responseMessage || errorMsg;
     //   searchObj.data.errorDetail = error_detail || "";
     // }
