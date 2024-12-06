@@ -4458,6 +4458,16 @@ const useLogs = () => {
         );
       }
 
+      // get function definition
+      if (
+        searchObj.data.tempFunctionContent != "" &&
+        searchObj.meta.toggleFunction
+      ) {
+        queryReq.query["query_fn"] = b64EncodeUnicode(
+          searchObj.data.tempFunctionContent,
+        );
+      }
+
       if (searchObj.data.datetime.type === "relative") {
         if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
       } else {
