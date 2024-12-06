@@ -510,9 +510,6 @@ pub async fn write_results(
     is_aggregate: bool,
     is_descending: bool,
 ) {
-    // TODO: remove return
-    return;
-    #[allow(unreachable_code)]
     let mut local_resp = res.clone();
     let remove_hit = if is_descending {
         local_resp.hits.last()
