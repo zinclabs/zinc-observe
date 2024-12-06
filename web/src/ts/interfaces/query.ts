@@ -31,6 +31,7 @@ export interface QueryPayload {
   end_time: number;
   from: number;
   size: number;
+  query_fn?: string;
 }
 export interface HistogramQueryPayload {
   histogram: string;

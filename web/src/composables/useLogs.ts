@@ -1527,9 +1527,8 @@ const useLogs = () => {
           searchObj.data.tempFunctionContent != "" &&
           searchObj.meta.toggleFunction
         ) {
-          queryReq.query["query_fn"] = b64EncodeUnicode(
-            searchObj.data.tempFunctionContent,
-          );
+          queryReq.query["query_fn"] =
+            b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
         }
 
         // in case of relative time, set start_time and end_time to query
@@ -4463,9 +4462,8 @@ const useLogs = () => {
         searchObj.data.tempFunctionContent != "" &&
         searchObj.meta.toggleFunction
       ) {
-        queryReq.query["query_fn"] = b64EncodeUnicode(
-          searchObj.data.tempFunctionContent,
-        );
+        queryReq.query["query_fn"] =
+          b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
       }
 
       if (searchObj.data.datetime.type === "relative") {
@@ -4959,7 +4957,7 @@ const useLogs = () => {
     // Default error message
     let errorMsg =
       typeof error === "string" && error
-        ? error
+        ? JSON.stringify(error)
         : "Error while processing histogram request.";
 
     // Handle response errors
