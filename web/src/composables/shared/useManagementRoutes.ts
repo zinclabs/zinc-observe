@@ -1,6 +1,8 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 const Settings = () => import("@/components/settings/index.vue");
+const TemplateList = () => import("@/components/alerts/TemplateList.vue");
+const DestinationList = () => import("@/components/alerts/DestinationList.vue");
 
 const useManagementRoutes = () => {
   const routes: any = [
@@ -28,6 +30,22 @@ const useManagementRoutes = () => {
           name: "organizationSettings",
           component: () =>
             import("@/components/settings/OrganizationSettings.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "destinations",
+          name: "alertDestinations",
+          component: DestinationList,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "templates",
+          name: "alertTemplates",
+          component: TemplateList,
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },

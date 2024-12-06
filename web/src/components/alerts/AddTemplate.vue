@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             height: 22px;
           "
           title="Go Back"
-          @click="router.back()"
+          @click="$emit('cancel:hideform')"
         >
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>

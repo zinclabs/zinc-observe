@@ -34,8 +34,6 @@ const LogStream = () => import("@/views/LogStream.vue");
 const Alerts = () => import("@/views/AppAlerts.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
-const TemplateList = () => import("@/components/alerts/TemplateList.vue");
-const DestinationList = () => import("@/components/alerts/DestinationList.vue");
 const Settings = () => import("@/components/settings/index.vue");
 
 const Functions = () => import("@/views/Functions.vue");
@@ -272,37 +270,11 @@ const useRoutes = () => {
     },
     {
       path: "alerts",
-      name: "alerts",
-      component: Alerts,
+      name: "alertList",
+      component: AlertList,
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
-      children: [
-        {
-          path: "alerts",
-          name: "alertList",
-          component: AlertList,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "destinations",
-          name: "alertDestinations",
-          component: DestinationList,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "templates",
-          name: "alertTemplates",
-          component: TemplateList,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-      ],
     },
     {
       path: "rum",

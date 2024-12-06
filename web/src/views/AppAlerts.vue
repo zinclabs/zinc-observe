@@ -16,69 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page data-test="alerts-page" class="q-pa-none" style="min-height: inherit">
-    <q-splitter
-      v-model="splitterModel"
-      unit="px"
-      style="min-height: calc(100vh - 57px)"
-    >
-      <template v-slot:before>
-        <div class="alerts-tabs">
-          <q-tabs
-            data-test="alert-tabs"
-            v-model="activeTab"
-            indicator-color="transparent"
-            inline-label
-            vertical
-            class="q-mx-xs"
-          >
-            <q-route-tab
-              data-test="alert-alerts-tab"
-              name="alerts"
-              :to="{
-                name: 'alertList',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('alerts.header')"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              data-test="alert-destinations-tab"
-              name="destinations"
-              :to="{
-                name: 'alertDestinations',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('alert_destinations.header')"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              data-test="alert-templates-tab"
-              name="templates"
-              :to="{
-                name: 'alertTemplates',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('alert_templates.header')"
-              content-class="tab_content"
-            />
-          </q-tabs>
-        </div>
-      </template>
-      <template v-slot:after>
-        <RouterView
-          :templates="templates"
-          :destinations="destinations"
-          @get:destinations="getDestinations"
-          @get:templates="getTemplates"
-        />
-      </template>
-    </q-splitter>
+    <RouterView
+      :templates="templates"
+      :destinations="destinations"
+      @get:destinations="getDestinations"
+      @get:templates="getTemplates"
+    />
   </q-page>
 </template>
 

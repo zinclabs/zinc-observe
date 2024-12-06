@@ -104,7 +104,7 @@ test.describe("Alerts testcases", () => {
     // const allorgs = page.waitForResponse("**/api/default/organizations**");
     // const functions = page.waitForResponse("**/api/default/functions**");
     await page.goto(
-      `${logData.alertUrl}alerts?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.alertUrl}?org_identifier=${process.env["ORGNAME"]}`
 
     );
 
@@ -129,8 +129,8 @@ test.describe("Alerts testcases", () => {
   // });
 
   test("should display error when body not added under templates", async ({ page }) => {
-    await page.waitForTimeout(
-      2000);
+    await page.locator('[data-test="menu-link-settings-item"]').click();
+    await page.waitForTimeout(2000);
     await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
     // await page.waitForTimeout(1000);
     await page.waitForSelector('[data-test="alert-template-list-add-alert-btn"]');
@@ -142,6 +142,7 @@ test.describe("Alerts testcases", () => {
 
   });
   test("should display error when body added but name left blank under templates", async ({ page }) => {
+    await page.locator('[data-test="menu-link-settings-item"]').click();
     await page.waitForTimeout(2000);
     await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
     await page.waitForTimeout(1000);
@@ -156,6 +157,7 @@ test.describe("Alerts testcases", () => {
   });
 
   test("should display error only blank spaces added under  template name", async ({ page }) => {
+    await page.locator('[data-test="menu-link-settings-item"]').click();
     await page.waitForTimeout(2000);
     await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
     await page.waitForTimeout(1000);
@@ -172,9 +174,8 @@ test.describe("Alerts testcases", () => {
 
 
   test("should display error when valid JSON not entered under template body", async ({ page }) => {
-    await page.waitForTimeout(
-      2000);
-
+    await page.locator('[data-test="menu-link-settings-item"]').click();
+    await page.waitForTimeout(2000);
     await page.waitForSelector('[data-test="alert-templates-tab"]');
     await page.locator('[data-test="alert-templates-tab"]').click({ force: true });
     await page.waitForTimeout(1000);
@@ -202,8 +203,8 @@ test.describe("Alerts testcases", () => {
   });
 
   test.skip("should click on add destination button and display error if user clicks directly on save", async ({ page }) => {
-    await page.waitForTimeout(
-      2000);
+    await page.locator('[data-test="menu-link-settings-item"]').click();
+    await page.waitForTimeout(2000);
     await page.waitForSelector('[data-test="alert-destinations-tab"]');
     await page.locator(
       '[data-test="alert-destinations-tab"]').click({ force: true }); await page.waitForTimeout(

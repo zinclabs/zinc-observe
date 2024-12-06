@@ -1323,6 +1323,11 @@ fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -
             BinaryOperator::Eq => checking_inverted_index_inner(index_fields, left),
             _ => false,
         },
+        Expr::InList {
+            expr,
+            list: _,
+            negated: _,
+        } => checking_inverted_index_inner(index_fields, expr),
         Expr::Like {
             negated: _,
             expr,

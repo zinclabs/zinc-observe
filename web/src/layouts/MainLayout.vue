@@ -161,7 +161,7 @@ class="padding-none" />
 
         <q-btn round flat dense :ripple="false" @click="openSlack" data-test="menu-link-slack-item">
           <div class="row items-center no-wrap">
-            <q-icon><component :is="slackIcon" size="25px" /></q-icon>
+            <q-icon><component :is="slackIcon" size="25px" class="header-icon" /></q-icon>
           </div>
           <q-tooltip anchor="top middle" self="bottom middle">
             {{ t("menu.slack") }}
@@ -169,7 +169,7 @@ class="padding-none" />
         </q-btn>
         <q-btn round flat dense :ripple="false">
           <div class="row items-center no-wrap">
-            <q-icon name="help_outline" size="25px"></q-icon>
+            <q-icon name="help_outline" size="25px" class="header-icon"></q-icon>
             <q-tooltip anchor="top middle" self="bottom middle">
               {{ t("menu.help") }}
             </q-tooltip>
@@ -221,7 +221,7 @@ class="padding-none" />
           @click="router.push({ name: 'settings' })"
         >
           <div class="row items-center no-wrap">
-            <q-icon name="settings" size="25px"></q-icon>
+            <q-icon :name="outlinedSettings" size="25px" class="header-icon"></q-icon>
           </div>
           <q-tooltip anchor="top middle" self="bottom middle">
             {{ t("menu.settings") }}
@@ -233,6 +233,7 @@ class="padding-none" />
             <q-icon
               :name="user.picture ? user.picture : 'person'"
               size="25px"
+              class="header-icon"
             ></q-icon>
             <q-tooltip anchor="top middle" self="bottom middle">
               {{
@@ -1176,6 +1177,7 @@ export default defineComponent({
       expandMenu,
       slackIcon: markRaw(SlackIcon),
       openSlack,
+      outlinedSettings,
     };
   },
   computed: {
@@ -1488,5 +1490,9 @@ export default defineComponent({
   margin-left: 72px !important;
   margin-top: 16px !important;
   width: 80px !important;
+}
+
+.header-icon {
+  opacity: 0.7;
 }
 </style>

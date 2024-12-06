@@ -52,8 +52,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-route-tab
             name="organization"
             :to="'/settings/organization'"
-            :icon="outlinedSettings"
+            icon="business"
             :label="t('settings.orgLabel')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            data-test="alert-destinations-tab"
+            name="destinations"
+            :to="{
+              name: 'alertDestinations',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            icon="location_on"
+            :label="t('alert_destinations.header')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            data-test="alert-templates-tab"
+            name="templates"
+            :to="{
+              name: 'alertTemplates',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            icon="description"
+            :label="t('alert_templates.header')"
             content-class="tab_content"
           />
         </q-tabs>

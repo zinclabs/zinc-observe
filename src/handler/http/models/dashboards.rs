@@ -1,4 +1,8 @@
-use config::meta::dashboards::{v1, v2, v3, v4, v5};
+use chrono::{DateTime, FixedOffset, Utc};
+use config::meta::{
+    dashboards::{v1, v2, v3, v4, v5, Dashboard as MetaDashboard},
+    folder::Folder as MetaFolder,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use utoipa::ToSchema;
@@ -60,8 +64,19 @@ pub struct ListDashboardsResponseBodyItem {
     pub v4: Option<v4::Dashboard>,
     #[deprecated(note = "use GetDashboard endpoint to get dashboard details")]
     pub v5: Option<v5::Dashboard>,
+
     pub version: i32,
     pub hash: String,
+
+    pub folder_id: String,
+    pub folder_name: String,
+    pub dashboard_id: String,
+    pub title: String,
+    pub description: String,
+    pub role: String,
+    pub owner: String,
+    #[schema(value_type = String, format = DateTime)]
+    pub created: DateTime<FixedOffset>,
 }
 
 /// HTTP request body for `MoveDashboard` endpoint.
@@ -84,7 +99,7 @@ pub struct DashboardDetails {
     pub hash: String,
 }
 
-impl TryFrom<CreateDashboardRequestBody> for config::meta::dashboards::Dashboard {
+impl TryFrom<CreateDashboardRequestBody> for MetaDashboard {
     type Error = serde_json::Error;
 
     fn try_from(value: CreateDashboardRequestBody) -> Result<Self, Self::Error> {
@@ -93,19 +108,19 @@ impl TryFrom<CreateDashboardRequestBody> for config::meta::dashboards::Dashboard
     }
 }
 
-impl From<config::meta::dashboards::Dashboard> for CreateDashboardResponseBody {
-    fn from(value: config::meta::dashboards::Dashboard) -> Self {
+impl From<MetaDashboard> for CreateDashboardResponseBody {
+    fn from(value: MetaDashboard) -> Self {
         Self(value.into())
     }
 }
 
-impl From<config::meta::dashboards::Dashboard> for GetDashboardResponseBody {
-    fn from(value: config::meta::dashboards::Dashboard) -> Self {
+impl From<MetaDashboard> for GetDashboardResponseBody {
+    fn from(value: MetaDashboard) -> Self {
         Self(value.into())
     }
 }
 
-impl TryFrom<UpdateDashboardRequestBody> for config::meta::dashboards::Dashboard {
+impl TryFrom<UpdateDashboardRequestBody> for MetaDashboard {
     type Error = serde_json::Error;
 
     fn try_from(value: UpdateDashboardRequestBody) -> Result<Self, Self::Error> {
@@ -114,8 +129,8 @@ impl TryFrom<UpdateDashboardRequestBody> for config::meta::dashboards::Dashboard
     }
 }
 
-impl From<config::meta::dashboards::Dashboard> for UpdateDashboardResponseBody {
-    fn from(value: config::meta::dashboards::Dashboard) -> Self {
+impl From<MetaDashboard> for UpdateDashboardResponseBody {
+    fn from(value: MetaDashboard) -> Self {
         Self(value.into())
     }
 }
@@ -152,31 +167,45 @@ impl ListDashboardsQuery {
     }
 }
 
-impl From<Vec<config::meta::dashboards::Dashboard>> for ListDashboardsResponseBody {
-    fn from(value: Vec<config::meta::dashboards::Dashboard>) -> Self {
-        let dashboards = value.into_iter().map(|d| d.into()).collect();
+impl From<Vec<(MetaFolder, MetaDashboard)>> for ListDashboardsResponseBody {
+    fn from(value: Vec<(MetaFolder, MetaDashboard)>) -> Self {
+        let dashboards = value.into_iter().map(|fd| fd.into()).collect();
         Self { dashboards }
     }
 }
 
-impl From<config::meta::dashboards::Dashboard> for ListDashboardsResponseBodyItem {
+impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
     #[allow(deprecated)]
-    fn from(value: config::meta::dashboards::Dashboard) -> Self {
+    fn from(value: (MetaFolder, MetaDashboard)) -> Self {
+        let folder = value.0;
+        let dashboard = value.1;
         Self {
-            hash: value.hash,
-            version: value.version,
+            folder_id: folder.folder_id,
+            folder_name: folder.name,
+            dashboard_id: dashboard.dashboard_id().unwrap_or_default().to_owned(),
+            title: dashboard.title().unwrap_or_default().to_owned(),
+            description: dashboard.description().unwrap_or_default().to_owned(),
+            role: dashboard.role().unwrap_or_default().to_owned(),
+            owner: dashboard.owner().unwrap_or_default().to_owned(),
+            created: dashboard.created_at_deprecated().unwrap_or_else(|| {
+                Utc::now().with_timezone(
+                    &FixedOffset::east_opt(0).expect("Out of bounds timezone difference"),
+                )
+            }),
+            hash: dashboard.hash,
+            version: dashboard.version,
             // Populate deprecated fields until they are removed from the API.
-            v1: value.v1,
-            v2: value.v2,
-            v3: value.v3,
-            v4: value.v4,
-            v5: value.v5,
+            v1: dashboard.v1,
+            v2: dashboard.v2,
+            v3: dashboard.v3,
+            v4: dashboard.v4,
+            v5: dashboard.v5,
         }
     }
 }
 
-impl From<config::meta::dashboards::Dashboard> for DashboardDetails {
-    fn from(value: config::meta::dashboards::Dashboard) -> Self {
+impl From<MetaDashboard> for DashboardDetails {
+    fn from(value: MetaDashboard) -> Self {
         Self {
             version: value.version,
             v1: value.v1,
@@ -190,9 +219,7 @@ impl From<config::meta::dashboards::Dashboard> for DashboardDetails {
 }
 
 /// Parses the JSON value from an HTTP request body into a dashboard.
-fn parse_dashboard_request(
-    value: JsonValue,
-) -> Result<config::meta::dashboards::Dashboard, serde_json::Error> {
+fn parse_dashboard_request(value: JsonValue) -> Result<MetaDashboard, serde_json::Error> {
     // Pull the version field out of the JSON. If it doesn't exist, assume the
     // default version is 1.
     let version = value

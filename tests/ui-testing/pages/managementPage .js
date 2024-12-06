@@ -8,7 +8,7 @@ export
         this.page = page;
 
         this.homeIcon = page.locator("[name ='home']");
-        this.managementMenuItem = page.locator('[data-test="menu-link-/settings/-item"]');
+        this.managementMenuItem = page.locator('[data-test="menu-link-settings-item"]');
         this.submitButton = page.locator('[data-test="dashboard-add-submit"]'); // Add appropriate data-test attribute
         this.customLogoText = page.locator("[aria-label ='Custom Logo Text']");
         this.saveButton = page.locator('[data-test="settings_ent_logo_custom_text_save_btn"]');
@@ -20,12 +20,12 @@ export
     async navigateToManagement() {
         await this.page.waitForSelector("[name ='home']");
         await this.homeIcon.hover();
-        await this.page.waitForSelector('[data-test="menu-link-/settings/-item"]');
+        await this.page.waitForSelector('[data-test="menu-link-settings-item"]');
         await this.managementMenuItem.click({ force: true });
     }
 
     async goToManagement() {
-        await this.page.waitForSelector('[data-test="menu-link-/settings/-item"]');
+        await this.page.waitForSelector('[data-test="menu-link-settings-item"]');
         await this.managementMenuItem.click({ force: true });
         await expect(this.page.getByRole('main')).toContainText('Management');
     }

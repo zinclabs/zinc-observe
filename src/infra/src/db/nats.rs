@@ -694,9 +694,11 @@ pub async fn connect() -> async_nats::Client {
     }
 }
 
-/// global locker for nats
+// global locker for nats
 static LOCAL_LOCKER: Lazy<Mutex<HashMap<String, Arc<Mutex<bool>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+// even the watcher no response still need to check if the key exists. unit: second
+const LOCKER_WATCHER_CHECK_TTL: u64 = 1;
 
 pub(crate) struct Locker {
     pub key: String,
@@ -777,7 +779,9 @@ impl Locker {
                 Err(err) => {
                     // created error, means the key locked by other thread, wait and retry
                     last_err = Some(err.to_string());
-                    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                    if let Err(e) = wait_for_delete(&bucket, &key).await {
+                        log::error!("nats wait_for_delete key: {}, error: {}", key, e);
+                    }
                 }
             };
         }
@@ -820,6 +824,61 @@ impl Locker {
         };
         self.state.store(2, Ordering::SeqCst);
         Ok(())
+    }
+}
+
+async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str) -> Result<()> {
+    let mut ticker =
+        tokio::time::interval(tokio::time::Duration::from_secs(LOCKER_WATCHER_CHECK_TTL));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    let mut watcher = bucket.watch(key).await?;
+    let mut stream_exited = false;
+    loop {
+        // Sometimes the NATS streams just...terminate, so make sure if we have a stream
+        // termination, we retry the connection
+        if stream_exited {
+            stream_exited = false;
+            watcher = bucket.watch(key).await?;
+        }
+        tokio::select! {
+            _ = ticker.tick() => {
+                match bucket.get(key).await {
+                    Ok(Some(_)) => {
+                        log::debug!("nats another process is currently locking the key: {}", key);
+                        continue;
+                    }
+                    Ok(None) => return Ok(()),
+                    Err(e) => {
+                        log::error!("nats got error from key request, will wait for next tick, key: {}, error: {}",key, e);
+                        continue;
+                    }
+                }
+            }
+            res = watcher.next() => {
+                match res {
+                    Some(r) => {
+                        match r {
+                            Ok(entry) => {
+                                 // If it was a delete, return now
+                                if matches!(entry.operation, jetstream::kv::Operation::Delete | jetstream::kv::Operation::Purge) {
+                                     return Ok(());
+                                }
+                                log::debug!("nats event was not delete, continuing to wait the key: {}", key);
+                                continue;
+                            }
+                            Err(e) => {
+                                log::error!("nats got error from key watcher, will wait for next event, key: {}, error: {}", key, e);
+                                continue;
+                            }
+                        }
+                    }
+                    None => {
+                        stream_exited = true;
+                        continue
+                    }
+                }
+            }
+        }
     }
 }
 

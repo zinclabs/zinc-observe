@@ -143,7 +143,7 @@ pub async fn update_dashboard(
 #[tracing::instrument]
 pub async fn list_dashboards(
     params: ListDashboardsParams,
-) -> Result<Vec<Dashboard>, DashboardError> {
+) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
     let dashboards = table::dashboards::list(params).await?;
     Ok(dashboards)
 }
