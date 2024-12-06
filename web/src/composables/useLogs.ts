@@ -4411,11 +4411,11 @@ const useLogs = () => {
     return node && node.type === "column_ref";
   }
 
-  // TODO : Check about get page count api
-
   const getDataThroughWebSocket = (isPagination: boolean) => {
     try {
-      if (!isPagination) {
+      if (isPagination) {
+        searchObj.data.queryResults.hits = [];
+      } else {
         resetQueryData();
         searchObj.data.queryResults = {};
       }
