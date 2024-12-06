@@ -724,13 +724,7 @@ async fn do_partitioned_search(
             req.payload.query.size -= curr_res_size;
         }
 
-        let search_res = if let Ok(res) = do_search(&req, org_id, user_id).await {
-            res
-        } else {
-            // send partial search response if search fails
-            send_partial_search_resp(session, trace_id).await?;
-            break;
-        };
+        let search_res = do_search(&req, org_id, user_id).await?;
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
