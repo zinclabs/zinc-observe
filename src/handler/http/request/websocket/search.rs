@@ -198,11 +198,24 @@ pub async fn handle_search_request(
         let cached_hits = cached_resp
             .iter()
             .fold(0, |acc, c| acc + c.cached_response.hits.len());
+
+        let c_start_time = cached_resp
+            .first()
+            .map(|c| c.response_start_time)
+            .unwrap_or_default();
+
+        let c_end_time = cached_resp
+            .last()
+            .map(|c| c.response_end_time)
+            .unwrap_or_default();
+
         log::info!(
-            "[WS_SEARCH] trace_id: {}, found cache responses len:{}, with hits: {}",
+            "[WS_SEARCH] trace_id: {}, found cache responses len:{}, with hits: {}, cache_start_time: {:#?}, cache_end_time: {:#?}",
             trace_id,
             cached_resp.len(),
             cached_hits,
+            c_start_time,
+            c_end_time
         );
 
         // handle cache responses and deltas
@@ -341,8 +354,9 @@ async fn handle_cache_responses_and_deltas(
     let mut is_search_err = false;
 
     log::info!(
-        "[WS_SEARCH] trace_id: {}, Handling cache response and deltas, deltas_len: {}, cache_start_time: {}, cache_end_time: {}, deltas: {:?}",
+        "[WS_SEARCH] trace_id: {}, Handling cache response and deltas, curr_res_size: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}, deltas: {:?}",
         trace_id,
+        curr_res_size,
         deltas.len(),
         cached_resp.first().map(|c| c.response_start_time).unwrap_or_default(),
         cached_resp.last().map(|c| c.response_end_time).unwrap_or_default(),
@@ -407,7 +421,15 @@ async fn handle_cache_responses_and_deltas(
                 delta_iter.next(); // Move to the next delta after processing
             } else {
                 // Send cached response
-                send_cached_responses(session, &trace_id, cached, accumulated_results).await?;
+                send_cached_responses(
+                    session,
+                    &trace_id,
+                    req_size,
+                    cached,
+                    accumulated_results,
+                    &mut curr_res_size,
+                )
+                .await?;
                 cached_resp_iter.next();
             }
         } else if let Some(&delta) = delta_iter.peek() {
@@ -436,7 +458,15 @@ async fn handle_cache_responses_and_deltas(
             delta_iter.next(); // Move to the next delta after processing
         } else if let Some(cached) = cached_resp_iter.next() {
             // Process remaining cached responses
-            send_cached_responses(session, &trace_id, cached, accumulated_results).await?;
+            send_cached_responses(
+                session,
+                &trace_id,
+                req_size,
+                cached,
+                accumulated_results,
+                &mut curr_res_size,
+            )
+            .await?;
         }
 
         // Stop if reached the requested result size
@@ -604,8 +634,10 @@ async fn get_partitions(
 async fn send_cached_responses(
     session: &mut Session,
     trace_id: &str,
+    req_size: i64,
     cached: &CachedQueryResponse,
     accumulated_results: &mut Vec<SearchResultType>,
+    curr_res_size: &mut i64,
 ) -> Result<(), Error> {
     log::info!(
         "[WS_SEARCH]: Processing cached response for trace_id: {}",
@@ -613,6 +645,20 @@ async fn send_cached_responses(
     );
 
     let mut cached = cached.clone();
+
+    // add cache hits to `curr_res_size`
+    *curr_res_size += cached.cached_response.hits.len() as i64;
+
+    // truncate hits if `curr_res_size` is greater than `req_size`
+    if req_size != -1 && *curr_res_size > req_size {
+        let excess_hits = *curr_res_size - req_size;
+        let total_hits = cached.cached_response.hits.len() as i64;
+        if total_hits > excess_hits {
+            let cache_hits: usize = (total_hits - excess_hits) as usize;
+            cached.cached_response.hits.truncate(cache_hits);
+            cached.cached_response.total = cache_hits;
+        }
+    }
 
     // Accumulate the result
     accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
