@@ -15,19 +15,28 @@
 
 use std::sync::Arc;
 
-use config::meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey};
+use config::{
+    get_config,
+    meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey},
+};
 use datafusion::{
     common::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
         Result,
     },
-    physical_plan::{repartition::RepartitionExec, ExecutionPlan, Partitioning},
+    physical_plan::{
+        memory::MemoryExec, repartition::RepartitionExec, union::UnionExec, ExecutionPlan,
+        Partitioning,
+    },
 };
 use hashbrown::HashMap;
 use proto::cluster_rpc::KvItem;
 
 use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
-use crate::service::search::{index::IndexCondition, request::Request};
+use crate::{
+    common::infra::config::HOLD_RECORD_BATCHES,
+    service::search::{index::IndexCondition, request::Request},
+};
 
 // add remote scan to physical plan
 pub struct RemoteScanRewriter {
@@ -82,9 +91,43 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     input.clone(),
                     self.remote_scan_nodes.get_remote_node(table_name.as_str()),
                 )?);
-                let partitioning = Partitioning::RoundRobinBatch(node_len);
-                let repartition = Arc::new(RepartitionExec::try_new(remote_scan, partitioning)?);
-                let new_node = node.with_new_children(vec![repartition])?;
+
+                let new_node = if get_config().common.partition_agg_requests {
+                    let trace_id = self.remote_scan_nodes.req.trace_id.clone();
+                    let orig_trace_id = trace_id
+                        .split_once('-')
+                        .map(|(first, _)| first.to_string())
+                        .unwrap_or_default();
+                    let w = HOLD_RECORD_BATCHES.read().unwrap();
+                    let hold_batches = w.get(&orig_trace_id);
+
+                    let batch = if let Some(batches) = hold_batches {
+                        batches.clone()
+                    } else {
+                        vec![]
+                    };
+                    drop(w);
+                    let mem_exec_plan =
+                        Arc::new(MemoryExec::try_new(&[batch], input.schema().clone(), None)?);
+                    let count = mem_exec_plan
+                        .properties()
+                        .output_partitioning()
+                        .partition_count();
+                    let new_children: Vec<Arc<dyn ExecutionPlan>> =
+                        vec![remote_scan, mem_exec_plan];
+                    // new_children.push(remote_scan);
+                    // new_children.push(new_plan);
+                    let new_union = Arc::new(UnionExec::new(new_children));
+                    let partitioning = Partitioning::RoundRobinBatch(count + node_len);
+                    let repartition = Arc::new(RepartitionExec::try_new(new_union, partitioning)?);
+                    node.with_new_children(vec![repartition])?
+                } else {
+                    let partitioning = Partitioning::RoundRobinBatch(node_len);
+                    let repartition =
+                        Arc::new(RepartitionExec::try_new(remote_scan, partitioning)?);
+                    node.with_new_children(vec![repartition])?
+                };
+
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
@@ -101,7 +144,9 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     new_input,
                     self.remote_scan_nodes.get_remote_node(table_name.as_str()),
                 )?);
+
                 let new_node = node.with_new_children(vec![remote_scan])?;
+
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
@@ -113,6 +158,7 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 let mut new_children: Vec<Arc<dyn ExecutionPlan>> = vec![];
                 for child in node.children() {
                     let mut visitor = TableNameVisitor::new();
+
                     child.visit(&mut visitor)?;
                     let table_name = visitor.table_name.clone().unwrap();
                     let remote_scan = Arc::new(RemoteScanExec::new(
@@ -121,11 +167,13 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     )?);
                     new_children.push(remote_scan);
                 }
+
                 let new_node = node.with_new_children(new_children)?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
-        }
+        };
+
         Ok(Transformed::no(node))
     }
 }

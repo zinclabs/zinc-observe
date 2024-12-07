@@ -541,6 +541,7 @@ pub async fn search_partition(
     org_id: &str,
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
+    is_ws_request: bool,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let start = std::time::Instant::now();
     let cfg = get_config();
@@ -570,7 +571,11 @@ pub async fn search_partition(
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
     let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
-    let skip_get_file_list = ts_column.is_none() || apply_over_hits;
+    let skip_get_file_list = if is_ws_request && is_aggregate && cfg.common.partition_agg_requests {
+        false
+    } else {
+        ts_column.is_none() || apply_over_hits
+    };
 
     let mut files = Vec::new();
 
@@ -699,7 +704,6 @@ pub async fn search_partition(
             max_query_range
         };
     }
-
     // Generate partitions by DESC order
     let mut partitions = Vec::with_capacity(part_num);
     let mut end = req.end_time;
@@ -1138,6 +1142,7 @@ pub async fn search_partition_multi(
                 clusters: req.clusters.clone(),
                 query_fn: req.query_fn.clone(),
             },
+            false,
         )
         .await
         {

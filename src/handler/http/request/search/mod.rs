@@ -1160,7 +1160,7 @@ pub async fn search_partition(
         return Ok(MetaHttpResponse::bad_request(e));
     }
 
-    let search_res = SearchService::search_partition(&trace_id, &org_id, stream_type, &req)
+    let search_res = SearchService::search_partition(&trace_id, &org_id, stream_type, &req, false)
         .instrument(http_span)
         .await;
 

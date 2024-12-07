@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use arrow::array::RecordBatch;
 use config::{
     meta::{
         alerts::{alert::Alert, destinations::Destination, templates::Template},
@@ -88,3 +89,6 @@ pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, Executable
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
 pub static WS_SESSIONS: Lazy<RwHashMap<String, actix_ws::Session>> = Lazy::new(DashMap::default);
+
+pub static HOLD_RECORD_BATCHES: Lazy<Arc<std::sync::RwLock<HashMap<String, Vec<RecordBatch>>>>> =
+    Lazy::new(|| Arc::new(std::sync::RwLock::new(HashMap::new())));

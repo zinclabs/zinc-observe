@@ -32,6 +32,7 @@ use tracing::Instrument;
 use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
     common::{
+        infra::config::HOLD_RECORD_BATCHES,
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
         utils::websocket::{
             calc_queried_range, calc_result_cache_ratio, get_search_type_from_ws_req,
@@ -40,10 +41,9 @@ use crate::{
     },
     handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
     service::search::{
-        cache,
-        cache::cacher::get_ts_col_order_by,
+        self as SearchService,
+        cache::{self, cacher::get_ts_col_order_by},
         sql::Sql,
-        {self as SearchService},
     },
 };
 
@@ -179,7 +179,9 @@ pub async fn handle_search_request(
         stream_settings.max_query_range
     }; // hours
 
-    if is_partition_request(&req.payload, stream_type, org_id).await {
+    if is_partition_request(&req.payload, stream_type, org_id).await
+        || config::get_config().common.partition_agg_requests
+    {
         log::info!(
             "[WS_SEARCH] trace_id: {}, Searching Cache, req_size: {}",
             req.trace_id,
@@ -622,6 +624,7 @@ async fn get_partitions(
         org_id,
         req.stream_type,
         &search_partition_req,
+        true,
     )
     .instrument(tracing::info_span!(
         "src::handler::http::request::websocket::search::get_partitions"
@@ -809,6 +812,13 @@ async fn write_results_to_file(
     end_time: i64,
     accumulated_results: &mut Vec<SearchResultType>,
 ) -> Result<(), Error> {
+    // clean up record batches from memory
+    if config::get_config().common.partition_agg_requests {
+        let mut w = HOLD_RECORD_BATCHES.write().unwrap();
+        let _ = w.remove(&c_resp.trace_id);
+        drop(w);
+    }
+
     if accumulated_results.is_empty() {
         return Ok(());
     }

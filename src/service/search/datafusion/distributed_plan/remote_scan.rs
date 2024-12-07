@@ -51,7 +51,10 @@ use super::{
     codec::{ComposedPhysicalExtensionCodec, EmptyExecPhysicalExtensionCodec},
     node::RemoteScanNode,
 };
-use crate::service::{grpc::get_cached_channel, search::MetadataMap};
+use crate::{
+    common::infra::config::HOLD_RECORD_BATCHES,
+    service::{grpc::get_cached_channel, search::MetadataMap},
+};
 
 /// Execution plan for empty relation with produce_one_row=false
 #[derive(Debug)]
@@ -165,6 +168,7 @@ impl ExecutionPlan for RemoteScanExec {
             self.partial_err.clone(),
         );
         let stream = futures::stream::once(fut).try_flatten();
+
         Ok(Box::pin(RecordBatchStreamAdapter::new(
             self.schema().clone(),
             stream,
@@ -335,7 +339,6 @@ impl Stream for FlightStream {
         cx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
         let dictionaries_by_field = HashMap::new();
-
         match self.stream.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok(flight_data))) => {
                 let record_batch = flight_data_to_arrow_batch(
@@ -343,6 +346,25 @@ impl Stream for FlightStream {
                     self.schema.clone(),
                     &dictionaries_by_field,
                 )?;
+                if config::get_config().common.partition_agg_requests {
+                    let r = HOLD_RECORD_BATCHES.read().unwrap();
+                    let orig_trace_id = self
+                        .trace_id
+                        .split_once('-')
+                        .map(|(first, _)| first.to_string())
+                        .unwrap_or_default();
+                    let mut hold_batches = if r.get(&orig_trace_id).is_none() {
+                        vec![]
+                    } else {
+                        r.get(&orig_trace_id).unwrap().clone()
+                    };
+                    hold_batches.push(record_batch.clone());
+                    drop(r);
+                    let mut w = HOLD_RECORD_BATCHES.write().unwrap();
+                    w.insert(orig_trace_id, hold_batches.clone());
+                    drop(w);
+                };
+
                 Poll::Ready(Some(Ok(record_batch)))
             }
             Poll::Ready(None) => Poll::Ready(None),
