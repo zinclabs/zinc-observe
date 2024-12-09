@@ -381,8 +381,9 @@ async fn handle_cache_responses_and_deltas(
 
             if process_delta_first {
                 log::info!(
-                    "[WS_SEARCH] trace_id: {} Processing delta before cached response",
-                    trace_id
+                    "[WS_SEARCH] trace_id: {} Processing delta before cached response, order_by: {:#?}",
+                    trace_id,
+                    order_by
                 );
                 let delta = process_delta(
                     session,
