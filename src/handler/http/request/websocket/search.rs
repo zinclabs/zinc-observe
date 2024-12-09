@@ -373,7 +373,7 @@ async fn handle_cache_responses_and_deltas(
                 cached.response_start_time,
                 cached.response_end_time,
             );
-            if *order_by == OrderBy::Asc && delta.delta_end_time < cached.response_start_time {
+            if *order_by == OrderBy::Asc && delta.delta_end_time <= cached.response_start_time {
                 log::info!(
                     "[WS_SEARCH] trace_id: {} Processing delta before cached response",
                     trace_id
@@ -398,7 +398,7 @@ async fn handle_cache_responses_and_deltas(
                 }
                 delta_iter.next(); // Move to the next delta after processing
             } else if *order_by == OrderBy::Desc
-                && delta.delta_end_time > cached.response_start_time
+                && delta.delta_end_time >= cached.response_start_time
             {
                 let delta = process_delta(
                     session,
