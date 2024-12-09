@@ -546,8 +546,9 @@ async fn process_delta(
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
-            "[WS_SEARCH]: Found {} hits for trace_id: {}",
+            "[WS_SEARCH]: Found {} hits, hits: {:#?}, for trace_id: {}",
             search_res.hits.len(),
+            search_res.hits,
             trace_id
         );
 
