@@ -600,6 +600,30 @@ pub async fn write_results(
     });
 }
 
+/// Caches search results to disk after applying filtering and validation strategies.
+///
+/// # Caching Strategy
+/// 1. **Remove One Hit for Deduplication**:
+///    - Removes either the first or last record based on the `is_descending` flag.
+///      - `is_descending = true`: Removes the last record.
+///      - `is_descending = false`: Removes the first record.
+///
+/// 2. **Skip Caching for Empty or Insufficient Hits**:
+///    - If no hits remain after removing one, caching is skipped.
+///    - Logs a message: `"No hits found for caching, skipping caching."`
+///
+/// 3. **Discard Short Time Ranges**:
+///    - Skips caching if the difference between the first and last record timestamps is smaller
+///      than the configured `discard_duration`.
+///
+/// 4. **Adjust Cache Time Range**:
+///    - Adjusts the cache start and end times based on the smallest and largest timestamps:
+///      - `start_time = max(smallest_ts, req_query_start_time)`
+///      - `end_time = min(largest_ts, req_query_end_time)`
+///
+/// 5. **Cache to Disk**:
+///    - Saves the filtered response to a file named:
+///      `"<start_time>_<end_time>_<is_aggregate>_<is_descending>.json"`.
 #[allow(clippy::too_many_arguments)]
 pub async fn write_results_v2(
     trace_id: &str,
@@ -626,6 +650,9 @@ pub async fn write_results_v2(
                 .hits
                 .retain(|hit| hit.get(ts_column) != Some(&ts_value));
         }
+
+        local_resp.total = local_resp.hits.len();
+        local_resp.size = local_resp.hits.len() as i64;
     }
 
     if local_resp.hits.is_empty() {
