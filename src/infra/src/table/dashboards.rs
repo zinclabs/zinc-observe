@@ -23,8 +23,8 @@ use config::meta::{
 };
 use sea_orm::{
     prelude::Expr, sea_query::Func, ActiveModelTrait, ActiveValue::NotSet, ColumnTrait,
-    DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
-    TryIntoModel,
+    ConnectionTrait, DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set, TransactionTrait, TryIntoModel,
 };
 use serde_json::Value as JsonValue;
 
@@ -88,23 +88,18 @@ impl TryFrom<dashboards::Model> for Dashboard {
     }
 }
 
-/// Gets a dashboard.
+/// Gets a dashboard and its parent folder.
 pub async fn get(
     org_id: &str,
-    folder_id: &str,
     dashboard_id: &str,
-) -> Result<Option<Dashboard>, errors::Error> {
+) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let model = get_model(client, org_id, folder_id, dashboard_id)
-        .await?
-        .and_then(|(_folder, maybe_dash)| maybe_dash);
-
-    if let Some(model) = model {
-        let dash = model.try_into()?;
-        Ok(Some(dash))
-    } else {
-        Ok(None)
-    }
+    let Some((folder_m, dash_m)) = get_model(client, org_id, dashboard_id).await? else {
+        return Ok(None);
+    };
+    let folder = folder_m.into();
+    let dash = dash_m.try_into()?;
+    Ok(Some((folder, dash)))
 }
 
 /// Lists all dashboards belonging to the given org and folder.
@@ -140,8 +135,6 @@ pub async fn put(
     folder_id: &str,
     dashboard: Dashboard,
 ) -> Result<Dashboard, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
     // Get the fields that will be inserted into or updated in the database.
     let dashboard_id = dashboard
         .dashboard_id()
@@ -168,22 +161,25 @@ pub async fn put(
         .map(|d| d.to_owned());
     let version = dashboard.version;
     let created_at_depricated = dashboard.created_at_deprecated();
-
     let data = inner_data_as_json(dashboard)?;
 
-    let (folder_m, mut dash_am) = match get_model(client, org_id, folder_id, &dashboard_id).await? {
-        None => {
-            // Destination folder does not exist so the dashboard can neither be
-            // created nor updated.
-            Err(errors::PutDashboardError::FolderDoesNotExist)
-        }
-        Some((folder_m, Some(dash_m))) => {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let tx = client.begin().await?;
+
+    let Some(folder_m) = super::folders::get_model(&tx, org_id, folder_id).await? else {
+        // Destination folder does not exist so the dashboard can neither be
+        // created nor updated.
+        return Err(errors::PutDashboardError::FolderDoesNotExist.into());
+    };
+
+    let mut dash_am: dashboards::ActiveModel = match get_model(&tx, org_id, &dashboard_id).await? {
+        Some((_, dash_m)) => {
             // Destination folder exists and dashboard already exists, so
             // convert the dashboard model to an active model that will be
             // updated.
-            Ok((folder_m, dash_m.into()))
+            dash_m.into()
         }
-        Some((folder_m, None)) => {
+        None => {
             // Destination folder exists but dashboard does not exist, so create
             // a new dashboard active model that will be inserted.
             let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
@@ -197,7 +193,7 @@ pub async fn put(
                     .map_err(|_| PutDashboardError::ConvertingCreatedTimestamp)?
             };
 
-            let dash_am = dashboards::ActiveModel {
+            dashboards::ActiveModel {
                 id: NotSet, // Set by DB.
                 dashboard_id: Set(dashboard_id.to_owned()),
                 folder_id: NotSet,   // Can be updated, so it is set below.
@@ -208,10 +204,9 @@ pub async fn put(
                 data: NotSet,        // Can be updated, so it is set below.
                 version: NotSet,     // Can be updated, so it is set below.
                 created_at: Set(created_at_unix),
-            };
-            Ok((folder_m, dash_am))
+            }
         }
-    }?;
+    };
 
     // All of the following fields will be set on creation or updated.
     dash_am.folder_id = Set(folder_m.id);
@@ -222,22 +217,19 @@ pub async fn put(
     dash_am.data = Set(data);
     dash_am.version = Set(version);
 
-    let model: dashboards::Model = dash_am.save(client).await?.try_into_model()?;
+    let model: dashboards::Model = dash_am.save(&tx).await?.try_into_model()?;
+    tx.commit().await?;
+
     let dash = model.try_into()?;
     Ok(dash)
 }
 
-/// Deletes a dashboard with the given `folder_id` and `dashboard_id` surrogate
-/// keys.
-pub async fn delete(
-    org_id: &str,
-    folder_id: &str,
-    dashboard_id: &str,
-) -> Result<(), errors::Error> {
+/// Deletes a dashboard with the given `dashboard_id` surrogate key.
+pub async fn delete(org_id: &str, dashboard_id: &str) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let model = get_model(client, org_id, folder_id, dashboard_id)
+    let model = get_model(client, org_id, dashboard_id)
         .await?
-        .and_then(|(_folder, maybe_dash)| maybe_dash);
+        .map(|(_folder, dash)| dash);
 
     if let Some(model) = model {
         let _ = model.delete(client).await?;
@@ -254,34 +246,25 @@ pub async fn delete_all() -> Result<(), errors::Error> {
 }
 
 /// Tries to get a dashboard ORM entity and its parent folder ORM entity.
-async fn get_model(
-    db: &DatabaseConnection,
+async fn get_model<C: ConnectionTrait>(
+    db: &C,
     org_id: &str,
-    folder_id: &str,
     dashboard_id: &str,
-) -> Result<Option<(folders::Model, Option<dashboards::Model>)>, sea_orm::DbErr> {
-    let select_folders = folders::Entity::find()
-        .filter(folders::Column::Org.eq(org_id))
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()))
-        .filter(folders::Column::FolderId.eq(folder_id));
-
-    let Some(folder) = select_folders.one(db).await? else {
-        return Ok(None);
-    };
-
-    let maybe_dashboard = folder
-        .find_related(dashboards::Entity)
+) -> Result<Option<(folders::Model, dashboards::Model)>, sea_orm::DbErr> {
+    let f_and_d = dashboards::Entity::find()
         .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .find_also_related(folders::Entity)
+        .filter(folders::Column::Org.eq(org_id))
         .one(db)
-        .await?;
-
-    Ok(Some((folder, maybe_dashboard)))
+        .await?
+        .and_then(|(d, maybe_f)| maybe_f.map(|f| (f, d)));
+    Ok(f_and_d)
 }
 
 /// Lists dashboard ORM models using the given parameters. Returns each
 /// dashboard and its parent folder.
-async fn list_models(
-    db: &DatabaseConnection,
+async fn list_models<C: ConnectionTrait>(
+    db: &C,
     params: ListDashboardsParams,
 ) -> Result<Vec<(folders::Model, dashboards::Model)>, sea_orm::DbErr> {
     let query = dashboards::Entity::find()

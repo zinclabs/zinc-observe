@@ -15,8 +15,8 @@
 
 use config::meta::folder::Folder;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, DatabaseConnection,
+    EntityTrait, ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 
 use super::entity::folders::{ActiveModel, Column, Entity, Model};
@@ -126,8 +126,8 @@ pub async fn delete(org_id: &str, folder_id: &str) -> Result<(), errors::Error> 
 }
 
 /// Gets a folder ORM entity by its `folder_id`.
-async fn get_model(
-    db: &DatabaseConnection,
+pub(crate) async fn get_model<C: ConnectionTrait>(
+    db: &C,
     org_id: &str,
     folder_id: &str,
 ) -> Result<Option<Model>, sea_orm::DbErr> {
@@ -139,8 +139,8 @@ async fn get_model(
 }
 
 /// Lists all folder ORM models with the specified type.
-async fn list_models(
-    db: &DatabaseConnection,
+async fn list_models<C: ConnectionTrait>(
+    db: &C,
     org_id: &str,
     folder_type: FolderType,
 ) -> Result<Vec<Model>, sea_orm::DbErr> {

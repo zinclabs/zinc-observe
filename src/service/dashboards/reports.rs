@@ -134,7 +134,6 @@ pub async fn save(
     let mut tasks = Vec::with_capacity(report.dashboards.len());
     for dashboard in report.dashboards.iter() {
         let dash_id = &dashboard.dashboard;
-        let folder = &dashboard.folder;
         if dashboard.tabs.is_empty() {
             return Err(anyhow::anyhow!("Atleast one tab is required"));
         }
@@ -142,7 +141,9 @@ pub async fn save(
         // Supports only one tab for now
         let tab_id = &dashboard.tabs[0];
         tasks.push(async move {
-            let maybe_dashboard = table::dashboards::get(org_id, folder, dash_id).await?;
+            let maybe_dashboard = table::dashboards::get(org_id, dash_id)
+                .await?
+                .map(|(_f, d)| d);
             // Check if the tab_id exists
             if let Some(dashboard) = maybe_dashboard.and_then(|d| d.v3) {
                 let mut tab_found = false;
