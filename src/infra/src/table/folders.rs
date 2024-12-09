@@ -15,8 +15,8 @@
 
 use config::meta::folder::Folder;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, DatabaseConnection,
-    EntityTrait, ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait,
+    QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 
 use super::entity::folders::{ActiveModel, Column, Entity, Model};
