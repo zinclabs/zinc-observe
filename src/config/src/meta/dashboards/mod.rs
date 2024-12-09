@@ -201,6 +201,9 @@ pub struct ListDashboardsParams {
     /// The optional case-insensitive title substring with which to filter
     /// dashboards.
     pub title_pat: Option<String>,
+
+    /// The optional page size and page index of results to retrieve.
+    pub page_size_and_idx: Option<(u64, u64)>,
 }
 
 impl ListDashboardsParams {
@@ -211,6 +214,7 @@ impl ListDashboardsParams {
             org_id: org_id.to_string(),
             folder_id: None,
             title_pat: None,
+            page_size_and_idx: None,
         }
     }
 
@@ -226,6 +230,12 @@ impl ListDashboardsParams {
     /// contains the case-insitive title pattern.
     pub fn where_title_contains(mut self, title_pat: &str) -> Self {
         self.title_pat = Some(title_pat.to_string());
+        self
+    }
+
+    /// Paginate the results by the given page size and page index.
+    pub fn paginate(mut self, page_size: u64, page_idx: u64) -> Self {
+        self.page_size_and_idx = Some((page_size, page_idx));
         self
     }
 }

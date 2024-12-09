@@ -18,10 +18,7 @@ use datafusion::{
 use serde::{Deserialize, Serialize};
 use sqlparser::ast::{BinaryOperator, Expr, FunctionArguments};
 use tantivy::{
-    query::{
-        BooleanQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery,
-        TermSetQuery,
-    },
+    query::{BooleanQuery, FuzzyTermQuery, Occur, PhrasePrefixQuery, Query, RegexQuery, TermQuery},
     schema::{Field, IndexRecordOption, Schema},
     Term,
 };
@@ -267,10 +264,14 @@ impl Condition {
             }
             Condition::In(field, values) => {
                 let field = schema.get_field(field)?;
-                let terms = values
+                let terms: Vec<Box<dyn Query>> = values
                     .iter()
-                    .map(|value| Term::from_field_text(field, value));
-                Box::new(TermSetQuery::new(terms))
+                    .map(|value| {
+                        let term = Term::from_field_text(field, value);
+                        Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _
+                    })
+                    .collect();
+                Box::new(BooleanQuery::union(terms))
             }
             Condition::MatchAll(value) => {
                 let default_field = default_field.ok_or_else(|| {
@@ -294,20 +295,17 @@ impl Condition {
                             "The value of match_all() function can't be empty"
                         ));
                     }
-                    let mut terms: Vec<(Occur, Box<dyn Query>)> = o2_collect_tokens(value)
+                    let mut terms: Vec<Box<dyn Query>> = o2_collect_tokens(value)
                         .into_iter()
                         .map(|value| {
                             let term = Term::from_field_text(default_field, &value);
-                            (
-                                Occur::Must,
-                                Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _,
-                            )
+                            Box::new(TermQuery::new(term, IndexRecordOption::Basic)) as _
                         })
                         .collect();
                     if terms.len() > 1 {
-                        Box::new(BooleanQuery::new(terms))
+                        Box::new(BooleanQuery::intersection(terms))
                     } else {
-                        terms.remove(0).1
+                        terms.remove(0)
                     }
                 }
             }
@@ -328,15 +326,12 @@ impl Condition {
             Condition::Or(left, right) => {
                 let left_query = left.to_tantivy_query(schema, default_field)?;
                 let right_query = right.to_tantivy_query(schema, default_field)?;
-                optimize_or_query_with_termset(left_query, right_query)
+                Box::new(BooleanQuery::union(vec![left_query, right_query]))
             }
             Condition::And(left, right) => {
                 let left_query = left.to_tantivy_query(schema, default_field)?;
                 let right_query = right.to_tantivy_query(schema, default_field)?;
-                Box::new(BooleanQuery::new(vec![
-                    (Occur::Must, left_query),
-                    (Occur::Must, right_query),
-                ]))
+                Box::new(BooleanQuery::intersection(vec![left_query, right_query]))
             }
         })
     }
@@ -599,58 +594,4 @@ fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, a
         )))),
         _ => unimplemented!(),
     })
-}
-
-fn optimize_or_query_with_termset(left: Box<dyn Query>, right: Box<dyn Query>) -> Box<dyn Query> {
-    // check both termQuery
-    if let (Some(left), Some(right)) = (
-        left.as_any().downcast_ref::<TermQuery>(),
-        right.as_any().downcast_ref::<TermQuery>(),
-    ) {
-        let left_term = left.term();
-        let right_term = right.term();
-        if left_term.field() == right_term.field() {
-            return Box::new(TermSetQuery::new(vec![
-                left_term.clone(),
-                right_term.clone(),
-            ]));
-        }
-    }
-
-    // check left is termSetQuery, right is termQuery
-    if let (Some(left), Some(right)) = (
-        left.as_any().downcast_ref::<TermSetQuery>(),
-        right.as_any().downcast_ref::<TermQuery>(),
-    ) {
-        let right_term = right.term();
-        let mut termset = Vec::new();
-        left.query_terms(&mut |term, _| {
-            termset.push(term);
-        });
-        if !termset.is_empty() && termset.first().unwrap().field() == right_term.field() {
-            termset.push(right_term);
-            return Box::new(TermSetQuery::new(termset.into_iter().cloned()));
-        }
-    }
-
-    // check left is termQuery, right is termSetQuery
-    if let (Some(left), Some(right)) = (
-        left.as_any().downcast_ref::<TermQuery>(),
-        right.as_any().downcast_ref::<TermSetQuery>(),
-    ) {
-        let left_term = left.term();
-        let mut termset = Vec::new();
-        right.query_terms(&mut |term, _| {
-            termset.push(term);
-        });
-        if !termset.is_empty() && termset.first().unwrap().field() == left_term.field() {
-            termset.push(left_term);
-            return Box::new(TermSetQuery::new(termset.into_iter().cloned()));
-        }
-    }
-
-    Box::new(BooleanQuery::new(vec![
-        (Occur::Should, left),
-        (Occur::Should, right),
-    ]))
 }

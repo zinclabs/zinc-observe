@@ -30,6 +30,7 @@ pub struct UpdateDashboardResponseBody(DashboardDetails);
 /// HTTP URL query component that contains parameters for listing dashboards.
 #[derive(Debug, Deserialize, utoipa::IntoParams)]
 #[into_params(style = Form, parameter_in = Query)]
+#[serde(rename_all = "camelCase")]
 pub struct ListDashboardsQuery {
     /// Optional folder ID filter parameter
     ///
@@ -43,6 +44,13 @@ pub struct ListDashboardsQuery {
     /// The optional case-insensitive title substring with which to filter
     /// dashboards.
     title: Option<String>,
+
+    /// The optional number of dashboards to retrieve. If not set then all
+    /// dashboards that match the query parameters will be returned.
+    ///
+    /// Currently this parameter is only untilized by the API when the `title`
+    /// parameter is also set.
+    page_size: Option<u64>,
 }
 
 /// HTTP response body for `ListDashboards` endpoint.
@@ -137,33 +145,51 @@ impl From<MetaDashboard> for UpdateDashboardResponseBody {
 
 impl ListDashboardsQuery {
     pub fn into(self, org_id: &str) -> config::meta::dashboards::ListDashboardsParams {
-        match self {
+        let mut query = match &self {
             Self {
                 folder: Some(f),
                 title: Some(t),
+                ..
             } => config::meta::dashboards::ListDashboardsParams::new(org_id)
-                .with_folder_id(&f)
-                .where_title_contains(&t),
+                .with_folder_id(f)
+                .where_title_contains(t),
             Self {
                 folder: None,
                 title: Some(t),
+                ..
             } => {
-                config::meta::dashboards::ListDashboardsParams::new(org_id).where_title_contains(&t)
+                config::meta::dashboards::ListDashboardsParams::new(org_id).where_title_contains(t)
             }
             Self {
                 folder: Some(f),
                 title: None,
-            } => config::meta::dashboards::ListDashboardsParams::new(org_id).with_folder_id(&f),
+                ..
+            } => config::meta::dashboards::ListDashboardsParams::new(org_id).with_folder_id(f),
             Self {
                 folder: None,
                 title: None,
+                ..
             } => {
                 // To preserve backwards-compatability when no filter parameters
                 // are given we will list the contents of the default folder.
                 config::meta::dashboards::ListDashboardsParams::new(org_id)
                     .with_folder_id(config::meta::folder::DEFAULT_FOLDER)
             }
+        };
+
+        // The API currently only supports using page_size to limit the output
+        // to the top results. And the page_size parameter is only used when the
+        // title parameter is provided to search dashboards by title pattern.
+        // When the title parameter is not set we simply want to return all
+        // dashboards that match the selected folder so we ignore the page_size
+        // parameter.
+        if self.title.is_some_and(|t| !t.is_empty()) {
+            if let Some(page_size) = self.page_size {
+                query = query.paginate(page_size, 0)
+            }
         }
+
+        query
     }
 }
 

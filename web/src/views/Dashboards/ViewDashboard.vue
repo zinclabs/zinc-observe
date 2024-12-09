@@ -1070,7 +1070,7 @@ export default defineComponent({
 
 .stickyHeader {
   position: sticky;
-  top: 57px;
+  top: 40px;
   z-index: 1001;
 }
 .stickyHeader.fullscreenHeader {
