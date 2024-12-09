@@ -200,7 +200,8 @@ pub async fn move_dashboard(
     };
 
     // add the dashboard to the destination folder
-    put(org_id, dashboard_id, to_folder, dashboard, None).await?;
+    let hash = dashboard.hash.clone();
+    put(org_id, dashboard_id, to_folder, dashboard, Some(&hash)).await?;
 
     // delete the dashboard from the source folder
     let _ = table::dashboards::delete(org_id, dashboard_id).await;
