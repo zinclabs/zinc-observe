@@ -556,9 +556,10 @@ async fn process_delta(
                 time_offset: end_time,
             };
             log::info!(
-                "[WS_SEARCH]: Sending search response for trace_id: {}, delta: {:?}, hits: {}, result_cache_ratio: {}, accumulated_results len: {}",
+                "[WS_SEARCH]: Sending search response for trace_id: {}, delta: {:?}, hits: {:#?}, hits len: {}, result_cache_ratio: {}, accumulated_results len: {}",
                 trace_id,
                 delta,
+                search_res.hits,
                 search_res.hits.len(),
                 result_cache_ratio,
                 accumulated_results.len()
