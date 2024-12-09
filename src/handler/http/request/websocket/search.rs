@@ -342,7 +342,7 @@ async fn handle_cache_responses_and_deltas(
 ) -> Result<(), Error> {
     // reverse the deltas if order_by is descending
     if let OrderBy::Desc = order_by {
-        deltas = deltas.into_iter().rev().collect::<Vec<QueryDelta>>();
+        deltas.reverse();
     }
 
     // Initialize iterators for deltas and cached responses
@@ -373,33 +373,17 @@ async fn handle_cache_responses_and_deltas(
                 cached.response_start_time,
                 cached.response_end_time,
             );
-            if *order_by == OrderBy::Asc && delta.delta_end_time <= cached.response_start_time {
+            // Compare delta and cached response based on the order
+            let process_delta_first = match order_by {
+                OrderBy::Asc => delta.delta_end_time <= cached.response_start_time,
+                OrderBy::Desc => delta.delta_start_time >= cached.response_end_time,
+            };
+
+            if process_delta_first {
                 log::info!(
                     "[WS_SEARCH] trace_id: {} Processing delta before cached response",
                     trace_id
                 );
-                let delta = process_delta(
-                    session,
-                    req,
-                    trace_id.clone(),
-                    delta,
-                    req_size,
-                    accumulated_results,
-                    &mut curr_res_size,
-                    org_id,
-                    user_id,
-                    &mut remaining_query_range,
-                )
-                .await;
-
-                if delta.is_err() {
-                    is_search_err = true;
-                    break;
-                }
-                delta_iter.next(); // Move to the next delta after processing
-            } else if *order_by == OrderBy::Desc
-                && delta.delta_end_time >= cached.response_start_time
-            {
                 let delta = process_delta(
                     session,
                     req,
