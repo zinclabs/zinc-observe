@@ -1465,11 +1465,15 @@ const useLogs = () => {
   const getQueryData = async (isPagination = false) => {
     try {
       // get websocket enable config from store
-      searchObj.communicationMethod =
+      // window will have more priority
+      // if window has use_web_socket property then use that
+      // else use organization settings
+      const shouldUseWebSocket =
+        (window as any).use_web_socket ??
         store?.state?.organizationData?.organizationSettings
-          ?.enable_websocket_search === true || (window as any).use_web_socket
-          ? "ws"
-          : "http";
+          ?.enable_websocket_search;
+
+      searchObj.communicationMethod = shouldUseWebSocket ? "ws" : "http";
 
       if (searchObj.communicationMethod === "ws") {
         getDataThroughWebSocket(isPagination);

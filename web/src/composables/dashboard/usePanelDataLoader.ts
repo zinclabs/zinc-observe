@@ -1086,12 +1086,16 @@ export const usePanelDataLoader = (
 
               state.metadata.queries[panelQueryIndex] = metadata;
 
-              // check if websocket search is enabled from organization settings
-              if (
+              // get websocket enable config from store
+              // window will have more priority
+              // if window has use_web_socket property then use that
+              // else use organization settings
+              const shouldUseWebSocket =
+                (window as any).use_web_socket ??
                 store?.state?.organizationData?.organizationSettings
-                  ?.enable_websocket_search === true ||
-                (window as any).use_web_socket
-              ) {
+                  ?.enable_websocket_search;
+
+              if (shouldUseWebSocket) {
                 await getDataThroughWebSocket(
                   query,
                   it,
@@ -1111,7 +1115,6 @@ export const usePanelDataLoader = (
                   pageType,
                   abortControllerRef,
                 );
-                state.loading = false;
               }
             }
           }
