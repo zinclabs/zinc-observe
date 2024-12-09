@@ -137,33 +137,46 @@ export const getAllDashboards = async (store: any, folderId: any) => {
       store.state.selectedOrganization.identifier,
       folderId
     );
+    // console.log("res", res.data.dashboards);
 
     const migratedDashboards = res.data.dashboards.map((dashboard: any) => ({
-      dashboard: convertDashboardSchemaVersion(
-        dashboard["v" + dashboard.version]
-      ),
-      hash: dashboard.hash.toString(),
+      dashboard: {
+        version: dashboard.version,
+        folderId: dashboard.folder_id,
+        folderName: dashboard.folder_name,
+        dashboardId: dashboard.dashboard_id,
+        title: dashboard.title,
+        description: dashboard.description,
+        role: dashboard.role,
+        owner: dashboard.owner,
+        created: dashboard.created,
+        hash: dashboard.hash.toString(),
+      },
     }));
 
-    store.dispatch("setAllDashboardListHash", {
-      ...store.state.organizationData.allDashboardListHash,
-      [folderId]: Object.fromEntries(
-        migratedDashboards.map((dashboard: any) => [
-          dashboard.dashboard.dashboardId,
-          dashboard.hash,
-        ])
-      ),
-    });
+    
+    console.log("migratedDashboards", migratedDashboards);
+    return migratedDashboards;
+
+    // store.dispatch("setAllDashboardListHash", {
+    //   ...store.state.organizationData.allDashboardListHash,
+    //   [folderId]: Object.fromEntries(
+    //     migratedDashboards.map((dashboard: any) => [
+    //       dashboard.dashboard.dashboardId,
+    //       dashboard.hash,
+    //     ]),
+    //   ),
+    // });
 
     // save to store
-    store.dispatch("setAllDashboardList", {
-      ...store.state.organizationData.allDashboardList,
-      [folderId]: migratedDashboards
-        .map((dashboard: any) => dashboard.dashboard)
-        .sort((a: any, b: any) => b.created.localeCompare(a.created)),
-    });
+    // store.dispatch("setAllDashboardList", {
+    //   ...store.state.organizationData.allDashboardList,
+    //   [folderId]: migratedDashboards
+    //     .map((dashboard: any) => dashboard.dashboard)
+    //     .sort((a: any, b: any) => b.created.localeCompare(a.created)),
+    // });
   } catch (error) {
-    // handle error
+    console.error("Error fetching dashboards:", error);
     throw error;
   }
 };
@@ -171,10 +184,13 @@ export const getAllDashboards = async (store: any, folderId: any) => {
 //get all dashboards by folderId if not there then call api else return from store
 export const getAllDashboardsByFolderId = async (store: any, folderId: any) => {
   try {
-    if (!store.state.organizationData.allDashboardList[folderId]) {
-      await getAllDashboards(store, folderId);
-    }
-    return store.state.organizationData.allDashboardList[folderId];
+    // if (!store.state.organizationData.allDashboardList[folderId]) {
+      const res = await getAllDashboards(store, folderId);
+    // }
+    console.log("res", res);
+    
+    return res;
+    // return store.state.organizationData.allDashboardList[folderId];
   } catch (error) {
     throw error;
   }

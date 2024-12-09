@@ -495,15 +495,31 @@ export default defineComponent({
           spinner: true,
           message: "Please wait while loading dashboards...",
         });
-        await getAllDashboardsByFolderId(store, activeFolderId.value);
-        dismiss();
-        router.push({
-          path: "/dashboards",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            folder: activeFolderId.value,
-          },
-        });
+
+        try {
+          const response = await getAllDashboardsByFolderId(
+            store,
+            activeFolderId.value,
+          );
+          console.log("Dashboards for folder:", response);
+
+          dashboardList.value = response || [];
+        } catch (error) {
+          console.error("Error loading dashboards:", error);
+          showErrorNotification(
+            error?.message ||
+              "Failed to load dashboards for the selected folder.",
+          );
+        } finally {
+          dismiss();
+          router.push({
+            path: "/dashboards",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+            },
+          });
+        }
       },
       { deep: true },
     );
@@ -574,55 +590,69 @@ export default defineComponent({
     };
 
     const routeToViewD = (row) => {
-      const selectedDashboard = store.state.organizationData.allDashboardList[
-        activeFolderId.value
-      ].find((dashboard) => dashboard.dashboardId === row.id);
+      console.log("row", row);
 
-      const selectedTabId = selectedDashboard
-        ? selectedDashboard?.tabs[0]?.tabId
-        : null;
+      console.log("activeFolderId", activeFolderId.value);
+
       return router.push({
         path: "/dashboards/view",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.id,
           folder: activeFolderId.value || "default",
-          tab: selectedTabId,
         },
       });
     };
+    const dashboardList = ref([]);
     const getDashboards = async () => {
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait while loading dashboards...",
-      });
-      await getAllDashboards(store, activeFolderId.value ?? "default");
-      dismiss();
+      try {
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait while loading dashboards...",
+        });
+        console.log("activeFolderId", activeFolderId.value);
+
+        const response = await getAllDashboards(
+          store,
+          activeFolderId.value ?? "default",
+        );
+        console.log("response", response);
+
+        dashboardList.value = response;
+        dismiss();
+      } catch (err) {
+        showErrorNotification(err?.message || "Failed to load dashboards.");
+      }
     };
-    const dashboards = computed(function () {
-      const dashboardList = toRaw(
-        store.state.organizationData?.allDashboardList[activeFolderId.value] ??
-          [],
+
+    const dashboards = computed(() => {
+      console.log("dashboardList", dashboardList.value);
+      console.log(
+        "dashboardList.length",
+        dashboardList.value.map((it) => it),
       );
-      return dashboardList.map((board: any, index) => {
+
+      return dashboardList.value.map((board: any, index) => {
+        console.log("board", board);
+
         return {
           "#": index < 9 ? `0${index + 1}` : index + 1,
-          id: board.dashboardId,
-          name: board.title,
-          identifier: board.dashboardId,
-          description: board.description,
-          owner: board.owner,
-          created: date.formatDate(board.created, "YYYY-MM-DDTHH:mm:ssZ"),
+          id: board.dashboard.dashboardId,
+          name: board.dashboard.title,
+          identifier: board.dashboard.dashboardId,
+          description: board.dashboard.description,
+          owner: board.dashboard.owner,
+          created: date.formatDate(
+            board.dashboard.created,
+            "YYYY-MM-DDTHH:mm:ssZ",
+          ),
           actions: "true",
         };
       });
     });
 
     const resultTotal = computed(function () {
-      return (
-        store.state.organizationData?.allDashboardList[activeFolderId.value]
-          ?.length || 0
-      );
+      return dashboardList.value.length;
     });
 
     const deleteDashboard = async () => {
