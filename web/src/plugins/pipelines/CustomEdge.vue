@@ -85,7 +85,7 @@ const { removeEdges } = useVueFlow()
 
 
 onMounted(() => {
-  console.log('EdgeWithButton mounted')
+ 
 })
 
 

@@ -148,6 +148,7 @@ export default function useDragAndDrop() {
    * @param {DragEvent} event
    */
   function onDrop(event:any ,offSet:any = {x:0,y:0}) {
+
     const position = screenToFlowCoordinate({
       x: event.clientX + offSet.x,
       y: event.clientY + offSet.y,
@@ -183,6 +184,7 @@ export default function useDragAndDrop() {
     pipelineObj.dialog.name = newNode.data.node_type;
     pipelineObj.dialog.show = true;
     pipelineObj.isEditNode = false;
+
   }
 
   function onNodeChange(changes:any) {
@@ -231,7 +233,6 @@ export default function useDragAndDrop() {
 
     const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, connection);
     if(isCycle){
-      console.log($q,"qusar")
       $q.notify({
         message: "Adding this edge will create a cycle in the pipeline",
         color: "negative",
@@ -336,7 +337,7 @@ export default function useDragAndDrop() {
     return true; // Allow connection for 'both' nodes
   }
 
-  function addNode(newNode:any) {
+  function addNode(newNode:any) {    
 
     if(pipelineObj.isEditNode){
       if(pipelineObj.userSelectedNode == null){
@@ -365,18 +366,6 @@ export default function useDragAndDrop() {
 
 
       };
-      //not required because we create new nodes every time we click on shortcuts
-      // const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
-      // if(isCycle){
-      //   $q.notify({
-      //     message: "Adding this edge will create a cycle in the pipeline",
-      //     color: "negative",
-      //     position: "bottom",
-      //     timeout: 3000,
-        
-      // });
-      // return;
-      // }
       pipelineObj.currentSelectedPipeline.edges = [
         ...pipelineObj.currentSelectedPipeline.edges,
         newEdge,
@@ -384,60 +373,59 @@ export default function useDragAndDrop() {
       pipelineObj.userClickedNode = {};
       pipelineObj.userSelectedNode = {};
     }
-
-if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
-  const newEdge = {
-    id: `e${pipelineObj.userSelectedNode.id}-${pipelineObj.currentSelectedNodeData.id}`,
-    source:  pipelineObj.userSelectedNode.id,
-    target:pipelineObj.currentSelectedNodeData.id,
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 20,  // Increase arrow width
-        height: 20, // Increase arrow height
-      },
-    type: 'custom',
-    
-    style:{
-      strokeWidth: 2,
-    },
-    animated:true,
-
+    if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
+      const newEdge = {
+        id: `e${pipelineObj.userSelectedNode.id}-${pipelineObj.currentSelectedNodeData.id}`,
+        source:  pipelineObj.userSelectedNode.id,
+        target:pipelineObj.currentSelectedNodeData.id,
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 20,  // Increase arrow width
+            height: 20, // Increase arrow height
+          },
+        type: 'custom',
+        
+        style:{
+          strokeWidth: 2,
+        },
+        animated:true,
 
 
-  };
+
+      };
 
 
-  
+      
 
-  const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
-  if(isCycle){
-    $q.notify({
-      message: "Adding this edge will create a cycle in the pipeline",
-      color: "negative",
-      position: "bottom",
-      timeout: 3000,
-    
-  });
-  return;
-  }
-  const targetEdgeIfExist = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === pipelineObj.currentSelectedNodeData.id);
+      const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
+      if(isCycle){
+        $q.notify({
+          message: "Adding this edge will create a cycle in the pipeline",
+          color: "negative",
+          position: "bottom",
+          timeout: 3000,
+        
+      });
+      return;
+      }
+      const targetEdgeIfExist = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === pipelineObj.currentSelectedNodeData.id);
 
-    // If targetEdgeIfExist is found, filter it out from the edges array
+        // If targetEdgeIfExist is found, filter it out from the edges array
 
-  if (targetEdgeIfExist) {
-    pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter(
-      (edge:any) => edge.targetNode.id !== targetEdgeIfExist.targetNode.id
-    );
-  }
-  // Add the new edge to the edges array
-  pipelineObj.currentSelectedPipeline.edges = [
-    ...pipelineObj.currentSelectedPipeline.edges,
-    newEdge,
-  ];
-  // Update edges state
+      if (targetEdgeIfExist) {
+        pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter(
+          (edge:any) => edge.targetNode.id !== targetEdgeIfExist.targetNode.id
+        );
+      }
+      // Add the new edge to the edges array
+      pipelineObj.currentSelectedPipeline.edges = [
+        ...pipelineObj.currentSelectedPipeline.edges,
+        newEdge,
+      ];
+      // Update edges state
 
 
-}
+    }
 
     if(pipelineObj.isEditPipeline == true ){
       pipelineObj.dirtyFlag = true;
@@ -466,162 +454,50 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
       }
     }
 
+
+
     
     pipelineObj.isEditNode = false;
     // pipelineObj.currentSelectedNodeData = dialogObj;
     pipelineObj.userClickedNode = {};
     pipelineObj.userSelectedNode = {};
-    console.log(pipelineObj.currentSelectedNodeData,"pipelineObj.currentSelectedPipeline")
-  }
+    if(pipelineObj.currentSelectedNodeData.type == 'input' && pipelineObj.currentSelectedNodeData.data.node_type == 'stream' && pipelineObj.currentSelectedPipeline.nodes.length === 1){
+      const position = {x:pipelineObj.currentSelectedNodeData.position.x, y:pipelineObj.currentSelectedNodeData.position.y+200};
 
-
-
-  const formattedOptions = computed(() => { 
-    const groupedOptions :any = {};
-    let conditionCounter : number = 1;
+      const nodeId = getUUID();
   
-    // Find the index of the current selected node, if it exists
-    const currentIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
-      (node:any) => node.id === pipelineObj.currentSelectedNodeData?.id
-    );
-  
-    const nodesToProcess = currentIndex !== -1 
-    ? pipelineObj.currentSelectedPipeline.nodes.filter((_:any, index:any) => index !== currentIndex) 
-    : pipelineObj.currentSelectedPipeline.nodes;
-
-    // const nodesToProcess = pipelineObj.currentSelectedPipeline.nodes;
-  
-    // Map and group nodes by io_type
-    nodesToProcess.forEach((node:any) => {
-      // Skip nodes with io_type 'output'
-      if (node.io_type === 'output') {
-        return;
-      }
-  
-      let label = node.data.label;
-      let icon = "";
-      let color = "red";
-  
-      // Determine label, icon, and color based on node properties
-      if (node.io_type === 'input') {
-        label = node.io_type;
-        color = "#c8d6f5";
-        icon = streamImage;
-      } else if (node.type === 'default' && node.data.node_type === 'function') {
-        label = node.data.name;
-        color = "#efefef";
-        icon = functionImage;
-      } else if (node.type === 'default' && node.data.node_type === 'condition') {
-        label = `Condition ${conditionCounter++}`;
-        color = "#efefef";
-        icon = conditionImage;
-      }
-  
-      // Create the option object
-      const option = {
-        id: node.id,
-        label,
-        node_type: node.data.node_type,
-        io_type: node.io_type,
-        icon,
-        color,
+      const outputNode = {
+        id: nodeId,
+        type: 'output',
+        io_type: 'output',
+        position,
+        data: {...pipelineObj.currentSelectedNodeData.data,label: nodeId},
       };
-  
-      // Group by io_type
-      if (!groupedOptions[node.io_type]) {
-        groupedOptions[node.io_type] = [];
-      }
-      groupedOptions[node.io_type].push(option);
-    });
-  
-    // Helper function to map io_type to custom group names
-    const getGroupName = (io_type:any) => {
-      switch (io_type) {
-        case 'input':
-          return 'Source';
-        case 'default':
-          return 'Transform';
-        default:
-          return io_type; // fallback to the original io_type if not matched
-      }
-    };
-  
-    // Flatten the grouped options into an array with custom group headers
-    return Object.entries(groupedOptions).flatMap(([group, options]:any) => {
-      return [
-        { label: getGroupName(group), isGroup: true }, // Custom Group header
-        ...options,
+      pipelineObj.currentSelectedPipeline.nodes.push(outputNode);
+      const newEdge = {
+        id: `e${pipelineObj.currentSelectedNodeData.id}-${outputNode.id}`,
+        source: pipelineObj.currentSelectedNodeData.id,
+        target: outputNode.id,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 20,  // Increase arrow width
+          height: 20, // Increase arrow height
+        },
+        type: 'custom',
+        
+        style:{
+          strokeWidth: 2,
+        },
+        animated:true,
+      };
+      pipelineObj.currentSelectedPipeline.edges = [
+        ...pipelineObj.currentSelectedPipeline.edges,
+        newEdge,
       ];
-    });
-  });
-  
-  
-  
- 
-  const filteredOptions = ref(formattedOptions.value);
-
-  const filterOptions = (val:any, update:any) => {
-    if (val === '') {
-      filteredOptions.value = formattedOptions.value;
-    } else {
-      const filterFn = (option:any) =>
-        option.label.toLowerCase().includes(val.toLowerCase()) ||
-        (option.node_type && option.node_type.toLowerCase().includes(val.toLowerCase()));
-
-      const filtered : any = [];
-      formattedOptions.value.forEach(option => {
-        if (option.isGroup) {
-          const groupItems = formattedOptions.value.filter(opt => opt.io_type === option.label && filterFn(opt));
-          if (groupItems.length > 0) {
-            filtered.push(option);
-            filtered.push(...groupItems);
-          }
-        } else if (filterFn(option)) {
-          filtered.push(option);
-        }
-      });
-
-      filteredOptions.value = filtered;
-    }
-
-    update(() => filteredOptions.value);
-  };
-
-  const getParentNode = (nodeId:any) => {
-    const edge = pipelineObj.currentSelectedPipeline.edges.find(
-      (edge:any) => edge.target === nodeId,
-    );
-    if(edge){
-      return pipelineObj.currentSelectedPipeline.nodes.find(
-        (node:any) => node.id === edge.source,
-      );
-    }
-
-  }
-
-  const currentSelectedParentNode = () =>{
-
-    const parentNode = getParentNode(pipelineObj.currentSelectedNodeID);
-    if(parentNode){
-      const currentParentNode = formattedOptions.value.find(
-        (node)=> node?.id === parentNode.id
-      )
-      if(currentParentNode){
-        return currentParentNode;
-      }
-    }
-
-    else {
-      return null;
     }
   }
-
-
-  
-  
 
   function editNode(updatedNode:any) {
-    console.log(updateNode,"update Node")
     const index = pipelineObj.currentSelectedPipeline.nodes.findIndex(
       (node:any) => node.id === updatedNode.id,
     );
@@ -707,10 +583,5 @@ if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
     deletePipelineNode,
     resetPipelineData,
     comparePipelinesById,
-    formattedOptions,
-    filteredOptions,
-    filterOptions,
-    getParentNode,
-    currentSelectedParentNode,
   };
 }

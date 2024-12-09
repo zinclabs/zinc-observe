@@ -335,9 +335,9 @@ const updateActiveTab = () => {
       ...pipeline,
       "#": index + 1,
     }));
+    columns.value = getColumnsForActiveTab(activeTab.value);
     filteredPipelines.value = pipelines.value;
     resultTotal.value = pipelines.value.length;
-    columns.value = getColumnsForActiveTab(activeTab.value);
     return;
   }
 
@@ -571,7 +571,7 @@ const deletePipeline = async () => {
       org_id
     })
     .then(async () => {
-      updateActiveTab();
+     
       q.notify({
         message: "Pipeline deleted successfully",
         color: "positive",
@@ -587,9 +587,9 @@ const deletePipeline = async () => {
         timeout: 3000,
       });
     })
-    .finally(() => {
-      getPipelines();
-      updateActiveTab(); 
+    .finally(async () => {
+      await getPipelines();
+      updateActiveTab();
          dismiss();
     });
 

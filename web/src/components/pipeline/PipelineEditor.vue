@@ -143,6 +143,7 @@ import {
   defineAsyncComponent,
   onBeforeMount,
   onMounted,
+  onUnmounted,
   ref,
   type Ref,
 } from "vue";
@@ -152,7 +153,7 @@ import functionsService from "@/services/jstransform";
 
 import { useStore } from "vuex";
 import pipelineService from "@/services/pipelines";
-import { useRouter } from "vue-router";
+import { onBeforeRouteLeave, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
@@ -394,8 +395,36 @@ onBeforeMount(() => {
 });
 
 onMounted(()=>{
-
+  window.addEventListener("beforeunload", beforeUnloadHandler);
 })
+
+onUnmounted(()=>{
+  window.removeEventListener("beforeunload", beforeUnloadHandler);
+})
+
+let forceSkipBeforeUnloadListener = false;
+
+onBeforeRouteLeave ((to, from, next) => {
+      // check if it is a force navigation, then allow
+      if(forceSkipBeforeUnloadListener) {
+        next()
+        return;
+      }
+      // else continue to warn user
+      if ((from.path === "/pipeline/pipelines/edit") && pipelineObj.dirtyFlag || (from.path === "/pipeline/pipelines/add" && pipelineObj.currentSelectedPipeline.nodes.length > 1)) {
+        const confirmMessage = t("pipeline.unsavedMessage");
+        if (window.confirm(confirmMessage)) {
+          // User confirmed, allow navigation
+          next();
+        } else {
+          // User canceled, prevent navigation
+          next(false);
+        }
+      } else {
+        // No unsaved changes or not leaving the edit route, allow navigation
+        next();
+      }
+    });
 
 
 
@@ -491,6 +520,8 @@ const resetDialog = () => {
 };
 
 const savePipeline = async () => {
+
+  forceSkipBeforeUnloadListener = true;
   if (pipelineObj.currentSelectedPipeline.name === "") {
     q.notify({
       message: "Pipeline name is required",
@@ -717,6 +748,16 @@ const updateNewFunction = (_function: Function) => {
     functionOptions.value.push(_function.name);
   }
 };
+
+const beforeUnloadHandler = (e: any) => {
+      //check is data updated or not
+      if (pipelineObj.dirtyFlag || (pipelineObj.currentSelectedPipeline.nodes.length > 1 && !pipelineObj.isEditPipeline)) {
+        // Display a confirmation message
+        const confirmMessage = t("pipeline.unsavedMessage"); // Some browsers require a return statement to display the message
+        e.returnValue = confirmMessage;
+        return confirmMessage;
+      }
+    };
 </script>
 
 <style scoped lang="scss">

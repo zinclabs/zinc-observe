@@ -32,60 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="add-condition-query-input-title"
         >
         <div>
-        <div data-test="previous-node-associate-function" class="previous-drop-down">
-      <q-select
-          color="input-border"
-          class="q-py-sm showLabelOnTop no-case tw-w-full "
-          stack-label
-          outlined
-          filled
-          dense
-          v-model="selected"
-          :options="filteredOptions"
-          use-input
-          input-debounce="300"
-          @filter="filterOptions"
-
-
-          label="Select Previous Node"
-          clearable
-        >
-        <template v-slot:option="scope">
-  <q-item
-  data-test="previous-node-dropdown-input-stream-node-option"
-    v-bind="scope.itemProps"
-    v-if="!scope.opt.isGroup"
-    class="full-width"
-    :style="{ backgroundColor: scope.opt.color  }"
-    style="color: black;"
-  >              
-    <q-item-section avatar class="w-full">
-      <q-img
-        :src="scope.opt.icon"
-        style="width: 24px; height: 24px"
-      />
-    </q-item-section>
-    
-    <div :data-test="`previous-node-dropdown-item-${scope.opt.label}`" class="flex tw-justify-between tw-w-full"  >
-      <q-item-section>
-        <q-item-label v-html="scope.opt.label"></q-item-label>
-      </q-item-section>
-      <q-item-section>
-        <q-item-label class="tw-ml-auto" v-html="scope.opt.node_type"></q-item-label>
-      </q-item-section>
-    </div>
-  </q-item>
-
-  <!-- Render non-selectable group headers -->
-  <q-item v-else   :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
-    <q-item-section :data-test="`previous-node-dropdown-list-group-${scope.opt.label}`"  >
-      <q-item-label v-html="scope.opt.label" />
-    </q-item-section>
-  </q-item>
-</template>
-
-        </q-select>
-      </div>
   </div>
           <real-time-alert
             :columns="filteredColumns"
@@ -94,12 +40,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @field:remove="removeField"
             :enableNewValueMode="true" 
           />
+          <q-card class="note-container " >
 
-   
+          <q-card-section class="q-pa-sm ">
+            <div class="note-heading ">Condition value Guidelines:</div>
+            <q-banner  inline dense class="note-info " >
+              <div>
+                <q-icon name="info" color="orange" class="q-mr-sm" />
+                <span>To check for an empty value, use <span class="highlight">""</span>. Example: 
+                  <span class="code">app_name != ""</span>
+                </span>
+              </div>
+              <div>
+                <q-icon name="info" color="orange"class="q-mr-sm" />
+                <span>To check for an Null value, use <span class="highlight">null</span>. Example: 
+                  <span class="code">app_name != null</span>
+                </span>
+              </div>
+              <div>
+                <q-icon name="warning" color="red" class="q-mr-sm" />
+                <span>If conditions are not met, the record will be dropped.</span>
+              </div>
+              <div>
+                <q-icon name="warning" color="red" class="q-mr-sm" />
+                <span>If the record does not have the specified field, it will be dropped.</span>
+              </div>
+            </q-banner>
+          </q-card-section>
+          </q-card>
+
+
         </div>
 
         <div
-          class="flex justify-start q-mt-lg q-py-sm full-width"
+          class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
           <q-btn
@@ -226,7 +200,7 @@ const routeFormRef = ref<any>(null);
 
 const showTimezoneWarning = ref(false);
 
-const { addNode, pipelineObj , deletePipelineNode, formattedOptions,   filteredOptions, filterOptions,getParentNode ,currentSelectedParentNode} = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
 
 const selected = ref(null);
 watch(selected, (newValue:any) => {
@@ -290,28 +264,9 @@ onBeforeMount(async () => {
 onMounted(async () => {
   await importSqlParser();
   getFields();
-  if(pipelineObj.isEditNode){
-    const selectedParentNode = currentSelectedParentNode();
-    if(selectedParentNode){
-      selected.value = selectedParentNode;
-
-    }
-  }
-  else{
-    if(pipelineObj.userSelectedNode){
-      const currentSelectedNode = formattedOptions.value.find(
-        (node)=> node?.id === pipelineObj.userSelectedNode.label
-      )
-      if(currentSelectedNode?.node_type){
-        selected.value = currentSelectedNode;
-
-      }
-    }
-    else{
-      selected.value = null;
+    if(pipelineObj.userSelectedNode){   
       pipelineObj.userSelectedNode = {};
     }
-  }
 });
 
 const importSqlParser = async () => {
@@ -571,4 +526,48 @@ const validateSqlQuery = () => {
 .previous-drop-down{
   width: 600px;
 }
+
+.note-container {
+  background-color: #F9F290 ;
+  border-radius: 4px;
+  border: 1px solid #F5A623;
+  color: #865300;
+  width: 100%;
+  margin-bottom: 20px;
+  margin-top: 10px;
+}
+
+.note-container .highlight {
+  font-weight: bold;
+  color: #007bff; /* Blue color to highlight key terms */
+}
+
+.note-container .emphasis {
+  font-style: italic;
+  color: #555; /* Subtle dark gray for emphasis */
+}
+
+.note-container .code {
+  font-family: monospace;
+  padding: 2px 4px;
+  border-radius: 3px;
+  color: #d63384; /* Soft pinkish-red for code */
+
+
+}
+
+.note-heading{
+  font-size: medium;
+}
+
+.note-info{
+  font-size: small;
+  color: #865300;
+  background-color: #F9F290 ;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  justify-content: space-between;
+}
+
 </style>

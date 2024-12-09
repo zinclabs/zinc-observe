@@ -612,8 +612,8 @@ function getIcon(data, ioType) {
 <style lang="scss">
 .node_handle_custom{
   background-color:#9a9698;
-    height:8px;
-    width:24px;
+    height:10px;
+    width:30px;
     border-radius:4px;
   filter: invert(100%);
 }

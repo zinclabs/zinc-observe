@@ -24,60 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("pipeline.associateFunction") }}
     </div>
     <q-separator />
-    <div data-test="previous-node-associate-function" class="q-px-md">
-      <q-select
-          color="input-border"
-          class="q-py-sm showLabelOnTop no-case tw-w-full "
-          stack-label
-          outlined
-          filled
-          dense
-          v-model="selected"
-          :options="filteredOptions"
-          use-input
-          input-debounce="300"
-          @filter="filterOptions"
 
-
-          label="Select Previous Node"
-          clearable
-        >
-        <template v-slot:option="scope">
-  <q-item
-   data-test="previous-node-dropdown-input-stream-node-option"
-    v-bind="scope.itemProps"
-    v-if="!scope.opt.isGroup"
-    class="full-width"
-    :style="{ backgroundColor: scope.opt.color  }"
-    style="color: black;"
-  >              
-    <q-item-section avatar class="w-full">
-      <q-img
-        :src="scope.opt.icon"
-        style="width: 24px; height: 24px"
-      />
-    </q-item-section>
-    
-    <div :data-test="`previous-node-dropdown-item-${scope.opt.label}`" class="flex tw-justify-between tw-w-full"  >
-      <q-item-section>
-        <q-item-label v-html="scope.opt.label"></q-item-label>
-      </q-item-section>
-      <q-item-section>
-        <q-item-label class="tw-ml-auto" v-html="scope.opt.node_type"></q-item-label>
-      </q-item-section>
-    </div>
-  </q-item>
-
-  <!-- Render non-selectable group headers -->
-  <q-item v-else   :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'">
-    <q-item-section :data-test="`previous-node-dropdown-list-group-${scope.opt.label}`"  >
-      <q-item-label v-html="scope.opt.label" />
-    </q-item-section>
-  </q-item>
-</template>
-
-        </q-select>
-      </div>
     <div v-if="loading">
       <q-spinner
         v-if="loading"
@@ -271,7 +218,7 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 
-const { addNode, pipelineObj , deletePipelineNode, formattedOptions,   filteredOptions, filterOptions,getParentNode ,currentSelectedParentNode} = useDragAndDrop();
+const { addNode, pipelineObj , deletePipelineNode } = useDragAndDrop();
 
 const addFunctionRef: any = ref(null);
 
@@ -291,12 +238,6 @@ const q = useQuasar();
 const store = useStore();
 
 const functionExists = ref(false);
-const selected = ref(null);
-
-watch(selected, (newValue:any) => {
-  console.log(pipelineObj.userSelectedNode,"user seelcted node")
-      pipelineObj.userSelectedNode = newValue; 
-});
 
 const nodeLink = ref({
   from: "",
@@ -327,28 +268,9 @@ watch(
       }
     );
 onMounted(()=>{
-  if(pipelineObj.isEditNode){
-    const selectedParentNode = currentSelectedParentNode();
-    if(selectedParentNode){
-      selected.value = selectedParentNode;
-
-    }
-  }
-  else{
     if(pipelineObj.userSelectedNode){
-      const currentSelectedNode = formattedOptions.value.find(
-        (node)=> node?.id === pipelineObj.userSelectedNode.label
-      )
-      if(currentSelectedNode?.node_type){
-        selected.value = currentSelectedNode;
-
-      }
-    }
-    else{
-      selected.value = null;
       pipelineObj.userSelectedNode = {};
     }
-  }
 })
 
 

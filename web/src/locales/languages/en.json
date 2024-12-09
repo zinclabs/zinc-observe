@@ -403,10 +403,11 @@
     "createStream": "Create Stream",
     "indexType": "Index Type",
     "addField": "Add Field",
-    "addSchemaField": "Add to Defined Schema Fields",
-    "removeSchemaField": "Remove Defined Schema Fields",
+    "addSchemaField": "Add to Defined Schema",
+    "removeSchemaField": "Remove Defined Schema",
     "storeOriginalData": "Store Original Data",
-    "approxPartition": "Use Stream Stats for Partitioning"
+    "approxPartition": "Use Stream Stats for Partitioning",
+    "indexSize": "Index Size"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -425,7 +426,9 @@
     "flatteningLbl": "After Flattening",
     "streamTitle": "Associate Stream",
     "conditionTitle": "Associate Condition",
-    "query": "Associate Query"
+    "query": "Associate Query",
+    "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?"
+
   },
   "function": {
     "header": "Functions",

@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height no-wrap" v-if="indexData.schema">
+  <q-card style="width: 60vw;" class="column full-height no-wrap" v-if="indexData.schema">
     <q-card-section class="q-ma-none">
       <div class="row items-center no-wrap">
         <div class="col">
-          <div class="text-body1 text-bold" data-test="schema-title-text">
+          <div class="text-body1 tw-font-semibold tw-text-xl" data-test="schema-title-text">
             {{ t("logStream.schemaHeader") }}
           </div>
         </div>
@@ -46,81 +46,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           No data available.
         </div>
         <div v-else class="indexDetailsContainer" style="height: 100vh">
-          <div class="title" data-test="schema-stream-title-text">
-            {{ indexData.name }}
+         <div class="titleContainer tw-flex tw-flex-col tw-items-flex-start tw-gap-5">
+          <div data-test="stream-details-container" class="stream_details_container tw-flex tw-justify-between tw-gap-5 tw-flex-wrap" >
+           
+          <div data-test="schema-stream-title-text">
+            {{ t("alerts.stream_name") }} <span class="title q-pl-xs"> {{ indexData.name }}</span>
           </div>
-          <div class="q-table__container q-table--cell-separator">
-            <table class="q-table" data-test="schema-stream-meta-data-table">
-              <thead>
-                <tr>
-                  <th v-if="store.state.zoConfig.show_stream_stats_doc_num">
-                    {{ t("logStream.docsCount") }}
-                  </th>
-                  <th>{{ t("logStream.storageSize") }}</th>
-                  <th v-if="isCloud !== 'true'">
-                    {{ t("logStream.compressedSize") }}
-                  </th>
-                  <th v-if="store.state.zoConfig.show_stream_stats_doc_num">
-                    {{ t("logStream.time") }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td v-if="store.state.zoConfig.show_stream_stats_doc_num">
-                    {{
-                      parseInt(indexData.stats.doc_num).toLocaleString("en-US")
-                    }}
-                  </td>
-                  <td>
-                    {{ formatSizeFromMB(indexData.stats.storage_size) }}
-                  </td>
-                  <td v-if="isCloud !== 'true'">
-                    {{ formatSizeFromMB(indexData.stats.compressed_size) }}
-                  </td>
-                  <td
-                    v-if="store.state.zoConfig.show_stream_stats_doc_num"
-                    class="text-center"
-                  >
-                    {{ indexData.stats.doc_time_min }}
-                    <br />
-                    to
-                    <br />
-                    {{ indexData.stats.doc_time_max }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div  v-if="store.state.zoConfig.show_stream_stats_doc_num" data-test="schema-stream-title-text">
+            {{ t("logStream.docsCount") }} <span class="title q-pl-xs"> {{ parseInt(indexData.stats.doc_num).toLocaleString("en-US") }}  </span>
           </div>
-          <q-separator v-if="showDataRetention" class="q-mt-lg q-mb-lg" />
+          <div data-test="schema-stream-title-text">
+            {{ t("logStream.storageSize") }} <span class="title q-pl-xs">  {{ formatSizeFromMB(indexData.stats.storage_size) }}</span>
+          </div>
+          <div v-if="isCloud !== 'true'" data-test="schema-stream-title-text">
+            {{ t("logStream.compressedSize") }} <span class="title q-pl-xs">   {{ formatSizeFromMB(indexData.stats.compressed_size) }}</span>
+          </div>
+
+          </div>
+          <div class="tw-flex tw-justify-between">
+            <div v-if="isCloud !== 'true'" data-test="schema-stream-title-text">
+              {{ t("logStream.indexSize") }} <span class="title q-pl-xs">   {{ formatSizeFromMB(indexData.stats.index_size) }}</span>
+              </div>
+              <div class="stream-time-container"  v-if="store.state.zoConfig.show_stream_stats_doc_num" data-test="schema-stream-title-text">
+                {{ t("logStream.time") }} <span class="title q-pl-xs">   {{ indexData.stats.doc_time_min }} </span> <span >to</span> <span class="title" >{{ indexData.stats.doc_time_max }}</span>
+              </div>
+          </div>
+        </div>
+
+
 
           <template v-if="showDataRetention">
+            <div class="tw-flex tw-justify-between  ">
             <div class="row flex items-center q-pb-xs q-mt-lg">
-              <label class="q-pr-sm text-bold">Data Retention (in days)</label>
+              <div class="flex tw-flex-col">
+                <label class="q-pr-sm tw-font-medium">Data Retention in days</label>
+                <span class="tw-text-xs tw-font-normal"> (Global retention is {{ store.state.zoConfig.data_retention_days }} days)
+                </span>
+              </div>
               <q-input
-                data-test="stream-details-data-retention-input"
-                v-model="dataRetentionDays"
-                type="number"
-                dense
-                filled
-                min="0"
-                round
-                class="q-mr-sm data-retention-input"
-                :rules="[
-                  (val: any) =>
-                    (!!val && val > 0) ||
-                    'Retention period must be at least 1 day',
-                ]"
-                @change="formDirtyFlag = true"
-              ></q-input>
+                  data-test="stream-details-data-retention-input"
+                  v-model="dataRetentionDays"
+                  type="number"
+                  dense
+                  filled
+                  min="1"
+                  round
+                  class="q-mr-sm q-ml-sm data-retention-input"
+                  hide-bottom-space
+                  @change="formDirtyFlag = true"
+                  @update:model-value="markFormDirty"
+                />
               <div>
-                <span class="text-bold">Note:</span> Global data retention
-                period is {{ store.state.zoConfig.data_retention_days }} days
+   
               </div>
             </div>
 
             <div class="row flex items-center q-pb-xs q-mt-lg">
-              <label class="q-pr-sm text-bold"
+              <label class="q-pr-sm tw-font-medium"
                 >Max Query Range (in hours)</label
               >
               <q-input
@@ -144,51 +126,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="approxPartition"
                 :label="t('logStream.approxPartition')"
                 @click="formDirtyFlag = true"
+                left-label
+                dense
               />
             </div>
+          </div>
+          <div
+            class="q-ma-none q-pa-none text-negative"
+            style="min-height: 20px;"
+          >
+            <span v-if="dataRetentionDays <= 0 || dataRetentionDays == ''">
+              Retention period must be at least 1 day
+            </span>
+        </div>
           </template>
 
-          <template
-            v-if="
-              indexData.defined_schema_fields.length && isSchemaEvolutionEnabled
-            "
-          >
-            <q-separator
-              id="schema-add-fields-section"
-              class="q-mt-lg q-mb-lg"
-            />
-            <div
-              data-test="schema-add-fields-title"
-              class="q-pr-sm text-bold q-mb-sm"
-            >
-              Add Fields
-            </div>
-            <StreamFieldsInputs
-              :fields="newSchemaFields"
-              :showHeader="false"
-              :visibleInputs="{
-                name: true,
-                type: false,
-                index_type: false,
-              }"
-              @add="addSchemaField"
-              @remove="removeSchemaField"
-            />
-          </template>
-          <q-separator class="q-mt-lg q-mb-lg" />
+          <q-separator class="q-mb-md" />
+
 
           <div
-            class="title flex tw-justify-between items-center"
+            class="title flex tw-justify-between tw-items-center"
             data-test="schema-log-stream-mapping-title-text"
           >
-            <div>
-              {{ t("logStream.mapping") }}
+            <div  style="font-weight: 400;">
               <label
                 v-show="indexData.defaultFts"
-                class="warning-msg"
-                style="font-weight: normal"
-                >- Using default fts keys, as no fts keys are set for
-                stream.</label
+                style="font-weight:600"
+                class="mapping-warning-msg"
+                > {{ t("logStream.mapping") }} Default FTS keys used (no custom keys set).</label
               >
             </div>
             <q-toggle
@@ -196,32 +161,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="storeOriginalData"
               :label="t('logStream.storeOriginalData')"
               @click="formDirtyFlag = true"
+              left-label
+              dense
             />
           </div>
-
-          <!-- Note: Drawer max-height to be dynamically calculated with JS -->
-          <div
-            class="q-table__container q-table--cell-separator"
-            style="margin-bottom: 30px"
-          >
-            <q-table
-              data-test="schema-log-stream-field-mapping-table"
-              :rows="indexData.schema"
-              :columns="columns"
-              :row-key="(row) => 'tr_' + row.name"
-              :filter="`${filterField}@${activeTab}`"
-              :filter-method="filterFieldFn"
-              :pagination="{ rowsPerPage }"
-              selection="multiple"
-              v-model:selected="selectedFields"
-              class="q-table"
-              id="schemaFieldList"
-              :rows-per-page-options="[]"
-              :hidePagination="indexData.schema.length <= rowsPerPage"
-              dense
-            >
-              <template #top-right>
-                <div class="flex justify-between items-center full-width">
+                <div class="flex justify-between items-center full-width q-mb-md">
                   <div>
                     <app-tabs
                       v-if="isSchemaEvolutionEnabled"
@@ -238,22 +182,121 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
 
-                  <q-input
+                    <div class="flex items-center tw-gap-4">
+                    <q-input
                     data-test="schema-field-search-input"
                     v-model="filterField"
                     data-cy="schema-index-field-search-input"
-                    filled
+                     filled
                     borderless
                     dense
                     debounce="1"
                     :placeholder="t('search.searchField')"
                   >
+
                     <template #prepend>
                       <q-icon name="search" />
                     </template>
                   </q-input>
+                  <q-btn
+                  color="primary"
+                  data-test="schema-add-fields-title"
+                  @click="openDialog"
+                  class="font-weight-bold"
+                >
+                  Add Field(s)
+                </q-btn>
+                </div>    
                 </div>
-              </template>
+          <div class="q-mb-md" v-if="isDialogOpen">
+            <q-card class="add-fields-card" >
+        
+        <!-- Header Section -->
+              <q-card-section>
+                <div class="tw-flex tw-justify-between tw-items-center">
+                  <div class="text-h6">Add Field(s)</div>
+                  <div>
+                    <q-btn
+                      data-test="add-stream-cancel-btn"
+                      icon="close"
+                      class="q-my-sm text-bold q-mr-md"
+                      text-color="light-text"
+                      padding="sm md"
+                      no-caps
+                      dense
+                      flat
+                      @click="closeDialog"
+                    />
+                  </div>
+                </div>
+              </q-card-section>
+              <!-- Main Content (Scrollable if necessary) -->
+              <q-card-section class="q-pa-none" style="flex: 1; overflow-y: auto;">
+                <StreamFieldsInputs
+                  :fields="newSchemaFields"
+                  :showHeader="false"
+                  :isInSchema = 'true'
+                  :visibleInputs="{
+                    name: true,
+                    type: false,
+                    index_type: false,
+                  }"
+                  @add="addSchemaField"
+                  @remove="removeSchemaField"
+                />
+              </q-card-section>
+
+            </q-card>
+          </div>
+
+          <!-- Note: Drawer max-height to be dynamically calculated with JS -->
+          <div
+            class=" "
+            style="margin-bottom: 30px"
+          >
+            <q-table
+            ref="qTable"
+              data-test="schema-log-stream-field-mapping-table"
+              :rows="indexData.schema"
+              :columns="columns"
+              :row-key="(row) => 'tr_' + row.name"
+              :filter="`${filterField}@${activeTab}`"
+              :filter-method="filterFieldFn"
+              :pagination="pagination"
+              selection="multiple"
+              v-model:selected="selectedFields"
+              class="q-table"
+              id="schemaFieldList"
+              :rows-per-page-options="[]"
+              dense
+            >
+            <template v-slot:header="props">
+
+              <q-tr :props="props">
+                <q-th>
+                    <q-checkbox
+                      v-model="props.selected"
+                      color="primary"
+                    />
+                  </q-th>
+                <q-th
+                  v-for="col in props.cols"
+                  :key="col.name"
+                  :props="props"
+                >
+                <span v-if="col.icon" >
+                  <q-icon color="primary" :name="outlinedPerson"></q-icon>
+                  <q-icon color="primary" :name="outlinedSchema"></q-icon>
+
+                </span>
+                <span v-else>
+                  {{ col.label }}
+                </span>
+                
+                </q-th>
+              </q-tr>
+          </template>
+
               <template v-slot:header-selection="scope">
                 <q-td class="text-center">
                   <q-checkbox
@@ -293,9 +336,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-slot:body-cell-type="props">
                 <q-td>{{ props.row.type }}</q-td>
               </template>
+              <template v-slot:body-cell-settings="props">
+                <q-td class="text-left"  v-if="props.row.isUserDefined" >
+                  <q-icon color="primary" :name="outlinedPerson"></q-icon>
+                  <q-icon color="primary" :name="outlinedSchema"></q-icon>
+                </q-td>
+                <q-td v-else>
+
+                </q-td>
+              </template>
               <template v-slot:body-cell-index_type="props">
                 <q-td data-test="schema-stream-index-select"
-                  ><q-select
+                  >
+                  <q-select
                     v-if="
                       !(
                         props.row.name ==
@@ -323,67 +376,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     outlined
                     filled
                     dense
-                    style="width: 300px"
+                    style="min-width:300px; max-width: 300px; "
                     @update:model-value="markFormDirty(props.row.name, 'fts')"
                   />
                 </q-td>
               </template>
-              <template v-slot:bottom-row>
-                <q-tr
-                  ><q-td colspan="100%">
-                    <div v-if="indexData.schema.length > 0" class="q-mt-sm">
-                      <q-btn
-                        v-bind:disable="!selectedFields.length"
-                        data-test="schema-delete-button"
-                        class="q-my-sm text-bold btn-delete"
-                        color="warning"
-                        :label="t('logStream.delete')"
-                        text-color="light-text"
-                        padding="sm md"
-                        no-caps
-                        @click="confirmQueryModeChangeDialog = true"
-                      />
 
-                      <q-btn
-                        v-if="isSchemaEvolutionEnabled"
-                        data-test="schema-add-field-button"
-                        class="q-my-sm no-border text-bold q-ml-md"
-                        :label="
-                          activeTab === 'schemaFields'
-                            ? t('logStream.removeSchemaField')
-                            : t('logStream.addSchemaField')
-                        "
-                        padding="sm md"
-                        color="secondary"
-                        no-caps
-                        v-bind:disable="!selectedFields.length"
-                        @click="updateDefinedSchemaFields"
-                      />
 
-                      <q-btn
-                        v-bind:disable="!formDirtyFlag"
-                        data-test="schema-update-settings-button"
-                        :label="t('logStream.updateSettings')"
-                        class="q-my-sm text-bold no-border q-ml-md float-right"
-                        color="secondary"
-                        padding="sm xl"
-                        type="submit"
-                        no-caps
-                      />
-                      <q-btn
-                        v-close-popup="true"
-                        data-test="schema-cancel-button"
-                        class="q-my-sm text-bold float-right q-ml-md"
-                        :label="t('logStream.cancel')"
-                        text-color="light-text"
-                        padding="sm md"
-                        no-caps
-                      /></div></q-td
-                ></q-tr>
+              <template #bottom="scope">
+                <QTablePagination
+                  :scope="scope"
+                  :position="'bottom'"
+                  :resultTotal="resultTotal"
+                  :perPageOptions="perPageOptions"
+                  @update:changeRecordPerPage="changePagination"
+                />
               </template>
             </q-table>
+
+
+            <!-- floating footer for the table -->
+  <div :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'" class="floating-buttons q-px-md q-py-xs ">
+            <div v-if="indexData.schema.length > 0" class="q-mt-sm">
+             <span class="q-px-sm q-py-md"><strong> {{ selectedFields.length }}</strong> fields selected</span>
+             <q-btn
+                v-if="isSchemaEvolutionEnabled"
+                data-test="schema-add-field-button"
+                class="q-my-sm no-border text-bold q-mr-md"
+                padding="sm md"
+                color="primary"
+                no-caps
+                v-bind:disable="!selectedFields.length"
+                @click="updateDefinedSchemaFields"
+              >
+              <span class="flex items-center justify-start q-mr-sm">
+                <q-icon size="14px"  :name="outlinedPerson"/>
+                <q-icon size="14px" :name="outlinedSchema" />
+              </span>
+              {{ activeTab === 'schemaFields' ? t('logStream.removeSchemaField') : t('logStream.addSchemaField') }}
+
+             </q-btn>
+              <q-btn
+                v-bind:disable="!selectedFields.length"
+                data-test="schema-delete-button"
+                class="q-my-sm text-bold btn-delete"
+                text-color="red"
+                padding="sm md"
+                no-caps
+                dense
+                flat
+                style="border: 1px red solid;"
+                @click="confirmQueryModeChangeDialog = true"
+              >
+              <span class="flex items-center tw-gap-1">
+                <q-icon size="14px" :name="outlinedDelete" />
+                {{   t('logStream.delete') }}
+              </span>
+            </q-btn>
+            <q-btn
+                v-close-popup="true"
+                data-test="schema-cancel-button"
+                class="q-my-sm text-bold float-right q-ml-md btn-delete"
+                :label="t('logStream.cancel')"
+                text-color="red"
+                padding="sm md"
+                no-caps
+                dense
+                flat
+                 style="border: 1px red solid;"
+              />
+              <q-btn
+                v-bind:disable="!formDirtyFlag"
+                data-test="schema-update-settings-button"
+                :label="t('logStream.updateSettings')"
+                class="q-my-sm text-bold no-border q-ml-md float-right"
+                color="secondary"
+                padding="sm xl"
+                type="submit"
+                no-caps
+              />
+
+            </div>
           </div>
+
+          </div>
+
         </div>
+        
       </q-form>
       <br /><br /><br />
     </q-card-section>
@@ -391,6 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <q-card v-else class="column q-pa-md full-height no-wrap">
     <h5>Wait while loading...</h5>
   </q-card>
+
   <ConfirmDialog
     title="Delete Action"
     :message="t('logStream.deleteActionMessage')"
@@ -416,6 +496,12 @@ import { useRouter } from "vue-router";
 import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 
+import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import { outlinedSchema,outlinedPerson,outlinedDelete } from "@quasar/extras/material-icons-outlined";
+
+
+
+
 const defaultValue: any = () => {
   return {
     name: "",
@@ -439,6 +525,7 @@ export default defineComponent({
     ConfirmDialog,
     StreamFieldsInputs,
     AppTabs,
+    QTablePagination,
   },
   setup({ modelValue }) {
     const { t } = useI18n();
@@ -453,13 +540,37 @@ export default defineComponent({
     const confirmQueryModeChangeDialog = ref(false);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
-    const rowsPerPage = ref(250);
+    const rowsPerPage = ref(20);
     const filterField = ref("");
     const router = useRouter();
-    const newSchemaFields = ref([]);
+    const qTable = ref(null);
+    const newSchemaFields = ref([
+    ]);
     const activeTab = ref("allFields");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
+    const isDialogOpen = ref(false);
+    const resultTotal = ref<number>(0);
+      const perPageOptions: any = [
+      { label: "5", value: 5 },
+      { label: "10", value: 10 },
+      { label: "20", value: 20 },
+      { label: "50", value: 50 },
+      { label: "100", value: 100 },
+      { label: "All", value: 0 },
+    ];
+
+
+    const changePagination = (val: { label: string; value: any }) => {
+      selectedPerPage.value = val.value;
+      pagination.value.rowsPerPage = val.value;
+      qTable.value?.setPagination(pagination.value);
+    };
+
+    const selectedPerPage = ref<number>(20);
+    const pagination: any = ref({
+      rowsPerPage: 20,
+    });
 
     const selectedFields = ref([]);
 
@@ -474,12 +585,12 @@ export default defineComponent({
     const tabs = computed(() => [
       {
         value: "allFields",
-        label: "All Fields",
+        label: `All Fields (${indexData.value.schema.length})`,
         disabled: false,
       },
       {
         value: "schemaFields",
-        label: "User Defined Schema",
+        label: `User Defined Schema (${indexData.value.defined_schema_fields.length})`,
         disabled: !hasUserDefinedSchema.value,
       },
     ]);
@@ -706,7 +817,14 @@ export default defineComponent({
 
       await getStream(indexData.value.name, indexData.value.stream_type, true)
         .then((streamResponse) => {
+          streamResponse = updateStreamResponse(streamResponse);
           setSchema(streamResponse);
+          if(activeTab.value === 'schemaFields'){
+            resultTotal.value = streamResponse.settings?.defined_schema_fields?.length;
+          }
+          else{
+            resultTotal.value = streamResponse.schema?.length;
+          }
           loadingState.value = false;
           dismiss();
         })
@@ -724,7 +842,6 @@ export default defineComponent({
         bloom_filter_fields: [],
         defined_schema_fields: [...indexData.value.defined_schema_fields],
       };
-
       if (showDataRetention.value && dataRetentionDays.value < 1) {
         q.notify({
           color: "negative",
@@ -843,8 +960,11 @@ export default defineComponent({
             true,
             true
           ).then((streamResponse) => {
+            formDirtyFlag.value = false;
+            streamResponse = updateStreamResponse(streamResponse);
             setSchema(streamResponse);
             loadingState.value = false;
+            isDialogOpen.value = false;
             q.notify({
               color: "positive",
               message: "Stream settings updated successfully.",
@@ -954,17 +1074,32 @@ export default defineComponent({
         label: t("logStream.propertyName"),
         align: "center",
         sortable: true,
+        field: "name",
+      },
+      {
+        name: "settings",
+        align: "left",
+        sortable: true,
+        field: "isUserDefined",
+        icon:"settings",
+        sort: (a, b) => {
+          // Ensure `isUserDefined` is properly handled
+          if (a && !b) return -1; // `a` comes first
+          if (!a && b) return 1;  // `b` comes first
+          return 0; // No change in order
+        },
       },
       {
         name: "type",
         label: t("logStream.propertyType"),
-        align: "center",
+        align: "left",
         sortable: true,
+        field: "type",
       },
       {
         name: "index_type",
         label: t("logStream.indexType"),
-        align: "center",
+        align: "left",
         sortable: false,
       },
     ];
@@ -980,6 +1115,13 @@ export default defineComponent({
 
     const removeSchemaField = (field: any, index: number) => {
       newSchemaFields.value.splice(index, 1);
+      if(newSchemaFields.value.length === 0){
+        isDialogOpen.value = false;
+        newSchemaFields.value = [
+      ]
+      }
+
+
     };
 
     const scrollToAddFields = () => {
@@ -991,6 +1133,12 @@ export default defineComponent({
 
     const updateActiveTab = (tab) => {
       activeTab.value = tab;
+      if(tab === 'schemaFields'){
+        resultTotal.value = indexData.value.defined_schema_fields.length;
+      }
+      else{
+        resultTotal.value = indexData.value.schema.length;
+      }
     };
 
     const updateDefinedSchemaFields = () => {
@@ -1026,7 +1174,55 @@ export default defineComponent({
 
       selectedFields.value = [];
     };
+    const updateStreamResponse = (streamResponse) => {
+      if (streamResponse.settings.hasOwnProperty('defined_schema_fields')) {
+        const userDefinedSchema = streamResponse.settings.defined_schema_fields;
 
+        // Map through the schema and add `isUserDefined` field
+        const updatedSchema = streamResponse.schema.map((field) => ({
+          ...field,
+          isUserDefined: userDefinedSchema.includes(field.name), // Mark true if in userDefinedSchema
+        }));
+
+        // Find fields in userDefinedSchema that are not in the schema
+        const additionalFields = userDefinedSchema
+          .filter((name) => !streamResponse.schema.some((field) => field.name === name))
+          .map((name) => ({
+            name,
+            isUserDefined: true,
+            // Optionally, add default values for other properties (e.g., type, index_type, etc.)
+          }));
+
+        // Combine the updated schema with additional fields
+        streamResponse.schema = [...updatedSchema, ...additionalFields];
+      }
+      updateResultTotal(streamResponse);
+      return streamResponse;
+    };
+    const closeDialog = () =>{
+      isDialogOpen.value = false;
+      newSchemaFields.value = [];
+    }
+
+    const openDialog = () =>{
+      isDialogOpen.value = true; 
+      formDirtyFlag.value = true;
+      newSchemaFields.value = [
+        {
+          name: "",
+          type: "",
+          index_type: [],
+        },
+      ]
+    }
+    const updateResultTotal = (streamResponse) =>{
+      if(activeTab.value === 'schemaFields'){
+        resultTotal.value = streamResponse.settings?.defined_schema_fields?.length;
+      }
+      else{
+        resultTotal.value = streamResponse.schema?.length;
+      }
+    }
     return {
       t,
       q,
@@ -1069,6 +1265,19 @@ export default defineComponent({
       updateDefinedSchemaFields,
       selectedFields,
       allFieldsName,
+      updateStreamResponse,
+      isDialogOpen,
+      closeDialog,
+      resultTotal,
+      perPageOptions,
+      changePagination,
+      selectedPerPage,
+      pagination,
+      qTable,
+      outlinedPerson,
+      outlinedSchema,
+      outlinedDelete,
+      openDialog,
     };
   },
   created() {
@@ -1086,6 +1295,9 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
+.q-card__section--vert{
+  padding: 8px 16px;
+}
 .indexDetailsContainer {
   padding: 1.25rem;
   width: 100%;
@@ -1095,12 +1307,20 @@ export default defineComponent({
     font-weight: 700;
   }
 
+  .titleContainer{
+    background-color: #00000005;
+    border: 1px solid $input-field-border-color;
+    border-radius: 5px;
+    padding: 1rem;
+  }
+
   .q-table {
     border: 1px solid $input-field-border-color;
   }
 
   .q-table {
     border-radius: 0.5rem;
+    position: relative;
 
     thead tr {
       height: 2.5rem;
@@ -1170,13 +1390,23 @@ export default defineComponent({
   }
 
   .data-retention-input {
-    &.q-field {
+     border: 1px solid $input-field-border-color;
+     border-radius: 0.2rem ;
+     width: 80px;
+     height: 39px;
+     &.q-field {
       padding-bottom: 0 !important;
     }
-    .q-field__bottom {
-      padding: 8px 0;
-    }
+
   }
+}
+
+.mapping-warning-msg{
+  background-color: #F9F290 ;
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: 1px solid #F5A623;
+  color: #865300;
 }
 
 // .sticky-buttons {
@@ -1215,6 +1445,12 @@ export default defineComponent({
 </style>
 
 <style lang="scss">
+.add-fields-card{
+  width: 100vw; 
+  max-width: 100%; 
+  display: flex; 
+  flex-direction: column;
+}
 .stream-schema-index-select {
   .q-field__control {
     .q-field__control-container {
@@ -1236,6 +1472,20 @@ export default defineComponent({
     width: 100%;
   }
 
+  .q-table{
+    td:nth-child(2) {
+      min-width: 20rem;
+      width: 20rem;
+      max-width: 10rem;
+      overflow: scroll;
+      text-wrap: wrap;
+    }
+    td:nth-child(3) {
+      padding: 4px 8px !important;
+    }
+  }
+
+
   th:first-child,
   td:first-child {
     padding-left: 8px !important;
@@ -1255,4 +1505,21 @@ export default defineComponent({
     }
   }
 }
+.floating-buttons {
+  position: sticky;
+  bottom: 0;
+  top: 0;
+  z-index: 1; /* Ensure it stays on top of table content */
+  width: 100%;
+}
+.dark-theme {
+  background-color: var(--q-light);
+  backdrop-filter: blur(10px);
+}
+.light-theme {
+  background-color: var(--q-light);
+  backdrop-filter: blur(10px);
+}
+
+
 </style>

@@ -72,9 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="flex">
-        <template v-if="tab === 'sql'">
-          <div>
             <query-editor
               data-test="scheduled-pipeline-sql-editor"
               ref="queryEditorRef"
@@ -91,70 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-negative q-mb-xs" style="height: 21px">
               <span v-show="!isValidSqlQuery"> Invalid SQL Query</span>
             </div>
-          </div>
-        </template>
-        <template v-if="tab === 'promql'">
-          <query-editor
-            data-test="scheduled-pipeline-promql-editor"
-            ref="queryEditorRef"
-            editor-id="alerts-query-editor"
-            class="monaco-editor q-mb-md"
-            v-model:query="promqlQuery"
-            @update:query="updateQueryValue"
-          />
-        </template>
-
-        <div
-          data-test="logs-vrl-function-editor"
-          v-show="!disableVrlFunction && isVrlFunctionEnabled && tab === 'sql'"
-        >
-          <div style="height: 40px; width: 100%">
-            <div style="display: flex; height: 40px">
-              <q-select
-                v-model="selectedFunction"
-                label="Use Saved function"
-                :options="functionOptions"
-                data-test="dashboard-use-saved-vrl-function"
-                input-debounce="0"
-                behavior="menu"
-                use-input
-                filled
-                borderless
-                dense
-                hide-selected
-                menu-anchor="top left"
-                fill-input
-                option-label="name"
-                option-value="name"
-                @filter="filterFunctionOptions"
-                @update:modelValue="onFunctionSelect"
-                style="width: 100%"
-              >
-                <template #no-option>
-                  <q-item>
-                    <q-item-section> {{ t("search.noResult") }}</q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-            </div>
-          </div>
-          <query-editor
-            data-test="logs-vrl-function-editor"
-            ref="fnEditorRef"
-            editor-id="fnEditor"
-            class="monaco-editor"
-            v-model:query="vrlFunctionContent"
-            :class="
-              vrlFunctionContent == '' && functionEditorPlaceholderFlag
-                ? 'empty-function'
-                : ''
-            "
-            language="ruby"
-            @focus="functionEditorPlaceholderFlag = false"
-            @blur="functionEditorPlaceholderFlag = true"
-          />
-        </div>
-      </div>
     </template>
 
     <div class="q-mt-sm">
@@ -1271,7 +1204,7 @@ defineExpose({
 }
 .scheduled-alerts {
   .monaco-editor {
-  width: calc(100vw - 850px) !important;
+  width: 100% !important;
   min-width: 500px !important;
   min-height: calc(100vh - 500px) !important;
   border: 1px solid $border-color;

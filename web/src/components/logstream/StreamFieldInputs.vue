@@ -27,7 +27,10 @@
         class="flex justify-start items-end q-col-gutter-sm q-pb-sm"
         :data-test="`alert-conditions-${index + 1}`"
       >
-        <div data-test="add-stream-field-name-input" class="q-ml-none o2-input">
+        <div data-test="add-stream-field-name-input" class="q-ml-none o2-input flex items-center ">
+          <span class="q-py-sm q-pr-md">
+            Field Name
+          </span>
           <q-input
             v-model="field.name"
             :placeholder="t('common.name') + ' *'"
@@ -40,7 +43,7 @@
             dense
             :rules="[(val: any) => !!val.trim() || 'Field is required!']"
             tabindex="0"
-            style="min-width: 350px"
+            :style="isInSchema ? { width: '40vw' } : { width: '300px' }"
           />
         </div>
         <!-- <div
@@ -98,31 +101,31 @@
           <q-btn
             data-test="add-stream-delete-field-btn"
             :icon="outlinedDelete"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs "
             :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
             padding="sm"
             unelevated
             size="sm"
-            round
             flat
+            
             :title="t('alert_templates.edit')"
             @click="deleteApiHeader(field, index)"
-            style="min-width: auto"
+            style="min-width: auto; border: 1px solid #F2452F; color: #F2452F;"
           />
           <q-btn
             data-test="add-stream-add-field-btn"
             v-if="index === fields.length - 1"
             icon="add"
-            class="q-ml-xs iconHoverBtn"
+            class="q-ml-xs "
             :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
             padding="sm"
             unelevated
             size="sm"
-            round
             flat
+            :disable="field.name === '' ||  (fields.length === 1 && field.name == '' )"
             :title="t('alert_templates.edit')"
             @click="addApiHeader()"
-            style="min-width: auto"
+            style="min-width: auto;border: 1px solid #5960B2; color: #5960B2;"
           />
         </div>
       </div>
@@ -145,6 +148,10 @@ defineProps({
   showHeader: {
     type: Boolean,
     default: true,
+  },
+  isInSchema: {
+    type: Boolean,
+    default: false,
   },
   visibleInputs: {
     type: Object,

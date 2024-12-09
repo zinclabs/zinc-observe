@@ -196,7 +196,7 @@ test.describe("Schema testcases", () => {
     await page.getByRole('button', { name: 'Ok' }).click();
   });
 
-  test('should details on navigating from blank stream to stream with details', async ({ page }) => {
+  test('should add a new field and delete it from schema', async ({ page }) => {
     await page.locator('[data-test="menu-link-\\/streams-item"]').click();
     await page.getByPlaceholder('Search Stream').click();
     await page.getByPlaceholder('Search Stream').fill('e2e_automate');
@@ -205,10 +205,13 @@ test.describe("Schema testcases", () => {
     await page.locator('[data-test="schema-stream-delete-kubernetes_annotations_kubernetes_io_psp-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-add-field-button"]').click();
     await page.locator('[data-test="schema-update-settings-button"]').click();
-    await page.locator('[data-test="add-stream-add-field-btn"]').click();
+    await page.locator('[data-test="schema-add-fields-title"]').click();
+    
     await page.getByPlaceholder('Name *').click();
     await page.getByPlaceholder('Name *').fill('newtest');
     await page.locator('[data-test="schema-update-settings-button"]').click();
+    await page.locator('[data-test="schema-field-search-input"]').fill('newtest')
+    await page.waitForTimeout(1000);
     await page.locator('[data-test="schema-stream-delete-newtest-field-fts-key-checkbox"]').click();
     await page.locator('[data-test="schema-add-field-button"]').click();
     await page.locator('[data-test="schema-update-settings-button"]').click();
