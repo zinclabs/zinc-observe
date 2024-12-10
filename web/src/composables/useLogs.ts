@@ -4472,18 +4472,19 @@ const useLogs = () => {
 
       if (searchObj.data.datetime.type === "relative") {
         if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
-      } else {
-        if (
-          searchObj.meta.refreshInterval == 0 &&
-          router.currentRoute.value.name == "logs" &&
-          searchObj.data.queryResults.hasOwnProperty("hits")
-        ) {
-          const start_time: number =
-            initialQueryPayload.value?.query?.start_time || 0;
-          const end_time: number =
-            initialQueryPayload.value?.query?.end_time || 0;
-          queryReq.query.start_time = start_time;
-          queryReq.query.end_time = end_time;
+        else {
+          if (
+            searchObj.meta.refreshInterval == 0 &&
+            router.currentRoute.value.name == "logs" &&
+            searchObj.data.queryResults.hasOwnProperty("hits")
+          ) {
+            const start_time: number =
+              initialQueryPayload.value?.query?.start_time || 0;
+            const end_time: number =
+              initialQueryPayload.value?.query?.end_time || 0;
+            queryReq.query.start_time = start_time;
+            queryReq.query.end_time = end_time;
+          }
         }
       }
 
@@ -4661,7 +4662,11 @@ const useLogs = () => {
           searchObj.data.queryResults.took =
             searchObj.data.queryResults.took + response.content.results.took;
         } else {
-          searchObj.data.queryResults = response.content.results;
+          if (isPagination) {
+            searchObj.data.queryResults.hits = response.content.results.hits;
+          } else {
+            searchObj.data.queryResults = response.content.results;
+          }
         }
       }
 
