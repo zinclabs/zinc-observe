@@ -23,8 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
     >
       <div class="my-card card-container">
-        <div align="center" flat
-bordered class="my-card q-py-md">
+        <div align="center" flat bordered class="my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.streams") }}</div>
           <div class="text-h6">{{ summary.streams_count }}</div>
           <div class="row justify-center" v-if="isCloud == 'false'">
@@ -51,8 +50,7 @@ bordered class="my-card q-py-md">
         <q-separator />
 
         <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
+          <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
               exact
@@ -64,8 +62,7 @@ flat
       </div>
 
       <div align="center" class="my-card card-container">
-        <div align="center" flat
-bordered class="my-card q-py-md">
+        <div align="center" flat bordered class="my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.queryFunctions") }}</div>
           <div class="text-h6">{{ summary.query_fns }}</div>
           <div class="text-subtitle1">{{ t("home.ingestFunctions") }}</div>
@@ -73,8 +70,7 @@ bordered class="my-card q-py-md">
         </div>
         <q-separator />
         <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
+          <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
               exact
@@ -86,8 +82,7 @@ flat
       </div>
 
       <div class="my-card card-container">
-        <div align="center" flat
-bordered class="my-card q-py-md">
+        <div align="center" flat bordered class="my-card q-py-md">
           <div class="text-subtitle1">{{ t("home.scheduledAlert") }}</div>
           <div class="text-h6">{{ summary.scheduled_alerts }}</div>
           <div class="text-subtitle1">{{ t("home.rtAlert") }}</div>
@@ -95,12 +90,11 @@ bordered class="my-card q-py-md">
         </div>
         <q-separator />
         <div align="center" class="q-py-sm">
-          <q-btn no-caps color="primary"
-flat
+          <q-btn no-caps color="primary" flat
             >{{ t("home.view") }}
             <router-link
               exact
-              :to="{ name: 'alerts' }"
+              :to="{ name: 'alertList' }"
               class="absolute full-width full-height"
             ></router-link>
           </q-btn>
@@ -114,8 +108,7 @@ flat
       style="margin: 0 auto; justify-content: center"
     >
       <div class="my-card card-container">
-        <div align="center" flat
-bordered class="my-card q-py-md">
+        <div align="center" flat bordered class="my-card q-py-md">
           <div class="text-h6">{{ t("home.noData") }}</div>
           <div class="text-subtitle1">{{ t("home.ingestionMsg") }}</div>
         </div>

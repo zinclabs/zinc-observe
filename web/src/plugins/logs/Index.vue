@@ -369,7 +369,7 @@ import { buildSqlQuery, getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
-import type { ActivationState, PageType } from "@/ts/interfaces/logs.ts";
+import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
 
 export default defineComponent({
   name: "PageSearch",
