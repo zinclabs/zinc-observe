@@ -1860,6 +1860,7 @@ const useLogs = () => {
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
+
       return parser.astify(filteredQuery);
 
       // return convertPostgreToMySql(parser.astify(filteredQuery));
@@ -4581,25 +4582,27 @@ const useLogs = () => {
     payload: any,
     response: any,
   ) => {
-    if (payload.type === "search") {
-      handleLogsResponse(
-        payload.queryReq,
-        payload.isPagination,
-        payload.traceId,
-        response,
-      );
-    }
+    if (response.type === "search_response") {
+      if (payload.type === "search") {
+        handleLogsResponse(
+          payload.queryReq,
+          payload.isPagination,
+          payload.traceId,
+          response,
+        );
+      }
 
-    if (payload.type === "histogram") {
-      handleHistogramResponse(payload.queryReq, payload.traceId, response);
-    }
+      if (payload.type === "histogram") {
+        handleHistogramResponse(payload.queryReq, payload.traceId, response);
+      }
 
-    if (payload.type === "pageCount") {
-      handlePageCountResponse(payload.queryReq, payload.traceId, response);
-    }
+      if (payload.type === "pageCount") {
+        handlePageCountResponse(payload.queryReq, payload.traceId, response);
+      }
 
-    if (payload.type === "cancel") {
-      handleCancelSearchResponse(requestId, payload.traceId, response);
+      if (payload.type === "cancel") {
+        handleCancelSearchResponse(requestId, payload.traceId, response);
+      }
     }
   };
 
@@ -4615,6 +4618,7 @@ const useLogs = () => {
       // When using limit
       searchAggData.total = 0;
       searchAggData.hasAggregation = false;
+      searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
         if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
           searchAggData.total = response.content?.results?.total || 0;
