@@ -299,7 +299,7 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
         req.stream_type,
         Some(user_id.to_string()),
         &req.payload,
-        req.use_cache,
+        false,
     )
     .instrument(span)
     .await;
