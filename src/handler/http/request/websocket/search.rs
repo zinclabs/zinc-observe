@@ -34,8 +34,7 @@ use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
         utils::websocket::{
-            calc_queried_range, calc_result_cache_ratio, get_search_type_from_ws_req,
-            update_histogram_interval_in_query,
+            calc_queried_range, get_search_type_from_ws_req, update_histogram_interval_in_query,
         },
     },
     handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
@@ -277,10 +276,10 @@ pub async fn handle_search_request(
 
     // Once all searches are complete, write the accumulated results to a file
     log::info!("[WS_SEARCH] trace_id {} all searches completed", trace_id);
-    // let end_res = WsServerEvents::End {
-    //     trace_id: Some(trace_id.clone()),
-    // };
-    // send_message(session, end_res.to_json().to_string()).await?;
+    let end_res = WsServerEvents::End {
+        trace_id: Some(trace_id.clone()),
+    };
+    send_message(session, end_res.to_json().to_string()).await?;
 
     Ok(())
 }
@@ -526,7 +525,7 @@ async fn process_delta(
             req.payload.query.size -= *curr_res_size;
         }
 
-        let mut search_res = do_search(&req, org_id, user_id).await?;
+        let search_res = do_search(&req, org_id, user_id).await?;
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
