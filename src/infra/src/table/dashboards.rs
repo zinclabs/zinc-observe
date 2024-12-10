@@ -88,14 +88,18 @@ impl TryFrom<dashboards::Model> for Dashboard {
     }
 }
 
-/// Gets a dashboard.
-pub async fn get(
+/// Gets a dashboard by it's folder ID and dashboard ID.
+///
+/// This method differs from [get_by_id] in that it will only return the
+/// dashboard if it is found in the specified folder, whereas [get_by_id] will
+/// return the dashboard if it is found in any folder.
+pub async fn get_from_folder(
     org_id: &str,
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<Option<Dashboard>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let model = get_model(client, org_id, folder_id, dashboard_id)
+    let model = get_model_from_folder(client, org_id, folder_id, dashboard_id)
         .await?
         .and_then(|(_folder, maybe_dash)| maybe_dash);
 
@@ -105,6 +109,24 @@ pub async fn get(
     } else {
         Ok(None)
     }
+}
+
+/// Gets a dashboard by it's dashboard ID.
+///
+/// This method differs from [get] in that it will return the dashboard if it is
+/// found in any folder, whereas [get] will only return the dashboard if it is
+/// found in the specified folder.
+pub async fn get_by_id(
+    org_id: &str,
+    dashboard_id: &str,
+) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Some((folder_m, dash_m)) = get_model_by_id(client, org_id, dashboard_id).await? else {
+        return Ok(None);
+    };
+    let folder = folder_m.into();
+    let dash = dash_m.try_into()?;
+    Ok(Some((folder, dash)))
 }
 
 /// Lists all dashboards belonging to the given org and folder.
@@ -171,47 +193,48 @@ pub async fn put(
 
     let data = inner_data_as_json(dashboard)?;
 
-    let (folder_m, mut dash_am) = match get_model(client, org_id, folder_id, &dashboard_id).await? {
-        None => {
-            // Destination folder does not exist so the dashboard can neither be
-            // created nor updated.
-            Err(errors::PutDashboardError::FolderDoesNotExist)
-        }
-        Some((folder_m, Some(dash_m))) => {
-            // Destination folder exists and dashboard already exists, so
-            // convert the dashboard model to an active model that will be
-            // updated.
-            Ok((folder_m, dash_m.into()))
-        }
-        Some((folder_m, None)) => {
-            // Destination folder exists but dashboard does not exist, so create
-            // a new dashboard active model that will be inserted.
-            let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
-                created_at_tz.timestamp()
-            } else {
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map_err(|_| PutDashboardError::ConvertingCreatedTimestamp)?
-                    .as_secs()
-                    .try_into()
-                    .map_err(|_| PutDashboardError::ConvertingCreatedTimestamp)?
-            };
+    let (folder_m, mut dash_am) =
+        match get_model_from_folder(client, org_id, folder_id, &dashboard_id).await? {
+            None => {
+                // Destination folder does not exist so the dashboard can neither be
+                // created nor updated.
+                Err(errors::PutDashboardError::FolderDoesNotExist)
+            }
+            Some((folder_m, Some(dash_m))) => {
+                // Destination folder exists and dashboard already exists, so
+                // convert the dashboard model to an active model that will be
+                // updated.
+                Ok((folder_m, dash_m.into()))
+            }
+            Some((folder_m, None)) => {
+                // Destination folder exists but dashboard does not exist, so create
+                // a new dashboard active model that will be inserted.
+                let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
+                    created_at_tz.timestamp()
+                } else {
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_err(|_| PutDashboardError::ConvertingCreatedTimestamp)?
+                        .as_secs()
+                        .try_into()
+                        .map_err(|_| PutDashboardError::ConvertingCreatedTimestamp)?
+                };
 
-            let dash_am = dashboards::ActiveModel {
-                id: NotSet, // Set by DB.
-                dashboard_id: Set(dashboard_id.to_owned()),
-                folder_id: NotSet,   // Can be updated, so it is set below.
-                owner: NotSet,       // Can be updated, so it is set below.
-                role: NotSet,        // Can be updated, so it is set below.
-                title: NotSet,       // Can be updated, so it is set below.
-                description: NotSet, // Can be updated, so it is set below.
-                data: NotSet,        // Can be updated, so it is set below.
-                version: NotSet,     // Can be updated, so it is set below.
-                created_at: Set(created_at_unix),
-            };
-            Ok((folder_m, dash_am))
-        }
-    }?;
+                let dash_am = dashboards::ActiveModel {
+                    id: NotSet, // Set by DB.
+                    dashboard_id: Set(dashboard_id.to_owned()),
+                    folder_id: NotSet,   // Can be updated, so it is set below.
+                    owner: NotSet,       // Can be updated, so it is set below.
+                    role: NotSet,        // Can be updated, so it is set below.
+                    title: NotSet,       // Can be updated, so it is set below.
+                    description: NotSet, // Can be updated, so it is set below.
+                    data: NotSet,        // Can be updated, so it is set below.
+                    version: NotSet,     // Can be updated, so it is set below.
+                    created_at: Set(created_at_unix),
+                };
+                Ok((folder_m, dash_am))
+            }
+        }?;
 
     // All of the following fields will be set on creation or updated.
     dash_am.folder_id = Set(folder_m.id);
@@ -229,13 +252,13 @@ pub async fn put(
 
 /// Deletes a dashboard with the given `folder_id` and `dashboard_id` surrogate
 /// keys.
-pub async fn delete(
+pub async fn delete_from_folder(
     org_id: &str,
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let model = get_model(client, org_id, folder_id, dashboard_id)
+    let model = get_model_from_folder(client, org_id, folder_id, dashboard_id)
         .await?
         .and_then(|(_folder, maybe_dash)| maybe_dash);
 
@@ -254,7 +277,7 @@ pub async fn delete_all() -> Result<(), errors::Error> {
 }
 
 /// Tries to get a dashboard ORM entity and its parent folder ORM entity.
-async fn get_model(
+async fn get_model_from_folder(
     db: &DatabaseConnection,
     org_id: &str,
     folder_id: &str,
@@ -276,6 +299,23 @@ async fn get_model(
         .await?;
 
     Ok(Some((folder, maybe_dashboard)))
+}
+
+/// Tries to get a dashboard ORM entity and its parent folder ORM entity by the
+/// dashboard ID.
+async fn get_model_by_id(
+    db: &DatabaseConnection,
+    org_id: &str,
+    dashboard_id: &str,
+) -> Result<Option<(folders::Model, dashboards::Model)>, sea_orm::DbErr> {
+    let f_and_d = dashboards::Entity::find()
+        .filter(dashboards::Column::DashboardId.eq(dashboard_id))
+        .find_also_related(folders::Entity)
+        .filter(folders::Column::Org.eq(org_id))
+        .one(db)
+        .await?
+        .and_then(|(d, maybe_f)| maybe_f.map(|f| (f, d)));
+    Ok(f_and_d)
 }
 
 /// Lists dashboard ORM models using the given parameters. Returns each

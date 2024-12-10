@@ -149,34 +149,27 @@ pub async fn list_dashboards(
 }
 
 #[tracing::instrument]
-pub async fn get_dashboard(
-    org_id: &str,
-    dashboard_id: &str,
-    folder_id: &str,
-) -> Result<Dashboard, DashboardError> {
-    table::dashboards::get(org_id, folder_id, dashboard_id)
+pub async fn get_dashboard(org_id: &str, dashboard_id: &str) -> Result<Dashboard, DashboardError> {
+    table::dashboards::get_by_id(org_id, dashboard_id)
         .await?
         .ok_or(DashboardError::DashboardNotFound)
+        .map(|(_f, d)| d)
 }
 
 #[tracing::instrument]
-pub async fn delete_dashboard(
-    org_id: &str,
-    dashboard_id: &str,
-    folder_id: &str,
-) -> Result<(), DashboardError> {
-    match table::dashboards::get(org_id, folder_id, dashboard_id).await? {
-        Some(_) => {} // Dashboard exists. Continue with deleting.
-        None => return Err(DashboardError::DashboardNotFound),
+pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), DashboardError> {
+    let Some((folder, _dashboard)) = table::dashboards::get_by_id(org_id, dashboard_id).await?
+    else {
+        return Err(DashboardError::DashboardNotFound);
     };
-    table::dashboards::delete(org_id, folder_id, dashboard_id).await?;
+    table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
     remove_ownership(
         org_id,
         "dashboards",
         Authz {
             obj_id: dashboard_id.to_owned(),
             parent_type: "folders".to_owned(),
-            parent: folder_id.to_owned(),
+            parent: folder.folder_id,
         },
     )
     .await;
@@ -194,7 +187,9 @@ pub async fn move_dashboard(
         return Err(DashboardError::MoveMissingFolderParam);
     };
 
-    let Some(dashboard) = table::dashboards::get(org_id, from_folder, dashboard_id).await? else {
+    let Some(dashboard) =
+        table::dashboards::get_from_folder(org_id, from_folder, dashboard_id).await?
+    else {
         return Err(DashboardError::DashboardNotFound);
     };
 
@@ -207,7 +202,7 @@ pub async fn move_dashboard(
     put(org_id, dashboard_id, to_folder, dashboard, None).await?;
 
     // delete the dashboard from the source folder
-    let _ = table::dashboards::delete(org_id, from_folder, dashboard_id).await;
+    let _ = table::dashboards::delete_from_folder(org_id, from_folder, dashboard_id).await;
 
     Ok(())
 }
@@ -220,7 +215,9 @@ async fn put(
     mut dashboard: Dashboard,
     hash: Option<&str>,
 ) -> Result<Dashboard, DashboardError> {
-    if let Some(existing_dash) = table::dashboards::get(org_id, folder_id, dashboard_id).await? {
+    if let Some(existing_dash) =
+        table::dashboards::get_from_folder(org_id, folder_id, dashboard_id).await?
+    {
         let existing_dash_hash = existing_dash.hash;
 
         let Some(Ok(hash_val)) = hash.map(|hash_str| hash_str.parse::<u64>()) else {

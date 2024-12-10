@@ -184,10 +184,9 @@ async fn list_dashboards(org_id: web::Path<String>, req: HttpRequest) -> impl Re
     ),
 )]
 #[get("/{org_id}/dashboards/{dashboard_id}")]
-async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
+async fn get_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    let folder = get_folder(req);
-    let dashboard = match dashboards::get_dashboard(&org_id, &dashboard_id, &folder).await {
+    let dashboard = match dashboards::get_dashboard(&org_id, &dashboard_id).await {
         Ok(dashboard) => dashboard,
         Err(err) => return err.into(),
     };
@@ -214,10 +213,9 @@ async fn get_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> i
     ),
 )]
 #[delete("/{org_id}/dashboards/{dashboard_id}")]
-async fn delete_dashboard(path: web::Path<(String, String)>, req: HttpRequest) -> impl Responder {
+async fn delete_dashboard(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, dashboard_id) = path.into_inner();
-    let folder_id = get_folder(req);
-    match dashboards::delete_dashboard(&org_id, &dashboard_id, &folder_id).await {
+    match dashboards::delete_dashboard(&org_id, &dashboard_id).await {
         Ok(()) => HttpResponse::Ok().json(MetaHttpResponse::message(
             http::StatusCode::OK.into(),
             "Dashboard deleted".to_string(),
