@@ -43,8 +43,8 @@ const dashboards = {
       }`
     );
   },
-  get_Dashboard: (org_identifier: string) => {
-    return http().get(`/api/dashboards/passcode/${org_identifier}`);
+  get_Dashboard: (org_identifier: string, dashboardID: string) => {
+    return http().get(`/api/${org_identifier}/dashboards/${dashboardID}`);
   },
   save: (
     organization: string,

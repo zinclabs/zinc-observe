@@ -137,7 +137,6 @@ export const getAllDashboards = async (store: any, folderId: any) => {
       store.state.selectedOrganization.identifier,
       folderId
     );
-    // console.log("res", res.data.dashboards);
 
     const migratedDashboards = res.data.dashboards.map((dashboard: any) => ({
       dashboard: {
@@ -154,27 +153,8 @@ export const getAllDashboards = async (store: any, folderId: any) => {
       },
     }));
 
-    
     console.log("migratedDashboards", migratedDashboards);
     return migratedDashboards;
-
-    // store.dispatch("setAllDashboardListHash", {
-    //   ...store.state.organizationData.allDashboardListHash,
-    //   [folderId]: Object.fromEntries(
-    //     migratedDashboards.map((dashboard: any) => [
-    //       dashboard.dashboard.dashboardId,
-    //       dashboard.hash,
-    //     ]),
-    //   ),
-    // });
-
-    // save to store
-    // store.dispatch("setAllDashboardList", {
-    //   ...store.state.organizationData.allDashboardList,
-    //   [folderId]: migratedDashboards
-    //     .map((dashboard: any) => dashboard.dashboard)
-    //     .sort((a: any, b: any) => b.created.localeCompare(a.created)),
-    // });
   } catch (error) {
     console.error("Error fetching dashboards:", error);
     throw error;
@@ -184,24 +164,31 @@ export const getAllDashboards = async (store: any, folderId: any) => {
 //get all dashboards by folderId if not there then call api else return from store
 export const getAllDashboardsByFolderId = async (store: any, folderId: any) => {
   try {
-    // if (!store.state.organizationData.allDashboardList[folderId]) {
       const res = await getAllDashboards(store, folderId);
     // }
+    // }
     console.log("res", res);
-    
+
     return res;
-    // return store.state.organizationData.allDashboardList[folderId];
   } catch (error) {
     throw error;
   }
 };
 
-function findDashboard(dashboardId: string, store: any, folderId: any) {
+const findDashboard = async (
+  dashboardId: string,
+  store: any,
+  folderId: any,
+) => {
   try {
-    const dashboards = store.state.organizationData.allDashboardList[folderId];
-    const dashboard = dashboards.find(
-      (it: any) => it.dashboardId === dashboardId
-    );
+    const dashboards = await getAllDashboardsByFolderId(store, folderId);
+    console.log("dashboards findDashboard", dashboards);
+
+    const dashboard = dashboards
+      .map((it: any) => it.dashboard)
+      .find((it: any) => it.dashboardId === dashboardId);
+    console.log("dashboard findDashboard", dashboard);
+
     // return the deep cody of the dashboard object to prevent it from being modified
     return dashboard && typeof dashboard === "object"
       ? JSON.parse(JSON.stringify(dashboard))
@@ -209,9 +196,11 @@ function findDashboard(dashboardId: string, store: any, folderId: any) {
   } catch (error) {
     throw error;
   }
-}
+};
 
 export const getTabDataFromTabId = (dashboardData: any, tabId: any) => {
+  console.log("dashboardData getTabDataFromTabId", dashboardData);
+
   // find tab from tabId
   return dashboardData?.tabs?.find((tab: any) => tab.tabId == tabId);
 };
@@ -518,14 +507,15 @@ export const getDashboard = async (
   dashboardId: any,
   folderId: any
 ) => {
+  console.log("dashboardId", dashboardId);
+  
   try {
-    if (
-      !store.state.organizationData.allDashboardList[folderId] ||
-      store.state.organizationData.allDashboardList[folderId].length == 0
-    ) {
-      await getAllDashboards(store, folderId);
-    }
-    return findDashboard(dashboardId, store, folderId);
+    const res = await dashboardService.get_Dashboard(
+      store.state.selectedOrganization.identifier,
+      dashboardId
+    )
+    console.log("res------", res);
+    
   } catch (error) {
     throw error;
   }
