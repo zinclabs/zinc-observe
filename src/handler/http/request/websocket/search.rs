@@ -277,6 +277,10 @@ pub async fn handle_search_request(
 
     // Once all searches are complete, write the accumulated results to a file
     log::info!("[WS_SEARCH] trace_id {} all searches completed", trace_id);
+    let end_res = WsServerEvents::End {
+        trace_id: Some(trace_id.clone()),
+    };
+    send_message(session, end_res.to_json().to_string()).await?;
 
     Ok(())
 }

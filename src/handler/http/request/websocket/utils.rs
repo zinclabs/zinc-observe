@@ -159,13 +159,19 @@ pub enum WsServerEvents {
         time_offset: i64,
     },
     #[cfg(feature = "enterprise")]
-    CancelResponse { trace_id: String, is_success: bool },
+    CancelResponse {
+        trace_id: String,
+        is_success: bool,
+    },
     Error {
         code: u16,
         message: String,
         error_detail: Option<String>,
         trace_id: Option<String>,
         request_id: Option<String>,
+    },
+    End {
+        trace_id: Option<String>,
     },
 }
 
