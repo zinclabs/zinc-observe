@@ -277,10 +277,10 @@ pub async fn handle_search_request(
 
     // Once all searches are complete, write the accumulated results to a file
     log::info!("[WS_SEARCH] trace_id {} all searches completed", trace_id);
-    let end_res = WsServerEvents::End {
-        trace_id: Some(trace_id.clone()),
-    };
-    send_message(session, end_res.to_json().to_string()).await?;
+    // let end_res = WsServerEvents::End {
+    //     trace_id: Some(trace_id.clone()),
+    // };
+    // send_message(session, end_res.to_json().to_string()).await?;
 
     Ok(())
 }
@@ -545,9 +545,8 @@ async fn process_delta(
             // Accumulate the result
             accumulated_results.push(SearchResultType::Search(search_res.clone()));
 
-            // calc `result_cache_ratio`
-            let result_cache_ratio = calc_result_cache_ratio(accumulated_results);
-            search_res.result_cache_ratio = result_cache_ratio;
+            // `result_cache_ratio` will be 0 for delta search
+            let result_cache_ratio = search_res.result_cache_ratio;
 
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.clone(),
@@ -653,9 +652,8 @@ async fn send_cached_responses(
     // Accumulate the result
     accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
 
-    // calc `result_cache_ratio`
-    let result_cache_ratio = calc_result_cache_ratio(accumulated_results);
-    cached.cached_response.result_cache_ratio = result_cache_ratio;
+    // `result_cache_ratio` for cached response is 100
+    cached.cached_response.result_cache_ratio = 100;
 
     // Send the cached response
     let ws_search_res = WsServerEvents::SearchResponse {
@@ -667,7 +665,7 @@ async fn send_cached_responses(
         "[WS_SEARCH]: Sending cached search response for trace_id: {}, hits: {}, result_cache_ratio: {}, accumulated_result len: {}",
         trace_id,
         cached.cached_response.hits.len(),
-        result_cache_ratio,
+        cached.cached_response.result_cache_ratio,
         accumulated_results.len()
     );
     send_message(session, ws_search_res.to_json().to_string()).await?;
