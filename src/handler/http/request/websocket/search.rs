@@ -286,7 +286,14 @@ pub async fn handle_search_request(
 }
 
 async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<Response, Error> {
-    SearchService::cache::search(
+    let span = tracing::info_span!(
+        "src::handler::http::request::websocket::search::do_search",
+        trace_id = %req.trace_id,
+        org_id = %org_id,
+        user_id = %user_id
+    );
+
+    let res = SearchService::cache::search(
         &req.trace_id,
         org_id,
         req.stream_type,
@@ -294,10 +301,22 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
         &req.payload,
         req.use_cache,
     )
-    .instrument(tracing::info_span!(
-        "src::handler::http::request::websocket::search::do_search"
-    ))
-    .await
+    .instrument(span)
+    .await;
+
+    res.map(handle_partial_response)
+}
+
+fn handle_partial_response(mut res: Response) -> Response {
+    if res.is_partial {
+        let partial_err = "Please be aware that the response is based on partial data";
+        res.function_error = if res.function_error.is_empty() {
+            partial_err.to_string()
+        } else {
+            format!("{} \n {}", partial_err, res.function_error)
+        };
+    }
+    res
 }
 
 async fn is_partition_request(
@@ -355,7 +374,6 @@ async fn handle_cache_responses_and_deltas(
     let mut curr_res_size = 0; // number of records
 
     let mut remaining_query_range = max_query_range as f64; // hours
-    let mut is_search_err = false;
 
     log::info!(
         "[WS_SEARCH] trace_id: {}, Handling cache response and deltas, curr_res_size: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}, deltas: {:?}",
@@ -389,7 +407,7 @@ async fn handle_cache_responses_and_deltas(
                     trace_id,
                     order_by
                 );
-                let delta = process_delta(
+                process_delta(
                     session,
                     req,
                     trace_id.clone(),
@@ -401,12 +419,7 @@ async fn handle_cache_responses_and_deltas(
                     user_id,
                     &mut remaining_query_range,
                 )
-                .await;
-
-                if delta.is_err() {
-                    is_search_err = true;
-                    break;
-                }
+                .await?;
                 delta_iter.next(); // Move to the next delta after processing
             } else {
                 // Send cached response
@@ -427,7 +440,7 @@ async fn handle_cache_responses_and_deltas(
                 "[WS_SEARCH] trace_id: {} Processing remaining delta",
                 trace_id
             );
-            let delta = process_delta(
+            process_delta(
                 session,
                 req,
                 trace_id.clone(),
@@ -439,11 +452,7 @@ async fn handle_cache_responses_and_deltas(
                 user_id,
                 &mut remaining_query_range,
             )
-            .await;
-            if delta.is_err() {
-                is_search_err = true;
-                break;
-            }
+            .await?;
             delta_iter.next(); // Move to the next delta after processing
         } else if let Some(cached) = cached_resp_iter.next() {
             // Process remaining cached responses
@@ -466,20 +475,6 @@ async fn handle_cache_responses_and_deltas(
                 req_size
             );
             break;
-        }
-    }
-
-    if is_search_err {
-        log::info!(
-            "[WS_SEARCH] trace_id: {} Search error occurred, stopping search",
-            trace_id
-        );
-        if let Err(e) = send_partial_search_resp(session, &trace_id).await {
-            log::error!(
-                "[WS_SEARCH] trace_id: {} Failed to send partial search response: {:?}",
-                trace_id,
-                e
-            );
         }
     }
 
@@ -777,7 +772,7 @@ async fn do_partitioned_search(
     Ok(())
 }
 
-async fn send_partial_search_resp(session: &mut Session, trace_id: &str) -> Result<(), Error> {
+async fn _send_partial_search_resp(session: &mut Session, trace_id: &str) -> Result<(), Error> {
     let s_resp = Response {
         is_partial: true,
         ..Default::default()
