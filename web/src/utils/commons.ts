@@ -514,8 +514,14 @@ export const getDashboard = async (
       store.state.selectedOrganization.identifier,
       dashboardId
     )
-    console.log("res------", res);
+    const currentDashboard = await findDashboard(dashboardId, store, folderId);
+    console.log("res------", res?.data);
+    console.log("------------------",currentDashboard);
     
+    return {
+      dashboardData: res?.data,
+      dash: currentDashboard
+    }
   } catch (error) {
     throw error;
   }

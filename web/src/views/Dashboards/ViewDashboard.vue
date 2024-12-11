@@ -55,11 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="q-table__title tw-text-gray-400 tw-mt-1"
               name="chevron_right"
             ></q-icon>
+            {{ currentDashboardData.data }}
             <span
               class="q-table__title q-mx-sm tw-truncate tw-flex-1"
-              :title="currentDashboardData.data?.title"
+              :title="currentDashboardData.data?.dash?.title"
             >
-              {{ currentDashboardData.data?.title }}
+              {{ currentDashboardData.data?.dash?.title }}
             </span>
           </div>
           <div class="tw-flex">
