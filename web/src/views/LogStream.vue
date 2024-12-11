@@ -500,13 +500,15 @@ export default defineComponent({
             dismiss();
           })
           .catch((err) => {
-            loadingState.value = false;
-            dismiss();
-            $q.notify({
+            if(err.response.status != 403){
+              $q.notify({
               type: "negative",
-              message: "Error while pulling stream.",
+              message: err.response?.data?.message || "Error while fetching streams.",
               timeout: 2000,
             });
+            }
+            loadingState.value = false;
+            dismiss();  
           });
       }
 
@@ -585,13 +587,12 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          if (err.response.status == 403) {
-            return;
-          }
+         if(err.response.status != 403){
           $q.notify({
             color: "negative",
             message: "Error while deleting stream.",
           });
+         }
         });
     };
     const deleteBatchStream = () => {
@@ -646,13 +647,12 @@ export default defineComponent({
           getLogStream();
         })
         .catch((error) => {
-          if (error.response.status == 403) {
-            return;
-          }
-          $q.notify({
+          if(error.response.status != 403){
+            $q.notify({
             color: "negative",
-            message: "Error while deleting streams.",
+            message: error.response?.data?.message || "Error while deleting streams.",
           });
+          }
         })
         .finally(() => {
           isDeleting.value = false;

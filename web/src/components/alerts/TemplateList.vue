@@ -191,13 +191,15 @@ const getTemplates = () => {
       }));
       updateRoute();
     })
-    .catch(() => {
+    .catch((err) => {
       dismiss();
-      q.notify({
-        type: "negative",
-        message: "Error while pulling templates.",
-        timeout: 2000,
-      });
+      if(err.response.status != 403){
+        q.notify({
+          type: "negative",
+          message: "Error while pulling templates.",
+          timeout: 2000,
+        });
+      }
     })
     .finally(() => {
       dismiss();

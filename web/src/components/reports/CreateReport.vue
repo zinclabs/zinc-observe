@@ -1019,11 +1019,14 @@ onBeforeMount(async () => {
         originalReportData.value = JSON.stringify(formData.value);
       })
       .catch((err) => {
-        q.notify({
+        if(err.response.status != 403){
+          q.notify({
           type: "negative",
           message: err?.data?.message || "Error while fetching report!",
           timeout: 4000,
-        });
+          });
+        }
+        
       })
       .finally(() => {
         isFetchingReport.value = false;
@@ -1369,10 +1372,8 @@ const saveReport = async () => {
       goToReports();
     })
     .catch((error) => {
-      if(error.response.status == 403){
-        return;
-      }
-      q.notify({
+      if(error.response.status != 403){
+        q.notify({
         type: "negative",
         message:
           error?.response?.data?.message ||
@@ -1380,7 +1381,8 @@ const saveReport = async () => {
             isEditingReport.value ? "updating" : "saving"
           } report.`,
         timeout: 4000,
-      });
+        });
+      } 
     })
     .finally(() => {
       dismiss();

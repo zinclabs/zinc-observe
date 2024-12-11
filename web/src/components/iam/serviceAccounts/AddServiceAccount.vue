@@ -230,16 +230,16 @@ export default defineComponent({
               this.$emit("updated", res.data, this.formData, "updated");
           })
           .catch((err: any) => {
-            if(err.response?.status == 403){
-                return;
+            if(err.response?.status != 403){
+              if(err?.response?.data?.message ) {
+                this.$q.notify({
+                  color: "negative",
+                  message: err?.response?.data?.message,
+                  timeout: 2000,
+                });
               }
-            if(err?.response?.data?.message ) {
-              this.$q.notify({
-                color: "negative",
-                message: err?.response?.data?.message,
-                timeout: 2000,
-              });
             }
+            
             dismiss();
             this.formData.email = userEmail;
           });
@@ -251,16 +251,16 @@ export default defineComponent({
               this.$emit("updated", res.data, this.formData, "created");
             })
             .catch((err: any) => {
-              if(err.response?.status == 403){
-                return;
+              if(err.response?.status != 403){
+                if(err?.response?.data?.message ) {
+                  this.$q.notify({
+                    color: "negative",
+                    message: err?.response?.data?.message,
+                    timeout: 2000,
+                  });
+                }
               }
-              if(err?.response?.data?.message ) {
-              this.$q.notify({
-                color: "negative",
-                message: err?.response?.data?.message,
-                timeout: 2000,
-              });
-            }
+              
               dismiss();
             });
       }

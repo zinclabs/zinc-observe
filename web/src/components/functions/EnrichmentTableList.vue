@@ -234,13 +234,15 @@ export default defineComponent({
         })
         .catch((err) => {
           console.log("--", err);
-
           dismiss();
-          $q.notify({
+          if(err.response.status != 403){
+            $q.notify({
             type: "negative",
-            message: "Error while pulling function.",
+            message: err.response?.data?.message || "Error while fetching functions.",
             timeout: 2000,
           });
+          }
+          
         });
     };
 
@@ -342,10 +344,12 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          $q.notify({
+          if(err.response.status != 403){
+            $q.notify({
             color: "negative",
-            message: "Error while deleting stream.",
+            message: err.response?.data?.message || "Error while deleting stream.",
           });
+          }
         });
 
       segment.track("Button Click", {

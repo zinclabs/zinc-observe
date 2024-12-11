@@ -457,13 +457,13 @@ export default defineComponent({
         if(fromColum) row.token = res.data.token;
         else serviceToken.value = res.data.token;
        }).catch((err)=>{
-        if(err.response?.status == 403){
-            return;
-          }
-        $q.notify({
+        if(err.response?.status != 403){
+          $q.notify({
           color: "negative",
           message: `Error fetching token: ${err.response?.data?.message || 'Unknown error'}`,
-        });
+          });
+        }
+        
        }).finally(()=>{
         row.isLoading = false;
        });
@@ -500,9 +500,6 @@ export default defineComponent({
             resolve(true);
           })
           .catch((err) => {
-            if(err.response?.status == 403){
-              return;
-            }
             dismiss();
             reject(false);
           });
@@ -624,13 +621,13 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          if(err.response?.status == 403){
-            return;
-          }
-          $q.notify({
+          if(err.response?.status != 403){
+            $q.notify({
             color: "negative",
             message: err.response?.data?.message || "Error while deleting user.",
-          });
+            });
+          }
+
         });
     };
 
@@ -647,13 +644,13 @@ export default defineComponent({
           message: "Service token refreshed successfully.",
         });
       }).catch((err)=>{
-        if(err.response?.status == 403){
-            return;
-          }
-        $q.notify({
+        if(err.response?.status != 403){
+          $q.notify({
           color: "negative",
           message: err.response?.data?.message || "Error while refreshing token.",
-        });
+          });
+        }
+        
       }).finally(()=>{
         row.isLoading = false;
       });
