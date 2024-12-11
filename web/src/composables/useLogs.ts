@@ -4620,6 +4620,39 @@ const useLogs = () => {
     try {
       const parsedSQL = fnParsedSQL();
 
+      if (
+        response.content.results.hasOwnProperty("function_error") &&
+        response.content.results.function_error != ""
+      ) {
+        searchObj.data.functionError = response.content.results.function_error;
+      }
+
+      if (
+        response.content.results.hasOwnProperty("function_error") &&
+        response.content.results.function_error != "" &&
+        response.content.results.hasOwnProperty("new_start_time") &&
+        response.content.results.hasOwnProperty("new_end_time")
+      ) {
+        response.content.results.function_error = getFunctionErrorMessage(
+          response.content.results.function_error,
+          response.content.results.new_start_time,
+          response.content.results.new_end_time,
+          store.state.timezone,
+        );
+        searchObj.data.datetime.startTime =
+          response.content.results.new_start_time;
+        searchObj.data.datetime.endTime = response.content.results.new_end_time;
+        searchObj.data.datetime.type = "absolute";
+        queryReq.query.start_time = response.content.results.new_start_time;
+        queryReq.query.end_time = response.content.results.new_end_time;
+        searchObj.data.histogramQuery.query.start_time =
+          response.content.results.new_start_time;
+        searchObj.data.histogramQuery.query.end_time =
+          response.content.results.new_end_time;
+
+        updateUrlQueryParams();
+      }
+
       if (searchObj.meta.sqlMode) {
         if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
           searchAggData.total =
@@ -4677,7 +4710,6 @@ const useLogs = () => {
       }
 
       // If its a pagination request, then append
-
       if (!isPagination) {
         searchObj.data.queryResults.pagination = [];
       }
