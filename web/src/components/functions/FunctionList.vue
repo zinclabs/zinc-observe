@@ -368,11 +368,13 @@ export default defineComponent({
           console.log("--", err);
 
           dismiss();
-          $q.notify({
+          if(err.response.status != 403){
+            $q.notify({
             type: "negative",
             message: "Error while pulling function.",
             timeout: 2000,
           });
+          }
         });
     };
 
@@ -515,12 +517,14 @@ export default defineComponent({
               });
             return;
           }
-          $q.notify({
+          if(err.response.status != 403){
+            $q.notify({
             type: "negative",
             message:
               JSON.stringify(err.response.data["message"]) ||
               "Function deletion failed.",
           });
+          }
         });
 
       segment.track("Button Click", {
