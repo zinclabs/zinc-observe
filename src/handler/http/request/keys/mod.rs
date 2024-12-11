@@ -20,7 +20,7 @@ use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse};
 
 use crate::{
     common::meta::{self, http::HttpResponse as MetaHttpResponse},
-    kms::{Key, KeyAddRequest, KeyGetResponse},
+    cipher::{Key, KeyAddRequest, KeyGetResponse},
 };
 
 /// Store a key credential in db
