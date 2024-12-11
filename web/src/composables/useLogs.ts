@@ -4459,7 +4459,6 @@ const useLogs = () => {
       // reset searchAggData
       searchAggData.total = 0;
       searchAggData.hasAggregation = false;
-      searchObj.meta.resultGrid.showPagination = true;
 
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
@@ -4549,6 +4548,28 @@ const useLogs = () => {
         (searchObj.data.resultGrid.currentPage - 1) *
         searchObj.meta.resultGrid.rowsPerPage;
       queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
+
+      const parsedSQL: any = fnParsedSQL();
+
+      searchObj.meta.resultGrid.showPagination = true;
+
+      if (searchObj.meta.sqlMode == true) {
+        if (isLimitQuery(parsedSQL)) {
+          queryReq.query.size = parsedSQL.limit.value[0].value;
+          searchObj.meta.resultGrid.showPagination = false;
+          //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
+
+          if (parsedSQL.limit.separator == "offset") {
+            queryReq.query.from = parsedSQL.limit.value[1].value || 0;
+          }
+          delete queryReq.query.track_total_hits;
+        }
+
+        if (isDistinctQuery(parsedSQL)) {
+          searchObj.meta.resultGrid.showPagination = false;
+          delete queryReq.query.track_total_hits;
+        }
+      }
 
       const { traceparent, traceId } = generateTraceContext();
       addTraceId(traceId);
@@ -4955,9 +4976,9 @@ const useLogs = () => {
 
         addRequestId(requestId, traceId);
       }
-    } else if (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL)) {
+    } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram is not available for limit queries.");
-    } else if (searchObj.meta.sqlMode && !isDistinctQuery(parsedSQL)) {
+    } else if (searchObj.meta.sqlMode && isDistinctQuery(parsedSQL)) {
       resetHistogramWithError(
         "Histogram is not available for DISTINCT queries.",
       );
@@ -4994,7 +5015,10 @@ const useLogs = () => {
   }
 
   function isNonAggregatedSQLMode(searchObj: any, parsedSQL: any) {
-    return searchObj.meta.sqlMode && isLimitQuery(parsedSQL);
+    return !(
+      searchObj.meta.sqlMode &&
+      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL))
+    );
   }
 
   function isHistogramDataMissing(searchObj: any) {
