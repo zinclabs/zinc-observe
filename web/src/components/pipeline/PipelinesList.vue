@@ -370,12 +370,14 @@ const toggleAlertState = (row : any) =>{
       timeout: 3000,
     });
   }).catch((error) => {
-    q.notify({
+    if(error.response.status != 403){
+      q.notify({
       message: error.response?.data?.message || "Error while updating pipeline state",
       color: "negative",
       position: "bottom",
       timeout: 3000,
     });
+    }
   });
 }
 
@@ -545,12 +547,14 @@ const savePipeline = (data: any) => {
       });
     })
     .catch((error) => {
-      q.notify({
+      if(error.response.status != 403){
+        q.notify({
         message: error.response?.data?.message || "Error while saving pipeline",
         color: "negative",
         position: "bottom",
         timeout: 3000,
       });
+      } 
     })
     .finally(() => {
       dismiss();
@@ -580,12 +584,14 @@ const deletePipeline = async () => {
       });
     })
     .catch((error) => {
-      q.notify({
+      if(error.response.status != 403){
+        q.notify({
         message: error.response?.data?.message || "Error while saving pipeline",
         color: "negative",
         position: "bottom",
         timeout: 3000,
       });
+      }
     })
     .finally(async () => {
       await getPipelines();
