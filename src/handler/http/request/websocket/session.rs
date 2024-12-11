@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use actix_http::ws::{CloseCode, CloseReason};
 use actix_ws::{MessageStream, Session};
 use config::{get_config, meta::websocket::SearchResultType};
 use futures::StreamExt;
@@ -100,7 +101,14 @@ pub async fn handle_text_message(
                         Ok(_) => {
                             // close the session
                             let session = session.clone();
-                            let _ = session.close(None).await;
+                            let close_reason = Some(CloseReason {
+                                code: CloseCode::Normal,
+                                description: Some(format!(
+                                    "[trace_id {}] Search completed",
+                                    search_req.trace_id.clone()
+                                )),
+                            });
+                            let _ = session.close(close_reason).await;
                         }
                         Err(e) => {
                             log::error!(
@@ -108,6 +116,10 @@ pub async fn handle_text_message(
                                     search_req.trace_id,
                                     e
                                 );
+                            let close_reason = Some(CloseReason {
+                                code: CloseCode::Error,
+                                description: Some(e.to_string()),
+                            });
                             let err_res = WsServerEvents::error_response(
                                 e,
                                 Some(search_req.trace_id),
@@ -115,7 +127,7 @@ pub async fn handle_text_message(
                             );
                             let _ = send_message(session, err_res.to_json().to_string()).await;
                             let session = session.clone();
-                            let _ = session.close(None).await;
+                            let _ = session.close(close_reason).await;
                         }
                     }
                 }
@@ -125,7 +137,11 @@ pub async fn handle_text_message(
                     // close the session if send_message failed
                     let _ = send_message(session, res.to_json().to_string()).await;
                     let session = session.clone();
-                    let _ = session.close(None).await;
+                    let close_reason = Some(CloseReason {
+                        code: CloseCode::Normal,
+                        description: Some(format!("[trace_id {}] Search canceled", trace_id)),
+                    });
+                    let _ = session.close(close_reason).await;
                 }
                 WsClientEvents::Benchmark { id } => {
                     // simulate random delay for benchmarking by sleep for 10/20/30/60/90
@@ -145,7 +161,11 @@ pub async fn handle_text_message(
                     });
                     let _ = send_message(session, response.to_string()).await;
                     let session = session.clone();
-                    let _ = session.close(None).await;
+                    let close_reason = Some(CloseReason {
+                        code: CloseCode::Normal,
+                        description: Some(format!("[id {}] benchmark completed", id)),
+                    });
+                    let _ = session.close(close_reason).await;
                 }
             }
         }
@@ -159,7 +179,11 @@ pub async fn handle_text_message(
             let err_res = WsServerEvents::error_response(e.into(), Some(req_id.to_string()), None);
             let _ = send_message(session, err_res.to_json().to_string()).await;
             let session = session.clone();
-            let _ = session.close(None).await;
+            let close_reason = Some(CloseReason {
+                code: CloseCode::Error,
+                description: Some(format!("[req_id {}] Request Error", req_id)),
+            });
+            let _ = session.close(close_reason).await;
         }
     }
 }
