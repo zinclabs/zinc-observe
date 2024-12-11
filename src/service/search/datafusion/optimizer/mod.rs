@@ -32,7 +32,6 @@ use datafusion::optimizer::{
     single_distinct_to_groupby::SingleDistinctToGroupBy,
     unwrap_cast_in_comparison::UnwrapCastInComparison, OptimizerRule,
 };
-use decrypt_impl::DecryptOptimizerRule;
 use infra::schema::get_stream_setting_fts_fields;
 use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
@@ -41,7 +40,6 @@ use crate::service::search::sql::Sql;
 
 pub mod add_sort_and_limit;
 pub mod add_timestamp;
-pub mod decrypt_impl;
 pub mod join_reorder;
 pub mod rewrite_histogram;
 pub mod rewrite_match;
@@ -108,7 +106,6 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };
     rules.push(Arc::new(AddTimestampRule::new(start_time, end_time)));
-    rules.push(Arc::new(DecryptOptimizerRule::new()));
     // ************************************
 
     // Filters can't be pushed down past Limits, we should do PushDownFilter after

@@ -56,7 +56,7 @@ use o2_enterprise::enterprise::{
 
 use super::{
     file_type::{FileType, GetExt},
-    optimizer::{decrypt_impl::DecryptQueryPlanner, join_reorder::JoinReorderRule},
+    optimizer::join_reorder::JoinReorderRule,
     storage::file_list,
     table_provider::{uniontable::NewUnionTable, NewListingTable},
     udf::transform_udf::get_all_transform,
@@ -272,7 +272,6 @@ pub async fn prepare_datafusion_context(
             .with_runtime_env(runtime_env)
             .with_default_features()
             .with_optimizer_rules(optimizer_rules)
-            .with_query_planner(Arc::new(DecryptQueryPlanner::new())) // TODO maybe move into mod like rules
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .build();
         Ok(SessionContext::new_with_state(state))
