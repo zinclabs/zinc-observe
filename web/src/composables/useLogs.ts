@@ -1315,8 +1315,6 @@ const useLogs = () => {
       let remainingRecords = rowsPerPage;
       let lastPartitionSize = 0;
 
-      console.log("partitionDetail", partitionDetail);
-
       if (
         partitionDetail.paginations.length <= currentPage + 3 ||
         regenrateFlag
@@ -1955,7 +1953,6 @@ const useLogs = () => {
           "UI",
         )
         .then(async (res) => {
-          console.log(searchObj.data.queryResults.partitionDetail);
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
@@ -2070,7 +2067,7 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
-        if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
+        if (isLimitQuery(parsedSQL)) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
           //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
@@ -2078,6 +2075,11 @@ const useLogs = () => {
           if (parsedSQL.limit.separator == "offset") {
             queryReq.query.from = parsedSQL.limit.value[1].value || 0;
           }
+          delete queryReq.query.track_total_hits;
+        }
+
+        if (isDistinctQuery(parsedSQL)) {
+          searchObj.meta.resultGrid.showPagination = false;
           delete queryReq.query.track_total_hits;
         }
 
