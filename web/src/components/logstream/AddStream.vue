@@ -238,11 +238,13 @@ const saveStream = async () => {
         });
     })
     .catch((err) => {
-      q.notify({
+      if(err.response.status != 403){
+        q.notify({
         color: "negative",
         message: err.response?.data?.message || "Failed to create stream",
         timeout: 4000,
       });
+      }
     });
 
     emits("added:stream-aded", streamInputs.value);

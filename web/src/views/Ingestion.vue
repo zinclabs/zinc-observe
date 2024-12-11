@@ -153,11 +153,13 @@ export default defineComponent({
           });
         })
         .catch((e) => {
-          this.q.notify({
-            type: "negative",
-            message: "Error while generating RUM Token." + e.error,
-            timeout: 5000,
-          });
+          if(e.response.status != 403){
+            this.q.notify({
+              type: "negative",
+              message: "Error while generating RUM Token." + e.error,
+              timeout: 5000,
+            });
+          }   
         });
 
       segment.track("Button Click", {
@@ -182,11 +184,13 @@ export default defineComponent({
           });
         })
         .catch((e) => {
-          this.q.notify({
+          if(e.response.status != 403){
+            this.q.notify({
             type: "negative",
             message: "Error while refreshing RUM Token." + e.error,
             timeout: 5000,
           });
+          }  
         });
 
       segment.track("Button Click", {
@@ -315,11 +319,13 @@ export default defineComponent({
           }
         })
         .catch((e) => {
-          q.notify({
-            type: "negative",
-            message: "Error while updating Token." + e.error,
-            timeout: 5000,
-          });
+          if(e.response.status != 403){
+            q.notify({
+              type: "negative",
+              message: "Error while updating Token." + e.error,
+              timeout: 5000,
+            });
+          }
         });
 
       segment.track("Button Click", {
