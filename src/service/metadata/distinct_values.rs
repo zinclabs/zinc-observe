@@ -179,6 +179,7 @@ impl Metadata for DistinctValues {
     }
 
     async fn flush(&self) -> Result<()> {
+        let cfg = get_config();
         let mut mem_table = self.mem_table.write().await;
         let mut new_table: MemTable = FxIndexMap::default();
         std::mem::swap(&mut new_table, &mut *mem_table);
@@ -265,7 +266,7 @@ impl Metadata for DistinctValues {
                 let data = data.as_object_mut().unwrap();
                 data.insert("count".to_string(), json::Value::Number(count.into()));
                 data.insert(
-                    get_config().common.column_timestamp.clone(),
+                    cfg.common.column_timestamp.clone(),
                     json::Value::Number(timestamp.into()),
                 );
                 let hour_key = ingestion::get_write_partition_key(
@@ -295,10 +296,14 @@ impl Metadata for DistinctValues {
                 &distinct_stream_name,
             )
             .await;
-            _ = ingestion::write_file(&writer, &distinct_stream_name, buf).await;
-            if let Err(e) = writer.sync().await {
-                log::error!("[DISTINCT_VALUES] error while syncing writer: {}", e);
-            }
+            _ = ingestion::write_file(
+                &writer,
+                &distinct_stream_name,
+                buf,
+                !cfg.common.wal_fsync_disabled,
+            )
+            .await;
+
             #[cfg(feature = "enterprise")]
             {
                 use o2_enterprise::enterprise::{

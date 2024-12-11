@@ -612,6 +612,8 @@ pub struct Common {
         help = "Bloom filter ndv ratio, set to 100 means NDV = row_count / 100, if set to 1 means will use NDV = row_count"
     )]
     pub bloom_filter_ndv_ratio: u64,
+    #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
+    pub wal_fsync_disabled: bool,
     #[env_config(name = "ZO_TRACING_ENABLED", default = false)]
     pub tracing_enabled: bool,
     #[env_config(name = "ZO_TRACING_SEARCH_ENABLED", default = false)]
@@ -909,8 +911,6 @@ pub struct Limit {
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_WAL_WRITE_BUFFER_SIZE", default = 16384)] // 16 KB
     pub wal_write_buffer_size: usize,
-    #[env_config(name = "ZO_WAL_FSYNC_DISABLED", default = false)]
-    pub wal_fsync_disabled: bool,
     #[env_config(name = "ZO_FILE_PUSH_INTERVAL", default = 10)] // seconds
     pub file_push_interval: u64,
     #[env_config(name = "ZO_FILE_PUSH_LIMIT", default = 0)] // files

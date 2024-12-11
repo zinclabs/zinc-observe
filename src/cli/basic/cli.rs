@@ -271,6 +271,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         }
         "migrate-schemas" => {
             println!("Running schema migration to row per schema version");
+            #[allow(deprecated)]
             migration::schema::run().await?
         }
         _ => {

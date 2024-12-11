@@ -74,6 +74,7 @@ impl Metadata for TraceListIndex {
             Field::new("trace_id", DataType::Utf8, false),
         ]))
     }
+
     async fn write(&self, org_id: &str, items: Vec<MetadataItem>) -> infra::errors::Result<()> {
         if items.is_empty() {
             return Ok(());
@@ -122,10 +123,13 @@ impl Metadata for TraceListIndex {
 
         let writer =
             ingester::get_writer(0, org_id, &StreamType::Metadata.to_string(), STREAM_NAME).await;
-        _ = ingestion::write_file(&writer, STREAM_NAME, buf).await;
-        if let Err(e) = writer.sync().await {
-            log::error!("[TraceListIndex] error while syncing writer: {}", e);
-        }
+        _ = ingestion::write_file(
+            &writer,
+            STREAM_NAME,
+            buf,
+            !get_config().common.wal_fsync_disabled,
+        )
+        .await;
 
         #[cfg(feature = "enterprise")]
         {
@@ -302,7 +306,7 @@ mod tests {
                 val.schema_key, val.schema, val.records_size, val.records
             );
         }
-        let r = ingestion::write_file(&writer, STREAM_NAME, buf).await;
+        let r = ingestion::write_file(&writer, STREAM_NAME, buf, false).await;
         println!("r: {:?}", r);
     }
 }

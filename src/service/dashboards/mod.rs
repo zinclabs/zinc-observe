@@ -239,3 +239,15 @@ async fn put(
     let dash = table::dashboards::put(org_id, folder_id, dashboard).await?;
     Ok(dash)
 }
+
+/// Internal helper function find dashboard and its folder by id.
+///
+/// Used by self_reporting to enrich dashboard SearchEventContext
+pub(crate) async fn get_folder_and_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+) -> Result<(Folder, Dashboard), DashboardError> {
+    table::dashboards::get_by_id(org_id, dashboard_id)
+        .await?
+        .ok_or(DashboardError::DashboardNotFound)
+}

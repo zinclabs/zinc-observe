@@ -1442,6 +1442,9 @@ export default defineComponent({
               });
             })
             .catch((err: any) => {
+              if(err.response?.status == 403){
+                return;
+              }
               dismiss();
               this.q.notify({
                 type: "negative",
@@ -1478,6 +1481,9 @@ export default defineComponent({
               });
             })
             .catch((err: any) => {
+              if(err.response?.status == 403){
+                return;
+              }
               dismiss();
               this.q.notify({
                 type: "negative",

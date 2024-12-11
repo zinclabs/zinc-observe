@@ -105,7 +105,8 @@ pub async fn token_validator(
                             header::HeaderValue::from_str(&res.0.user_email).unwrap(),
                         );
                         if auth_info.bypass_check
-                            || check_permissions(user_id, auth_info, Some(user.role)).await
+                            || check_permissions(user_id, auth_info, user.role, user.is_external)
+                                .await
                         {
                             Ok(req)
                         } else {

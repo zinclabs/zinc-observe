@@ -584,6 +584,9 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
+         if(err.response.status == 403){
+          return;
+         }
           $q.notify({
             color: "negative",
             message: "Error while deleting stream.",
@@ -642,7 +645,9 @@ export default defineComponent({
           getLogStream();
         })
         .catch((error) => {
-          console.error(error);
+          if(error.response.status == 403){
+            return;
+          }
           $q.notify({
             color: "negative",
             message: "Error while deleting streams.",

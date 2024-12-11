@@ -44,28 +44,6 @@ export default defineComponent({
     const destinations = ref([]);
     const splitterModel = ref(160);
 
-    onBeforeMount(() => {
-      redirectRoute();
-    });
-
-    watch(
-      () => router.currentRoute.value.name,
-      (routeName) => {
-        // This is handled for browser back button, as it was redirecting to this app alerts page and not alert list page
-        if (routeName === "alerts") router.back();
-      }
-    );
-
-    const redirectRoute = () => {
-      if (router.currentRoute.value.name === "alerts") {
-        router.push({
-          name: "alertList",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-      }
-    };
     const getTemplates = () => {
       // if (store.state.selectedOrganization.status == "active") {
       templateService
@@ -92,7 +70,6 @@ export default defineComponent({
       splitterModel,
       getTemplates,
       getDestinations,
-      redirectRoute,
       t,
       store,
     };

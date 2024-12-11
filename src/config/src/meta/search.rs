@@ -849,6 +849,17 @@ impl SearchEventContext {
             ..Default::default()
         }
     }
+
+    pub fn enrich_for_dashboard(
+        &mut self,
+        dashboard_title: String,
+        folder_name: String,
+        folder_id: String,
+    ) {
+        self.dashboard_name = Some(dashboard_title);
+        self.dashboard_folder_name = Some(folder_name);
+        self.dashboard_folder_id = Some(folder_id);
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

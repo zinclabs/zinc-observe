@@ -135,6 +135,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
   />
+  <ConfirmDialog
+    title="Save Pipeline"
+    message="Are you sure you want to save this Pipeline, as it does not have any impact?"
+    @update:ok="confirmSaveBasicPipeline"
+    @update:cancel="resetBasicDialog"
+    v-model="confirmDialogBasicPipeline"
+  />
 </template>
 
 <script setup lang="ts">
@@ -369,6 +376,7 @@ const nodeRows = ref<(string | null)[]>([]);
 
 const q = useQuasar();
 
+const confirmDialogBasicPipeline = ref(false);
 const associatedFunctions: Ref<string[]> = ref([]);
 
 const { t } = useI18n();
@@ -531,7 +539,6 @@ const savePipeline = async () => {
     });
     return;
   }
-
   // Find the input node
   const inputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
     (node:any) =>
@@ -565,8 +572,8 @@ const savePipeline = async () => {
     });
     return;
   }
-  
   else {
+
     pipelineObj.currentSelectedPipeline.nodes.map((node : any) => {
       if (node.data.node_type === "stream" && node.data.stream_name && node.data.stream_name.hasOwnProperty("value")) {
         node.data.stream_name = node.data.stream_name.value;
@@ -595,13 +602,27 @@ const savePipeline = async () => {
     return;
   }
 
+  const isValid = isValidNodes(pipelineObj.currentSelectedPipeline.nodes);
+  if(!isValid){
+    confirmDialogBasicPipeline.value  = true;
+    return;
+  }
+
+  await onSubmitPipeline();
+ 
+}
+
+const confirmSaveBasicPipeline = async () => {
+  confirmDialogBasicPipeline.value = false;
+  await onSubmitPipeline();
+}
+
+const onSubmitPipeline = async () =>{
   const dismiss = q.notify({
     message: "Saving pipeline...",
     position: "bottom",
     spinner: true,
   });
-
-
   const saveOperation = pipelineObj.isEditPipeline
     ? pipelineService.updatePipeline({
         data: pipelineObj.currentSelectedPipeline,
@@ -689,7 +710,6 @@ const openCancelDialog = () => {
   }
 
 };
-
 const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
   confirmDialogMeta.value.title = "";
@@ -697,6 +717,18 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.onConfirm = () => {};
   confirmDialogMeta.value.data = null;
 };
+
+const resetBasicDialog = () =>{
+  confirmDialogBasicPipeline.value = false;
+  router.push({
+    name: "pipelines",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+}
+
+
 
 const findMissingEdges = () => {
   const nodes = pipelineObj.currentSelectedPipeline.nodes;
@@ -724,6 +756,22 @@ const findMissingEdges = () => {
 
   return false; // All nodes are properly connected
 };
+const isValidNodes = (nodes:any) =>{
+  if(nodes.length > 2){
+    return true;
+  }
+  const inputNode = nodes.find((node:any) => node.io_type === "input");
+  const outputNode = nodes.find((node:any) => node.io_type === "output");
+
+  if(inputNode.data.node_type !== 'stream'){
+    return true;
+  }
+  if(inputNode.data.node_type === 'stream' && outputNode.data.node_type === 'stream' && inputNode.data.stream_name === outputNode.data.stream_name && inputNode.data.stream_type === outputNode.data.stream_type){
+    return false;
+  }
+  return true;
+
+}
 
 
 

@@ -378,6 +378,9 @@ const saveTemplate = () => {
         });
       })
       .catch((err) => {
+      if(err.response?.status == 403){
+          return;
+        }
         dismiss();
         q.notify({
           type: "negative",
@@ -407,6 +410,9 @@ const saveTemplate = () => {
           });
         })
         .catch((err) => {
+          if(err.response?.status == 403){
+            return;
+          }
           dismiss();
           q.notify({
             type: "negative",

@@ -506,10 +506,13 @@ async fn write_logs(
         stream_name,
     )
     .await;
-    let req_stats = write_file(&writer, stream_name, write_buf).await;
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
-    }
+    let req_stats = write_file(
+        &writer,
+        stream_name,
+        write_buf,
+        !cfg.common.wal_fsync_disabled,
+    )
+    .await;
 
     // send distinct_values
     if !distinct_values.is_empty() && !stream_name.starts_with(DISTINCT_STREAM_PREFIX) {

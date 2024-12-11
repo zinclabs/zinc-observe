@@ -50,6 +50,18 @@ const tabs = ref([
     class: "tab_content",
   },
   {
+    dataTest: "iam-service-accounts-tab",
+    name: "serviceAccounts",
+    to: {
+      name: "serviceAccounts",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    },
+    label: t("iam.serviceAccounts"),
+    class: "tab_content",
+  },
+  {
     dataTest: "iam-groups-tab",
     name: "groups",
     to: {
@@ -117,11 +129,12 @@ watch(
 );
 
 function setTabs() {
-  const cloud = ["users", "organizations"];
+  const cloud = ["users", "organizations", "serviceAccounts"];
 
   const rbac = ["groups", "roles"];
 
-  const os = ["users"];
+  const os = ["users", "serviceAccounts"];
+
 
   const isEnterprise =
     config.isEnterprise == "true" || config.isCloud == "true";

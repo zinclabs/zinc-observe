@@ -88,6 +88,10 @@ async fn add_distinct_from_dashboard(
 pub async fn run() -> Result<(), anyhow::Error> {
     // load dashboards list
     let db = infra_db::get_db().await;
+
+    // The following for-loop, which assigns all dashboards in the meta table to
+    // a default folder, is deprecated as of v0.14.0 and will be removed in
+    // v0.17.0.
     let db_key = "/dashboard/".to_string();
     let data = db.list(&db_key).await?;
     for (key, val) in data {
@@ -108,6 +112,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
         }
     }
 
+    // The logic that follows is dependent on the dashboards table created in
+    // the SeaORM migration list. Unlike the logic above, it will not be
+    // deprecated in v0.14.0, though we could probably move it into its own
+    // migration script in the SeaORM migration list so that it is tracked by
+    // SeaORM.
     if distinct_values::len().await? > 0 {
         log::info!("dashboard distinct values migration already done.");
     } else {

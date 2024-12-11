@@ -18,6 +18,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::{
+        search::SearchEventType,
         self_reporting::{
             usage::{AggregatedData, GroupKey, UsageData, UsageEvent, USAGE_STREAM},
             ReportingData,
@@ -31,16 +32,40 @@ use proto::cluster_rpc;
 
 use crate::{common::meta::ingestion, service};
 
-pub(super) async fn ingest_usages(curr_usages: Vec<UsageData>) {
+pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
     if curr_usages.is_empty() {
         log::info!("[SELF-REPORTING] Returning as no usages reported ");
         return;
     }
     let mut groups: HashMap<GroupKey, AggregatedData> = HashMap::new();
     let mut search_events = vec![];
-    for usage_data in &curr_usages {
+    for usage_data in curr_usages.iter_mut() {
         // Skip aggregation for usage_data with event "Search"
         if usage_data.event == UsageEvent::Search {
+            // enrich dashboard search usage with more context if `usage_data` only has id's, but
+            // not names
+            if matches!(usage_data.search_type, Some(SearchEventType::Dashboards)) {
+                if let Some((Some(dashboard_id), None)) = usage_data
+                    .search_event_context
+                    .as_ref()
+                    .map(|ctx| (&ctx.dashboard_id, &ctx.dashboard_name))
+                {
+                    if let Ok((folder, dashboard)) = service::dashboards::get_folder_and_dashboard(
+                        &usage_data.org_id,
+                        dashboard_id,
+                    )
+                    .await
+                    {
+                        if let Some(ctx) = usage_data.search_event_context.as_mut() {
+                            ctx.enrich_for_dashboard(
+                                dashboard.title().unwrap().to_string(),
+                                folder.name,
+                                folder.folder_id,
+                            )
+                        };
+                    }
+                }
+            }
             search_events.push(usage_data.clone());
             continue;
         }

@@ -819,8 +819,9 @@ pub(crate) async fn generate_index_on_ingester(
         return Ok(());
     }
 
+    let cfg = get_config();
     let index_stream_name =
-        if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
+        if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
         } else {
             format!("{}_{}", stream_name, stream_type)
@@ -887,7 +888,7 @@ pub(crate) async fn generate_index_on_ingester(
         .await;
     } else if let Some(schema) = schema_map.get(&index_stream_name) {
         // check if the schema has been updated <= v0.10.8-rc4
-        if get_config().common.inverted_index_old_format
+        if cfg.common.inverted_index_old_format
             && stream_type == StreamType::Logs
             && !schema.fields_map().contains_key("segment_ids")
         {
@@ -939,7 +940,7 @@ pub(crate) async fn generate_index_on_ingester(
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     for row in json_rows {
         let timestamp: i64 = row
-            .get(&get_config().common.column_timestamp)
+            .get(&cfg.common.column_timestamp)
             .unwrap()
             .as_i64()
             .unwrap();
@@ -970,10 +971,13 @@ pub(crate) async fn generate_index_on_ingester(
         &index_stream_name,
     )
     .await;
-    let _ = crate::service::ingestion::write_file(&writer, &index_stream_name, data_buf).await;
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
-    }
+    let _ = crate::service::ingestion::write_file(
+        &writer,
+        &index_stream_name,
+        data_buf,
+        !cfg.common.wal_fsync_disabled,
+    )
+    .await;
 
     log::info!(
         "[INGESTER:JOB] Written index wal file successfully, took: {} ms",

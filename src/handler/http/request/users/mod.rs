@@ -68,7 +68,7 @@ use crate::{
 #[get("/{org_id}/users")]
 pub async fn list(org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let org_id = org_id.into_inner();
-    users::list_users(&org_id).await
+    users::list_users(&org_id, None, None).await
 }
 
 /// CreateUser
@@ -623,7 +623,10 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
 pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Error> {
     let roles = UserRole::iter()
         .filter_map(|role| {
-            if role.eq(&UserRole::Root) || role.eq(&UserRole::Member) {
+            if role.eq(&UserRole::Root)
+                || role.eq(&UserRole::Member)
+                || role.eq(&UserRole::ServiceAccount)
+            {
                 None
             } else {
                 Some(RolesResponse {

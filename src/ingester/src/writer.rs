@@ -31,7 +31,7 @@ use config::{
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use snafu::ResultExt;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use wal::Writer as WalWriter;
 
 use crate::{
@@ -56,7 +56,7 @@ static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
 pub struct Writer {
     idx: usize,
     key: WriterKey,
-    wal: Arc<Mutex<WalWriter>>,
+    wal: Arc<RwLock<WalWriter>>,
     memtable: Arc<RwLock<MemTable>>,
     next_seq: AtomicU64,
     created_at: AtomicI64,
@@ -141,9 +141,8 @@ pub async fn check_ttl() -> Result<()> {
     for w in WRITERS.iter() {
         let w = w.read().await;
         for r in w.values() {
-            // check writer
-            r.write(Arc::new(Schema::empty()), Entry::default(), true)
-                .await?;
+            // check rotation
+            r.rotate(0, 0).await?;
         }
     }
     Ok(())
@@ -183,7 +182,7 @@ impl Writer {
         Self {
             idx,
             key: key.clone(),
-            wal: Arc::new(Mutex::new(
+            wal: Arc::new(RwLock::new(
                 WalWriter::new(
                     wal_dir,
                     &key.org_id,
@@ -201,93 +200,151 @@ impl Writer {
     }
 
     // check_ttl is used to check if the memtable has expired
-    pub async fn write(
-        &self,
-        schema: Arc<Schema>,
-        mut entry: Entry,
-        check_ttl: bool,
-    ) -> Result<()> {
-        if entry.data.is_empty() && !check_ttl {
+    pub async fn write(&self, schema: Arc<Schema>, mut entry: Entry, fsync: bool) -> Result<()> {
+        if entry.data.is_empty() {
             return Ok(());
         }
-        let (entry_bytes, entry_batch) = if !check_ttl {
-            let bytes = entry.into_bytes()?;
-            let batch = entry.into_batch(self.key.stream_type.clone(), schema.clone())?;
-            (bytes, Some(batch))
-        } else {
-            (Vec::new(), None)
-        };
+
+        entry.schema = Some(schema);
+        self.write_batch(vec![entry], fsync).await
+    }
+
+    pub async fn write_batch(&self, mut entries: Vec<Entry>, fsync: bool) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        let bytes_entries = entries
+            .iter_mut()
+            .map(|entry| entry.into_bytes())
+            .collect::<Result<Vec<_>>>()?;
+        let batch_entries = entries
+            .iter()
+            .map(|entry| {
+                entry.into_batch(self.key.stream_type.clone(), entry.schema.clone().unwrap())
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let (entries_json_size, entries_arrow_size) = batch_entries
+            .iter()
+            .map(|entry| (entry.data_json_size, entry.data_arrow_size))
+            .fold(
+                (0, 0),
+                |(acc_json_size, acc_arrow_size), (json_size, arrow_size)| {
+                    (acc_json_size + json_size, acc_arrow_size + arrow_size)
+                },
+            );
+
+        // check rotation
+        self.rotate(entries_json_size, entries_arrow_size).await?;
+
+        // write into wal
         let start = std::time::Instant::now();
-        let mut wal = self.wal.lock().await;
+        let mut wal = self.wal.write().await;
         let wal_lock_time = start.elapsed().as_millis() as f64;
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
+        for entry in bytes_entries {
+            if entry.is_empty() {
+                continue;
+            }
+            wal.write(&entry).context(WalSnafu)?;
+        }
+        drop(wal);
+
+        // write into memtable
+        let start = std::time::Instant::now();
         let mut mem = self.memtable.write().await;
-        let mem_lock_time = start.elapsed().as_millis() as f64 - wal_lock_time;
+        let mem_lock_time = start.elapsed().as_millis() as f64;
         metrics::INGEST_MEMTABLE_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(mem_lock_time);
-        if self.check_wal_threshold(wal.size(), entry_bytes.len())
-            || self.check_mem_threshold(mem.size(), entry.data_size)
-        {
-            let cfg = get_config();
-            // sync wal before rotation
+        for (entry, batch) in entries.into_iter().zip(batch_entries) {
+            if entry.data_size == 0 {
+                continue;
+            }
+            mem.write(entry.schema.clone().unwrap(), entry, batch)?;
+        }
+        drop(mem);
+
+        // check fsync
+        if fsync {
+            let mut wal = self.wal.write().await;
             wal.sync().context(WalSnafu)?;
-            // rotation wal
-            let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
-            let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
-                .join("logs")
-                .join(self.idx.to_string());
-            log::info!(
-                "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
-                wal_dir.display().to_string(),
-                &self.key.org_id,
-                &self.key.stream_type,
-                wal_id
-            );
-            let new_wal = WalWriter::new(
-                wal_dir,
-                &self.key.org_id,
-                &self.key.stream_type,
-                wal_id,
-                cfg.limit.max_file_size_on_disk as u64,
-                cfg.limit.wal_write_buffer_size,
-            )
-            .context(WalSnafu)?;
-            let old_wal = std::mem::replace(&mut *wal, new_wal);
-
-            // rotation memtable
-            let new_mem = MemTable::new();
-            let old_mem = std::mem::replace(&mut *mem, new_mem);
-            // update created_at
-            self.created_at
-                .store(Utc::now().timestamp_micros(), Ordering::Release);
-
-            let path = old_wal.path().clone();
-            let path_str = path.display().to_string();
-            let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
-            log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {}", path_str,);
-            IMMUTABLES.write().await.insert(path, table);
-            log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {}", path_str);
+            drop(wal);
         }
 
-        if !check_ttl {
-            // write into wal
-            wal.write(&entry_bytes, false).context(WalSnafu)?;
-            // write into memtable
-            let Some(entry_batch) = entry_batch else {
-                return Ok(());
-            };
-            mem.write(schema, entry, entry_batch)?;
+        Ok(())
+    }
+
+    // rotate is used to rotate the wal and memtable if the size exceeds the threshold
+    async fn rotate(&self, entry_bytes_size: usize, entry_batch_size: usize) -> Result<()> {
+        if !self.check_wal_threshold(self.wal.read().await.size(), entry_bytes_size)
+            && !self.check_mem_threshold(self.memtable.read().await.size(), entry_batch_size)
+        {
+            return Ok(());
         }
+
+        // rotation wal
+        let cfg = get_config();
+        let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
+        let wal_dir = PathBuf::from(&cfg.common.data_wal_dir)
+            .join("logs")
+            .join(self.idx.to_string());
+        log::info!(
+            "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
+            wal_dir.display().to_string(),
+            &self.key.org_id,
+            &self.key.stream_type,
+            wal_id
+        );
+        let new_wal = WalWriter::new(
+            wal_dir,
+            &self.key.org_id,
+            &self.key.stream_type,
+            wal_id,
+            cfg.limit.max_file_size_on_disk as u64,
+            cfg.limit.wal_write_buffer_size,
+        )
+        .context(WalSnafu)?;
+        let start = std::time::Instant::now();
+        let mut wal = self.wal.write().await;
+        let wal_lock_time = start.elapsed().as_millis() as f64;
+        metrics::INGEST_WAL_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(wal_lock_time);
+        wal.sync().context(WalSnafu)?; // sync wal before rotation
+        let old_wal = std::mem::replace(&mut *wal, new_wal);
+        drop(wal);
+
+        // rotation memtable
+        let new_mem = MemTable::new();
+        let start = std::time::Instant::now();
+        let mut mem = self.memtable.write().await;
+        let mem_lock_time = start.elapsed().as_millis() as f64;
+        metrics::INGEST_MEMTABLE_LOCK_TIME
+            .with_label_values(&[&self.key.org_id])
+            .observe(mem_lock_time);
+        let old_mem = std::mem::replace(&mut *mem, new_mem);
+        drop(mem);
+
+        // update created_at
+        self.created_at
+            .store(Utc::now().timestamp_micros(), Ordering::Release);
+
+        let path = old_wal.path().clone();
+        let path_str = path.display().to_string();
+        let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
+        log::info!("[INGESTER:MEM] start add to IMMUTABLES, file: {}", path_str,);
+        IMMUTABLES.write().await.insert(path, table);
+        log::info!("[INGESTER:MEM] dones add to IMMUTABLES, file: {}", path_str);
 
         Ok(())
     }
 
     pub async fn close(&self) -> Result<()> {
         // rotation wal
-        let mut wal = self.wal.lock().await;
+        let mut wal = self.wal.write().await;
         wal.sync().context(WalSnafu)?;
         let path = wal.path().clone();
         drop(wal);
@@ -301,11 +358,6 @@ impl Writer {
         let table = Arc::new(Immutable::new(self.idx, self.key.clone(), old_mem));
         IMMUTABLES.write().await.insert(path, table);
         Ok(())
-    }
-
-    pub async fn sync(&self) -> Result<()> {
-        let mut wal = self.wal.lock().await;
-        wal.sync().context(WalSnafu)
     }
 
     pub async fn read(

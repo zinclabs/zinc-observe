@@ -271,6 +271,24 @@
     "roles": "Roles",
     "groups": "Groups"
   },
+  "serviceAccounts": {
+    "header":"Service Accounts",
+    "search":"Search Service Account",
+    "refresh":"Refresh Service Token",
+    "showToken":"Show Service Token",
+    "hideToken":"Hide Service Token",
+    "delete":"Delete Service Account",
+    "update":"Update Service Account",
+    "copyToken":"Copy Token",
+    "add":"Add Service Account",
+    "confirmDeleteMsg": "Are you sure that you want to delete this Service Account?",
+    "confirmDeleteHead": "Delete Service Account",
+    "confirmRefreshMsg": "Are you sure that you want to Refresh this Service Account Token?",
+    "confirmRefreshHead": "Refresh Service Token",
+    "downloadToken":"Download Token"
+
+
+  },
   "iam": {
     "users": "Users",
     "groups": "User Groups",
@@ -293,7 +311,8 @@
     "resourceName": "Resource Name",
     "searchRole": "Search Role",
     "searchGroup": "Search Group",
-    "object": "Object"
+    "object": "Object",
+    "serviceAccounts": "Service Accounts"
   },
   "ticket": {
     "header": "Support Tickets",

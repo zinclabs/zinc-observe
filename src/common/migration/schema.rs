@@ -47,6 +47,7 @@ use crate::{
 const SCHEMA_MIGRATION_KEY: &str = "/migration/schema_versions/status";
 const META_MIGRATION_VERSION_KEY: &str = "/migration/meta/version";
 
+#[deprecated(since = "0.14.0", note = "will be removed in 0.17.0")]
 pub async fn run() -> Result<(), anyhow::Error> {
     match upgrade_schema_row_per_version().await {
         std::result::Result::Ok(true) => {

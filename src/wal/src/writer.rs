@@ -31,6 +31,7 @@ pub struct Writer {
     bytes_written: usize,
     uncompressed_bytes_written: usize,
     buffer: Vec<u8>,
+    synced: bool,
 }
 
 impl Writer {
@@ -75,6 +76,7 @@ impl Writer {
             bytes_written,
             uncompressed_bytes_written: bytes_written,
             buffer: Vec::with_capacity(buffer_size),
+            synced: true,
         })
     }
 
@@ -89,7 +91,7 @@ impl Writer {
     }
 
     /// write the data to the wal file
-    pub fn write(&mut self, data: &[u8], sync: bool) -> Result<()> {
+    pub fn write(&mut self, data: &[u8]) -> Result<()> {
         // Ensure the write buffer is always empty before using it.
         self.buffer.clear();
         // And shrink the buffer below the maximum permitted size should the odd
@@ -139,26 +141,26 @@ impl Writer {
 
         self.f.write_all(buf).context(WriteDataSnafu)?;
 
-        // fsync the fd
-        if sync {
-            self.sync()?;
-        }
-
         self.bytes_written += bytes_written;
         self.uncompressed_bytes_written += uncompressed_len;
+        self.synced = false;
 
         Ok(())
     }
 
     pub fn sync(&mut self) -> Result<()> {
+        if self.synced {
+            return Ok(());
+        }
         self.f.flush().context(FileSyncSnafu {
             path: self.path.clone(),
         })?;
-        if !config::get_config().limit.wal_fsync_disabled {
+        if !config::get_config().common.wal_fsync_disabled {
             self.f.get_ref().sync_data().context(FileSyncSnafu {
                 path: self.path.clone(),
             })?;
         }
+        self.synced = true;
         Ok(())
     }
 

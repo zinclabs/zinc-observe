@@ -28,6 +28,7 @@ pub mod pipeline;
 pub mod prom;
 pub mod rum;
 pub mod search;
+pub mod service_accounts;
 pub mod short_url;
 pub mod status;
 pub mod stream;

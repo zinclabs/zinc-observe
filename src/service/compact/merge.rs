@@ -256,7 +256,7 @@ pub async fn generate_old_data_job_by_stream(
     // get old data by hour, `offset - 2 hours` as old data
     let end_time = offset - hour_micros(2);
     let start_time = end_time
-        - Duration::try_days(stream_data_retention_days as i64)
+        - Duration::try_days(stream_data_retention_days)
             .unwrap()
             .num_microseconds()
             .unwrap();

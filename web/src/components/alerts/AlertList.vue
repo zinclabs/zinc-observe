@@ -703,6 +703,11 @@ export default defineComponent({
             }
           })
           .catch((e: any) => {
+            if(e.response?.status == 403){
+              showForm.value = false;
+              isSubmitting.value = false;
+              return;
+            }
             dismiss();
             $q.notify({
               type: "negative",
@@ -802,6 +807,9 @@ export default defineComponent({
           }
         })
         .catch((err) => {
+          if(err.response?.status == 403){
+            return;
+          }
           $q.notify({
             type: "negative",
             message: err?.data?.message || "Error while deleting alert.",

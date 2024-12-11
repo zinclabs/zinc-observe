@@ -3092,6 +3092,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
 
   const VARIABLE_PLACEHOLDER = "substituteValue";
 
+  const containsSubqueryInFrom = (parsedQuery: any) => {
+    if (!parsedQuery || !parsedQuery.from) return false;
+    return parsedQuery.from.some((item: any) => item.expr?.ast);
+  };
+
   const validateQuery = (query: any, variables: any) => {
     // Helper to test one replacement (string or number)
     const testReplacement = (q: any, varName: any, replacement: any) => {
@@ -3275,7 +3280,19 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         } else if(isDummyStreamName(tableName)){
           // nothing to do as the stream is dummy
         } else {
-          dashboardPanelData.meta.errors.queryErrors.push("Invalid stream");
+          let parsedQuery;
+          try {
+            parsedQuery = parser.astify(currentQuery?.query);
+          } catch (e) {
+            dashboardPanelData.meta.errors.queryErrors.push("Invalid SQL Syntax");
+            return;
+          }
+      
+          if (containsSubqueryInFrom(parsedQuery)) {
+            // nothing to do as the subqueries is found
+          } else {
+            dashboardPanelData.meta.errors.queryErrors.push("Invalid stream");
+          }
         }
       } else {
         dashboardPanelData.meta.errors.queryErrors.push("Stream name required");
@@ -3294,6 +3311,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     () => {
+      
       // Only continue if the current mode is "show custom query"
       if (
         dashboardPanelData.data.queries[

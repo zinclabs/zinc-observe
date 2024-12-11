@@ -63,6 +63,8 @@ pub async fn save_enrichment_data(
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
+    let cfg = get_config();
+
     let mut hour_key = String::new();
     let mut buf: HashMap<String, SchemaRecords> = HashMap::new();
     let table_name = table_name.trim();
@@ -93,7 +95,7 @@ pub async fn save_enrichment_data(
     }
 
     let stats = stats::get_stream_stats(org_id, stream_name, StreamType::EnrichmentTables);
-    let max_enrichment_table_size = get_config().limit.max_enrichment_table_size;
+    let max_enrichment_table_size = cfg.limit.max_enrichment_table_size;
     log::info!(
         "enrichment table [{stream_name}] saving stats: {:?} vs max_table_size {}",
         stats,
@@ -129,12 +131,12 @@ pub async fn save_enrichment_data(
     let mut records_size = 0;
     let timestamp = Utc::now().timestamp_micros();
     for mut json_record in payload {
-        let timestamp = match json_record.get(&get_config().common.column_timestamp) {
+        let timestamp = match json_record.get(&cfg.common.column_timestamp) {
             Some(v) => v.as_i64().unwrap_or(timestamp),
             None => timestamp,
         };
         json_record.insert(
-            get_config().common.column_timestamp.clone(),
+            cfg.common.column_timestamp.clone(),
             json::Value::Number(timestamp.into()),
         );
 
@@ -204,10 +206,7 @@ pub async fn save_enrichment_data(
         stream_name,
     )
     .await;
-    let mut req_stats = write_file(&writer, stream_name, buf).await;
-    if let Err(e) = writer.sync().await {
-        log::error!("ingestion error while syncing writer: {}", e);
-    }
+    let mut req_stats = write_file(&writer, stream_name, buf, !cfg.common.wal_fsync_disabled).await;
 
     // notify update
     if stream_schema.has_fields {

@@ -27,7 +27,10 @@ pub fn write_benchmark(c: &mut Criterion) {
                 Writer::new(dir, "org", "stream", entry_size as u64, 1024_1024, buf_size).unwrap();
             let data = vec![42u8; entry_size];
             group.bench_function(BenchmarkId::new(buf_size.to_string(), entry_size), |b| {
-                b.iter(|| writer.write(black_box(&data), true));
+                b.iter(|| {
+                    writer.write(black_box(&data)).unwrap();
+                    writer.sync().unwrap();
+                });
             });
         }
     }

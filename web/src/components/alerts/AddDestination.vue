@@ -459,6 +459,9 @@ const saveDestination = () => {
         });
       })
       .catch((err: any) => {
+        if(err.response?.status == 403){
+          return;
+        }
         dismiss();
         q.notify({
           type: "negative",
@@ -482,6 +485,9 @@ const saveDestination = () => {
         });
       })
       .catch((err: any) => {
+        if(err.response?.status == 403){
+          return;
+        }
         dismiss();
         q.notify({
           type: "negative",

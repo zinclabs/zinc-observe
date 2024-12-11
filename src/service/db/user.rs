@@ -195,7 +195,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 for mut user in users {
                     if user.role.eq(&UserRole::Root) {
                         ROOT_USER.insert("root".to_string(), user.clone());
-                    } else {
+                    } else if !user.role.eq(&UserRole::ServiceAccount) {
                         user.role = UserRole::Admin;
                     };
                     USERS.insert(format!("{}/{}", user.org, item_key), user.clone());
@@ -250,9 +250,9 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         for mut user in users {
             if user.role.eq(&UserRole::Root) {
                 ROOT_USER.insert("root".to_string(), user.clone());
-            } else {
+            } else if !user.role.eq(&UserRole::ServiceAccount) {
                 user.role = UserRole::Admin;
-            }
+            };
             USERS.insert(format!("{}/{}", user.org, user.email), user.clone());
             if let Some(rum_token) = &user.rum_token {
                 USERS_RUM_TOKEN

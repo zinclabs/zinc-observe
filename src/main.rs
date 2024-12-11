@@ -227,6 +227,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("migrate dashboards failed: {}", e);
             }
 
+            #[allow(deprecated)]
             migration::upgrade_resource_names()
                 .await
                 .expect("migrate resource names into supported ofga format failed");

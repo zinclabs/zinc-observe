@@ -1368,6 +1368,9 @@ const saveReport = async () => {
       goToReports();
     })
     .catch((error) => {
+      if(error.response.status == 403){
+        return;
+      }
       q.notify({
         type: "negative",
         message:

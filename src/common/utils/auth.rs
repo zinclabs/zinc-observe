@@ -315,6 +315,7 @@ impl FromRequest for AuthExtractor {
                 || path_columns[1].starts_with("reports")
                 || path_columns[1].starts_with("savedviews")
                 || path_columns[1].starts_with("functions")
+                || path_columns[1].starts_with("service_accounts")
             {
                 format!(
                     "{}:{}",

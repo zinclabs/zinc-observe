@@ -36,10 +36,8 @@ use config::{
     utils::{flatten, json::*, schema::format_partition_key},
     SIZE_IN_MB,
 };
-use futures::future::try_join_all;
 use infra::schema::STREAM_RECORD_ID_GENERATOR;
 use proto::cluster_rpc::IngestionType;
-use tokio::sync::Semaphore;
 use vrl::{
     compiler::{runtime::Runtime, CompilationResult, TargetValueRef},
     prelude::state,
@@ -349,61 +347,38 @@ pub async fn write_file(
     writer: &Arc<ingester::Writer>,
     stream_name: &str,
     buf: HashMap<String, SchemaRecords>,
+    fsync: bool,
 ) -> RequestStats {
     let mut req_stats = RequestStats::default();
-    let cfg = get_config();
-    let mut tasks = Vec::with_capacity(buf.len());
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
-    for (hour_key, entry) in buf {
-        if entry.records.is_empty() {
-            continue;
-        }
-        let writer = Arc::clone(writer);
-        let stream_name = stream_name.to_string();
-        let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task = tokio::task::spawn(async move {
-            let entry_records = entry.records.len();
-            if let Err(e) = writer
-                .write(
-                    entry.schema,
-                    ingester::Entry {
-                        stream: Arc::from(stream_name),
-                        schema_key: Arc::from(entry.schema_key.as_str()),
-                        partition_key: Arc::from(hour_key.as_str()),
-                        data: entry.records,
-                        data_size: entry.records_size,
-                    },
-                    false,
-                )
-                .await
-            {
-                log::error!("ingestion write file error: {}", e);
+    let entries = buf
+        .into_iter()
+        .filter_map(|(hour_key, entry)| {
+            if entry.records.is_empty() {
+                None
+            } else {
+                Some(ingester::Entry {
+                    stream: Arc::from(stream_name),
+                    schema: Some(entry.schema),
+                    schema_key: Arc::from(entry.schema_key.as_str()),
+                    partition_key: Arc::from(hour_key.as_str()),
+                    data: entry.records,
+                    data_size: entry.records_size,
+                })
             }
-            drop(permit);
-            Ok((entry_records, entry.records_size)) as Result<(usize, usize)>
+        })
+        .collect::<Vec<_>>();
+    let (entries_records, entries_size) = entries
+        .iter()
+        .map(|entry| (entry.data.len(), entry.data_size))
+        .fold((0, 0), |(acc_records, acc_size), (records, size)| {
+            (acc_records + records, acc_size + size)
         });
-        tasks.push(task);
+    if let Err(e) = writer.write_batch(entries, fsync).await {
+        log::error!("ingestion write file error: {}", e);
     }
 
-    let task_results = match try_join_all(tasks).await {
-        Ok(res) => res,
-        Err(e) => {
-            log::error!("ingestion write file error: {}", e);
-            vec![]
-        }
-    };
-    for task in task_results {
-        match task {
-            Ok((entry_records, entry_size)) => {
-                req_stats.size += (entry_size as i64 / SIZE_IN_MB) as f64;
-                req_stats.records += entry_records as i64;
-            }
-            Err(e) => {
-                log::error!("ingestion write file error: {}", e);
-            }
-        }
-    }
-
+    req_stats.size += (entries_size as i64 / SIZE_IN_MB) as f64;
+    req_stats.records += entries_records as i64;
     req_stats
 }
 

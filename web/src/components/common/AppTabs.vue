@@ -76,6 +76,7 @@ const changeTab = (tab: Tab) => {
   .rum-tab {
     border-bottom: 2px solid transparent;
     width: 140px;
+    white-space: nowrap;
   }
   .active {
     border-bottom: 2px solid $primary;

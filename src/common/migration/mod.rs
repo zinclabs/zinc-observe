@@ -38,6 +38,7 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     log::info!("Upgrading from {} to {}", old_ver, new_ver);
     let v093 = Version::from("v0.9.3").unwrap();
     if old_ver < v093 {
+        #[allow(deprecated)]
         upgrade_092_093().await?;
     }
 
@@ -49,8 +50,10 @@ pub async fn check_upgrade(old_ver: &str, new_ver: &str) -> Result<(), anyhow::E
     Ok(())
 }
 
+#[deprecated(since = "0.14.0", note = "will be removed in 0.17.0")]
 async fn upgrade_092_093() -> Result<(), anyhow::Error> {
     // migration schema
+    #[allow(deprecated)]
     schema::run().await?;
 
     Ok(())
@@ -63,6 +66,7 @@ async fn upgrade_130_131() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[deprecated(since = "0.14.0", note = "will be removed in 0.17.0")]
 pub async fn upgrade_resource_names() -> Result<(), anyhow::Error> {
     // The below migration requires ofga init ready, but on Router node,
     // we don't initialize ofga, hence the migration should not run on router

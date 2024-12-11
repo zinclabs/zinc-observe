@@ -88,8 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="warning-msg"
             style="display: inline"
           >
-            <q-icon name="warning"
-size="xs" class="warning" />{{
+            <q-icon name="warning" size="xs" class="warning" />{{
               store.state.organizationData.quotaThresholdMsg
             }}
           </div>
@@ -159,9 +158,18 @@ class="padding-none" />
 
         <ThemeSwitcher></ThemeSwitcher>
 
-        <q-btn round flat dense :ripple="false" @click="openSlack" data-test="menu-link-slack-item">
+        <q-btn
+          round
+          flat
+          dense
+          :ripple="false"
+          @click="openSlack"
+          data-test="menu-link-slack-item"
+        >
           <div class="row items-center no-wrap">
-            <q-icon><component :is="slackIcon" size="25px" class="header-icon" /></q-icon>
+            <q-icon
+              ><component :is="slackIcon" size="25px" class="header-icon"
+            /></q-icon>
           </div>
           <q-tooltip anchor="top middle" self="bottom middle">
             {{ t("menu.slack") }}
@@ -169,7 +177,11 @@ class="padding-none" />
         </q-btn>
         <q-btn round flat dense :ripple="false">
           <div class="row items-center no-wrap">
-            <q-icon name="help_outline" size="25px" class="header-icon"></q-icon>
+            <q-icon
+              name="help_outline"
+              size="25px"
+              class="header-icon"
+            ></q-icon>
             <q-tooltip anchor="top middle" self="bottom middle">
               {{ t("menu.help") }}
             </q-tooltip>
@@ -221,14 +233,24 @@ class="padding-none" />
           @click="router.push({ name: 'settings' })"
         >
           <div class="row items-center no-wrap">
-            <q-icon :name="outlinedSettings" size="25px" class="header-icon"></q-icon>
+            <q-icon
+              :name="outlinedSettings"
+              size="25px"
+              class="header-icon"
+            ></q-icon>
           </div>
           <q-tooltip anchor="top middle" self="bottom middle">
             {{ t("menu.settings") }}
           </q-tooltip>
         </q-btn>
 
-        <q-btn round flat dense :ripple="false" data-test="header-my-account-profile-icon">
+        <q-btn
+          round
+          flat
+          dense
+          :ripple="false"
+          data-test="header-my-account-profile-icon"
+        >
           <div class="row items-center no-wrap">
             <q-icon
               :name="user.picture ? user.picture : 'person'"
@@ -292,8 +314,7 @@ class="padding-none" />
               </div>
               <q-item clickable>
                 <q-item-section avatar>
-                  <q-icon size="xs" name="language"
-class="padding-none" />
+                  <q-icon size="xs" name="language" class="padding-none" />
                 </q-item-section>
                 <q-item-section>
                   <q-item-label>{{ t("menu.language") }}</q-item-label>
@@ -360,8 +381,7 @@ class="padding-none" />
                 @click="signout"
               >
                 <q-item-section avatar>
-                  <q-icon size="xs" name="exit_to_app"
-class="padding-none" />
+                  <q-icon size="xs" name="exit_to_app" class="padding-none" />
                 </q-item-section>
                 <q-item-section>
                   <q-item-label>{{ t("menu.signOut") }}</q-item-label>
@@ -580,7 +600,6 @@ export default defineComponent({
       "functionList",
       "streamFunctions",
       "enrichmentTables",
-      "alerts",
       "alertList",
       "alertDestinations",
       "alertTemplates",
@@ -646,7 +665,7 @@ export default defineComponent({
         title: t("menu.alerts"),
         icon: outlinedReportProblem,
         link: "/alerts",
-        name: "alerts",
+        name: "alertList",
       },
       {
         title: t("menu.ingestion"),
@@ -1282,7 +1301,7 @@ export default defineComponent({
   }
 }
 
-.q-toolbar{
+.q-toolbar {
   min-height: 40px;
 }
 

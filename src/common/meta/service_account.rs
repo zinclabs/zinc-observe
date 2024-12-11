@@ -13,21 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod authz;
-pub mod http;
-pub mod ingestion;
-pub mod maxmind;
-pub mod middleware_data;
-pub mod organization;
-pub mod pipelines;
-pub mod prom;
-pub mod proxy;
-pub mod saved_view;
-pub mod search;
-pub mod service;
-pub mod service_account;
-pub mod stream;
-pub mod syslog;
-pub mod telemetry;
-pub mod traces;
-pub mod user;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Eq, PartialEq, Default)]
+pub struct ServiceAccountRequest {
+    pub email: String,
+    #[serde(default)]
+    pub first_name: String,
+    #[serde(default)]
+    pub last_name: String,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct APIToken {
+    pub token: String,
+    pub user: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Eq, PartialEq, Default)]
+pub struct UpdateServiceAccountRequest {
+    #[serde(default)]
+    pub first_name: String,
+    #[serde(default)]
+    pub last_name: String,
+}

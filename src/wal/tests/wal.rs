@@ -24,7 +24,7 @@ fn wal() {
     let mut writer = Writer::new(dir, "org", "stream", 1, 1024_1024, 8 * 1024).unwrap();
     for i in 0..entry_num {
         let data = format!("hello world {}", i);
-        writer.write(data.as_bytes(), true).unwrap();
+        writer.write(data.as_bytes()).unwrap();
     }
     writer.close().unwrap();
 

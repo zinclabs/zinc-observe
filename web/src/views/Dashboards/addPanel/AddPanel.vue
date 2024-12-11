@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: calc(100vh - 57px); overflow-y: auto" class="scroll">
+  <div style="height: calc(100vh - 40px); overflow-y: auto" class="scroll">
     <div class="flex justify-between items-center q-pa-sm">
       <div class="flex items-center q-table__title q-mr-md">
         <span>
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <q-separator></q-separator>
-    <div class="row" style="height: calc(100vh - 115px); overflow-y: auto">
+    <div class="row" style="height: calc(100vh - 99px); overflow-y: auto">
       <div
         class="col scroll"
         style="
@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div
               class="col scroll"
-              style="height: calc(100vh - 115px); overflow-y: auto"
+              style="height: calc(100vh - 99px); overflow-y: auto"
             >
               <div class="column" style="height: 100%">
                 <div class="col-auto q-pa-sm">
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               class="row"
-              style="height: calc(100vh - 115px); overflow-y: auto"
+              style="height: calc(100vh - 99px); overflow-y: auto"
             >
               <div class="col" style="height: 100%">
                 <q-splitter

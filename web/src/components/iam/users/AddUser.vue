@@ -370,6 +370,7 @@ export default defineComponent({
     const loadingOrganizations = ref(true);
     const logout_confirm = ref(false);
 
+
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
     });
