@@ -54,10 +54,10 @@
         <q-menu v-model="showAddMenu">
           <q-list>
             <q-item clickable @click="emitAddCondition">
-              <q-item-section>{{ t("common.addCondition") }}</q-item-section>
+              <q-item-section data-test="dashboard-add-group-add-condition">{{ t("common.addCondition") }}</q-item-section>
             </q-item>
             <q-item clickable @click="emitAddGroup">
-              <q-item-section>{{ t("common.addGroup") }}</q-item-section>
+              <q-item-section data-test="dashboard-add-group-add-group">{{ t("common.addGroup") }}</q-item-section>
             </q-item>
           </q-list>
         </q-menu>

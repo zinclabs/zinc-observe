@@ -15,7 +15,7 @@
 
 use std::{collections::HashMap, fmt};
 
-use actix_web::{HttpResponse, ResponseError};
+use actix_web::{http::header::ContentType, HttpResponse, ResponseError};
 
 const DEFAULT_REDIRECT_RELATIVE_URI: &str = "/web/";
 
@@ -50,10 +50,29 @@ impl RedirectResponse {
 
     fn build_redirect_response(&self) -> HttpResponse {
         let redirect_uri = self.build_full_redirect_uri();
-
-        HttpResponse::Found()
-            .append_header(("Location", redirect_uri))
-            .finish()
+        if redirect_uri.len() < 1024 {
+            HttpResponse::Found()
+                .append_header(("Location", redirect_uri))
+                .finish()
+        } else {
+            let html = format!(
+                r#"
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="utf-8">
+                    <meta http-equiv="refresh" content="0;url={redirect_uri}">
+                    <title>OpenObserve Redirecting...</title>
+                </head>
+                <body>
+                    Redirecting to <a href="{redirect_uri}">click here</a>
+                </body>
+                </html>"#
+            );
+            HttpResponse::Found()
+                .content_type(ContentType::html())
+                .body(html)
+        }
     }
 }
 

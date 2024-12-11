@@ -135,7 +135,9 @@ export const getAllDashboards = async (store: any, folderId: any) => {
       false,
       "",
       store.state.selectedOrganization.identifier,
-      folderId
+      folderId,
+      //adding empty string to avoid undefined error as we have added title param in api
+      ""
     );
 
     const migratedDashboards = res.data.dashboards.map((dashboard: any) => ({
@@ -531,26 +533,30 @@ export const deleteDashboardById = async (
     // Get list of all dashboard of all folders
     const allDashboardList = store.state.organizationData.allDashboardList;
 
-    // Filter out the deleted dashboard from the list
-    const newDashboards = allDashboardList[folderId].filter(
-      (dashboard: any) => dashboard.dashboardId != dashboardId
-    );
+    if (allDashboardList[folderId]) {
+      // Filter out the deleted dashboard from the list
+      const newDashboards = allDashboardList[folderId].filter(
+        (dashboard: any) => dashboard.dashboardId !== dashboardId
+      );
 
-    // Update the allDashboardList in the store with the new list
-    store.dispatch("setAllDashboardList", {
-      ...allDashboardList,
-      [folderId]: newDashboards,
-    });
+      // Update the allDashboardList in the store with the new list
+      store.dispatch("setAllDashboardList", {
+        ...allDashboardList,
+        [folderId]: newDashboards,
+      });
 
-    // remove current dashboard hash from allDashboardListHash
-    delete store.state.organizationData.allDashboardListHash[folderId][
-      dashboardId
-    ];
+      // remove current dashboard hash from allDashboardListHash
+      delete store.state.organizationData.allDashboardListHash[folderId][
+        dashboardId
+      ];
 
-    // update the allDashboardList in the store
-    store.dispatch("setAllDashboardListHash", {
-      ...store.state.organizationData.allDashboardListHash,
-    });
+      // update the allDashboardList in the store
+      store.dispatch("setAllDashboardListHash", {
+        ...store.state.organizationData.allDashboardListHash,
+      });
+    }
+
+
   } catch (error) {
     throw error;
   }

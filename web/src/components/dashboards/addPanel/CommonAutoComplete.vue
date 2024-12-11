@@ -10,6 +10,7 @@
       @blur="hideOptions"
       v-bind="$attrs"
       style="width: 100%"
+      data-test="common-auto-complete"
     >
       <template v-if="hasSlot('label')" v-slot:label>
         <slot name="label"></slot>
@@ -27,6 +28,7 @@
         :key="index"
         class="option"
         @mousedown="selectOption(option)"
+        data-test="common-auto-complete-option"
       >
         {{ option.label }}
       </div>

@@ -23,11 +23,24 @@ const dashboards = {
     desc: boolean,
     name: string,
     organization: string,
-    folderId: string
+    folderId: string,
+    title: string
   ) => {
-    return http().get(
-      `/api/${organization}/dashboards?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}&folder=${folderId}`
-    );
+    const params :any = {
+      page_num,
+      page_size,
+      sort_by,
+      desc,
+      name,
+    };
+    if(folderId) {
+      params.folder = folderId;
+    }
+    // Only add title if it is provided
+    if (title) {
+      params.title = title;
+    }
+    return http().get(`/api/${organization}/dashboards`, { params });
   },
   create: (organization: string, data: any, folderId?: string) => {
     return http().post(

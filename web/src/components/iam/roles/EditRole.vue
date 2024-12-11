@@ -1316,7 +1316,8 @@ const getDashboards = async (resource: Entity | Resource) => {
     false,
     "",
     store.state.selectedOrganization.identifier,
-    resource.name
+    resource.name,
+    ""
   );
 
   updateEntityEntities(

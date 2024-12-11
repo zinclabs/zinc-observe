@@ -9,7 +9,7 @@
     "devcloud": "NODE_ENV=devcloud vite --mode=devcloud",
     "build-alpha1": "run-p type-check build-only-alpha1",
     "build-cloud-prod": "run-p type-check build-only-cloud-prod",
-    "build": "NODE_OPTIONS='--max-old-space-size=8200' run-p type-check build-only",
+    "build": "run-p type-check build-only",
     "postbuild": "run-p copy",
     "preview": "vite preview",
     "copy": "cd dist && mkdir src && cd src && mkdir assets && cd .. && cd .. && cp -r src/assets/* dist/src/assets/",

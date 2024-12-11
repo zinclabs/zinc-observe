@@ -575,6 +575,7 @@ pub async fn search_partition(
     let mut files = Vec::new();
 
     let mut max_query_range = 0;
+    let mut max_query_range_in_hour = 0;
     for (stream_name, schema) in sql.schemas.iter() {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
         let use_stream_stats_for_partition = stream_settings.approx_partition;
@@ -591,6 +592,7 @@ pub async fn search_partition(
                 max_query_range,
                 stream_settings.max_query_range * 3600 * 1_000_000,
             );
+            max_query_range_in_hour = max(max_query_range_in_hour, stream_settings.max_query_range);
             files.extend(stream_files);
         } else {
             // data retention in seconds
@@ -634,7 +636,7 @@ pub async fn search_partition(
     if skip_get_file_list {
         let mut response = search::SearchPartitionResponse::default();
         response.partitions.push([req.start_time, req.end_time]);
-        response.max_query_range = max_query_range;
+        response.max_query_range = max_query_range_in_hour;
         response.histogram_interval = sql.histogram_interval;
         return Ok(response);
     };
@@ -657,8 +659,8 @@ pub async fn search_partition(
         records: records as usize,
         original_size: original_size as usize,
         compressed_size: 0, // there is no compressed size in file list
+        max_query_range: max_query_range_in_hour,
         histogram_interval: sql.histogram_interval,
-        max_query_range,
         partitions: vec![],
         order_by: OrderBy::Desc,
     };

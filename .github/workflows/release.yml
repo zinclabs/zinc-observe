@@ -75,18 +75,8 @@ jobs:
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
       - name: Build UI
-        if: contains(matrix.arch, 'windows') == false
         env: 
           NODE_OPTIONS: "--max-old-space-size=8192"
-        run: |
-            cd web/
-            npm install
-            npm run build
-      - name: Build UI for windows
-        if: contains(matrix.arch, 'windows')
-        env: 
-          NODE_OPTIONS: "--max-old-space-size=8192"
-        shell: bash
         run: |
             cd web/
             npm install
