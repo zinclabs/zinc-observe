@@ -73,7 +73,8 @@ pub mod enterprise_utils {
             let has_permission = crate::handler::http::auth::validator::check_permissions(
                 user_id,
                 auth_extractor,
-                Some(user.role),
+                user.role,
+                user.is_external
             )
             .await;
 
