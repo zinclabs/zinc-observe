@@ -17,10 +17,13 @@ use actix_ws::Session;
 use config::{
     get_config,
     meta::{
-        search::{Response, SearchPartitionRequest, SearchPartitionResponse},
+        search::{
+            Response, SearchPartitionRequest, SearchPartitionResponse,
+            PARTIAL_ERROR_RESPONSE_MESSAGE,
+        },
         sql::{resolve_stream_names, OrderBy},
         stream::StreamType,
-        websocket::{SearchEventReq, SearchResultType},
+        websocket::{SearchEventReq, SearchResultType, MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE},
     },
     utils::sql::is_aggregate_query,
 };
@@ -308,11 +311,13 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
 
 fn handle_partial_response(mut res: Response) -> Response {
     if res.is_partial {
-        let partial_err = "Please be aware that the response is based on partial data";
         res.function_error = if res.function_error.is_empty() {
-            partial_err.to_string()
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
         } else {
-            format!("{} \n {}", partial_err, res.function_error)
+            format!(
+                "{} \n {}",
+                PARTIAL_ERROR_RESPONSE_MESSAGE, res.function_error
+            )
         };
     }
     res
@@ -574,6 +579,9 @@ async fn process_delta(
                 "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
                 trace_id
             );
+            let _ =
+                send_partial_search_resp(session, &trace_id, MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE)
+                    .await;
             break;
         }
 
@@ -738,6 +746,9 @@ async fn do_partitioned_search(
                 "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
                 trace_id
             );
+            let _ =
+                send_partial_search_resp(session, trace_id, MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE)
+                    .await;
             break;
         }
 
@@ -769,9 +780,19 @@ async fn do_partitioned_search(
     Ok(())
 }
 
-async fn _send_partial_search_resp(session: &mut Session, trace_id: &str) -> Result<(), Error> {
+async fn send_partial_search_resp(
+    session: &mut Session,
+    trace_id: &str,
+    error: &str,
+) -> Result<(), Error> {
+    let error = if error.is_empty() {
+        PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
+    } else {
+        format!("{} \n {}", PARTIAL_ERROR_RESPONSE_MESSAGE, error)
+    };
     let s_resp = Response {
         is_partial: true,
+        function_error: error,
         ..Default::default()
     };
 

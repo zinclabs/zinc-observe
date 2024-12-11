@@ -21,7 +21,7 @@ use chrono::{Duration, Utc};
 use config::{
     get_config,
     meta::{
-        search::{SearchEventType, SearchHistoryHitResponse},
+        search::{SearchEventType, SearchHistoryHitResponse, PARTIAL_ERROR_RESPONSE_MESSAGE},
         self_reporting::usage::{RequestStats, UsageType, USAGE_STREAM},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -299,11 +299,13 @@ pub async fn search(
     match res {
         Ok(mut res) => {
             if res.is_partial {
-                let partial_err = "Please be aware that the response is based on partial data";
                 res.function_error = if res.function_error.is_empty() {
-                    partial_err.to_string()
+                    PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
                 } else {
-                    format!("{} \n {}", partial_err, res.function_error)
+                    format!(
+                        "{} \n {}",
+                        PARTIAL_ERROR_RESPONSE_MESSAGE, res.function_error
+                    )
                 };
             }
             if !range_error.is_empty() {

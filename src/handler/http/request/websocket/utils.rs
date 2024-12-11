@@ -74,7 +74,7 @@ pub mod enterprise_utils {
                 user_id,
                 auth_extractor,
                 user.role,
-                user.is_external
+                user.is_external,
             )
             .await;
 

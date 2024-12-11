@@ -22,6 +22,7 @@ use config::{
     meta::{
         function::VRLResultResolver,
         search,
+        search::PARTIAL_ERROR_RESPONSE_MESSAGE,
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -397,11 +398,13 @@ pub async fn search_multi(
 
                 if res.is_partial {
                     multi_res.is_partial = true;
-                    let partial_err = "Please be aware that the response is based on partial data";
                     multi_res.function_error = if res.function_error.is_empty() {
-                        partial_err.to_string()
+                        PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
                     } else {
-                        format!("{} \n {}", partial_err, res.function_error)
+                        format!(
+                            "{} \n {}",
+                            PARTIAL_ERROR_RESPONSE_MESSAGE, res.function_error
+                        )
                     };
                 }
                 if multi_res.histogram_interval.is_none() && res.histogram_interval.is_some() {

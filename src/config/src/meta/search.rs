@@ -25,6 +25,9 @@ use crate::{
     utils::{base64, json},
 };
 
+pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
+    "Please be aware that the response is based on partial data";
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StorageType {
     Memory,
