@@ -181,13 +181,17 @@ pub async fn handle_search_request(
         stream_settings.max_query_range
     }; // hours
 
-    if is_partition_request(&req.payload, stream_type, org_id).await {
+    // search result cache only when
+    // is_partition_request and
+    // from is 0 i.e. the first page/histogram queries
+    if is_partition_request(&req.payload, stream_type, org_id).await && req.payload.query.from == 0
+    {
         log::info!(
             "[WS_SEARCH] trace_id: {}, Searching Cache, req_size: {}",
             req.trace_id,
             req_size
         );
-        // search cache
+        // search result cache
         let c_resp =
             cache::check_cache_v2(&trace_id, org_id, stream_type, &req.payload, req.use_cache)
                 .await?;
@@ -254,7 +258,10 @@ pub async fn handle_search_request(
             )
             .await?;
         }
-        write_results_to_file(c_resp, start_time, end_time, accumulated_results).await?;
+        // cache only the first page
+        if req.payload.query.from == 0 {
+            write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await?;
+        }
     } else {
         // Single search (non-partitioned) for aggregate queries
         log::info!(
@@ -292,7 +299,6 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
         "src::handler::http::request::websocket::search::do_search",
         trace_id = %req.trace_id,
         org_id = %org_id,
-        user_id = %user_id
     );
 
     let res = SearchService::cache::search(
@@ -301,7 +307,7 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
         req.stream_type,
         Some(user_id.to_string()),
         &req.payload,
-        false,
+        false, // force search without cache
     )
     .instrument(span)
     .await;
@@ -811,7 +817,7 @@ async fn send_partial_search_resp(
     Ok(())
 }
 
-async fn write_results_to_file(
+async fn write_results_to_cache(
     c_resp: MultiCachedQueryResponse,
     start_time: i64,
     end_time: i64,
