@@ -2,6 +2,7 @@ use std::ops::ControlFlow;
 
 use config::meta::{
     search::{SearchEventContext, SearchEventType},
+    stream::StreamType,
     websocket::SearchResultType,
 };
 use infra::errors::Error;
@@ -108,8 +109,26 @@ fn update_histogram_in_expr(expr: &mut Expr, histogram_interval: i64) {
     }
 }
 
+/// Get the maximum query range for a list of streams in hours
+pub async fn get_max_query_range(
+    stream_names: &[String],
+    org_id: &str,
+    stream_type: StreamType,
+) -> i64 {
+    futures::future::join_all(
+        stream_names
+            .iter()
+            .map(|stream_name| infra::schema::get_settings(org_id, stream_name, stream_type)),
+    )
+    .await
+    .into_iter()
+    .filter_map(|settings| settings.map(|s| s.max_query_range))
+    .max()
+    .unwrap_or(0)
+}
+
 /// Calculates the ratio of cache hits to search hits in the accumulated search results.
-pub fn calc_result_cache_ratio(accumulated_results: &[SearchResultType]) -> usize {
+pub fn _calc_result_cache_ratio(accumulated_results: &[SearchResultType]) -> usize {
     let (search_hits, cache_hits) =
         accumulated_results
             .iter()

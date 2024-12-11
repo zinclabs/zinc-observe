@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_ws::Session;
+use chrono::Utc;
 use config::{
     get_config,
     meta::{
@@ -37,7 +38,8 @@ use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
         utils::websocket::{
-            calc_queried_range, get_search_type_from_ws_req, update_histogram_interval_in_query,
+            calc_queried_range, get_max_query_range, get_search_type_from_ws_req,
+            update_histogram_interval_in_query,
         },
     },
     handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
@@ -156,31 +158,6 @@ pub async fn handle_search_request(
     }
     let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
 
-    // start search
-    // get the max query range from the stream settings
-    let stream_name = if let Some(stream) = stream_names.first() {
-        stream
-    } else {
-        let err_res = WsServerEvents::error_response(
-            Error::Message("No stream name found in the query".to_string()),
-            Some(trace_id),
-            None,
-        );
-        send_message(session, err_res.to_json().to_string()).await?;
-        return Ok(());
-    };
-    let stream_settings = infra::schema::get_settings(org_id, stream_name, stream_type)
-        .await
-        .unwrap();
-    // TODO: revisit `max_query_range` to handle the below if condition in a better way
-    // `max_query_range` is used initialize `remaining_query_range`
-    // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
-    let max_query_range = if stream_settings.max_query_range == 0 {
-        i64::MAX
-    } else {
-        stream_settings.max_query_range
-    }; // hours
-
     // search result cache only when
     // is_partition_request and
     // from is 0 i.e. the first page/histogram queries
@@ -226,6 +203,15 @@ pub async fn handle_search_request(
 
         // handle cache responses and deltas
         if !cached_resp.is_empty() && cached_hits > 0 {
+            // `max_query_range` is used initialize `remaining_query_range`
+            // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
+            // for cache only search
+            let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
+            let max_query_range = if max_query_range == 0 {
+                i64::MAX
+            } else {
+                max_query_range
+            }; // hours
             handle_cache_responses_and_deltas(
                 session,
                 &req,
@@ -246,9 +232,10 @@ pub async fn handle_search_request(
                 "[WS_SEARCH] trace_id: {} No cache found, processing search request",
                 trace_id
             );
+            let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
             do_partitioned_search(
                 session,
-                &req,
+                &mut req,
                 &trace_id,
                 req_size,
                 org_id,
@@ -585,9 +572,16 @@ async fn process_delta(
                 "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
                 trace_id
             );
-            let _ =
-                send_partial_search_resp(session, &trace_id, MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE)
-                    .await;
+            let _ = send_partial_search_resp(
+                session,
+                &trace_id,
+                MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE,
+                req.payload.query.start_time,
+                // send current end_time searches using result cache
+                Utc::now().timestamp_micros(),
+                search_res.order_by,
+            )
+            .await;
             break;
         }
 
@@ -690,7 +684,7 @@ async fn send_cached_responses(
 #[allow(clippy::too_many_arguments)]
 async fn do_partitioned_search(
     session: &mut Session,
-    req: &SearchEventReq,
+    req: &mut SearchEventReq,
     trace_id: &str,
     req_size: i64,
     org_id: &str,
@@ -698,10 +692,22 @@ async fn do_partitioned_search(
     accumulated_results: &mut Vec<SearchResultType>,
     max_query_range: i64, // hours
 ) -> Result<(), Error> {
+    // limit the search by max_query_range
+    let mut range_error = String::new();
+    if max_query_range > 0
+        && (req.payload.query.end_time - req.payload.query.start_time)
+            > max_query_range * 3600 * 1_000_000
+    {
+        req.payload.query.start_time =
+            req.payload.query.end_time - max_query_range * 3600 * 1_000_000;
+        range_error = format!(
+            "Query duration is modified due to query range restriction of {} hours",
+            max_query_range
+        );
+    }
+
     let partitions_resp = get_partitions(req, org_id).await?;
     let partitions = partitions_resp.partitions;
-
-    let mut remaining_query_range = max_query_range as f64; // hours
 
     if partitions.is_empty() {
         return Ok(());
@@ -725,14 +731,21 @@ async fn do_partitioned_search(
             req.payload.query.size -= curr_res_size;
         }
 
-        let search_res = do_search(&req, org_id, user_id).await?;
+        let mut search_res = do_search(&req, org_id, user_id).await?;
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
-            // for every partition, compute the queried range omitting the result cache ratio
-            let queried_range =
-                calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
-            remaining_query_range -= queried_range;
+            // check range error
+            if !range_error.is_empty() {
+                search_res.is_partial = true;
+                search_res.function_error = if search_res.function_error.is_empty() {
+                    range_error.clone()
+                } else {
+                    format!("{} \n {}", range_error, search_res.function_error)
+                };
+                search_res.new_start_time = Some(req.payload.query.start_time);
+                search_res.new_end_time = Some(req.payload.query.end_time);
+            }
 
             // Accumulate the result
             accumulated_results.push(SearchResultType::Search(search_res.clone()));
@@ -744,18 +757,6 @@ async fn do_partitioned_search(
                 time_offset: end_time,
             };
             send_message(session, ws_search_res.to_json().to_string()).await?;
-        }
-
-        // Stop if `remaining_query_range` is less than 0
-        if remaining_query_range < 0.00 {
-            log::info!(
-                "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
-                trace_id
-            );
-            let _ =
-                send_partial_search_resp(session, trace_id, MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE)
-                    .await;
-            break;
         }
 
         // Stop if reached the requested result size
@@ -790,6 +791,9 @@ async fn send_partial_search_resp(
     session: &mut Session,
     trace_id: &str,
     error: &str,
+    new_start_time: i64,
+    new_end_time: i64,
+    order_by: Option<OrderBy>,
 ) -> Result<(), Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
@@ -799,6 +803,10 @@ async fn send_partial_search_resp(
     let s_resp = Response {
         is_partial: true,
         function_error: error,
+        new_start_time: Some(new_start_time),
+        new_end_time: Some(new_end_time),
+        order_by,
+        trace_id: trace_id.to_string(),
         ..Default::default()
     };
 
