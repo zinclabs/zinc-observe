@@ -231,7 +231,7 @@ async function getUsedStreamsList() {
   try {
     const res = await pipelineService.getPipelineStreams(org_identifier);
     usedStreams.value = res.data.list;
-  } catch (error) {
+  } catch (error:any) {
     usedStreams.value = [];
     if(error.response.status != 403){
       $q.notify({
