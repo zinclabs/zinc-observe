@@ -15,12 +15,15 @@
 
 use std::sync::Arc;
 
+use arrow::array::{ArrayRef, StringArray};
 use config::utils::str;
 use datafusion::{
     arrow::datatypes::DataType,
+    common::cast::as_string_array,
     error::DataFusionError,
     logical_expr::{ColumnarValue, ScalarFunctionImplementation, ScalarUDF, Volatility},
     prelude::create_udf,
+    scalar::ScalarValue,
     sql::sqlparser::parser::ParserError,
 };
 use once_cell::sync::Lazy;
@@ -55,13 +58,32 @@ fn decrypt() -> ScalarFunctionImplementation {
             ));
         }
 
-        let values = &args[0];
-        let key = &args[1];
+        let key = match &args[1] {
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.to_owned(),
+            _ => {
+                return Err(DataFusionError::SQL(
+                    ParserError::ParserError(
+                        "second argument to decrypt must be a key-name string".to_string(),
+                    ),
+                    None,
+                ))
+            }
+        };
 
-        println!("values : {:?}", values);
-        println!("key : {:?}", key);
-        Err(DataFusionError::NotImplemented(
-            "BUG: decrypt should have optimized away and never reached here".to_string(),
-        ))
+        let args = ColumnarValue::values_to_arrays(args)?;
+
+        let values = as_string_array(&args[0]).map_err(|_| {
+            DataFusionError::SQL(
+                ParserError::ParserError(
+                    "first argument to decrypt must be a string type column".to_string(),
+                ),
+                None,
+            )
+        })?;
+
+        // TODO: here we will eventually do the decryption with key
+        let ret = values.iter().map(|v| v).collect::<StringArray>();
+
+        Ok(ColumnarValue::from(Arc::new(ret) as ArrayRef))
     })
 }
