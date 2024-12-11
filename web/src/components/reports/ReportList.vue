@@ -323,11 +323,13 @@ onBeforeMount(() => {
       filterReports();
     })
     .catch((err) => {
-      q.notify({
+      if(err.response.status != 403){
+        q.notify({
         type: "negative",
         message: err?.data?.message || "Error while fetching reports!",
         timeout: 3000,
-      });
+        });
+      }
     })
     .finally(() => {
       isLoadingReports.value = false;
@@ -383,11 +385,13 @@ const toggleReportState = (report: any) => {
       });
     })
     .catch((err) => {
-      q.notify({
+      if(err.response.status != 403){
+        q.notify({
         type: "negative",
         message: err?.data?.message || "Error while stopping report!",
         timeout: 4000,
       });
+      }
     })
     .finally(() => {
       reportsStateLoadingMap.value[report.name] = false;
@@ -445,11 +449,13 @@ const deleteReport = (report: any) => {
       });
     })
     .catch((err: any) => {
-      q.notify({
+      if(err.response.status != 403){
+        q.notify({
         type: "negative",
         message: err?.data?.message || "Error while deleting report!",
         timeout: 4000,
       });
+      }
     })
     .finally(() => dismiss());
 };

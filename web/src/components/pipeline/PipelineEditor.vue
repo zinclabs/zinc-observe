@@ -668,13 +668,14 @@ const onSubmitPipeline = async () =>{
         });
       }
       else{
-        q.notify({
-        message:
-          error.response?.data?.message || "Error while saving pipeline",
-        color: "negative",
-        position: "bottom",
-        timeout: 3000,
-      });
+        if(error.response.status != 403){
+          q.notify({
+            message: error.response?.data?.message || "Error while saving pipeline",
+            color: "negative",
+            position: "bottom",
+            timeout: 3000,
+          });
+        }
       }
     })
     .finally(() => {
