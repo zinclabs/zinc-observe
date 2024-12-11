@@ -18,6 +18,7 @@ export interface Query {
   size: number;
   sql: string;
   sql_mode: string;
+  track_total_hits?: boolean;
 }
 
 export interface SearchRequestPayload {
@@ -32,6 +33,7 @@ export interface QueryPayload {
   from: number;
   size: number;
   query_fn?: string;
+  track_total_hits?: boolean;
 }
 export interface HistogramQueryPayload {
   histogram: string;
