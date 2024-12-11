@@ -25,17 +25,6 @@ use datafusion::{
 };
 use once_cell::sync::Lazy;
 
-// NOTE: This is not the actual implementation fo decrypt, because
-// decrypt needs async function, and udf do not support async functions.
-// Hence a method shown https://github.com/apache/datafusion/pull/6713/commits/127cc9313882aa321da8cd175fddc70eaec94e23
-// is used as guidance.
-
-// Thus this is only the "dummy" implementation, and actual handler is in the optimizer
-// The way it works is that we register a dummy UDF here so datafusion doesn't complain
-//  about the function not existing while parsing sql,
-// and then in optimizer passes we replcae that call with our custom physical executor
-// which actually does the work.
-
 /// The name of the decrypt UDF given to DataFusion.
 pub const DECRYPT_UDF_NAME: &str = "decrypt";
 
@@ -49,13 +38,13 @@ pub(crate) static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         DataType::Utf8,
         // Volatile is needed, as it is needed for our optimizer to be used, check if Stable can be
         // used instead as volatile is much less performant
-        Volatility::Volatile,
-        decrypt_placeholder(),
+        Volatility::Stable,
+        decrypt(),
     )
 });
 
-/// decrypt function placeholder for datafusion
-fn decrypt_placeholder() -> ScalarFunctionImplementation {
+/// decrypt function
+fn decrypt() -> ScalarFunctionImplementation {
     Arc::new(move |args: &[ColumnarValue]| {
         if args.len() != 2 {
             return Err(DataFusionError::SQL(
@@ -65,6 +54,12 @@ fn decrypt_placeholder() -> ScalarFunctionImplementation {
                 None,
             ));
         }
+
+        let values = &args[0];
+        let key = &args[1];
+
+        println!("values : {:?}", values);
+        println!("key : {:?}", key);
         Err(DataFusionError::NotImplemented(
             "BUG: decrypt should have optimized away and never reached here".to_string(),
         ))
