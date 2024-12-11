@@ -286,12 +286,16 @@ export const usePanelDataLoader = (
   };
 
   const cancelQueryAbort = () => {
-    // check if websocket search is enabled from organization settings
-    if (
-      (store?.state?.organizationData?.organizationSettings?.enable_websocket ||
-        (window as any)?.use_web_socket) &&
-      state.searchWebSocketRequestIdsAndTraceIds
-    ) {
+    state.loading = false;
+    // get websocket enable config from store
+    // window will have more priority
+    // if window has use_web_socket property then use that
+    // else use organization settings
+    const shouldUseWebSocket =
+      (window as any).use_web_socket ??
+      store?.state?.organizationData?.organizationSettings
+        ?.enable_websocket_search;
+    if (shouldUseWebSocket && state.searchWebSocketRequestIdsAndTraceIds) {
       // loop on state.searchWebSocketRequestIdsAndTraceIds
       state.searchWebSocketRequestIdsAndTraceIds.forEach((it) => {
         cancelSearchQueryBasedOnRequestId(it.requestId, it.traceId);
@@ -594,6 +598,11 @@ export const usePanelDataLoader = (
 
       processApiError(response?.content?.meta, "sql");
     }
+
+    if (response.type === "end") {
+      // set loading to false
+      state.loading = false;
+    }
   };
 
   const sendSearchMessage = async (requestId: string, payload: any) => {
@@ -626,8 +635,6 @@ export const usePanelDataLoader = (
     payload: any,
     response: any,
   ) => {
-    removeTraceId(payload.traceId);
-
     removeRequestId(requestId);
 
     if (response.type === "error") {
@@ -643,8 +650,6 @@ export const usePanelDataLoader = (
     payload: any,
     response: any,
   ) => {
-    removeTraceId(payload.traceId);
-
     removeRequestId(requestId);
 
     // set loading to false
@@ -664,7 +669,6 @@ export const usePanelDataLoader = (
   ) => {
     try {
       const { traceId } = generateTraceContext();
-      addTraceId(traceId);
 
       const payload: {
         queryReq: any;

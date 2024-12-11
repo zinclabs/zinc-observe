@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
         </div>
       </div>
-      <div v-if="searchObj.data.histogram.errorMsg == ''">
+      <div v-if="searchObj.data?.histogram?.errorMsg == ''">
         <ChartRenderer
           v-if="searchObj.meta.showHistogram"
           data-test="logs-search-result-bar-chart"
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="
-          searchObj.data.histogram.errorMsg != '' &&
+          searchObj.data.histogram?.errorMsg != '' &&
           searchObj.meta.showHistogram
         "
       >
@@ -117,11 +117,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("search.histogramErrorBtnLabel") }}</q-btn
           ><br />
           <span v-if="disableMoreErrorDetails">
-            {{ searchObj.data.histogram.errorMsg }}
+            {{ searchObj.data.histogram?.errorMsg }}
           </span>
         </h6>
         <h6 class="text-center" v-else>
-          {{ searchObj.data.histogram.errorMsg }}
+          {{ searchObj.data.histogram?.errorMsg }}
         </h6>
       </div>
       <tenstack-table

@@ -4424,6 +4424,11 @@ const useLogs = () => {
         searchObj.data.queryResults = {};
       }
 
+      // reset searchAggData
+      searchAggData.total = 0;
+      searchAggData.hasAggregation = false;
+      searchObj.meta.resultGrid.showPagination = true;
+
       searchObj.meta.showDetailTab = false;
       searchObj.meta.searchApplied = true;
       searchObj.data.functionError = "";
@@ -4615,13 +4620,10 @@ const useLogs = () => {
     try {
       const parsedSQL = fnParsedSQL();
 
-      // When using limit
-      searchAggData.total = 0;
-      searchAggData.hasAggregation = false;
-      searchObj.meta.resultGrid.showPagination = true;
-      if (searchObj.meta.sqlMode == true) {
+      if (searchObj.meta.sqlMode) {
         if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
-          searchAggData.total = response.content?.results?.total || 0;
+          searchAggData.total =
+            searchAggData.total + response.content?.results?.total;
           searchAggData.hasAggregation = true;
           searchObj.meta.resultGrid.showPagination = false;
         }
