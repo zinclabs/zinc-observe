@@ -4955,8 +4955,12 @@ const useLogs = () => {
 
         addRequestId(requestId, traceId);
       }
-    } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
+    } else if (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram is not available for limit queries.");
+    } else if (searchObj.meta.sqlMode && !isDistinctQuery(parsedSQL)) {
+      resetHistogramWithError(
+        "Histogram is not available for DISTINCT queries.",
+      );
     } else {
       let aggFlag = false;
       if (parsedSQL) {
@@ -4990,7 +4994,7 @@ const useLogs = () => {
   }
 
   function isNonAggregatedSQLMode(searchObj: any, parsedSQL: any) {
-    return searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL);
+    return searchObj.meta.sqlMode && isLimitQuery(parsedSQL);
   }
 
   function isHistogramDataMissing(searchObj: any) {
