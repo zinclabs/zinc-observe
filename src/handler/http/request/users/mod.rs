@@ -658,9 +658,8 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
     use chrono::Utc;
 
     audit_message._timestamp = Utc::now().timestamp_micros();
-    match &mut audit_message.protocol {
-        Protocol::Http(http_meta) => http_meta.response_code = 401,
-        _ => (),
+    if let Protocol::Http(http_meta) = &mut audit_message.protocol {
+        http_meta.response_code = 401;
     }
     // Even if the user_email of audit_message is not set, still the event should be audited
     audit(audit_message).await;

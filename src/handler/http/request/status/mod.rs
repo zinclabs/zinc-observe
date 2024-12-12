@@ -457,11 +457,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             }
             Err(_) => {
                 // Bad Request
-                match audit_message.protocol {
-                    Protocol::Http(ref mut http_meta) => {
-                        http_meta.response_code = 400;
-                    }
-                    _ => {}
+                if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                    http_meta.response_code = 400;
                 }
                 audit(audit_message).await;
                 return Err(Error::new(ErrorKind::Other, "invalid state in request"));
@@ -470,11 +467,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
 
         None => {
             // Bad Request
-            match audit_message.protocol {
-                Protocol::Http(ref mut http_meta) => {
-                    http_meta.response_code = 400;
-                }
-                _ => {}
+            if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                http_meta.response_code = 400;
             }
             audit(audit_message).await;
             return Err(Error::new(ErrorKind::Other, "no state in request"));
@@ -512,11 +506,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     process_token(res).await
                 }
                 Err(e) => {
-                    match audit_message.protocol {
-                        Protocol::Http(ref mut http_meta) => {
-                            http_meta.response_code = 400;
-                        }
-                        _ => {}
+                    if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                        http_meta.response_code = 400;
                     }
                     audit_message._timestamp = chrono::Utc::now().timestamp_micros();
                     audit(audit_message).await;
@@ -561,11 +552,8 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 .finish())
         }
         Err(e) => {
-            match audit_message.protocol {
-                Protocol::Http(ref mut http_meta) => {
-                    http_meta.response_code = 400;
-                }
-                _ => {}
+            if let Protocol::Http(ref mut http_meta) = audit_message.protocol {
+                http_meta.response_code = 400;
             }
             audit_message._timestamp = chrono::Utc::now().timestamp_micros();
             audit(audit_message).await;
