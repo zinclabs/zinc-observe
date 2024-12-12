@@ -139,12 +139,14 @@ const saveGroup = () => {
       });
     })
     .catch((err) => {
-      q.notify({
+      if(err.response.status != 403){
+        q.notify({
         message: "Error while creating group",
         color: "negative",
         position: "bottom",
         timeout: 3000,
       });
+      }
       console.log(err);
     });
 };

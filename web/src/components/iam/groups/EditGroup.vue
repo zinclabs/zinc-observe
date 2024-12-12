@@ -235,11 +235,13 @@ const saveGroupChanges = () => {
       removedUsers.value = new Set([]);
     })
     .catch((err) => {
-      q.notify({
-        type: "negative",
-        message: "Error while updating group!",
-        timeout: 3000,
-      });
+      if(err.response.status != 403){
+        q.notify({
+          type: "negative",
+          message: "Error while updating group!",
+          timeout: 3000,
+        });
+      }
     });
 };
 
