@@ -1647,9 +1647,7 @@ const useLogs = () => {
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
-              (searchObj.meta.sqlMode &&
-                !isLimitQuery(parsedSQL) &&
-                !isDistinctQuery(parsedSQL)))) ||
+              isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&

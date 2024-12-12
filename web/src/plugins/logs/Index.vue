@@ -427,6 +427,7 @@ export default defineComponent({
         // As page count request was getting fired on changing date records per page instead of histogram,
         // so added this condition to avoid that
         this.searchObj.meta.refreshHistogram = true;
+        this.searchObj.data.queryResults.aggs = null;
 
         await this.getQueryData(false);
         this.refreshHistogramChart();
