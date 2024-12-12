@@ -19,7 +19,7 @@ use config::{
     get_config,
     meta::{
         search::{
-            Response, SearchPartitionRequest, SearchPartitionResponse,
+            Response, SearchEventType, SearchPartitionRequest, SearchPartitionResponse,
             PARTIAL_ERROR_RESPONSE_MESSAGE,
         },
         sql::{resolve_stream_names, OrderBy},
@@ -156,7 +156,12 @@ pub async fn handle_search_request(
             interval
         );
     }
-    let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
+    let mut order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
+
+    // Force set order_by to desc if its from Dashboards
+    if req.search_type == SearchEventType::Alerts {
+        order_by = OrderBy::Desc;
+    }
 
     // search result cache only when
     // is_partition_request and
@@ -207,11 +212,15 @@ pub async fn handle_search_request(
             // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
             // for cache only search
             let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
-            let max_query_range = if max_query_range == 0 {
+            let max_query_range = if max_query_range == 0
+                // disable limit for `Alerts`
+                ||  req.search_type == SearchEventType::Alerts
+            {
                 i64::MAX
             } else {
                 max_query_range
             }; // hours
+
             handle_cache_responses_and_deltas(
                 session,
                 &req,
@@ -232,7 +241,13 @@ pub async fn handle_search_request(
                 "[WS_SEARCH] trace_id: {} No cache found, processing search request",
                 trace_id
             );
-            let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
+            // disable `max_query_range` for Alerts
+            let max_query_range = if req.search_type == SearchEventType::Alerts {
+                0
+            } else {
+                get_max_query_range(&stream_names, org_id, stream_type).await
+            }; // hours
+
             do_partitioned_search(
                 session,
                 &mut req,
