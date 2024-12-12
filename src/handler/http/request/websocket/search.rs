@@ -156,12 +156,7 @@ pub async fn handle_search_request(
             interval
         );
     }
-    let mut order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
-
-    // Force set order_by to desc if its from Dashboards
-    if req.search_type == SearchEventType::Alerts {
-        order_by = OrderBy::Desc;
-    }
+    let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
 
     // search result cache only when
     // is_partition_request and
@@ -373,8 +368,14 @@ async fn handle_cache_responses_and_deltas(
     org_id: &str,
     user_id: &str,
     max_query_range: i64,
-    order_by: &OrderBy,
+    mut order_by: &OrderBy,
 ) -> Result<(), Error> {
+    // Force set order_by to desc for dashboards
+    // so that deltas are processed in the reverse order
+    if req.search_type == SearchEventType::Dashboards {
+        order_by = &OrderBy::Desc;
+    }
+
     // deltas are always asc
     // reverse the deltas if order_by is descending
     if let OrderBy::Desc = order_by {
@@ -728,10 +729,15 @@ async fn do_partitioned_search(
     }
 
     let partitions_resp = get_partitions(req, org_id).await?;
-    let partitions = partitions_resp.partitions;
+    let mut partitions = partitions_resp.partitions;
 
     if partitions.is_empty() {
         return Ok(());
+    }
+
+    // sort partitions in desc by _timestamp for dashboards
+    if req.search_type == SearchEventType::Dashboards {
+        partitions.sort_by(|a, b| b[0].cmp(&a[0]));
     }
 
     let mut curr_res_size = 0;
