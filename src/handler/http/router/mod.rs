@@ -26,7 +26,6 @@ use actix_web_httpauth::middleware::HttpAuthentication;
 use actix_web_lab::middleware::{from_fn, Next};
 use config::get_config;
 use futures::FutureExt;
-use o2_enterprise::enterprise::common::auditor::{HttpMeta, Protocol, WsMeta};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
@@ -37,7 +36,7 @@ use {
     base64::{engine::general_purpose, Engine as _},
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
-        auditor::AuditMessage, infra::config::get_config as get_o2_config,
+        auditor::{AuditMessage, Protocol, WsMeta, HttpMeta}, infra::config::get_config as get_o2_config,
     },
 };
 
