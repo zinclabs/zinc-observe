@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       `Use alphanumeric and '_' characters only, without spaces.`
                     : t('common.nameRequired'),
               ]"
+              maxlength="100"
             >
               <template v-slot:hint>
                 Use alphanumeric and '_' characters only, without spaces.

@@ -259,21 +259,24 @@ onBeforeMount(async () => {
   updateUserTable(usersDisplay.value);
 
   if (store.state.organizations.length > 0) {
-    orgOptions.value.push(
-      ...store.state.organizations.map((data:any) => ({
-        label: data.name,
-        id: data.id,
-        identifier: data.identifier,
-        user_email: store.state.userInfo.email,
-        ingest_threshold: data.ingest_threshold,
-        search_threshold: data.search_threshold,
-        subscription_type: data.CustomerBillingObj?.subscription_type || "",
-        status: data.status,
-        note: data.CustomerBillingObj?.note || "",
-      }))
-    );
-  }
+    const otherOrgOptions = store.state.organizations.map((data: any) => ({
+      label: data.name,
+      id: data.id,
+      identifier: data.identifier,
+      user_email: store.state.userInfo.email,
+      ingest_threshold: data.ingest_threshold,
+      search_threshold: data.search_threshold,
+      subscription_type: data.CustomerBillingObj?.subscription_type || "",
+      status: data.status,
+      note: data.CustomerBillingObj?.note || "",
+    }));
 
+    // Sort the organization options alphabetically by label
+    otherOrgOptions.sort((a, b) => a.label.localeCompare(b.label));
+
+    // Prepend "All" option to the sorted list
+    orgOptions.value = [{ label: "All", value: "all" }, ...otherOrgOptions];
+  }
   selectedOrg.value = orgOptions.value[0]; // Default to "All"
 });
 

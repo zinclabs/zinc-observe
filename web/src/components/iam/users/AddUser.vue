@@ -63,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               (val: any, rules: any) =>
                 rules.email(val) || 'Please enter a valid email address',
             ]"
+            maxlength="100"
           />
 
           <div v-if="!beingUpdated && !existingUser">
@@ -250,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(val) ||
                 'Input must start with a letter and be alphanumeric _ or -',
             ]"
+            maxlength="100"
           />
 
           <div class="flex justify-end q-mt-md">
@@ -368,6 +370,7 @@ export default defineComponent({
     let organizationOptions: any = ref([]);
     const loadingOrganizations = ref(true);
     const logout_confirm = ref(false);
+    const loggedInUserEmail = ref(store.state.userInfo.email);
 
 
     onActivated(() => {
@@ -417,6 +420,7 @@ export default defineComponent({
       getImageURL,
       loadingOrganizations,
       logout_confirm,
+      loggedInUserEmail
     };
   },
   created() {
@@ -430,7 +434,7 @@ export default defineComponent({
     ) {
       this.existingUser = false;
       this.beingUpdated = true;
-      this.formData = this.modelValue;
+      this.formData = {...this.modelValue};
       this.formData.change_password = false;
       this.formData.password = "";
     }
@@ -472,11 +476,10 @@ export default defineComponent({
           delete this.formData.old_password;
           delete this.formData.new_password;
         }
-
         userServiece
           .update(this.formData, selectedOrg, userEmail)
           .then((res: any) => {
-            if (this.formData.change_password == true) {
+            if (this.formData.change_password == true && this.loggedInUserEmail === this.modelValue.email) {
               this.logout_confirm = true;
             } else {
               dismiss();
@@ -514,11 +517,11 @@ export default defineComponent({
             })
             .catch((err: any) => {
               if(err.response.data.code === 422){
-                this.$q.notify({
-                  color: "positive",
-                  type: 'positive',
-                  message: "User added successfully.",
-                });
+                // this.$q.notify({
+                //   color: "positive",
+                //   type: 'positive',
+                //   message: "User added successfully.",
+                // });
                 dismiss();
                 this.existingUser = false;
               }

@@ -65,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dense
           :rules="[(val: any) => !!val || t('organization.nameRequired')]"
           data-test="org-name"
+          maxlength="100"
         />
 
         <div class="flex justify-center q-mt-lg">
