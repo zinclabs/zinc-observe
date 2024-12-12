@@ -36,6 +36,7 @@ use infra::{
     file_list,
     schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST},
 };
+use o2_enterprise::enterprise::common::auditor::{HttpMeta, Protocol};
 use serde::Serialize;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
@@ -378,12 +379,14 @@ pub async fn config_reload() -> Result<HttpResponse, Error> {
         // Since this is not a protected route, there is no way to get the user email
         user_email: "".to_string(),
         org_id: "".to_string(),
-        method: "GET".to_string(),
         _timestamp: chrono::Utc::now().timestamp_micros(),
-        path: "/config/reload".to_string(),
-        query_params: "".to_string(),
-        body: "".to_string(),
-        response_code: 200,
+        protocol: Protocol::Http(HttpMeta {
+            method: "GET".to_string(),
+            path: "/config/reload".to_string(),
+            query_params: "".to_string(),
+            body: "".to_string(),
+            response_code: 200,
+        }),
     })
     .await;
     Ok(HttpResponse::Ok().json(serde_json::json!({"status": status})))
@@ -437,12 +440,14 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        method: "GET".to_string(),
-        path: "/config/redirect".to_string(),
-        body: "".to_string(),
-        query_params: req.query_string().to_string(),
-        response_code: 302,
         _timestamp: chrono::Utc::now().timestamp_micros(),
+        protocol: Protocol::Http(HttpMeta {
+            method: "GET".to_string(),
+            path: "/config/redirect".to_string(),
+            body: "".to_string(),
+            query_params: req.query_string().to_string(),
+            response_code: 302,
+        }),
     };
 
     match query.get("state") {
@@ -452,7 +457,12 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             }
             Err(_) => {
                 // Bad Request
-                audit_message.response_code = 400;
+                match audit_message.protocol {
+                    Protocol::Http(ref mut http_meta) => {
+                        http_meta.response_code = 400;
+                    }
+                    _ => {}
+                }
                 audit(audit_message).await;
                 return Err(Error::new(ErrorKind::Other, "invalid state in request"));
             }
@@ -460,7 +470,12 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
 
         None => {
             // Bad Request
-            audit_message.response_code = 400;
+            match audit_message.protocol {
+                Protocol::Http(ref mut http_meta) => {
+                    http_meta.response_code = 400;
+                }
+                _ => {}
+            }
             audit(audit_message).await;
             return Err(Error::new(ErrorKind::Other, "no state in request"));
         }
@@ -497,7 +512,12 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                     process_token(res).await
                 }
                 Err(e) => {
-                    audit_message.response_code = 401;
+                    match audit_message.protocol {
+                        Protocol::Http(ref mut http_meta) => {
+                            http_meta.response_code = 400;
+                        }
+                        _ => {}
+                    }
                     audit_message._timestamp = chrono::Utc::now().timestamp_micros();
                     audit(audit_message).await;
                     return Ok(HttpResponse::Unauthorized().json(e.to_string()));
@@ -541,7 +561,12 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
                 .finish())
         }
         Err(e) => {
-            audit_message.response_code = 401;
+            match audit_message.protocol {
+                Protocol::Http(ref mut http_meta) => {
+                    http_meta.response_code = 400;
+                }
+                _ => {}
+            }
             audit_message._timestamp = chrono::Utc::now().timestamp_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Unauthorized().json(e.to_string()))
@@ -688,12 +713,14 @@ async fn logout(req: actix_web::HttpRequest) -> HttpResponse {
         audit(AuditMessage {
             user_email,
             org_id: "".to_string(),
-            method: "GET".to_string(),
             _timestamp: chrono::Utc::now().timestamp_micros(),
-            path: "/config/logout".to_string(),
-            query_params: req.query_string().to_string(),
-            body: "".to_string(),
-            response_code: 200,
+            protocol: Protocol::Http(HttpMeta {
+                method: "GET".to_string(),
+                path: "/config/logout".to_string(),
+                query_params: req.query_string().to_string(),
+                body: "".to_string(),
+                response_code: 200,
+            }),
         })
         .await;
     }

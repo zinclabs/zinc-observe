@@ -26,6 +26,7 @@ use actix_web_httpauth::middleware::HttpAuthentication;
 use actix_web_lab::middleware::{from_fn, Next};
 use config::get_config;
 use futures::FutureExt;
+use o2_enterprise::enterprise::common::auditor::{HttpMeta, Protocol};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
@@ -120,12 +121,14 @@ async fn audit_middleware(
             audit(AuditMessage {
                 user_email,
                 org_id,
-                method,
-                path,
-                body,
-                query_params,
-                response_code: res.response().status().as_u16(),
                 _timestamp: chrono::Utc::now().timestamp_micros(),
+                protocol: Protocol::Http(HttpMeta {
+                    method,
+                    path,
+                    body,
+                    query_params,
+                    response_code: res.response().status().as_u16(),
+                }),
             })
             .await;
         }

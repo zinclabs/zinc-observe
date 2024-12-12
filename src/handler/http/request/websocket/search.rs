@@ -360,6 +360,7 @@ async fn handle_cache_responses_and_deltas(
     max_query_range: i64,
     order_by: &OrderBy,
 ) -> Result<(), Error> {
+    // deltas are always asc
     // reverse the deltas if order_by is descending
     if let OrderBy::Desc = order_by {
         deltas.reverse();
@@ -700,6 +701,11 @@ async fn do_partitioned_search(
     {
         req.payload.query.start_time =
             req.payload.query.end_time - max_query_range * 3600 * 1_000_000;
+        log::info!(
+            "[WS_SEARCH] Query duration is modified due to query range restriction of {} hours, new start_time: {}",
+            max_query_range,
+            req.payload.query.start_time
+        );
         range_error = format!(
             "Query duration is modified due to query range restriction of {} hours",
             max_query_range
