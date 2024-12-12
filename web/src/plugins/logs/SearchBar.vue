@@ -1253,7 +1253,7 @@ export default defineComponent({
         }
       }
 
-      if(parsedSQL?._next) {
+      if (parsedSQL?._next) {
         columnNames = getColumnNames(parsedSQL._next);
       }
       return columnNames;
@@ -2712,6 +2712,347 @@ export default defineComponent({
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
+    // const updateFieldConditions = (query, fieldName, newValue, actionType = "include") => {
+    //   // Helper function to determine field type and construct expressions
+    //   const getFilterExpressionByFieldType = (field, fieldValue, action) => {
+    //     let operator = action === "include" ? "=" : "!=";
+    //     try {
+    //       let fieldType = "utf8";
+
+    //       const getStreamFieldTypes = (stream) => {
+    //         if (!stream.schema) return {};
+    //         return Object.fromEntries(
+    //           stream.schema.map((schema) => [schema.name, schema.type])
+    //         );
+    //       };
+
+    //       const fieldTypeList = searchObj.data.streamResults.list
+    //         .filter((stream) =>
+    //           searchObj.data.stream.selectedStream.includes(stream.name)
+    //         )
+    //         .reduce(
+    //           (acc, stream) => ({
+    //             ...acc,
+    //             ...getStreamFieldTypes(stream),
+    //           }),
+    //           {}
+    //         );
+
+    //       if (Object.hasOwn(fieldTypeList, field)) {
+    //         fieldType = fieldTypeList[field];
+    //       }
+
+    //       if (fieldValue === "null" || fieldValue === "" || fieldValue === null) {
+    //         operator = action === "include" ? "is" : "is not";
+    //         fieldValue = "null";
+    //       }
+
+    //       const isNumericType = (type) => ["int64", "float64"].includes(type.toLowerCase());
+    //       const isBooleanType = (type) => type.toLowerCase() === "boolean";
+
+    //       let expression = `${field} ${operator} ${fieldValue === "null" ? fieldValue : `'${fieldValue}'`}`;
+
+    //       if (isNumericType(fieldType)) {
+    //         expression = `${field} ${operator} ${fieldValue}`;
+    //       } else if (isBooleanType(fieldType)) {
+    //         operator = action === "include" ? "is" : "is not";
+    //         expression = `${field} ${operator} ${fieldValue}`;
+    //       }
+
+    //       return { operator, fieldValue, expression };
+    //     } catch (e) {
+    //       console.log("Error while getting filter expression by field type", e);
+    //       return { operator, fieldValue, expression: `${field} ${operator} '${fieldValue}'` };
+    //     }
+    //   };
+
+    //   // If no WHERE clause exists, create one
+    //   if (!query.where) {
+    //     const { operator, fieldValue } = getFilterExpressionByFieldType(fieldName, newValue, actionType);
+    //     query.where = {
+    //       type: 'binary_expr',
+    //       operator: operator,
+    //       left: { type: 'column_ref', column: { expr: { value: fieldName } } },
+    //       right: { type: 'single_quote_string', value: fieldValue },
+    //     };
+    //     return query;
+    //   }
+
+    //   let fieldFound = false;
+
+    //   function transformConditions(condition) {
+    //     if (!condition) return condition;
+
+    //     if (condition.type === 'binary_expr') {
+    //       if (
+    //         condition.left.type === 'column_ref' &&
+    //         condition.left.column.expr.value === fieldName
+    //       ) {
+    //         fieldFound = true;
+
+    //         const { operator, fieldValue } = getFilterExpressionByFieldType(
+    //           fieldName,
+    //           newValue,
+    //           actionType
+    //         );
+
+    //         switch (condition.operator) {
+    //           case '=':
+    //           case '!=':
+    //             condition.operator = operator.includes("IN") ? operator : operator;
+    //             condition.right = {
+    //               type: 'expr_list',
+    //               value: [
+    //                 { type: 'single_quote_string', value: condition.right.value },
+    //               ],
+    //             };
+    //             condition.right.value.push({
+    //               type: 'single_quote_string',
+    //               value: fieldValue,
+    //             });
+    //             break;
+
+    //           case 'IN':
+    //           case 'NOT IN':
+    //             condition.right.value.push({
+    //               type: 'single_quote_string',
+    //               value: fieldValue,
+    //             });
+    //             break;
+
+    //           default:
+    //             break;
+    //         }
+    //       } else {
+    //         condition.left = transformConditions(condition.left);
+    //         condition.right = transformConditions(condition.right);
+    //       }
+    //     }
+    //     return condition;
+    //   }
+
+    //   query.where = transformConditions(query.where);
+
+    //   if (!fieldFound) {
+    //     const { operator, fieldValue } = getFilterExpressionByFieldType(fieldName, newValue, actionType);
+
+    //     const newCondition = {
+    //       type: 'binary_expr',
+    //       operator: operator,
+    //       left: { type: 'column_ref', column: { expr: { value: fieldName } } },
+    //       right: { type: 'single_quote_string', value: fieldValue },
+    //     };
+
+    //     query.where = {
+    //       type: 'binary_expr',
+    //       operator: 'AND',
+    //       left: query.where,
+    //       right: newCondition,
+    //     };
+    //   }
+
+    //   return query;
+    // };
+
+    const updateFieldConditions = (query, fieldName, newValue, actionType = "include") => {
+  const getFilterExpressionByFieldType = (field, fieldValue, action) => {
+    let operator = action === "include" ? "=" : "!=";
+    if (fieldValue === "null" || fieldValue === "" || fieldValue === null) {
+      operator = action === "include" ? "IS" : "IS NOT";
+      fieldValue = null; // Use `null` without quotes
+    }
+    return { operator, fieldValue };
+  };
+
+  // Helper to wrap conditions in an OR clause
+  const wrapInOrClause = (existingCondition, newCondition) => ({
+    type: 'binary_expr',
+    operator: 'OR',
+    left: existingCondition,
+    right: newCondition,
+  });
+
+  // If no WHERE clause exists, create one
+  if (!query.where) {
+    const { operator, fieldValue } = getFilterExpressionByFieldType(fieldName, newValue, actionType);
+    query.where = {
+      type: 'binary_expr',
+      operator: operator,
+      left: { type: 'column_ref', column: { expr: { value: fieldName } } },
+      right: fieldValue !== null
+        ? { type: 'single_quote_string', value: fieldValue }
+        : { type: 'null' }, // Use type 'null' for unquoted null
+    };
+    return query;
+  }
+
+  let fieldFound = false;
+
+  function transformConditions(condition) {
+    if (!condition) return condition;
+
+    if (condition.type === 'binary_expr') {
+      if (
+        condition.left.type === 'column_ref' &&
+        condition.left.column.expr.value === fieldName
+      ) {
+        fieldFound = true;
+
+        const { operator, fieldValue } = getFilterExpressionByFieldType(fieldName, newValue, actionType);
+
+        if (condition.operator === 'NOT IN') {
+          // Append an OR clause for the new value
+          condition = wrapInOrClause(
+            condition,
+            {
+              type: 'binary_expr',
+              operator: operator,
+              left: { type: 'column_ref', column: { expr: { value: fieldName } } },
+              right: fieldValue !== null
+                ? { type: 'single_quote_string', value: fieldValue }
+                : { type: 'null' },
+            }
+          );
+        } else if (condition.operator === '=' || condition.operator === '!=') {
+          // Convert existing condition to an OR clause
+          condition = wrapInOrClause(
+            condition,
+            {
+              type: 'binary_expr',
+              operator: operator,
+              left: { type: 'column_ref', column: { expr: { value: fieldName } } },
+              right: fieldValue !== null
+                ? { type: 'single_quote_string', value: fieldValue }
+                : { type: 'null' },
+            }
+          );
+        } else if (condition.operator === 'IN') {
+          // Add NULL or the new value as a separate OR clause instead of modifying IN list
+          if (fieldValue === null) {
+            condition = wrapInOrClause(
+              condition,
+              {
+                type: 'binary_expr',
+                operator: operator,
+                left: { type: 'column_ref', column: { expr: { value: fieldName } } },
+                right: { type: 'null' },
+              }
+            );
+          } else {
+            condition.right.value.push({
+              type: 'single_quote_string',
+              value: fieldValue,
+            });
+          }
+        }
+      } else {
+        // Recursively process left and right conditions
+        condition.left = transformConditions(condition.left);
+        condition.right = transformConditions(condition.right);
+      }
+    }
+    return condition;
+  }
+
+  query.where = transformConditions(query.where);
+
+  // If the field was not found, add a new condition
+  if (!fieldFound) {
+    const { operator, fieldValue } = getFilterExpressionByFieldType(fieldName, newValue, actionType);
+
+    const newCondition = {
+      type: 'binary_expr',
+      operator: operator,
+      left: { type: 'column_ref', column: { expr: { value: fieldName } } },
+      right: fieldValue !== null
+        ? { type: 'single_quote_string', value: fieldValue }
+        : { type: 'null' },
+    };
+
+    // Append the new condition to the WHERE clause
+    query.where = {
+      type: 'binary_expr',
+      operator: 'AND',
+      left: query.where,
+      right: newCondition,
+    };
+  }
+
+  return query;
+};
+
+    /* Dummuy START function for testing */
+    const addFilter = (query, fieldName, newValue) => {
+      
+      const newQuery = updateFieldConditions(parser.astify(query.replace(/`/g, '"')), fieldName, newValue);
+      return parser.sqlify(newQuery);
+    };
+
+    const runTestCases = () => {
+      const query_in = "select * from stream where k8s_app_component IN ('nats')";
+      const query_equal = "select * from stream where k8s_app_component = 'nats'";
+      const query_not_in = "select * from stream where k8s_app_component NOT IN ('nats')";
+      const query_not_equal = "select * from stream where k8s_app_component != 'nats'";
+      const query_in_integers = "select * from stream where k8s_app_component IN (1, 2, 3)";
+      const query_equal_integers = "select * from stream where k8s_app_component = 1";
+      const query_not_in_integers = "select * from stream where k8s_app_component NOT IN (1, 2, 3)";
+      const query_not_equal_integers = "select * from stream where k8s_app_component != 1";
+      const query_in_additional_filter = "select * from stream where k8s_app_component IN ('nats') and k8s_app_name = 'nats-streaming-server'";
+      const query_only_additional_filter = "select * from stream where k8s_app_name = 'nats-streaming-server'";
+      const query_union_all = "select * from stream where k8s_app_component IN ('nats') UNION ALL select * from stream where k8s_app_name = 'nats-streaming-server'";
+      const query_existin_null = "select * from stream where k8s_app_component = null";
+
+      console.log(query_in, " ====> ", addFilter(query_in, 'k8s_app_component', 'controller'));
+      console.log(query_equal, " ====> ", addFilter(query_equal, 'k8s_app_component', 'controller'));
+      console.log(query_not_in, " ====> ", addFilter(query_not_in, 'k8s_app_component', 'controller'));
+      console.log(query_not_equal, " ====> ", addFilter(query_not_equal, 'k8s_app_component', 'controller'));
+      console.log(query_in_integers, " ====> ", addFilter(query_in_integers, 'k8s_app_component', 'controller'));
+      console.log(query_equal_integers, " ====> ", addFilter(query_equal_integers, 'k8s_app_component', 'controller'));
+      console.log(query_not_in_integers, " ====> ", addFilter(query_not_in_integers, 'k8s_app_component', 'controller'));
+      console.log(query_not_equal_integers, " ====> ", addFilter(query_not_equal_integers, 'k8s_app_component', 'controller'));
+      console.log(query_in_additional_filter, " ====> ", addFilter(query_in_additional_filter, 'k8s_app_component', 'controller'));
+      console.log(query_only_additional_filter, " ====> ", addFilter(query_only_additional_filter, 'k8s_app_component', 'controller'));
+      console.log(query_union_all, " ====> ", addFilter(query_union_all, 'k8s_app_component', 'controller'));
+      console.log(query_existin_null, " ====> ", addFilter(query_existin_null, 'k8s_app_component', 'controller'));
+
+
+      console.log("\n");
+      console.log("Test Cases with NULL value:");
+      console.log("\n");
+
+      console.log(query_in, " ====> ", addFilter(query_in, 'k8s_app_component', 'null'));
+      console.log(query_equal, " ====> ", addFilter(query_equal, 'k8s_app_component', 'null'));
+      console.log(query_not_in, " ====> ", addFilter(query_not_in, 'k8s_app_component', 'null'));
+      console.log(query_not_equal, " ====> ", addFilter(query_not_equal, 'k8s_app_component', 'null'));
+      console.log(query_in_integers, " ====> ", addFilter(query_in_integers, 'k8s_app_component', 'null'));
+      console.log(query_equal_integers, " ====> ", addFilter(query_equal_integers, 'k8s_app_component', 'null'));
+      console.log(query_not_in_integers, " ====> ", addFilter(query_not_in_integers, 'k8s_app_component', 'null'));
+      console.log(query_not_equal_integers, " ====> ", addFilter(query_not_equal_integers, 'k8s_app_component', 'null'));
+      console.log(query_in_additional_filter, " ====> ", addFilter(query_in_additional_filter, 'k8s_app_component', 'null'));
+      console.log(query_only_additional_filter, " ====> ", addFilter(query_only_additional_filter, 'k8s_app_component', 'null'));
+      console.log(query_union_all, " ====> ", addFilter(query_union_all, 'k8s_app_component', 'null'));
+      console.log(query_existin_null, " ====> ", addFilter(query_existin_null, 'k8s_app_component', 'controller'));
+
+      console.log("\n");
+      console.log("Test Cases with BLANK value:");
+      console.log("\n");
+
+      console.log(query_in, " ====> ", addFilter(query_in, 'k8s_app_component', ''));
+      console.log(query_equal, " ====> ", addFilter(query_equal, 'k8s_app_component', ''));
+      console.log(query_not_in, " ====> ", addFilter(query_not_in, 'k8s_app_component', ''));
+      console.log(query_not_equal, " ====> ", addFilter(query_not_equal, 'k8s_app_component', ''));
+      console.log(query_in_integers, " ====> ", addFilter(query_in_integers, 'k8s_app_component', ''));
+      console.log(query_equal_integers, " ====> ", addFilter(query_equal_integers, 'k8s_app_component', ''));
+      console.log(query_not_in_integers, " ====> ", addFilter(query_not_in_integers, 'k8s_app_component', ''));
+      console.log(query_not_equal_integers, " ====> ", addFilter(query_not_equal_integers, 'k8s_app_component', ''));
+      console.log(query_in_additional_filter, " ====> ", addFilter(query_in_additional_filter, 'k8s_app_component', ''));
+      console.log(query_only_additional_filter, " ====> ", addFilter(query_only_additional_filter, 'k8s_app_component', ''));
+      console.log(query_union_all, " ====> ", addFilter(query_union_all, 'k8s_app_component', ''));
+      console.log(query_existin_null, " ====> ", addFilter(query_existin_null, 'k8s_app_component', 'controller'));
+    };
+
+    /* Dummy END function for testing */
+
     // [END] cancel running queries
 
     return {
@@ -2800,6 +3141,8 @@ export default defineComponent({
       backgroundColorStyle,
       editorWidthToggleFunction,
       fnParsedSQL,
+      updateFieldConditions,
+      runTestCases,
     };
   },
   computed: {
@@ -2825,6 +3168,7 @@ export default defineComponent({
   watch: {
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter != "") {
+        this.runTestCases();
         let currentQuery = this.searchObj.data.query.split("|");
         if (currentQuery.length > 1) {
           if (currentQuery[1].trim() != "") {
