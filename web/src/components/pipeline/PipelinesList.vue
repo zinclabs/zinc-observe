@@ -358,8 +358,9 @@ const updateActiveTab = () => {
 
 
 const toggleAlertState = (row : any) =>{
-  row.enabled = !row.enabled;
+  const newState = !row.enabled;
   pipelineService.toggleState(store.state.selectedOrganization.identifier,row.pipeline_id,row.enabled).then((response) => {
+    row.enabled = newState;
     const message = row.enabled 
     ? `${row.name} state resumed successfully` 
     : `${row.name} state paused successfully`;
@@ -538,6 +539,7 @@ const savePipeline = (data: any) => {
     })
     .then(() => {
       getPipelines();
+      dismiss();
       showCreatePipeline.value = false;
       q.notify({
         message: "Pipeline created successfully",
@@ -547,6 +549,7 @@ const savePipeline = (data: any) => {
       });
     })
     .catch((error) => {
+      dismiss();
       if(error.response.status != 403){
         q.notify({
         message: error.response?.data?.message || "Error while saving pipeline",
@@ -556,9 +559,6 @@ const savePipeline = (data: any) => {
       });
       } 
     })
-    .finally(() => {
-      dismiss();
-    });
 };
 
 const deletePipeline = async () => {
@@ -586,7 +586,7 @@ const deletePipeline = async () => {
     .catch((error) => {
       if(error.response.status != 403){
         q.notify({
-        message: error.response?.data?.message || "Error while saving pipeline",
+        message: error.response?.data?.message || "Error while deleting pipeline",
         color: "negative",
         position: "bottom",
         timeout: 3000,
