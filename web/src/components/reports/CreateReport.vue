@@ -1104,7 +1104,8 @@ const setDashboardOptions = (id: string) => {
         false,
         "",
         store.state.selectedOrganization.identifier,
-        id
+        id,
+        ""
       )
       .then((response: any) => {
         response.data.dashboards

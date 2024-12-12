@@ -706,7 +706,12 @@
     "smooth": "Smooth",
     "stepBefore": "Step Before",
     "stepAfter": "Step After",
-    "stepMiddle": "Step Middle"
+    "stepMiddle": "Step Middle",
+    "searchAcross":"Search Across Folders",
+    "searchSelf":"Switch to Search across the current Folder",
+    "searchAll":"Switch to Search Across all Folders",
+    "folder":"Folder",
+    "searchMsg":"Search for Dashboards across Folders"
   },
   "panel": {
     "header": "Panel",
