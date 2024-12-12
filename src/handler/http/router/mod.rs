@@ -26,7 +26,7 @@ use actix_web_httpauth::middleware::HttpAuthentication;
 use actix_web_lab::middleware::{from_fn, Next};
 use config::get_config;
 use futures::FutureExt;
-use o2_enterprise::enterprise::common::auditor::{HttpMeta, Protocol};
+use o2_enterprise::enterprise::common::auditor::{HttpMeta, Protocol, WsMeta};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
@@ -102,6 +102,26 @@ async fn audit_middleware(
             .to_str()
             .unwrap()
             .to_string();
+
+        // Handle WebSocket Upgrade
+        // TODO: fix this
+        if path_columns.get(1).unwrap_or(&"").to_string().eq("ws") {
+            audit(AuditMessage {
+                user_email,
+                org_id,
+                _timestamp: chrono::Utc::now().timestamp_micros(),
+                protocol: Protocol::Ws(WsMeta {
+                    path,
+                    message_type: "WEBSOCKET_UPGRADE".to_string(),
+                    content: "".to_string(),
+                    close_reason: "".to_string(),
+                }),
+            })
+            .await;
+
+            // Proceed with the WebSocket upgrade
+            return next.call(req).await;
+        }
 
         // Put the payload back into the req
         let (_, mut payload) = Payload::create(true);

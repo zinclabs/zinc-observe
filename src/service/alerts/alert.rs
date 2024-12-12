@@ -863,7 +863,7 @@ async fn process_dest_template(
             base64::encode_url(&alert_query).replace('+', "%2B"),
             alert.org_id,
             function_content,
-            SearchEventType::Alerts.to_string()
+            SearchEventType::Alerts
         )
     } else {
         match alert.query_condition.query_type {
@@ -902,7 +902,7 @@ async fn process_dest_template(
             base64::encode_url(&alert_query),
             alert.org_id,
             function_content,
-            SearchEventType::Alerts.to_string()
+            SearchEventType::Alerts
         )
     };
 

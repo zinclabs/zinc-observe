@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_ws::Session;
-use chrono::Utc;
 use config::{
     get_config,
     meta::{
@@ -207,7 +206,7 @@ pub async fn handle_search_request(
             // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
             // for cache only search
             let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
-            let max_query_range = if max_query_range == 0
+            let remaining_query_range = if max_query_range == 0
                 // disable limit for `Alerts`
                 ||  req.search_type == SearchEventType::Alerts
             {
@@ -227,6 +226,7 @@ pub async fn handle_search_request(
                 org_id,
                 user_id,
                 max_query_range,
+                remaining_query_range,
                 &order_by,
             )
             .await?;
@@ -362,12 +362,13 @@ async fn handle_cache_responses_and_deltas(
     req: &SearchEventReq,
     trace_id: String,
     req_size: i64,
-    cached_resp: Vec<CachedQueryResponse>,
+    mut cached_resp: Vec<CachedQueryResponse>,
     mut deltas: Vec<QueryDelta>,
     accumulated_results: &mut Vec<SearchResultType>,
     org_id: &str,
     user_id: &str,
     max_query_range: i64,
+    remaining_query_range: i64,
     mut order_by: &OrderBy,
 ) -> Result<(), Error> {
     // Force set order_by to desc for dashboards
@@ -376,10 +377,18 @@ async fn handle_cache_responses_and_deltas(
         order_by = &OrderBy::Desc;
     }
 
+    // 10 - 20 , 6hrs, desc
+    // 16 - 20 delta
+    // 14 - 16 cache
+    // 12 - 14 delta
+    // 10 - 12 cache
+
     // deltas are always asc
     // reverse the deltas if order_by is descending
     if let OrderBy::Desc = order_by {
         deltas.reverse();
+        // sort cache by descending
+        cached_resp.sort_by(|a, b| b.response_start_time.cmp(&a.response_start_time));
     }
 
     // Initialize iterators for deltas and cached responses
@@ -387,15 +396,27 @@ async fn handle_cache_responses_and_deltas(
     let mut cached_resp_iter = cached_resp.iter().peekable();
     let mut curr_res_size = 0; // number of records
 
-    let mut remaining_query_range = max_query_range as f64; // hours
+    let mut remaining_query_range = remaining_query_range as f64; // hours
+    let cache_start_time = cached_resp
+        .first()
+        .map(|c| c.response_start_time)
+        .unwrap_or_default();
+    let cache_end_time = cached_resp
+        .last()
+        .map(|c| c.response_end_time)
+        .unwrap_or_default();
+    let cache_duration = cache_end_time - cache_start_time; // microseconds
+    let cached_search_duration = cache_duration + (max_query_range * 3600 * 1_000_000); // microseconds
 
     log::info!(
-        "[WS_SEARCH] trace_id: {}, Handling cache response and deltas, curr_res_size: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}, deltas: {:?}",
+        "[WS_SEARCH] trace_id: {}, Handling cache response and deltas, curr_res_size: {}, cached_search_duration: {}, remaining_query_duration: {}, deltas_len: {}, cache_start_time: {}, cache_end_time: {}, deltas: {:?}",
         trace_id,
         curr_res_size,
+        cached_search_duration,
+        remaining_query_range,
         deltas.len(),
-        cached_resp.first().map(|c| c.response_start_time).unwrap_or_default(),
-        cached_resp.last().map(|c| c.response_end_time).unwrap_or_default(),
+        cache_start_time,
+        cache_end_time,
         deltas
     );
 
@@ -432,6 +453,7 @@ async fn handle_cache_responses_and_deltas(
                     org_id,
                     user_id,
                     &mut remaining_query_range,
+                    cached_search_duration,
                 )
                 .await?;
                 delta_iter.next(); // Move to the next delta after processing
@@ -465,6 +487,7 @@ async fn handle_cache_responses_and_deltas(
                 org_id,
                 user_id,
                 &mut remaining_query_range,
+                cached_search_duration,
             )
             .await?;
             delta_iter.next(); // Move to the next delta after processing
@@ -508,6 +531,7 @@ async fn process_delta(
     org_id: &str,
     user_id: &str,
     remaining_query_range: &mut f64,
+    cache_req_duration: i64,
 ) -> Result<(), Error> {
     log::info!(
         "[WS_SEARCH]: Processing delta for trace_id: {}, delta: {:?}",
@@ -515,6 +539,8 @@ async fn process_delta(
         delta
     );
     let mut req = req.clone();
+    let original_req_start_time = req.payload.query.start_time;
+    let original_req_end_time = req.payload.query.end_time;
     req.payload.query.start_time = delta.delta_start_time;
     req.payload.query.end_time = delta.delta_end_time;
 
@@ -589,13 +615,52 @@ async fn process_delta(
                 "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
                 trace_id
             );
+            // 10 - 20 , 3 hrs, asc
+            // 10 - 15 cache
+            // 15 - 18 search -- stop search new_end_time will now
+
+            // 10 - 20 , 3hrs, desc
+            // 15 - 20 delta -- stop search at 20 - 17, start time will be now
+            // 10 - 15 cache
+
+            // 10 - 20 , 5hrs, asc
+            // 10 - 12 cache -- 5hrs
+            // 12 - 14 delta -- 3hrs
+            // 14 - 16 cache -- 3hrs
+            // 16 - 20 delta -- 0hrs -- new_end_time 19 (start_time + max_query_range +
+            // cache_duration), new_start_time 10
+
+            // 10 - 20 , 5 hrs, desc
+            // 16 - 20 delta -- 4hrs
+            // 14 - 16 cache -- 4hrs
+            // 12 - 14 delta -- 0hrs -- new_start_time 13 (end_time - max_query_range +
+            // cache_duration), new_end_time 20 10 - 12 cache
+            // TODO: cannot consider `cache_req_duration` need to compute actual duration due to
+            // limit
+            let (new_start_time, new_end_time) = if let Some(order_by) = search_res.order_by {
+                if order_by == OrderBy::Desc {
+                    (
+                        original_req_start_time,
+                        original_req_start_time + cache_req_duration,
+                    )
+                } else {
+                    (
+                        original_req_end_time - cache_req_duration,
+                        original_req_end_time,
+                    )
+                }
+            } else {
+                (
+                    original_req_start_time,
+                    original_req_start_time + cache_req_duration,
+                )
+            };
             let _ = send_partial_search_resp(
                 session,
                 &trace_id,
                 MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE,
-                req.payload.query.start_time,
-                // send current end_time searches using result cache
-                Utc::now().timestamp_micros(),
+                new_start_time,
+                new_end_time,
                 search_res.order_by,
             )
             .await;
