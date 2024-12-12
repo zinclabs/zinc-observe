@@ -63,6 +63,7 @@ jobs:
 
       - name: Build frontend code
         env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
           VITE_COVERAGE: "true"
           COVERAGE: "true"
         run: cd web && npm install && npm run build
