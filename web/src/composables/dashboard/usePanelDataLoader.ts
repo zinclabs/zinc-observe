@@ -382,15 +382,11 @@ export const usePanelDataLoader = (
         ? `${res?.data?.histogram_interval} seconds`
         : null;
 
-      // Add empty objects to state.metadata.queries and state.resultMetaData for the results of this query
+      // Add empty objects to state.resultMetaData for the results of this query
       state.data.push([]);
-      state.metadata.queries.push({});
       state.resultMetaData.push({});
 
       const currentQueryIndex = state.data.length - 1;
-
-      // Update the metadata for the current query
-      Object.assign(state.metadata.queries[currentQueryIndex], metadata);
 
       // remaining query range
       let remainingQueryRange = max_query_range;
