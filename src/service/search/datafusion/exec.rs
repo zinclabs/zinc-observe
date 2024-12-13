@@ -56,7 +56,7 @@ use o2_enterprise::enterprise::{
 
 use super::{
     file_type::{FileType, GetExt},
-    optimizer::join_reorder::JoinReorderRule,
+    optimizer::{decrypt_impl::DecryptQueryPlanner, join_reorder::JoinReorderRule},
     storage::file_list,
     table_provider::{uniontable::NewUnionTable, NewListingTable},
     udf::transform_udf::get_all_transform,
@@ -272,6 +272,7 @@ pub async fn prepare_datafusion_context(
             .with_runtime_env(runtime_env)
             .with_default_features()
             .with_optimizer_rules(optimizer_rules)
+            .with_query_planner(Arc::new(DecryptQueryPlanner::new())) // TODO maybe move into mod like rules
             .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
             .build();
         Ok(SessionContext::new_with_state(state))
@@ -308,6 +309,7 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_RAW_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::MATCH_ALL_UDF.clone());
     ctx.register_udf(super::udf::match_all_udf::FUZZY_MATCH_ALL_UDF.clone());
+    ctx.register_udf(super::udf::decrypt_udf::DECRYPT_UDF.clone());
     ctx.register_udaf(AggregateUDF::from(
         super::udaf::percentile_cont::PercentileCont::new(),
     ));

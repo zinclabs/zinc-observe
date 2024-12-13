@@ -24,6 +24,7 @@ pub(crate) mod arrzip_udf;
 pub(crate) mod cast_to_arr_udf;
 pub(crate) mod date_format_udf;
 pub(crate) mod fuzzy_match_udf;
+pub(crate) mod decrypt_udf;
 pub(crate) mod histogram_udf;
 pub(crate) mod match_all_udf;
 pub(crate) mod regexp_matches_udf;

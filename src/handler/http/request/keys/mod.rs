@@ -19,8 +19,8 @@ use actix_http::StatusCode;
 use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse};
 
 use crate::{
-    common::meta::{self, http::HttpResponse as MetaHttpResponse},
     cipher::{Key, KeyAddRequest, KeyGetResponse},
+    common::meta::{self, http::HttpResponse as MetaHttpResponse},
 };
 
 /// Store a key credential in db
