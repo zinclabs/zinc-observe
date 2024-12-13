@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use add_sort_and_limit::AddSortAndLimitRule;
 use add_timestamp::AddTimestampRule;
+use cipher::RewriteDecrypt;
 use datafusion::optimizer::{
     common_subexpr_eliminate::CommonSubexprEliminate,
     decorrelate_predicate_subquery::DecorrelatePredicateSubquery,
@@ -40,6 +41,7 @@ use crate::service::search::sql::Sql;
 
 pub mod add_sort_and_limit;
 pub mod add_timestamp;
+pub mod cipher;
 pub mod join_reorder;
 pub mod rewrite_histogram;
 pub mod rewrite_match;
@@ -106,6 +108,7 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };
     rules.push(Arc::new(AddTimestampRule::new(start_time, end_time)));
+    rules.push(Arc::new(RewriteDecrypt::new()));
     // ************************************
 
     // Filters can't be pushed down past Limits, we should do PushDownFilter after

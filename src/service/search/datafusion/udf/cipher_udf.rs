@@ -31,9 +31,9 @@ use once_cell::sync::Lazy;
 use crate::cipher::registry::REGISTRY;
 
 /// The name of the decrypt UDF given to DataFusion.
-pub const DECRYPT_UDF_NAME: &str = "decrypt";
+pub(crate) const DECRYPT_UDF_NAME: &str = "decrypt";
 /// The name of the decrypt UDF given to DataFusion.
-pub const ENCRYPT_UDF_NAME: &str = "decrypt";
+pub(crate) const ENCRYPT_UDF_NAME: &str = "encrypt";
 
 /// implementation of decrypt
 pub(crate) static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
