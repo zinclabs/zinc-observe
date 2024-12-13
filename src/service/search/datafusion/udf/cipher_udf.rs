@@ -32,8 +32,10 @@ use crate::cipher::registry::REGISTRY;
 
 /// The name of the decrypt UDF given to DataFusion.
 pub const DECRYPT_UDF_NAME: &str = "decrypt";
+/// The name of the decrypt UDF given to DataFusion.
+pub const ENCRYPT_UDF_NAME: &str = "decrypt";
 
-/// Dummy implementation of decrypt
+/// implementation of decrypt
 pub(crate) static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
     create_udf(
         DECRYPT_UDF_NAME,
@@ -43,6 +45,19 @@ pub(crate) static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         DataType::Utf8,
         Volatility::Stable,
         decrypt(),
+    )
+});
+
+/// implementation of decrypt
+pub(crate) static ENCRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
+    create_udf(
+        ENCRYPT_UDF_NAME,
+        // expects two arguments : field and key_name
+        vec![DataType::Utf8, DataType::Utf8],
+        // returns string
+        DataType::Utf8,
+        Volatility::Stable,
+        encrypt(),
     )
 });
 
@@ -79,6 +94,64 @@ fn decrypt() -> ScalarFunctionImplementation {
             DataFusionError::SQL(
                 ParserError::ParserError(
                     "first argument to decrypt must be a string type column".to_string(),
+                ),
+                None,
+            )
+        })?;
+
+        // NOTE!!! : the {} block is important as it will drop read lock
+        // if we take a read lock outside of block scope, it might not be dropped
+        let mut cipher = {
+            match REGISTRY.read().get_key(&key) {
+                None => {
+                    return Err(DataFusionError::Execution(format!(
+                        "key with name {} not found",
+                        key
+                    )));
+                }
+                Some(k) => k,
+            }
+        };
+
+        let ret = values
+            .iter()
+            .map(|v| v.map(|v| cipher.decrypt(v).unwrap()))
+            .collect::<StringArray>();
+
+        Ok(ColumnarValue::from(Arc::new(ret) as ArrayRef))
+    })
+}
+
+/// decrypt function
+fn encrypt() -> ScalarFunctionImplementation {
+    Arc::new(move |args: &[ColumnarValue]| {
+        if args.len() != 2 {
+            return Err(DataFusionError::SQL(
+                ParserError::ParserError(
+                    "encrypt requires tow params : encrypt(field_name, key_name)".to_string(),
+                ),
+                None,
+            ));
+        }
+
+        let key = match &args[1] {
+            ColumnarValue::Scalar(ScalarValue::Utf8(Some(s))) => s.to_owned(),
+            _ => {
+                return Err(DataFusionError::SQL(
+                    ParserError::ParserError(
+                        "second argument to encrypt must be a key-name string".to_string(),
+                    ),
+                    None,
+                ))
+            }
+        };
+
+        let args = ColumnarValue::values_to_arrays(args)?;
+
+        let values = as_string_array(&args[0]).map_err(|_| {
+            DataFusionError::SQL(
+                ParserError::ParserError(
+                    "first argument to encrypt must be a string type column".to_string(),
                 ),
                 None,
             )
