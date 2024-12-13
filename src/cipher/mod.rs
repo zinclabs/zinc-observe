@@ -5,6 +5,9 @@ use thiserror::Error as ThisError;
 use utoipa::ToSchema;
 
 pub mod providers;
+pub mod cipher;
+pub mod registry;
+pub mod algorithms;
 
 #[derive(ThisError, Debug)]
 pub enum Error {
