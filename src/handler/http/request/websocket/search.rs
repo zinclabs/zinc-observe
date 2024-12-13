@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use actix_ws::Session;
 use config::{
     get_config,
     meta::{
@@ -31,6 +30,7 @@ use infra::errors::Error;
 use proto::cluster_rpc::SearchQuery;
 use tracing::Instrument;
 
+use super::{session::WsSession, utils::cancellation_registry_cache_utils};
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
@@ -79,7 +79,7 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
 }
 
 pub async fn handle_search_request(
-    session: &mut Session,
+    session: &mut WsSession,
     accumulated_results: &mut Vec<SearchResultType>,
     org_id: &str,
     user_id: &str,
@@ -156,6 +156,9 @@ pub async fn handle_search_request(
         );
     }
     let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
+
+    // Set cancel flag to stop search when cancel event is received
+    cancellation_registry_cache_utils::add_cancellation_flag(&trace_id);
 
     // search result cache only when
     // is_partition_request and
@@ -288,6 +291,9 @@ pub async fn handle_search_request(
     };
     send_message(session, end_res.to_json().to_string()).await?;
 
+    // Remove the cancellation flag
+    cancellation_registry_cache_utils::remove_cancellation_flag(&trace_id);
+
     Ok(())
 }
 
@@ -298,13 +304,12 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
         org_id = %org_id,
     );
 
-    let res = SearchService::cache::search(
+    let res = SearchService::search(
         &req.trace_id,
         org_id,
         req.stream_type,
         Some(user_id.to_string()),
         &req.payload,
-        false, // force search without cache
     )
     .instrument(span)
     .await;
@@ -358,7 +363,7 @@ async fn is_partition_request(
 
 #[allow(clippy::too_many_arguments)]
 async fn handle_cache_responses_and_deltas(
-    session: &mut Session,
+    session: &mut WsSession,
     req: &SearchEventReq,
     trace_id: String,
     req_size: i64,
@@ -377,14 +382,7 @@ async fn handle_cache_responses_and_deltas(
         order_by = &OrderBy::Desc;
     }
 
-    // 10 - 20 , 6hrs, desc
-    // 16 - 20 delta
-    // 14 - 16 cache
-    // 12 - 14 delta
-    // 10 - 12 cache
-
-    // deltas are always asc
-    // sort both deltas and cache in descending order
+    // sort both deltas and cache by order_by
     match order_by {
         OrderBy::Desc => {
             deltas.sort_by(|a, b| b.delta_start_time.cmp(&a.delta_start_time));
@@ -526,7 +524,7 @@ async fn handle_cache_responses_and_deltas(
 // Process a single delta (time range not covered by cache)
 #[allow(clippy::too_many_arguments)]
 async fn process_delta(
-    session: &mut Session,
+    session: &mut WsSession,
     req: &SearchEventReq,
     trace_id: String,
     delta: &QueryDelta,
@@ -563,6 +561,15 @@ async fn process_delta(
     );
 
     for &[start_time, end_time] in partitions.iter() {
+        // Check if the cancellation flag is set
+        if cancellation_registry_cache_utils::is_cancelled(&trace_id) {
+            log::info!(
+                "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping delta search",
+                trace_id
+            );
+            return Ok(()); // Gracefully terminate the delta processing
+        }
+
         let mut req = req.clone();
         req.payload.query.start_time = start_time;
         req.payload.query.end_time = end_time;
@@ -620,26 +627,6 @@ async fn process_delta(
                 "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
                 trace_id
             );
-            // 10 - 20 , 3 hrs, asc
-            // 10 - 15 cache
-            // 15 - 18 search -- stop search new_end_time will now
-
-            // 10 - 20 , 3hrs, desc
-            // 15 - 20 delta -- stop search at 20 - 17, start time will be now
-            // 10 - 15 cache
-
-            // 10 - 20 , 5hrs, asc
-            // 10 - 12 cache -- 5hrs
-            // 12 - 14 delta -- 3hrs
-            // 14 - 16 cache -- 3hrs
-            // 16 - 20 delta -- 0hrs -- new_end_time 19 (start_time + max_query_range +
-            // cache_duration), new_start_time 10
-
-            // 10 - 20 , 5 hrs, desc
-            // 16 - 20 delta -- 4hrs
-            // 14 - 16 cache -- 4hrs
-            // 12 - 14 delta -- 0hrs -- new_start_time 13 (end_time - max_query_range +
-            // cache_duration), new_end_time 20 10 - 12 cache
             // TODO: cannot consider `cache_req_duration` need to compute actual duration due to
             // limit
             let (new_start_time, new_end_time) = if let Some(order_by) = search_res.order_by {
@@ -715,13 +702,21 @@ async fn get_partitions(
 }
 
 async fn send_cached_responses(
-    session: &mut Session,
+    session: &mut WsSession,
     trace_id: &str,
     req_size: i64,
     cached: &CachedQueryResponse,
     accumulated_results: &mut Vec<SearchResultType>,
     curr_res_size: &mut i64,
 ) -> Result<(), Error> {
+    if cancellation_registry_cache_utils::is_cancelled(trace_id) {
+        log::info!(
+            "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping cached response",
+            trace_id
+        );
+        return Ok(());
+    };
+
     log::info!(
         "[WS_SEARCH]: Processing cached response for trace_id: {}",
         trace_id
@@ -770,7 +765,7 @@ async fn send_cached_responses(
 // Do partitioned search without cache
 #[allow(clippy::too_many_arguments)]
 async fn do_partitioned_search(
-    session: &mut Session,
+    session: &mut WsSession,
     req: &mut SearchEventReq,
     trace_id: &str,
     req_size: i64,
@@ -820,6 +815,15 @@ async fn do_partitioned_search(
     );
 
     for &[start_time, end_time] in partitions.iter() {
+        // Check if the cancellation flag is set
+        if cancellation_registry_cache_utils::is_cancelled(trace_id) {
+            log::info!(
+                "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping partitioned search",
+                trace_id
+            );
+            return Ok(());
+        }
+
         let mut req = req.clone();
         req.payload.query.start_time = start_time;
         req.payload.query.end_time = end_time;
@@ -885,7 +889,7 @@ async fn do_partitioned_search(
 }
 
 async fn send_partial_search_resp(
-    session: &mut Session,
+    session: &mut WsSession,
     trace_id: &str,
     error: &str,
     new_start_time: i64,

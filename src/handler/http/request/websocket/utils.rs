@@ -88,10 +88,12 @@ pub mod enterprise_utils {
 }
 
 pub mod sessions_cache_utils {
-    use crate::common::infra::config::WS_SESSIONS;
+    use crate::{
+        common::infra::config::WS_SESSIONS, handler::http::request::websocket::session::WsSession,
+    };
 
     /// Insert a new session into the cache
-    pub fn insert_session(session_id: &str, session: actix_ws::Session) {
+    pub fn insert_session(session_id: &str, session: WsSession) {
         WS_SESSIONS.insert(session_id.to_string(), session);
     }
 
@@ -101,7 +103,7 @@ pub mod sessions_cache_utils {
     }
 
     /// Get a session from the cache
-    pub fn get_session(session_id: &str) -> Option<actix_ws::Session> {
+    pub fn get_session(session_id: &str) -> Option<WsSession> {
         WS_SESSIONS.get(session_id).map(|entry| entry.clone())
     }
 
@@ -113,6 +115,58 @@ pub mod sessions_cache_utils {
     /// Get the number of sessions in the cache
     pub fn len_sessions() -> usize {
         WS_SESSIONS.len()
+    }
+}
+
+pub mod cancellation_registry_cache_utils {
+    use crate::handler::http::request::websocket::session::CANCELLATION_FLAGS;
+
+    /// Add a new cancellation flag for the given trace_id
+    pub fn add_cancellation_flag(trace_id: &str) {
+        CANCELLATION_FLAGS.insert(trace_id.to_string(), false);
+        log::info!(
+            "[WS_CANCEL]: Added cancellation flag for trace_id: {}",
+            trace_id
+        );
+    }
+
+    /// Set the cancellation flag for the given trace_id
+    pub fn set_cancellation_flag(trace_id: &str) {
+        if let Some(mut flag) = CANCELLATION_FLAGS.get_mut(trace_id) {
+            *flag = true; // Set the flag to `true`
+            log::info!(
+                "[WS_CANCEL]: Cancellation flag set for trace_id: {}",
+                trace_id
+            );
+        } else {
+            log::warn!(
+                "[WS_CANCEL]: No cancellation flag found for trace_id: {}",
+                trace_id
+            );
+        }
+    }
+
+    /// Remove the cancellation flag for the given trace_id
+    pub fn remove_cancellation_flag(trace_id: &str) {
+        if CANCELLATION_FLAGS.remove(trace_id).is_some() {
+            log::info!(
+                "[WS_CANCEL]: Cancellation flag removed for trace_id: {}",
+                trace_id
+            );
+        } else {
+            log::warn!(
+                "[WS_CANCEL]: No cancellation flag found to remove for trace_id: {}",
+                trace_id
+            );
+        }
+    }
+
+    /// Check if a cancellation flag is set for the given trace_id
+    pub fn is_cancelled(trace_id: &str) -> bool {
+        CANCELLATION_FLAGS
+            .get(trace_id)
+            .map(|flag| *flag)
+            .unwrap_or(false)
     }
 }
 

@@ -19,6 +19,7 @@ pub mod utils;
 
 use actix_web::{get, web, Error, HttpRequest, HttpResponse};
 use config::get_config;
+use session::WsSession;
 use utils::sessions_cache_utils;
 
 #[get("{org_id}/ws/{request_id}")]
@@ -40,7 +41,8 @@ pub async fn websocket(
 
     let (res, session, msg_stream) = actix_ws::handle(&req, stream)?;
 
-    sessions_cache_utils::insert_session(&request_id, session.clone());
+    let ws_session = WsSession::new(session);
+    sessions_cache_utils::insert_session(&request_id, ws_session);
     log::info!(
         "[WS_HANDLER]: Node Role: {} Got websocket request for request_id: {}",
         cfg.common.node_role,
@@ -48,9 +50,7 @@ pub async fn websocket(
     );
 
     // Spawn the handler
-    actix_web::rt::spawn(session::run(
-        session, msg_stream, user_id, request_id, org_id,
-    ));
+    actix_web::rt::spawn(session::run(msg_stream, user_id, request_id, org_id));
 
     Ok(res)
 }

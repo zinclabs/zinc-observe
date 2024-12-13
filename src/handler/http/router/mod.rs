@@ -36,7 +36,8 @@ use {
     base64::{engine::general_purpose, Engine as _},
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, WsMeta, HttpMeta}, infra::config::get_config as get_o2_config,
+        auditor::{AuditMessage, HttpMeta, Protocol, WsMeta},
+        infra::config::get_config as get_o2_config,
     },
 };
 
