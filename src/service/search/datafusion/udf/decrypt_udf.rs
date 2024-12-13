@@ -28,6 +28,8 @@ use datafusion::{
 };
 use once_cell::sync::Lazy;
 
+use crate::cipher::registry::REGISTRY;
+
 /// The name of the decrypt UDF given to DataFusion.
 pub const DECRYPT_UDF_NAME: &str = "decrypt";
 
@@ -39,12 +41,13 @@ pub(crate) static DECRYPT_UDF: Lazy<ScalarUDF> = Lazy::new(|| {
         vec![DataType::Utf8, DataType::Utf8],
         // returns string
         DataType::Utf8,
-        // Volatile is needed, as it is needed for our optimizer to be used, check if Stable can be
-        // used instead as volatile is much less performant
         Volatility::Stable,
         decrypt(),
     )
 });
+
+// TODO the key name will have to container org,
+// and we have to make sure that is not leaked to the end-user
 
 /// decrypt function
 fn decrypt() -> ScalarFunctionImplementation {
@@ -81,8 +84,24 @@ fn decrypt() -> ScalarFunctionImplementation {
             )
         })?;
 
-        // TODO: here we will eventually do the decryption with key
-        let ret = values.iter().map(|v| v).collect::<StringArray>();
+        // NOTE!!! : the {} block is important as it will drop read lock
+        // if we take a read lock outside of block scope, it might not be dropped
+        let mut cipher = {
+            match REGISTRY.read().get_key(&key) {
+                None => {
+                    return Err(DataFusionError::Execution(format!(
+                        "key with name {} not found",
+                        key
+                    )));
+                }
+                Some(k) => k,
+            }
+        };
+
+        let ret = values
+            .iter()
+            .map(|v| v.map(|v| cipher.encrypt(v).unwrap()))
+            .collect::<StringArray>();
 
         Ok(ColumnarValue::from(Arc::new(ret) as ArrayRef))
     })
