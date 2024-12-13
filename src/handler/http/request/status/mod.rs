@@ -36,7 +36,6 @@ use infra::{
     file_list,
     schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST},
 };
-use o2_enterprise::enterprise::common::auditor::{HttpMeta, Protocol};
 use serde::Serialize;
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
@@ -50,7 +49,7 @@ use {
     config::{ider, utils::base64},
     o2_enterprise::enterprise::{
         common::{
-            auditor::AuditMessage,
+            auditor::{AuditMessage, HttpMeta, Protocol},
             infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
             settings::{get_logo, get_logo_text},
         },

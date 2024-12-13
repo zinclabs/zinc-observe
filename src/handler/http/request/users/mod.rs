@@ -26,14 +26,13 @@ use config::{
     utils::{base64, json},
     Config,
 };
-use o2_enterprise::enterprise::common::auditor::{HttpMeta, Protocol};
 use serde::Serialize;
 use strum::IntoEnumIterator;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::self_reporting::audit,
     o2_enterprise::enterprise::common::{
-        auditor::AuditMessage, infra::config::get_config as get_o2_config,
+        auditor::{AuditMessage, HttpMeta, Protocol}, infra::config::get_config as get_o2_config,
     },
 };
 
