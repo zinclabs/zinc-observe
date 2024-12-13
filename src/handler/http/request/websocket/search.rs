@@ -627,26 +627,21 @@ async fn process_delta(
                 "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
                 trace_id
             );
-            // TODO: cannot consider `cache_req_duration` need to compute actual duration due to
-            // limit
-            let (new_start_time, new_end_time) = if let Some(order_by) = search_res.order_by {
-                if order_by == OrderBy::Desc {
-                    (
-                        original_req_start_time,
-                        original_req_start_time + cache_req_duration,
-                    )
-                } else {
-                    (
-                        original_req_end_time - cache_req_duration,
-                        original_req_end_time,
-                    )
-                }
-            } else {
-                (
+            let (new_start_time, new_end_time) = match search_res.order_by {
+                Some(OrderBy::Desc) => (
+                    original_req_end_time - cache_req_duration,
+                    original_req_end_time,
+                ),
+                Some(OrderBy::Asc) => (
                     original_req_start_time,
                     original_req_start_time + cache_req_duration,
-                )
+                ),
+                None => (
+                    original_req_end_time - cache_req_duration,
+                    original_req_end_time,
+                ),
             };
+            // passs original start_time and end_time partition end time
             let _ = send_partial_search_resp(
                 session,
                 &trace_id,
