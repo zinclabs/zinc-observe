@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="date-time-button"
       :class="selectedType + 'type'"
       :disable="disable"
+      @click="showOnlyAbsolute"
     >
       <q-menu
         id="date-time-menu"
@@ -39,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @before-show="onBeforeShow"
         @before-hide="onBeforeHide"
       >
-        <div class="flex justify-evenly q-py-sm">
+        <div v-if="showRelative" class="flex justify-evenly q-py-sm">
           <q-btn
             data-test="date-time-relative-tab"
             size="md"
@@ -66,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-separator />
         <q-tab-panels v-model="selectedType" animated>
-          <q-tab-panel name="relative" class="q-pa-none">
+          <q-tab-panel v-if="showRelative" name="relative" class="q-pa-none">
             <div class="date-time-table relative column">
               <div
                 class="relative-row q-px-md q-py-sm"
@@ -179,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></q-tooltip
               >
               <div class="flex justify-center q-pa-none">
+                <!-- here add -->
                 <q-date
                   size="sm"
                   v-model="selectedDate"
@@ -186,12 +188,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   range
                   :locale="dateLocale"
                   :options="optionsFn"
+                  
                 />
               </div>
-              <div class="notePara">* You can choose multiple date</div>
-              <q-separator class="q-my-sm" />
+              <div  class="notePara">* You can choose multiple date</div>
+              <q-separator v-if="showRelative" class="q-my-sm" />
 
-              <table class="q-px-md startEndTime">
+              <table v-if="showRelative" class="q-px-md startEndTime">
                 <tr>
                   <td class="label tw-px-2">Start time</td>
                   <td class="label tw-px-2">End time</td>
@@ -299,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           popup-content-style="z-index: 10002"
         >
         </q-select>
-        <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
+        <div v-if="!autoApply " class="flex justify-end q-py-sm q-px-md">
           <q-separator class="q-my-sm" />
           <q-btn
             data-test="date-time-apply-btn"
@@ -329,6 +332,7 @@ import {
   nextTick,
   onActivated,
   onBeforeUnmount,
+  onBeforeMount,
 } from "vue";
 import {
   getImageURL,
@@ -381,6 +385,14 @@ export default defineComponent({
       type: String,
       default: "date-time-btn",
     },
+    showRelative: {
+      type: Boolean,
+      default: true,
+    },
+    minDate: {
+      type: String,
+      default: null,
+    }
   },
 
   emits: ["on:date-change", "on:timezone-change"],
@@ -499,9 +511,13 @@ export default defineComponent({
     const dateLocale = {
       daysShort: ["S", "M", "T", "W", "T", "F", "S"],
     };
+    onBeforeMount(()=>{
+      if(!props.showRelative) setDateType("absolute");
+    })
 
     onMounted(() => {
       // updateDisplayValue();
+      if(!props.showRelative) setDateType("absolute");
       try {
         resetTime("", "");
 
@@ -871,6 +887,9 @@ export default defineComponent({
     };
 
     const getDisplayValue = computed(() => {
+      if(!props.showRelative){
+        selectedType.value = "absolute";
+      }
       if (selectedType.value === "relative") {
         return `Past ${relativeValue.value} ${getPeriodLabel.value}`;
       } else {
@@ -912,11 +931,15 @@ export default defineComponent({
     };
 
     const optionsFn = (date) => {
+
       const formattedDate = timestampToTimezoneDate(
         new Date().getTime(),
         store.state.timezone,
         "yyyy/MM/dd",
       );
+      if(!props.showRelative){
+        return date >= props.minDate;
+      }
       return date >= "1999/01/01" && date <= formattedDate;
     };
 
@@ -1021,6 +1044,12 @@ export default defineComponent({
       }
     };
 
+    const showOnlyAbsolute = () =>{
+      if(!props.showRelative){
+        setDateType("absolute");
+      }
+    }
+
     return {
       t,
       datetimeBtn,
@@ -1058,6 +1087,7 @@ export default defineComponent({
       relativePeriodsSelect,
       computeRelativePeriod,
       onBeforeHide,
+      showOnlyAbsolute,
     };
   },
   computed: {
