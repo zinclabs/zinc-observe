@@ -372,39 +372,30 @@ const updateActiveTab = () => {
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
 
-const toggleAlertState = (row: any) => {
+const toggleAlertState = (row : any) =>{
   const newState = !row.enabled;
-  pipelineService
-    .toggleState(
-      store.state.selectedOrganization.identifier,
-      row.pipeline_id,
-      row.enabled,
-    )
-    .then((response) => {
-      row.enabled = newState;
-      const message = row.enabled
-        ? `${row.name} state resumed successfully`
-        : `${row.name} state paused successfully`;
-      q.notify({
-        message: message,
-        color: "positive",
-        position: "bottom",
-        timeout: 3000,
-      });
-    })
-    .catch((error) => {
-      if (error.response.status != 403) {
-        q.notify({
-          message:
-            error.response?.data?.message ||
-            "Error while updating pipeline state",
-          color: "negative",
-          position: "bottom",
-          timeout: 3000,
-        });
-      }
+  pipelineService.toggleState(store.state.selectedOrganization.identifier,row.pipeline_id,row.enabled).then((response) => {
+    row.enabled = newState;
+    const message = row.enabled 
+    ? `${row.name} state resumed successfully` 
+    : `${row.name} state paused successfully`;
+    q.notify({
+      message: message,
+      color: "positive",
+      position: "bottom",
+      timeout: 3000,
     });
-};
+  }).catch((error) => {
+    if(error.response.status != 403){
+      q.notify({
+      message: error.response?.data?.message || "Error while updating pipeline state",
+      color: "negative",
+      position: "bottom",
+      timeout: 3000,
+    });
+    }
+  });
+}
 
 const triggerExpand = (props: any) => {
   if (
@@ -648,16 +639,15 @@ const savePipeline = (data: any) => {
     })
     .catch((error) => {
       dismiss();
-      if (error.response.status != 403) {
+      if(error.response.status != 403){
         q.notify({
-          message:
-            error.response?.data?.message || "Error while saving pipeline",
-          color: "negative",
-          position: "bottom",
-          timeout: 3000,
-        });
-      }
-    });
+        message: error.response?.data?.message || "Error while saving pipeline",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      });
+      } 
+    })
 };
 
 const deletePipeline = async () => {
@@ -682,14 +672,13 @@ const deletePipeline = async () => {
       });
     })
     .catch((error) => {
-      if (error.response.status != 403) {
+      if(error.response.status != 403){
         q.notify({
-          message:
-            error.response?.data?.message || "Error while deleting pipeline",
-          color: "negative",
-          position: "bottom",
-          timeout: 3000,
-        });
+        message: error.response?.data?.message || "Error while deleting pipeline",
+        color: "negative",
+        position: "bottom",
+        timeout: 3000,
+      });
       }
     })
     .finally(async () => {
