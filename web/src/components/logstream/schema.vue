@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </q-card-section>
     <q-separator />
 
+
     <q-card-section class="q-ma-none q-pa-none">
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
         <div
@@ -427,54 +428,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <q-icon color="primary" :name="outlinedPerson"></q-icon>
                   <q-icon color="primary" :name="outlinedSchema"></q-icon>
                 </q-td>
-                <q-td v-else> </q-td>
-              </template>
-              <template v-slot:body-cell-index_type="props">
-                <q-td data-test="schema-stream-index-select">
-                  <q-select
-                    v-if="
-                      !(
-                        props.row.name ==
-                          store.state.zoConfig.timestamp_column ||
-                        props.row.name == allFieldsName
-                      )
-                    "
-                    v-model="props.row.index_type"
-                    :options="streamIndexType"
-                    :popup-content-style="{ textTransform: 'capitalize' }"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="stream-schema-index-select q-py-xs fit q-pa-xs"
-                    size="xs"
-                    :option-disable="
-                      (_option) => disableOptions(props.row, _option)
-                    "
-                    multiple
-                    :max-values="2"
-                    map-options
-                    emit-value
-                    autoclose
-                    clearable
-                    stack-label
-                    outlined
-                    filled
-                    dense
-                    style="min-width: 300px; max-width: 300px"
-                    @update:model-value="markFormDirty(props.row.name, 'fts')"
-                  />
-                </q-td>
-              </template>
+                <q-td v-else>
 
-              <template #bottom="scope">
-                <QTablePagination
-                  :scope="scope"
-                  :position="'bottom'"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  @update:changeRecordPerPage="changePagination"
-                />
-              </template>
-            </q-table>
+                  </q-td>
+                </template>
+                <template v-slot:body-cell-index_type="props">
+                  <q-td data-test="schema-stream-index-select"
+                    >
+                    <q-select
+                      v-if="
+                        !(
+                          props.row.name ==
+                            store.state.zoConfig.timestamp_column ||
+                          props.row.name == allFieldsName
+                        )
+                      "
+                      v-model="props.row.index_type"
+                      :options="streamIndexType"
+                      :popup-content-style="{ textTransform: 'capitalize' }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="stream-schema-index-select q-py-xs fit q-pa-xs"
+                      size="xs"
+                      :option-disable="
+                        (_option) => disableOptions(props.row, _option)
+                      "
+                      multiple
+                      :max-values="2"
+                      map-options
+                      emit-value
+                      autoclose
+                      clearable
+                      stack-label
+                      outlined
+                      filled
+                      dense
+                      style="min-width:300px; max-width: 300px; "
+                      @update:model-value="markFormDirty(props.row.name, 'fts')"
+                    />
+                  </q-td>
+                </template>
+
+
+                <template #bottom="scope">
+                  <QTablePagination
+                    :scope="scope"
+                    :position="'bottom'"
+                    :resultTotal="resultTotal"
+                    :perPageOptions="perPageOptions"
+                    @update:changeRecordPerPage="changePagination"
+                  />
+                </template>
+              </q-table>
 
 
 
@@ -552,77 +557,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
             <!-- floating footer for the table -->
-            <div
-              :class="
-                store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'
-              "
-              class="floating-buttons q-px-md q-py-xs"
-            >
-              <div v-if="indexData.schema.length > 0" class="q-mt-sm">
-                <span class="q-px-sm q-py-md"
-                  ><strong> {{ selectedFields.length }}</strong> fields
-                  selected</span
-                >
-                <q-btn
-                  v-if="isSchemaEvolutionEnabled"
-                  data-test="schema-add-field-button"
-                  class="q-my-sm no-border text-bold q-mr-md"
-                  padding="sm md"
-                  color="primary"
-                  no-caps
-                  v-bind:disable="!selectedFields.length"
-                  @click="updateDefinedSchemaFields"
-                >
-                  <span class="flex items-center justify-start q-mr-sm">
-                    <q-icon size="14px" :name="outlinedPerson" />
-                    <q-icon size="14px" :name="outlinedSchema" />
-                  </span>
-                  {{
-                    activeTab === "schemaFields"
-                      ? t("logStream.removeSchemaField")
-                      : t("logStream.addSchemaField")
-                  }}
-                </q-btn>
-                <q-btn
-                  v-bind:disable="!selectedFields.length"
-                  data-test="schema-delete-button"
-                  class="q-my-sm text-bold btn-delete"
-                  text-color="red"
-                  padding="sm md"
-                  no-caps
-                  dense
-                  flat
-                  style="border: 1px red solid"
-                  @click="confirmQueryModeChangeDialog = true"
-                >
-                  <span class="flex items-center tw-gap-1">
-                    <q-icon size="14px" :name="outlinedDelete" />
-                    {{ t("logStream.delete") }}
-                  </span>
-                </q-btn>
-                <q-btn
-                  v-close-popup="true"
-                  data-test="schema-cancel-button"
-                  class="q-my-sm text-bold float-right q-ml-md btn-delete"
-                  :label="t('logStream.cancel')"
-                  text-color="red"
-                  padding="sm md"
-                  no-caps
-                  dense
-                  flat
-                  style="border: 1px red solid"
-                />
-                <q-btn
-                  v-bind:disable="!formDirtyFlag"
-                  data-test="schema-update-settings-button"
-                  :label="t('logStream.updateSettings')"
-                  class="q-my-sm text-bold no-border q-ml-md float-right"
-                  color="secondary"
-                  padding="sm xl"
-                  type="submit"
-                  no-caps
-                />
-              </div>
+
+          <div :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'" class="floating-buttons q-px-md q-py-xs ">
+            <div v-if="indexData.schema.length > 0" class="q-mt-sm flex items-center justify-between">
+             <div class="flex items-center">
+              <span v-if="activeMainTab == 'schemaSettings'" class="q-px-sm q-py-md"><strong> {{ selectedFields.length }}</strong> fields selected</span>
+              <q-btn
+                v-if="isSchemaEvolutionEnabled && activeMainTab == 'schemaSettings'"
+                data-test="schema-add-field-button"
+                class="q-my-sm no-border text-bold q-mr-md"
+                padding="sm md"
+                color="primary"
+                no-caps
+                v-bind:disable="!selectedFields.length"
+                @click="updateDefinedSchemaFields"
+              >
+              <span class="flex items-center justify-start q-mr-sm">
+                <q-icon size="14px"  :name="outlinedPerson"/>
+                <q-icon size="14px" :name="outlinedSchema" />
+              </span>
+              {{ activeTab === 'schemaFields' ? t('logStream.removeSchemaField') : t('logStream.addSchemaField') }}
+
+             </q-btn>
+              <q-btn
+              
+                v-bind:disable="!selectedFields.length"
+                data-test="schema-delete-button"
+                class="q-my-sm text-bold btn-delete"
+                text-color="red"
+                padding="sm md"
+                no-caps
+                dense
+                flat
+                style="border: 1px red solid;"
+                @click="confirmQueryModeChangeDialog = true"
+              >
+              <span class="flex items-center tw-gap-1">
+                <q-icon size="14px" :name="outlinedDelete" />
+                {{   t('logStream.delete') }}
+              </span>
+            </q-btn>
+             </div>
+            <div class="flex justify-end">
+              <q-btn
+                v-close-popup="true"
+                data-test="schema-cancel-button"
+                class="q-my-sm text-bold q-ml-md btn-delete"
+                :label="t('logStream.cancel')"
+                text-color="red"
+                padding="sm md"
+                
+                no-caps
+                dense
+                flat
+                style="border: 1px red solid;"
+              />
+              <q-btn
+                v-bind:disable="!formDirtyFlag"
+                data-test="schema-update-settings-button"
+                :label="t('logStream.updateSettings')"
+                class="q-my-sm text-bold no-border q-ml-md"
+                color="secondary"
+                padding="sm xl"
+                type="submit"
+                no-caps
+              />
+            </div>
+
             </div>
           </div>
         </div>
@@ -665,6 +666,8 @@ import {
   outlinedPerson,
   outlinedDelete,
 } from "@quasar/extras/material-icons-outlined";
+
+import DateTime from '@/components/DateTime.vue'
 
 import DateTime from '@/components/DateTime.vue'
 
@@ -711,6 +714,72 @@ export default defineComponent({
     const filterField = ref("");
     const router = useRouter();
     const qTable = ref(null);
+    const minDate = ref(null);
+    const selectedDateFields = ref([]);
+    const redBtnRows = ref(
+  [
+    {
+      "start_time": "2024-12-06T16:44:43+05:30",
+      "end_time": "2024-12-06T13:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T11:44:43+05:30",
+      "end_time": "2024-12-06T10:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T09:44:43+05:30",
+      "end_time": "2024-12-06T08:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T10:44:43+05:30",
+      "end_time": "2024-12-06T12:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T12:44:43+05:30",
+      "end_time": "2024-12-06T11:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T13:44:43+05:30",
+      "end_time": "2024-12-06T12:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T10:44:43+05:30",
+      "end_time": "2024-12-06T09:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T16:44:43+05:30",
+      "end_time": "2024-12-06T13:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T11:44:43+05:30",
+      "end_time": "2024-12-06T10:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T09:44:43+05:30",
+      "end_time": "2024-12-06T08:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T10:44:43+05:30",
+      "end_time": "2024-12-06T12:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T12:44:43+05:30",
+      "end_time": "2024-12-06T11:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T13:44:43+05:30",
+      "end_time": "2024-12-06T12:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T10:44:43+05:30",
+      "end_time": "2024-12-06T09:44:43+05:30",
+    }
+  ].map((row, index) => ({
+    ...row,
+    index: index + 1,  // Add index starting from 1
+  }))
+);
+
     const minDate = ref(null);
     const selectedDateFields = ref([]);
     const redBtnRows = ref(
@@ -1498,6 +1567,50 @@ export default defineComponent({
         resultTotal.value = streamResponse.schema?.length;
       }
     };
+    function convertUnixToQuasarFormat(unixMicroseconds: any) {
+      if (!unixMicroseconds) return "";
+      const unixSeconds = unixMicroseconds / 1e6;
+      const dateToFormat = new Date(unixSeconds * 1000);
+      const formattedDate = dateToFormat.toISOString();
+      return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+    } 
+    const dateChangeValue = (value) => {
+      if(value.relativeTimePeriod == null){      
+        redBtnRows.value.push(
+        {
+          "start_time": convertUnixToQuasarFormat(value.startTime),
+          "end_time": convertUnixToQuasarFormat(value.endTime),
+        }
+      )
+      q.notify({
+              color: "positive",
+              message: "Date added Successfully",
+              timeout: 2000,
+            });
+      
+      }
+    };
+    const calculateDateRange = () => {
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - dataRetentionDays.value); // Adjust to the desired number of days (10 days in this case)
+
+  // If no min/max date is provided, default to 30 days ago and today
+      const formattedDate = timestampToTimezoneDate (
+        new Date().getTime(), // Current timestamp
+        store.state.timezone, // Get the timezone from the store
+        "yyyy/MM/dd" // Desired format
+      );
+      // Format minDate using timestampToTimezoneDate for a custom format
+      minDate.value = timestampToTimezoneDate(
+        thirtyDaysAgo.getTime(),
+        store.state.timezone,
+        "yyyy/MM/dd" // Desired format
+      );
+  };
+
+
+
     function convertUnixToQuasarFormat(unixMicroseconds: any) {
       if (!unixMicroseconds) return "";
       const unixSeconds = unixMicroseconds / 1e6;
