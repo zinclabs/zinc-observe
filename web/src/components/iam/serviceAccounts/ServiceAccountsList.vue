@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #body-cell-actions="props">
         <q-td :props="props" side>
           <q-btn
+          data-test="service-accounts-refresh"
           icon="refresh"
           :title="t('serviceAccounts.refresh')"
           class="q-ml-xs"
@@ -96,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="confirmRefreshAction(props.row)"
           />
           <q-btn
+            data-test="service-accounts-edit"
             icon="edit"
             :title="t('serviceAccounts.update')"
             class="q-ml-xs"
@@ -108,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="cursor: pointer !important"
           />
           <q-btn
+            data-test="service-accounts-delete"
             :icon="outlinedDelete"
             :title="t('serviceAccounts.delete')"
             class="q-ml-xs"
@@ -200,10 +203,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn
+            v-close-popup="true"
+            unelevated
+            no-caps
+            class="q-mr-sm"
+            data-test="cancel-refresh-service-token"
+          >
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
+            data-test="confirm-refresh-service-token"
             v-close-popup="true"
             unelevated
             no-caps
