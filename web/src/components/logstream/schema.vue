@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </q-card-section>
     <q-separator />
+
     <q-card-section class="q-ma-none q-pa-none">
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
         <div
@@ -184,9 +185,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
 
-          <q-separator class="q-mb-md" />
+          <div class="flex  q-mb-md justify-end " style="">
+            <q-item
+            :class="{
+              'q-router-link--active':
+              activeMainTab === 'schemaSettings',
+            }"
+             clickable @click="activeMainTab = 'schemaSettings'" :ripple="true">
+              <q-item-section   avatar>
+                <span class="flex"><q-icon size="16px" class="q-mr-xs" name="settings" />
+                  <q-item-label>Stream Settings</q-item-label></span>
+              </q-item-section>
+            </q-item>
+            <q-item
+            :class="{
+              'q-router-link--active':
+              activeMainTab === 'redButton',
+            }"
+             @click="activeMainTab = 'redButton'"  clickable :ripple="true">
+             <q-item-section   avatar>
+                <span class="flex"><q-icon size="16px"  class="q-mr-xs" name="backup" />
+                  <q-item-label>Extended Retention</q-item-label></span>
+              </q-item-section>
+            </q-item>
+              </div>
+          <!-- schema settings tab -->
+          <div v-if="activeMainTab == 'schemaSettings'">
 
-          <div
+            <div
             class="title flex tw-justify-between tw-items-center"
             data-test="schema-log-stream-mapping-title-text"
           >
@@ -208,6 +234,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               left-label
               dense
             />
+            </div>
+            <div class="flex justify-between items-center full-width q-mb-md">
+              <div>
+                <app-tabs
+                  v-if="isSchemaEvolutionEnabled"
+                  class="schema-fields-tabs"
+                  style="
+                    border: 1px solid #8a8a8a;
+                    border-radius: 4px;
+                    overflow: hidden;
+                  "
+                  data-test="schema-fields-tabs"
+                  :tabs="tabs"
+                  :active-tab="activeTab"
+                  @update:active-tab="updateActiveTab"
+                />
+              </div>
           </div>
           <div class="flex justify-between items-center full-width q-mb-md">
             <div>
@@ -433,6 +476,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </q-table>
 
+
+
+            </div>
+          </div>
+          <!-- red button tab -->
+          <div v-else>
+          <div class="q-mt-md">
+            <div class="mapping-warning-msg q-mb-sm" style="width: fit-content;" >
+              <span style="font-weight: 600;">
+              <q-icon name="info" class="q-mr-xs" size="16px" />
+              An additional {VALUE_FROM_CONFIG}10-day extension will be applied to the selected date ranges.</span>
+            </div>
+
+            <div class="text-center q-mt-sm tw-flex items-center ">
+             <span class="text-bold"> Select Date</span>
+              <date-time class="q-ml-sm" @on:date-change="dateChangeValue" :show-relative="false" :minDate="minDate" />
+            </div>
+
+            <div
+              class="q-mt-md"
+              style="margin-bottom: 30px"
+            >
+              <q-table
+              ref="qTable"
+                :row-key="(row,index) => 'tr_' + row.index "
+                data-test="schema-log-stream-field-mapping-table"
+                :rows="redBtnRows"
+                :columns="redBtnColumns"
+                :pagination="pagination"
+                selection="multiple"
+                v-model:selected="selectedDateFields"
+                class="q-table"
+                id="schemaFieldList"
+                :rows-per-page-options="[]"
+                dense
+              >
+
+              <template v-slot:header-selection="scope">
+                <q-td class="text-center">
+                  <q-checkbox
+                    :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
+                    v-model="scope.selected"
+                    size="sm"
+                  />
+                </q-td>
+              </template>
+
+              <template v-slot:body-selection="scope">
+                <q-td class="text-center q-td--no-hover">
+                  <q-checkbox
+                    :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
+                    v-model="scope.selected"
+                    size="sm"
+                  />
+                </q-td>
+              </template>
+
+                <template #bottom="scope">
+                  <QTablePagination
+                    :scope="scope"
+                    :position="'bottom'"
+                    :resultTotal="redBtnRows.length"
+                    :perPageOptions="perPageOptions"
+                    @update:changeRecordPerPage="changePagination"
+                  />
+                </template>
+              </q-table>
+
+
+
+
+            </div>
+          </div>
+
+          </div>
             <!-- floating footer for the table -->
             <div
               :class="
@@ -527,13 +645,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, onBeforeMount, reactive, ref } from "vue";
+import { computed, defineComponent, onBeforeMount, reactive, ref, onMounted,watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
-import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
+import { formatSizeFromMB, getImageURL,timestampToTimezoneDate } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
@@ -547,6 +665,8 @@ import {
   outlinedPerson,
   outlinedDelete,
 } from "@quasar/extras/material-icons-outlined";
+
+import DateTime from '@/components/DateTime.vue'
 
 const defaultValue: any = () => {
   return {
@@ -572,6 +692,7 @@ export default defineComponent({
     StreamFieldsInputs,
     AppTabs,
     QTablePagination,
+    DateTime,
   },
   setup({ modelValue }) {
     const { t } = useI18n();
@@ -590,8 +711,75 @@ export default defineComponent({
     const filterField = ref("");
     const router = useRouter();
     const qTable = ref(null);
+    const minDate = ref(null);
+    const selectedDateFields = ref([]);
+    const redBtnRows = ref(
+  [
+    {
+      "start_time": "2024-12-06T16:44:43+05:30",
+      "end_time": "2024-12-06T13:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T11:44:43+05:30",
+      "end_time": "2024-12-06T10:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T09:44:43+05:30",
+      "end_time": "2024-12-06T08:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T10:44:43+05:30",
+      "end_time": "2024-12-06T12:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T12:44:43+05:30",
+      "end_time": "2024-12-06T11:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T13:44:43+05:30",
+      "end_time": "2024-12-06T12:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T10:44:43+05:30",
+      "end_time": "2024-12-06T09:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T16:44:43+05:30",
+      "end_time": "2024-12-06T13:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T11:44:43+05:30",
+      "end_time": "2024-12-06T10:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T09:44:43+05:30",
+      "end_time": "2024-12-06T08:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T10:44:43+05:30",
+      "end_time": "2024-12-06T12:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T12:44:43+05:30",
+      "end_time": "2024-12-06T11:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T13:44:43+05:30",
+      "end_time": "2024-12-06T12:44:43+05:30",
+    },
+    {
+      "start_time": "2024-12-06T10:44:43+05:30",
+      "end_time": "2024-12-06T09:44:43+05:30",
+    }
+  ].map((row, index) => ({
+    ...row,
+    index: index + 1,  // Add index starting from 1
+  }))
+);
+
     const newSchemaFields = ref([]);
     const activeTab = ref("allFields");
+    const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
     const isDialogOpen = ref(false);
@@ -638,6 +826,18 @@ export default defineComponent({
         disabled: !hasUserDefinedSchema.value,
       },
     ]);
+    const mainTabs = computed(() => [
+      {
+        value: "redButton",
+        label: `Data Prolongation`,
+        disabled: false
+      },
+      {
+        value: "schemaSettings",
+        label: `Schema Settings`,
+        disabled: false,
+      },
+    ]);
 
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },
@@ -654,6 +854,8 @@ export default defineComponent({
     ];
     const { getStream, getUpdatedSettings } = useStreams();
 
+
+
     onBeforeMount(() => {
       dataRetentionDays.value = store.state.zoConfig.data_retention_days || 0;
       maxQueryRange.value = 0;
@@ -668,7 +870,6 @@ export default defineComponent({
     const markFormDirty = () => {
       formDirtyFlag.value = true;
     };
-
     const deleteFields = async () => {
       loadingState.value = true;
       await streamService
@@ -812,6 +1013,7 @@ export default defineComponent({
         dataRetentionDays.value =
           streamResponse.settings.data_retention ||
           store.state.zoConfig.data_retention_days;
+        calculateDateRange();
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
       storeOriginalData.value =
@@ -903,7 +1105,9 @@ export default defineComponent({
 
       if (showDataRetention.value) {
         settings["data_retention"] = Number(dataRetentionDays.value);
+        calculateDateRange();
       }
+
       settings["store_original_data"] = storeOriginalData.value;
       settings["approx_partition"] = approxPartition.value;
 
@@ -1154,6 +1358,25 @@ export default defineComponent({
       },
     ];
 
+    const redBtnColumns = [
+    {
+        name: "start_time",
+        label: "Start Date",
+        align: "center",
+        sortable: true,
+        field: "start_time",
+      },
+    {
+        name: "end_time",
+        label: "End Date",
+        align: "center",
+        sortable: true,
+        field: "end_time",
+      },
+    ]
+
+
+
     const addSchemaField = () => {
       newSchemaFields.value.push({
         name: "",
@@ -1185,6 +1408,9 @@ export default defineComponent({
       } else {
         resultTotal.value = indexData.value.schema.length;
       }
+    };
+    const updateActiveMainTab = (tab) => {
+      activeMainTab.value = tab;
     };
 
     const updateDefinedSchemaFields = () => {
@@ -1272,10 +1498,55 @@ export default defineComponent({
         resultTotal.value = streamResponse.schema?.length;
       }
     };
+    function convertUnixToQuasarFormat(unixMicroseconds: any) {
+      if (!unixMicroseconds) return "";
+      const unixSeconds = unixMicroseconds / 1e6;
+      const dateToFormat = new Date(unixSeconds * 1000);
+      const formattedDate = dateToFormat.toISOString();
+      return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+    } 
+    const dateChangeValue = (value) => {
+      if(value.relativeTimePeriod == null){      
+        redBtnRows.value.push(
+        {
+          "start_time": convertUnixToQuasarFormat(value.startTime),
+          "end_time": convertUnixToQuasarFormat(value.endTime),
+        }
+      )
+      q.notify({
+              color: "positive",
+              message: "Date added Successfully",
+              timeout: 2000,
+            });
+      
+      }
+    };
+    const calculateDateRange = () => {
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - dataRetentionDays.value); // Adjust to the desired number of days (10 days in this case)
+
+  // If no min/max date is provided, default to 30 days ago and today
+      const formattedDate = timestampToTimezoneDate (
+        new Date().getTime(), // Current timestamp
+        store.state.timezone, // Get the timezone from the store
+        "yyyy/MM/dd" // Desired format
+      );
+      // Format minDate using timestampToTimezoneDate for a custom format
+      minDate.value = timestampToTimezoneDate(
+        thirtyDaysAgo.getTime(),
+        store.state.timezone,
+        "yyyy/MM/dd" // Desired format
+      );
+  };
+
+
+
     return {
       t,
       q,
       store,
+      dateChangeValue,
       isCloud,
       indexData,
       getSchema,
@@ -1327,6 +1598,14 @@ export default defineComponent({
       outlinedSchema,
       outlinedDelete,
       openDialog,
+      calculateDateRange,
+      minDate,
+      mainTabs,
+      activeMainTab,
+      updateActiveMainTab,
+      redBtnColumns,
+      redBtnRows,
+      selectedDateFields,
     };
   },
   created() {
@@ -1457,6 +1736,42 @@ export default defineComponent({
   color: #865300;
 }
 
+.q-item {
+  padding: 3px 8px;
+  margin: 0 8px;
+  border-radius: 6px;
+
+  /* Overriding default height */
+  min-height: 30px;
+
+  &.q-router-link--active {
+    background-color: $primary;
+    color: white;
+
+    &::before {
+      content: " ";
+
+      position: absolute;
+      top: 0;
+      background-color: inherit;
+    }
+  }
+
+  &.ql-item-mini {
+    margin: 0;
+
+    &::before {
+      display: none;
+    }
+  }
+}
+
+.q-item__section--avatar {
+  margin: 0;
+  padding: 0;
+  min-width: 40px;
+}
+
 // .sticky-buttons {
 //   position: sticky;
 //   bottom: 0px;
@@ -1559,6 +1874,20 @@ export default defineComponent({
     }
   }
 }
+.main-fields-tabs {
+  height: fit-content;
+  color: var(--q-light);
+  .rum-tab {
+    padding: 4px 12px !important;
+
+    &.active {
+      color: white !important;
+      border-bottom: 5px solid var(--q-primary) !important;
+      background-color:rgba(88, 96, 178,0.6);
+
+    }
+  }
+}
 .floating-buttons {
   position: sticky;
   bottom: 0;
@@ -1574,4 +1903,13 @@ export default defineComponent({
   background-color: var(--q-light);
   backdrop-filter: blur(10px);
 }
+
+.warning-text {
+  color: #F5A623;
+  border: 1px solid #F5A623;
+  border-radius: 10px ;
+  padding: 6px 3px;
+}
+
+
 </style>
