@@ -43,7 +43,9 @@ pub async fn ws_proxy(
                 "[WS_PROXY] Failed to convert Actix request to Tungstenite request: {:?}",
                 e
             );
-            return Err(actix_web::error::ErrorInternalServerError("Failed to convert actix request to tungstenite request"));
+            return Err(actix_web::error::ErrorInternalServerError(
+                "Failed to convert actix request to tungstenite request",
+            ));
         }
     };
 
@@ -61,7 +63,6 @@ pub async fn ws_proxy(
     let (mut backend_ws_sink, mut backend_ws_stream) = backend_ws_stream.split();
 
     // Spawn tasks to forward messages between client and backend WebSocket
-    let c2b_node_role = node_role.clone();
     let client_to_backend = async move {
         while let Some(Ok(msg)) = client_msg_stream.next().await {
             let ws_msg = from_actix_message(msg);
@@ -71,7 +72,6 @@ pub async fn ws_proxy(
         }
     };
 
-    let b2c_node_role = node_role.clone();
     let backend_to_client = async move {
         while let Some(Ok(msg)) = backend_ws_stream.next().await {
             let ws_msg = from_tungstenite_msg_to_actix_msg(msg);

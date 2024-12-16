@@ -22,10 +22,11 @@ use infra::errors::Error;
 use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
 
-use super::utils::cancellation_registry_cache_utils;
 use crate::handler::http::request::websocket::{
     search,
-    utils::{sessions_cache_utils, WsClientEvents, WsServerEvents},
+    utils::{
+        cancellation_registry_cache_utils, sessions_cache_utils, WsClientEvents, WsServerEvents,
+    },
 };
 
 // Global cancellation registry for search requests by `trace_id`
@@ -179,7 +180,7 @@ pub async fn handle_text_message(
                             }
                         }
                     });
-                
+
                     drop(task);
                 }
                 #[cfg(feature = "enterprise")]

@@ -32,7 +32,8 @@ use strum::IntoEnumIterator;
 use {
     crate::service::self_reporting::audit,
     o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, HttpMeta, Protocol}, infra::config::get_config as get_o2_config,
+        auditor::{AuditMessage, HttpMeta, Protocol},
+        infra::config::get_config as get_o2_config,
     },
 };
 

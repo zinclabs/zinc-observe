@@ -88,4 +88,5 @@ pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, Executable
     Lazy::new(Default::default);
 pub static USER_SESSIONS: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 pub static SHORT_URLS: Lazy<RwHashMap<String, ShortUrlRecord>> = Lazy::new(DashMap::default);
+// TODO: Implement rate limiting for maximum number of sessions
 pub static WS_SESSIONS: Lazy<RwHashMap<String, WsSession>> = Lazy::new(DashMap::default);

@@ -156,8 +156,6 @@ async fn dispatch(
     payload: web::Payload,
     client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
-    let cfg = get_config();
-
     let start = std::time::Instant::now();
 
     // get online nodes
@@ -170,7 +168,6 @@ async fn dispatch(
     // check if the request is a websocket request
     let path_columns: Vec<&str> = path.split('/').collect();
     if *path_columns.get(3).unwrap_or(&"") == "ws" {
-        let node_role = cfg.common.node_role.clone();
         // Convert the HTTP/HTTPS URL to a WebSocket URL (WS/WSS)
         let ws_url = match convert_to_websocket_url(&new_url.value) {
             Ok(url) => url,
