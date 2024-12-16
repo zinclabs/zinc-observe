@@ -578,7 +578,7 @@ async fn process_delta(
             req.payload.query.size -= *curr_res_size;
         }
 
-        let search_res = do_search(&req, org_id, user_id).await?;
+        let mut search_res = do_search(&req, org_id, user_id).await?;
         *curr_res_size += search_res.hits.len() as i64;
 
         log::info!(
@@ -593,6 +593,19 @@ async fn process_delta(
             let queried_range =
                 calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
             *remaining_query_range -= queried_range;
+
+            // when searching with limit queries
+            // the limit in sql takes precedence over the requested size
+            // hence, the search result needs to be trimmed when the req limit is reached
+            if *curr_res_size > req_size {
+                let excess_hits = *curr_res_size - req_size;
+                let total_hits = search_res.hits.len() as i64;
+                if total_hits > excess_hits {
+                    let cache_hits: usize = (total_hits - excess_hits) as usize;
+                    search_res.hits.truncate(cache_hits);
+                    search_res.total = cache_hits;
+                }
+            }
 
             // Accumulate the result
             accumulated_results.push(SearchResultType::Search(search_res.clone()));
