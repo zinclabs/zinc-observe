@@ -37,8 +37,8 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     let functions = db::functions::list(org_id).await.unwrap();
     let alerts = db::alerts::alert::list(org_id, None, None).await.unwrap();
     let mut num_streams = 0;
-    let mut total_storage_size = 0;
-    let mut total_compressed_size = 0;
+    let mut total_storage_size = 0.0;
+    let mut total_compressed_size = 0.0;
     for stream in streams.iter() {
         if !stream.stream_type.eq(&StreamType::Index)
             && !stream.stream_type.eq(&StreamType::Metadata)

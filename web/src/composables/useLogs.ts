@@ -4274,12 +4274,25 @@ const useLogs = () => {
         throw new Error("Invalid SQL syntax");
       }
 
-      let newSelectedStreams: string[] = [];
+      const newSelectedStreams: string[] = [];
 
       //for simple query get the table name from the parsedSQL object
       // this will handle joins as well
       if (parsedSQL?.from) {
-        newSelectedStreams = parsedSQL.from.map((stream: any) => stream.table);
+        parsedSQL.from.map((stream: any) => {
+          // Check if 'expr' and 'ast' exist, then access 'from' to get the table
+          if (stream.expr?.ast?.from) {
+            stream.expr.ast.from.forEach((subStream: any) => {
+              if (subStream.table != undefined) {
+                newSelectedStreams.push(subStream.table);
+              }
+            });
+          }
+          // Otherwise, return the table name directly
+          if (stream.table != undefined) {
+            newSelectedStreams.push(stream.table);
+          }
+        });
       }
 
       // additionally, if union is there then it will have _next object which will have the table name it should check recursuvely as user can write multiple union

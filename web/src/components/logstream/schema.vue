@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Note: Drawer max-height to be dynamically calculated with JS -->
           <div
-            class=" "
+             :class="store.state.theme === 'dark' ? 'dark-theme-table' : 'light-theme-table'"
             style="margin-bottom: 30px"
           >
             <q-table
@@ -296,8 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </q-th>
               </q-tr>
           </template>
-
-              <template v-slot:header-selection="scope">
+          <template v-slot:header-selection="scope">
                 <q-td class="text-center">
                   <q-checkbox
                     v-if="
@@ -314,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template v-slot:body-selection="scope">
-                <q-td class="text-center">
+                <q-td class="text-center q-td--no-hover">
                   <q-checkbox
                     v-if="
                       !(
@@ -331,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template v-slot:body-cell-name="props">
-                <q-td>{{ props.row.name }}</q-td>
+                <q-td class="q-td--no-hover field-name">{{ props.row.name }}</q-td>
               </template>
               <template v-slot:body-cell-type="props">
                 <q-td>{{ props.row.type }}</q-td>
@@ -1474,12 +1473,13 @@ export default defineComponent({
 
   .q-table{
     td:nth-child(2) {
-      min-width: 20rem;
-      width: 20rem;
-      max-width: 10rem;
-      overflow: scroll;
-      text-wrap: wrap;
-    }
+    min-width: 20rem;
+    width: 20rem;
+    max-width: 20rem;
+    overflow: auto;
+    scrollbar-width: thin; 
+    scrollbar-color: #999 #f0f0f0;
+  }
     td:nth-child(3) {
       padding: 4px 8px !important;
     }
@@ -1490,6 +1490,12 @@ export default defineComponent({
   td:first-child {
     padding-left: 8px !important;
   }
+}
+.dark-theme-table tr:hover td:nth-child(2) {
+  background-color: #272A2B !important;
+}
+.light-theme-table tr:hover td:nth-child(2) {
+  background-color: #F7F7F7 !important;
 }
 
 .schema-fields-tabs {

@@ -51,18 +51,18 @@ pub async fn save_enrichment_table(
     let (org_id, table_name) = path.into_inner();
     let content_type = req.headers().get("content-type");
     let content_length = match req.headers().get("content-length") {
-        None => 0,
+        None => 0.0,
         Some(content_length) => {
             content_length
                 .to_str()
                 .unwrap_or("0")
-                .parse::<i64>()
-                .unwrap_or(0)
+                .parse::<f64>()
+                .unwrap_or(0.0)
                 / SIZE_IN_MB
         }
     };
     let cfg = config::get_config();
-    if content_length > cfg.limit.enrichment_table_limit as i64 {
+    if content_length > cfg.limit.enrichment_table_limit as f64 {
         return Ok(MetaHttpResponse::bad_request(format!(
             "exceeds allowed limit of {} mb",
             cfg.limit.enrichment_table_limit

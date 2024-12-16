@@ -57,6 +57,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </li>
                 <li>
+                  For fuzzy string matching based on Levenshtein distance,
+                  search of value 'error' use
+                  <span class="bg-highlight"
+                    >fuzzy_match(<b>fieldname</b>, 'error', 1)</span
+                  >
+                  OR
+                  <span class="bg-highlight">fuzzy_match_all('error', 1)</span>
+                </li>
+                <li>
                   For case-insensitive column search of value 'error' use
                   <span class="bg-highlight"
                     >str_match_ignore_case(<b>fieldname</b>, 'Error')</span
@@ -124,6 +133,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="bg-highlight"
                     >SELECT * FROM <b>stream</b> WHERE
                     str_match(<b>fieldname</b>, 'error')</span
+                  >
+                </li>
+                <li>
+                  For column search of value 'error' use
+                  <span class="bg-highlight"
+                    >SELECT * FROM <b>stream</b> WHERE
+                    fuzzy_match(<b>fieldname</b>, 'error', 1)</span
+                  >
+                </li>
+                <li>
+                  For all column search of value 'error' use
+                  <span class="bg-highlight"
+                    >SELECT * FROM <b>stream</b> WHERE fuzzy_match_all('error',
+                    1)</span
                   >
                 </li>
                 <li>

@@ -186,14 +186,14 @@ pub async fn add_zo_info(mut data: HashMap<String, json::Value>) -> HashMap<Stri
             }
         }
     }
-    let mut streams_orig_size: i64 = 0;
-    let mut streams_compressed_size: i64 = 0;
-    let mut logs_orig_size: i64 = 0;
-    let mut logs_compressed_size: i64 = 0;
-    let mut metrics_orig_size: i64 = 0;
-    let mut metrics_compressed_size: i64 = 0;
-    let mut traces_orig_size: i64 = 0;
-    let mut traces_compressed_size: i64 = 0;
+    let mut streams_orig_size: f64 = 0.0;
+    let mut streams_compressed_size: f64 = 0.0;
+    let mut logs_orig_size: f64 = 0.0;
+    let mut logs_compressed_size: f64 = 0.0;
+    let mut metrics_orig_size: f64 = 0.0;
+    let mut metrics_compressed_size: f64 = 0.0;
+    let mut traces_orig_size: f64 = 0.0;
+    let mut traces_compressed_size: f64 = 0.0;
     for stats in stats::get_stats().iter() {
         streams_orig_size += stats.storage_size;
         streams_compressed_size += stats.compressed_size;

@@ -191,6 +191,7 @@ const accessKey = computed(() => {
 const collectorCmd = computed(() => {
   return `helm --namespace openobserve-collector \\
   install o2c openobserve/openobserve-collector \\
+  --set k8sCluster=cluster1  \\
   --set exporters."otlphttp/openobserve".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}  \\
   --set exporters."otlphttp/openobserve".headers.Authorization="Basic [BASIC_PASSCODE]"  \\
   --set exporters."otlphttp/openobserve_k8s_events".endpoint=${endpoint.value.url}/api/${props.currOrgIdentifier}  \\
@@ -200,6 +201,7 @@ const collectorCmd = computed(() => {
 const collectorCmdThisCluster = computed(() => {
   return `helm --namespace openobserve-collector \\
   install o2c openobserve/openobserve-collector \\
+  --set k8sCluster=cluster1  \\
   --set exporters."otlphttp/openobserve".endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}  \\
   --set exporters."otlphttp/openobserve".headers.Authorization="Basic [BASIC_PASSCODE]"  \\
   --set exporters."otlphttp/openobserve_k8s_events".endpoint=http://o2-openobserve-router.openobserve.svc.cluster.local:5080/api/${props.currOrgIdentifier}  \\

@@ -132,6 +132,16 @@ const defaultSuggestions = [
     insertText: (_keyword: string) =>
       `str_match_ignore_case(fieldname, '${_keyword}')`,
   },
+  {
+    label: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
+    kind: "Text",
+    insertText: (_keyword: string) => `fuzzy_match(fieldname, '${_keyword}', 1)`,
+  },
+  {
+    label: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
+    kind: "Text",
+    insertText: (_keyword: string) => `fuzzy_match_all('${_keyword}', 1)`,
+  },
 ];
 
 const useSqlSuggestions = () => {

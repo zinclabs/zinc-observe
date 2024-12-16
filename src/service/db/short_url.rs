@@ -50,14 +50,16 @@ pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<()
         return Err(e).context("Failed to add short URL to DB");
     }
 
-    // trigger watch event
-    db::put(
-        &format!("{SHORT_URL_KEY}{short_id}"),
-        Bytes::new(),
-        NEED_WATCH,
-        None,
-    )
-    .await?;
+    // trigger watch event by putting empty value to cluster coordinator
+    let cluster_coordinator = super::get_coordinator().await;
+    cluster_coordinator
+        .put(
+            &format!("{SHORT_URL_KEY}{short_id}"),
+            Bytes::new(),
+            NEED_WATCH,
+            None,
+        )
+        .await?;
 
     Ok(())
 }
@@ -153,14 +155,16 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
             short_urls::batch_remove(expired_short_ids.clone()).await?;
 
             // delete from cache
+            let cluster_coordinator = super::get_coordinator().await;
             for short_id in expired_short_ids {
-                db::delete(
-                    &format!("{SHORT_URL_KEY}{short_id}"),
-                    false,
-                    db::NEED_WATCH,
-                    None,
-                )
-                .await?;
+                cluster_coordinator
+                    .delete(
+                        &format!("{SHORT_URL_KEY}{short_id}"),
+                        false,
+                        NEED_WATCH,
+                        None,
+                    )
+                    .await?;
             }
         }
     }

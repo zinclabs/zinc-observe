@@ -13,15 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Warning: The logic in this file should not be modified. Doing so will change
+// the behavior of the migration sequence and could result in users who execute
+// this migration before the changes and users who execute the migration after
+// the changes in executing different migration logic.
+
 use chrono::Utc;
-use config::{
-    meta::{
-        alerts::{alert::Alert, destinations::Destination, templates::Template},
-        dashboards::reports::Report,
-        stream::StreamType,
-    },
-    utils::json,
-};
+use config::{meta::dashboards::reports::Report, utils::json};
 use datafusion::arrow::datatypes::Schema;
 use infra::{
     db::{self as infra_db, NO_NEED_WATCH},
@@ -383,12 +381,12 @@ async fn migrate_alert_template_names() -> Result<(), anyhow::Error> {
         let keys: Vec<&str> = key.split('/').collect();
         let temp_name = keys[keys.len() - 1];
         if is_ofga_unsupported(temp_name) && keys.len() == 2 {
-            let mut temp: Template = json::from_slice(&val).unwrap();
+            let mut temp: meta::Template = json::from_slice(&val).unwrap();
             temp.name = into_ofga_supported_format(temp_name);
             #[cfg(feature = "enterprise")]
             get_ownership_tuple(keys[0], "templates", &temp.name, &mut write_tuples);
             // First create an alert copy with formatted template name
-            match db::alerts::templates::set(keys[0], &mut temp).await {
+            match meta::set_template_in_meta(keys[0], &mut temp).await {
                 // Delete template with unsupported template name
                 Ok(_) => {
                     if let Err(e) = db::alerts::templates::delete(keys[0], temp_name).await {
@@ -430,7 +428,7 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
         );
         let keys: Vec<&str> = key.split('/').collect();
         let dest_name = keys[keys.len() - 1];
-        let mut dest: Destination = json::from_slice(&val).unwrap();
+        let mut dest: meta::Destination = json::from_slice(&val).unwrap();
         let mut need_update = false;
         let mut create = false;
         if is_ofga_unsupported(dest_name) && keys.len() == 2 {
@@ -447,7 +445,7 @@ async fn migrate_alert_destination_names() -> Result<(), anyhow::Error> {
 
         if need_update {
             // Create a new destination copy with formatted destination name
-            match db::alerts::destinations::set(keys[0], &dest).await {
+            match meta::set_destination(keys[0], &dest).await {
                 // Delete destination with unsupported destination name
                 Ok(_) => {
                     // New destination created, delete the old one
@@ -494,7 +492,7 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
         let alert_name = keys[keys.len() - 1];
         let mut need_update = false;
         let mut create = false;
-        let mut alert: Alert = match json::from_slice(&val) {
+        let mut alert: meta::Alert = match json::from_slice(&val) {
             Ok(alert) => alert,
             Err(_) => {
                 log::error!("[Alert:Migration]: Failed to deserialize alert {alert_name}");
@@ -526,9 +524,9 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
             // updating the destinations of the alert.
             alert.destinations = destinations;
             // First create an alert copy with formatted alert name
-            match db::alerts::alert::set(
+            match meta::set_alert(
                 keys[0],
-                StreamType::from(keys[1]),
+                meta::StreamType::from(keys[1]),
                 keys[2],
                 &alert,
                 create,
@@ -538,9 +536,9 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
                 // Delete alert with unsupported alert name
                 Ok(_) => {
                     if create
-                        && db::alerts::alert::delete(
+                        && meta::delete_alert(
                             keys[0],
-                            StreamType::from(keys[1]),
+                            meta::StreamType::from(keys[1]),
                             keys[2],
                             alert_name,
                         )
@@ -567,4 +565,449 @@ async fn migrate_alert_names() -> Result<(), anyhow::Error> {
         add_init_ofga_tuples(write_tuples).await;
     }
     Ok(())
+}
+
+/// This types and logic in this embedded module originally existed in other
+/// parts of the codebase. However the types and logic in those module need to
+/// be able to change and evolve over time, whereas the logic inside this
+/// migration needs be immutable to maintain consistent behavior. Therefore
+/// logic from other parts of the codebase has been copied into this migration
+/// script to preserve its original behvaior. This logic should not be changed.
+mod meta {
+    use std::collections::HashMap;
+
+    use chrono::{DateTime, FixedOffset};
+    use serde::{Deserialize, Serialize};
+    use serde_json::Value as JsonValue;
+
+    use super::*;
+
+    const DEFAULT_ORG: &str = "default";
+
+    /// Inserts the alert into the meta table if it doesn't already exist or updates
+    /// it if it does already exist.
+    pub async fn set_alert(
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        alert: &Alert,
+        create: bool,
+    ) -> Result<(), anyhow::Error> {
+        let schedule_key = format!("{stream_type}/{stream_name}/{}", alert.name);
+        let key = format!("/alerts/{org_id}/{}", &schedule_key);
+        match db::put(
+            &key,
+            json::to_vec(alert).unwrap().into(),
+            db::NEED_WATCH,
+            None,
+        )
+        .await
+        {
+            Ok(_) => {
+                let trigger = db::scheduler::Trigger {
+                    org: org_id.to_string(),
+                    module_key: schedule_key.clone(),
+                    next_run_at: chrono::Utc::now().timestamp_micros(),
+                    is_realtime: alert.is_real_time,
+                    is_silenced: false,
+                    ..Default::default()
+                };
+                if create {
+                    match db::scheduler::push(trigger).await {
+                        Ok(_) => Ok(()),
+                        Err(e) => {
+                            log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+                            Ok(())
+                        }
+                    }
+                } else if db::scheduler::exists(
+                    org_id,
+                    db::scheduler::TriggerModule::Alert,
+                    &schedule_key,
+                )
+                .await
+                {
+                    match db::scheduler::update_trigger(trigger).await {
+                        Ok(_) => Ok(()),
+                        Err(e) => {
+                            log::error!("Failed to update trigger for alert {schedule_key}: {}", e);
+                            Ok(())
+                        }
+                    }
+                } else {
+                    match db::scheduler::push(trigger).await {
+                        Ok(_) => Ok(()),
+                        Err(e) => {
+                            log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+                            Ok(())
+                        }
+                    }
+                }
+            }
+            Err(e) => Err(anyhow::anyhow!("Error save alert {schedule_key}: {}", e)),
+        }
+    }
+
+    /// Deletes an alert from the meta table.
+    pub async fn delete_alert(
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        name: &str,
+    ) -> Result<(), anyhow::Error> {
+        let schedule_key = format!("{stream_type}/{stream_name}/{name}");
+        let key = format!("/alerts/{org_id}/{}", &schedule_key);
+        match db::delete(&key, false, db::NEED_WATCH, None).await {
+            Ok(_) => {
+                match db::scheduler::delete(
+                    org_id,
+                    db::scheduler::TriggerModule::Alert,
+                    &schedule_key,
+                )
+                .await
+                {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        log::error!("Failed to delete trigger: {}", e);
+                        Ok(())
+                    }
+                }
+            }
+            Err(e) => Err(anyhow::anyhow!("Error deleting alert: {e}")),
+        }
+    }
+
+    /// Inserts the destination into the meta table if it doesn't already exist or
+    /// updates it if it does already exist.
+    pub async fn set_destination(
+        org_id: &str,
+        destination: &Destination,
+    ) -> Result<(), anyhow::Error> {
+        let key = format!("/destinations/{org_id}/{}", destination.name);
+        Ok(db::put(
+            &key,
+            json::to_vec(destination).unwrap().into(),
+            db::NEED_WATCH,
+            None,
+        )
+        .await?)
+    }
+
+    /// Inserts the template into the meta table if it doesn't already exist or
+    /// updates it if it does already exist.
+    pub async fn set_template_in_meta(
+        org_id: &str,
+        template: &mut Template,
+    ) -> Result<(), anyhow::Error> {
+        template.is_default = Some(org_id == DEFAULT_ORG);
+        let key = format!("/templates/{org_id}/{}", template.name);
+        Ok(db::put(
+            &key,
+            json::to_vec(template).unwrap().into(),
+            db::NEED_WATCH,
+            None,
+        )
+        .await?)
+    }
+
+    /// Defines the JSON schema for alerts stored in the meta table at the time
+    /// this migration was originally written.
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub struct Alert {
+        #[serde(default)]
+        pub name: String,
+        #[serde(default)]
+        pub org_id: String,
+        #[serde(default)]
+        pub stream_type: StreamType,
+        #[serde(default)]
+        pub stream_name: String,
+        #[serde(default)]
+        pub is_real_time: bool,
+        #[serde(default)]
+        pub query_condition: QueryCondition,
+        #[serde(default)]
+        pub trigger_condition: TriggerCondition,
+        pub destinations: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub context_attributes: Option<HashMap<String, String>>,
+        #[serde(default)]
+        pub row_template: String,
+        #[serde(default)]
+        pub description: String,
+        #[serde(default)]
+        pub enabled: bool,
+        #[serde(default)]
+        /// Timezone offset in minutes.
+        /// The negative secs means the Western Hemisphere
+        pub tz_offset: i32,
+        #[serde(default)]
+        pub last_triggered_at: Option<i64>,
+        #[serde(default)]
+        pub last_satisfied_at: Option<i64>,
+        #[serde(default)]
+        pub owner: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub updated_at: Option<DateTime<FixedOffset>>,
+        #[serde(default)]
+        pub last_edited_by: Option<String>,
+    }
+
+    #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+    pub struct TriggerCondition {
+        pub period: i64, // 10 minutes
+        #[serde(default)]
+        pub operator: Operator, // >=
+        #[serde(default)]
+        pub threshold: i64, // 3 times
+        #[serde(default)]
+        pub frequency: i64, // 1 minute
+        #[serde(default)]
+        pub cron: String, // Cron Expression
+        #[serde(default)]
+        pub frequency_type: FrequencyType,
+        #[serde(default)]
+        pub silence: i64, // silence for 10 minutes after fire an alert
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub timezone: Option<String>,
+        #[serde(default)]
+        pub tolerance_in_secs: Option<i64>,
+    }
+
+    #[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq)]
+    pub struct CompareHistoricData {
+        #[serde(rename = "offSet")]
+        pub offset: String,
+    }
+
+    #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+    pub enum FrequencyType {
+        #[serde(rename = "cron")]
+        Cron,
+        #[serde(rename = "minutes")]
+        #[default]
+        Minutes,
+    }
+
+    #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+    pub struct QueryCondition {
+        #[serde(default)]
+        #[serde(rename = "type")]
+        pub query_type: QueryType,
+        pub conditions: Option<Vec<Condition>>,
+        pub sql: Option<String>,
+        pub promql: Option<String>,              // (cpu usage / cpu total)
+        pub promql_condition: Option<Condition>, // value >= 80
+        pub aggregation: Option<Aggregation>,
+        #[serde(default)]
+        pub vrl_function: Option<String>,
+        #[serde(default)]
+        pub search_event_type: Option<SearchEventType>,
+        #[serde(default)]
+        pub multi_time_range: Option<Vec<CompareHistoricData>>,
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+    pub struct Aggregation {
+        pub group_by: Option<Vec<String>>,
+        pub function: AggFunction,
+        pub having: Condition,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    pub enum AggFunction {
+        #[serde(rename = "avg")]
+        Avg,
+        #[serde(rename = "min")]
+        Min,
+        #[serde(rename = "max")]
+        Max,
+        #[serde(rename = "sum")]
+        Sum,
+        #[serde(rename = "count")]
+        Count,
+        #[serde(rename = "median")]
+        Median,
+        #[serde(rename = "p50")]
+        P50,
+        #[serde(rename = "p75")]
+        P75,
+        #[serde(rename = "p90")]
+        P90,
+        #[serde(rename = "p95")]
+        P95,
+        #[serde(rename = "p99")]
+        P99,
+    }
+
+    #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+    #[allow(clippy::upper_case_acronyms)] // Original code uses uppercase acronyms.
+    pub enum QueryType {
+        #[default]
+        #[serde(rename = "custom")]
+        Custom,
+        #[serde(rename = "sql")]
+        SQL,
+        #[serde(rename = "promql")]
+        PromQL,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct Condition {
+        pub column: String,
+        pub operator: Operator,
+        pub value: JsonValue,
+        #[serde(default)]
+        pub ignore_case: bool,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum Operator {
+        #[serde(rename = "=")]
+        EqualTo,
+        #[serde(rename = "!=")]
+        NotEqualTo,
+        #[serde(rename = ">")]
+        GreaterThan,
+        #[serde(rename = ">=")]
+        GreaterThanEquals,
+        #[serde(rename = "<")]
+        LessThan,
+        #[serde(rename = "<=")]
+        LessThanEquals,
+        Contains,
+        NotContains,
+    }
+
+    impl Default for Operator {
+        fn default() -> Self {
+            Self::EqualTo
+        }
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub struct Destination {
+        #[serde(default)]
+        pub name: String,
+        /// Required for `Http` destination_type
+        #[serde(default)]
+        pub url: String,
+        /// Required for `Http` destination_type
+        #[serde(default)]
+        pub method: HTTPType,
+        #[serde(default)]
+        pub skip_tls_verify: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub headers: Option<HashMap<String, String>>,
+        pub template: String,
+        /// Required when `destination_type` is `Email`
+        #[serde(default)]
+        pub emails: Vec<String>,
+        // New SNS-specific fields
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub sns_topic_arn: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub aws_region: Option<String>,
+        #[serde(rename = "type")]
+        #[serde(default)]
+        pub destination_type: DestinationType,
+    }
+
+    #[derive(Serialize, Debug, Default, PartialEq, Eq, Deserialize, Clone)]
+    pub enum DestinationType {
+        #[default]
+        #[serde(rename = "http")]
+        Http,
+        #[serde(rename = "email")]
+        Email,
+        #[serde(rename = "sns")]
+        Sns,
+    }
+
+    #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+    #[allow(clippy::upper_case_acronyms)] // Original code uses uppercase acronyms.
+    pub enum HTTPType {
+        #[default]
+        #[serde(rename = "post")]
+        POST,
+        #[serde(rename = "put")]
+        PUT,
+        #[serde(rename = "get")]
+        GET,
+    }
+
+    #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+    pub struct Template {
+        #[serde(default)]
+        pub name: String,
+        #[serde(default)]
+        pub body: String,
+        #[serde(rename = "isDefault")]
+        #[serde(default)]
+        pub is_default: Option<bool>,
+        /// Indicates whether the body is an http, email, or sns body.
+        #[serde(rename = "type")]
+        #[serde(default)]
+        pub template_type: DestinationType,
+        #[serde(default)]
+        pub title: String,
+    }
+
+    #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize)]
+    #[serde(rename_all = "lowercase")]
+    #[allow(clippy::upper_case_acronyms)] // Original code uses uppercase acronyms.
+    pub enum SearchEventType {
+        UI,
+        Dashboards,
+        Reports,
+        Alerts,
+        Values,
+        Other,
+        RUM,
+        DerivedStream,
+    }
+
+    #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize, Hash)]
+    #[serde(rename_all = "lowercase")]
+    pub enum StreamType {
+        #[default]
+        Logs,
+        Metrics,
+        Traces,
+        #[serde(rename = "enrichment_tables")]
+        EnrichmentTables,
+        #[serde(rename = "file_list")]
+        Filelist,
+        Metadata,
+        Index,
+    }
+
+    impl From<&str> for StreamType {
+        fn from(s: &str) -> Self {
+            match s.to_lowercase().as_str() {
+                "logs" => StreamType::Logs,
+                "metrics" => StreamType::Metrics,
+                "traces" => StreamType::Traces,
+                "enrichment_tables" => StreamType::EnrichmentTables,
+                "file_list" => StreamType::Filelist,
+                "metadata" => StreamType::Metadata,
+                "index" => StreamType::Index,
+                _ => StreamType::Logs,
+            }
+        }
+    }
+
+    impl std::fmt::Display for StreamType {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            match self {
+                StreamType::Logs => write!(f, "logs"),
+                StreamType::Metrics => write!(f, "metrics"),
+                StreamType::Traces => write!(f, "traces"),
+                StreamType::EnrichmentTables => write!(f, "enrichment_tables"),
+                StreamType::Filelist => write!(f, "file_list"),
+                StreamType::Metadata => write!(f, "metadata"),
+                StreamType::Index => write!(f, "index"),
+            }
+        }
+    }
 }

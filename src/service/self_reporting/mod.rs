@@ -82,7 +82,7 @@ pub async fn report_request_usage_stats(
         .inc_by(stats.records as u64);
     metrics::INGEST_BYTES
         .with_label_values(&[org_id, stream_name, stream_type.to_string().as_str()])
-        .inc_by((stats.size as i64 * SIZE_IN_MB) as u64);
+        .inc_by((stats.size * SIZE_IN_MB) as u64);
     let event: UsageEvent = usage_type.into();
     let now = DateTime::from_timestamp_micros(timestamp).unwrap();
 

@@ -317,14 +317,14 @@ impl Default for RequestStats {
 impl From<FileMeta> for RequestStats {
     fn from(meta: FileMeta) -> RequestStats {
         RequestStats {
-            size: (meta.original_size / SIZE_IN_MB) as f64,
+            size: meta.original_size as f64 / SIZE_IN_MB,
             records: meta.records,
             dropped_records: 0,
             response_time: 0.0,
             function: None,
             request_body: None,
             cached_ratio: None,
-            compressed_size: Some((meta.compressed_size / SIZE_IN_MB) as f64),
+            compressed_size: Some(meta.compressed_size as f64 / SIZE_IN_MB),
             min_ts: Some(meta.min_ts),
             max_ts: Some(meta.max_ts),
             user_email: None,

@@ -377,7 +377,7 @@ pub async fn write_file(
         log::error!("ingestion write file error: {}", e);
     }
 
-    req_stats.size += (entries_size as i64 / SIZE_IN_MB) as f64;
+    req_stats.size += entries_size as f64 / SIZE_IN_MB;
     req_stats.records += entries_records as i64;
     req_stats
 }

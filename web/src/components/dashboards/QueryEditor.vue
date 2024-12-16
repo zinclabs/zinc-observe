@@ -438,6 +438,18 @@ export default defineComponent({
               insertText: `str_match(fieldname, '${lastElement}')`,
               range: range,
             });
+            filteredSuggestions.push({
+              label: `fuzzy_match(fieldname, '${lastElement}', 1)`,
+              kind: monaco.languages.CompletionItemKind.Function,
+              insertText: `fuzzy_match(fieldname, '${lastElement}', 1)`,
+              range: range,
+            });
+            filteredSuggestions.push({
+              label: `fuzzy_match_all('${lastElement}', 1)`,
+              kind: monaco.languages.CompletionItemKind.Function,
+              insertText: `fuzzy_match_all('${lastElement}', 1)`,
+              range: range,
+            });
           } else {
             props.suggestions.forEach((suggestion: any) => {
               filteredSuggestions.push({

@@ -51,6 +51,9 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
         for stream_type in ALL_STREAM_TYPES {
+            if stream_type == StreamType::EnrichmentTables {
+                continue; // skip data retention for enrichment tables
+            }
             let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
             for stream_name in streams {
                 let Some(node_name) =

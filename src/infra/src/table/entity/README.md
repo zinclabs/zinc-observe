@@ -10,6 +10,7 @@ Be sure to replace `YOUR_DATABASE_URL` with the database connection string. Alte
 sea-orm-cli generate entity \
   --output-dir src/infra/src/table/entity \
   --date-time-crate chrono \
+  --ignore-tables distinct_value_fields \
   --ignore-tables file_list_deleted \
   --ignore-tables file_list_history \
   --ignore-tables file_list_jobs \

@@ -49,8 +49,8 @@ pub const MMDB_ASN_FILE_NAME: &str = "GeoLite2-ASN.mmdb";
 pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
 pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
-pub const SIZE_IN_MB: i64 = 1024 * 1024;
-pub const SIZE_IN_GB: i64 = 1024 * 1024 * 1024;
+pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
+pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_BATCH_SIZE: usize = 8 * 1024;
 pub const PARQUET_PAGE_SIZE: usize = 1024 * 1024;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 1024 * 1024; // this can't be change, it will cause segment matching error
@@ -703,7 +703,7 @@ pub struct Common {
     )]
     pub mmdb_geolite_citydb_sha256_url: String,
     #[env_config(
-        name = "ZO_MMDB_GEOLITE_CITYDB_SHA256_URL",
+        name = "ZO_MMDB_GEOLITE_ASNDB_SHA256_URL",
         default = "https://geoip.zinclabs.dev/GeoLite2-ASN.sha256"
     )]
     pub mmdb_geolite_asndb_sha256_url: String,
@@ -841,7 +841,7 @@ pub struct Common {
     )]
     pub self_metrics_consumption_interval: u64,
     #[env_config(
-        name = "ZO_SELF_METRIC_CONSUMPTION_WHITELIST",
+        name = "ZO_SELF_METRIC_CONSUMPTION_ACCEPTLIST",
         default = "",
         help = "only these metrics will be self-consumed, comma separated"
     )]
