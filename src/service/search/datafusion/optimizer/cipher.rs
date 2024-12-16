@@ -50,17 +50,17 @@ use crate::service::search::datafusion::udf::cipher_udf::{
 /// This is assuming both have same cost. If we later find they don't, we'll
 /// have to deal with that separately.
 #[derive(Default, Debug)]
-pub struct RewriteCipher {}
+pub struct RewriteCipherCall {}
 
-impl RewriteCipher {
+impl RewriteCipherCall {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl OptimizerRule for RewriteCipher {
+impl OptimizerRule for RewriteCipherCall {
     fn name(&self) -> &str {
-        "rewrite_decrypt"
+        "rewrite_cipher_key"
     }
 
     fn apply_order(&self) -> Option<ApplyOrder> {
@@ -172,7 +172,7 @@ impl TreeNodeRewriter for CipherReplace {
         // sanity check
         if cipher_args.len() != 2 {
             return Err(DataFusionError::Internal(
-                "decrypt function requires 2 arguments".to_string(),
+                "encrypt/decrypt functions requires 2 arguments".to_string(),
             ));
         }
 
@@ -185,24 +185,135 @@ impl TreeNodeRewriter for CipherReplace {
             _ => unreachable!("we made sure that type will be only one of these two"),
         };
 
-        // construct the encrypt call over the const value
-        let encrypt_call = Expr::ScalarFunction(ScalarFunction {
+        // construct the cipher call over the const value
+        let cipher_call = Expr::ScalarFunction(ScalarFunction {
             func: Arc::new(_cipher),
             args: vec![literal.to_owned(), key_name],
         });
 
-        // construct the new binary op, where we compare col to the encrypted value
-        // instead of decrypting col and comparing it to plain value
+        // construct the new binary op, where we compare col to the cipher-ed value
+        // instead of de-ciphering col and comparing it to plain value
         // it doesn't matter where the cipher was in original (left/right)
         // we always construct in order col op cipher . Because the op can be
         // only eq/neq , it will hold no matter operand order
         let binary_op = BinaryExpr {
             left: Box::new(col_expr),
             op: *op,
-            right: Box::new(encrypt_call),
+            right: Box::new(cipher_call),
         };
 
         Ok(Transformed::yes(Expr::BinaryExpr(binary_op)))
+    }
+}
+
+#[derive(Debug)]
+pub struct RewriteCipherKey {
+    org: String,
+}
+
+impl RewriteCipherKey {
+    pub fn new(org: &str) -> Self {
+        if org.is_empty() {
+            panic!("org must not be empty in cipher key re-write");
+        }
+        Self {
+            org: org.to_string(),
+        }
+    }
+}
+
+impl OptimizerRule for RewriteCipherKey {
+    fn name(&self) -> &str {
+        "rewrite_cipher_key"
+    }
+
+    fn apply_order(&self) -> Option<ApplyOrder> {
+        Some(ApplyOrder::BottomUp)
+    }
+
+    fn supports_rewrite(&self) -> bool {
+        true
+    }
+
+    fn rewrite(
+        &self,
+        plan: LogicalPlan,
+        _config: &dyn OptimizerConfig,
+    ) -> Result<Transformed<LogicalPlan>> {
+        let mut expr_rewriter = CipherKeyRewrite::new(&self.org);
+
+        let name_preserver = NamePreserver::new(&plan);
+        plan.map_expressions(|expr| {
+            let original_name = name_preserver.save(&expr);
+            expr.rewrite(&mut expr_rewriter)
+                .map(|transformed| transformed.update_data(|e| original_name.restore(e)))
+        })
+    }
+}
+
+// Rewriter for decrypt
+#[derive(Debug, Clone)]
+pub struct CipherKeyRewrite {
+    org: String,
+}
+
+impl CipherKeyRewrite {
+    pub fn new(org: &str) -> Self {
+        Self {
+            org: org.to_string(),
+        }
+    }
+}
+impl TreeNodeRewriter for CipherKeyRewrite {
+    type Node = Expr;
+
+    fn f_up(&mut self, expr: Expr) -> Result<Transformed<Expr>, DataFusionError> {
+        // get function and args from the call
+        let (func, args) = match &expr {
+            Expr::ScalarFunction(ScalarFunction { func, args }) => {
+                if func.name() != DECRYPT_UDF_NAME && func.name() != ENCRYPT_UDF_NAME {
+                    return Ok(Transformed::no(expr));
+                }
+                (func, args)
+            }
+            _ => return Ok(Transformed::no(expr)),
+        };
+
+        // sanity check
+        if args.len() != 2 {
+            return Err(DataFusionError::Internal(
+                "encrypt/decrypt functions requires 2 arguments".to_string(),
+            ));
+        }
+
+        // extract args
+        let col_expr = args[0].clone();
+        let key_name = args[1].clone();
+
+        let new_key_name = match key_name {
+            Expr::Literal(ScalarValue::Utf8(Some(s))) => {
+                let org_prefix = format!("{}:", self.org);
+                // because datafusion applies optimizer rules multiple times,
+                // we have to check if we have appended the prefix already.
+                // to prevent user trying to abuse this by adding another org's name
+                // in key name itself, we disallow key name to contain `:` character
+                if s.starts_with(&org_prefix) {
+                    return Ok(Transformed::no(expr));
+                }
+                // construct new key name containing the org name
+                let new_key_name = format!("{}:{}", self.org, s);
+                Expr::Literal(ScalarValue::Utf8(Some(new_key_name)))
+            }
+            _ => return Ok(Transformed::no(expr)),
+        };
+
+        // construct the cipher call with new key name
+        let cipher_call = Expr::ScalarFunction(ScalarFunction {
+            func: func.clone(),
+            args: vec![col_expr, new_key_name],
+        });
+
+        Ok(Transformed::yes(cipher_call))
     }
 }
 
@@ -223,14 +334,14 @@ mod tests {
         prelude::SessionContext,
     };
 
-    use super::RewriteCipher;
+    use super::{RewriteCipherCall, RewriteCipherKey};
     use crate::service::search::datafusion::udf::{
         cipher_udf::{DECRYPT_UDF, ENCRYPT_UDF},
         match_all_udf::MATCH_ALL_UDF,
     };
 
     #[tokio::test]
-    async fn test_rewrite_decrypt() {
+    async fn test_rewrite_cipher() {
         let sqls = [
             // equal to operator gets re-written
             (
@@ -324,11 +435,67 @@ mod tests {
         ctx.register_udf(DECRYPT_UDF.clone());
         ctx.register_udf(ENCRYPT_UDF.clone());
         ctx.register_udf(MATCH_ALL_UDF.clone());
-        ctx.add_optimizer_rule(Arc::new(RewriteCipher::new()));
+        ctx.add_optimizer_rule(Arc::new(RewriteCipherCall::new()));
 
         for (sql, res) in sqls {
             let plan = ctx.state().create_logical_plan(sql).await.unwrap();
-            let optimizer = Optimizer::with_rules(vec![Arc::new(RewriteCipher::new())]);
+            let optimizer = Optimizer::with_rules(vec![Arc::new(RewriteCipherCall::new())]);
+            let optimized_plan = optimizer
+                .optimize(plan, &OptimizerContext::new(), observe)
+                .unwrap();
+            let formatted_plan = format!("{optimized_plan}");
+            assert_eq!(res, formatted_plan);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_rewrite_cipher_key() {
+        let sqls = [
+            // check key is re-written
+            (
+                "SELECT _timestamp FROM t where decrypt(name, 'test_key') = 'test_val'",
+                "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"org1:test_key\")) = Utf8(\"test_val\")\n    TableScan: t"
+            ),
+            (
+                "SELECT _timestamp FROM t where 'test_val' = encrypt(name, 'test_key')",
+                "Projection: t._timestamp\n  Filter: Utf8(\"test_val\") = encrypt(t.name, Utf8(\"org1:test_key\"))\n    TableScan: t"
+            ),
+        ];
+
+        // define a schema.
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+        ]));
+
+        // define data.
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2, 3, 4, 5])),
+                Arc::new(StringArray::from(vec![
+                    "open",
+                    "observe",
+                    "openobserve",
+                    "o2",
+                    "oo",
+                ])),
+            ],
+        )
+        .unwrap();
+
+        fn observe(_plan: &LogicalPlan, _rule: &dyn OptimizerRule) {}
+
+        let ctx = SessionContext::new();
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+        ctx.register_udf(DECRYPT_UDF.clone());
+        ctx.register_udf(ENCRYPT_UDF.clone());
+        ctx.add_optimizer_rule(Arc::new(RewriteCipherKey::new("org1")));
+
+        for (sql, res) in sqls {
+            let plan = ctx.state().create_logical_plan(sql).await.unwrap();
+            let optimizer = Optimizer::with_rules(vec![Arc::new(RewriteCipherKey::new("org1"))]);
             let optimized_plan = optimizer
                 .optimize(plan, &OptimizerContext::new(), observe)
                 .unwrap();

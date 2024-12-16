@@ -104,9 +104,13 @@ fn decrypt() -> ScalarFunctionImplementation {
         let mut cipher = {
             match REGISTRY.read().get_key(&key) {
                 None => {
+                    let key_name = match key.split_once(":") {
+                        Some((_, n)) => n,
+                        None => &key,
+                    };
                     return Err(DataFusionError::Execution(format!(
                         "key with name {} not found",
-                        key
+                        key_name
                     )));
                 }
                 Some(k) => k,
@@ -162,9 +166,13 @@ fn encrypt() -> ScalarFunctionImplementation {
         let mut cipher = {
             match REGISTRY.read().get_key(&key) {
                 None => {
+                    let key_name = match key.split_once(":") {
+                        Some((_, n)) => n,
+                        None => &key,
+                    };
                     return Err(DataFusionError::Execution(format!(
                         "key with name {} not found",
-                        key
+                        key_name
                     )));
                 }
                 Some(k) => k,
