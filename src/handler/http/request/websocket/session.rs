@@ -167,7 +167,7 @@ pub async fn handle_text_message(
                                 );
                                 let close_reason = Some(CloseReason {
                                     code: CloseCode::Error,
-                                    description: Some(e.to_string()),
+                                    description: Some(format!("[trace_id: {}, error: {}]", search_req.trace_id, e)),
                                 });
                                 let err_res = WsServerEvents::error_response(
                                     e,
@@ -246,7 +246,6 @@ pub async fn handle_text_message(
 }
 
 pub async fn send_message(session: &mut WsSession, msg: String) -> Result<(), Error> {
-    dbg!(&msg);
     session.text(msg).await.map_err(|e| {
         log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
         Error::Message(e.to_string())
