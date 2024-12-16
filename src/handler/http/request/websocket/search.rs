@@ -548,7 +548,7 @@ async fn process_delta(
     req.payload.query.end_time = delta.delta_end_time;
 
     let partition_resp = get_partitions(&req, org_id).await?;
-    let partitions = partition_resp.partitions;
+    let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
         return Ok(());
@@ -559,6 +559,11 @@ async fn process_delta(
         partitions.len(),
         trace_id
     );
+
+    if req.search_type == SearchEventType::Dashboards {
+        // sort partitions by timestamp in desc
+        partitions.sort_by(|a, b| b[0].cmp(&a[0]));
+    }
 
     for &[start_time, end_time] in partitions.iter() {
         // Check if the cancellation flag is set
