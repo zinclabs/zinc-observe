@@ -26,12 +26,17 @@ use datafusion::{
     scalar::ScalarValue,
 };
 
-use crate::service::search::datafusion::udf::cipher_udf::{DECRYPT_UDF_NAME, ENCRYPT_UDF};
+use crate::service::search::datafusion::udf::cipher_udf::{
+    DECRYPT_UDF, DECRYPT_UDF_NAME, ENCRYPT_UDF, ENCRYPT_UDF_NAME,
+};
 
 /// Optimization rule that rewrite decrypt if applicable
 /// This will convert
 /// - decrypt(field,key_name) = value -> field = encrypt(value,key_name)
 /// - decrypt(field,key_name) != value -> field != encrypt(value,key_name)
+/// - encrypt(field,key_name) = value -> field = decrypt(value,key_name)
+/// - encrypt(field,key_name) != value -> field != decrypt(value,key_name)
+/// And The other way around
 ///
 /// The value must be static string, as otherwise there is no benefit to
 /// converting from decrypt->encrypt, both will have same const.
@@ -45,15 +50,15 @@ use crate::service::search::datafusion::udf::cipher_udf::{DECRYPT_UDF_NAME, ENCR
 /// This is assuming both have same cost. If we later find they don't, we'll
 /// have to deal with that separately.
 #[derive(Default, Debug)]
-pub struct RewriteDecrypt {}
+pub struct RewriteCipher {}
 
-impl RewriteDecrypt {
+impl RewriteCipher {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl OptimizerRule for RewriteDecrypt {
+impl OptimizerRule for RewriteCipher {
     fn name(&self) -> &str {
         "rewrite_decrypt"
     }
@@ -71,44 +76,47 @@ impl OptimizerRule for RewriteDecrypt {
         plan: LogicalPlan,
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
-        if plan
-            .expressions()
-            .iter()
-            .map(|expr| expr.exists(|expr| Ok(is_rewritable_decrypt(expr))).unwrap())
-            .any(|x| x)
-        {
-            let mut expr_rewriter = DecryptToEncrypt::new();
+        let mut expr_rewriter = CipherReplace::new();
 
-            let name_preserver = NamePreserver::new(&plan);
-            plan.map_expressions(|expr| {
-                let original_name = name_preserver.save(&expr);
-                expr.rewrite(&mut expr_rewriter)
-                    .map(|transformed| transformed.update_data(|e| original_name.restore(e)))
-            })
-        } else {
-            Ok(Transformed::no(plan))
-        }
+        let name_preserver = NamePreserver::new(&plan);
+        plan.map_expressions(|expr| {
+            let original_name = name_preserver.save(&expr);
+            expr.rewrite(&mut expr_rewriter)
+                .map(|transformed| transformed.update_data(|e| original_name.restore(e)))
+        })
     }
 }
 
-fn is_rewritable_decrypt(expr: &Expr) -> bool {
+fn is_rewritable_cipher_call(expr: &Expr) -> bool {
     if let Expr::BinaryExpr(BinaryExpr {
         left,
         op: Operator::Eq | Operator::NotEq,
         right,
     }) = expr
     {
-        // we are specifically looking for binary op, where the left side
-        // is decrypt invocation and right side  is a constant string
+        // we are specifically looking for binary op, where the one side
+        // is encrypt/decrypt invocation and other side is a constant string
 
-        // check left side is decrypt call
-        let left_is_decrypt = match left.as_ref() {
-            Expr::ScalarFunction(ScalarFunction { func, .. }) => func.name() == DECRYPT_UDF_NAME,
+        // check one side is encrypt/decrypt call
+        let left_is_cipher = match left.as_ref() {
+            Expr::ScalarFunction(ScalarFunction { func, .. }) => {
+                func.name() == DECRYPT_UDF_NAME || func.name() == ENCRYPT_UDF_NAME
+            }
             _ => false,
         };
-        // check right side is const string
+
+        let right_is_cipher = match right.as_ref() {
+            Expr::ScalarFunction(ScalarFunction { func, .. }) => {
+                func.name() == DECRYPT_UDF_NAME || func.name() == ENCRYPT_UDF_NAME
+            }
+            _ => false,
+        };
+
+        // check one side is const string
         let right_is_literal = matches!(right.as_ref(), Expr::Literal(ScalarValue::Utf8(_)));
-        left_is_decrypt && right_is_literal
+        let left_is_literal = matches!(left.as_ref(), Expr::Literal(ScalarValue::Utf8(_)));
+
+        (left_is_cipher && right_is_literal) || (left_is_literal && right_is_cipher)
     } else {
         false
     }
@@ -116,21 +124,20 @@ fn is_rewritable_decrypt(expr: &Expr) -> bool {
 
 // Rewriter for decrypt
 #[derive(Debug, Clone)]
-pub struct DecryptToEncrypt {}
+pub struct CipherReplace {}
 
-impl DecryptToEncrypt {
+impl CipherReplace {
     pub fn new() -> Self {
         Self {}
     }
 }
-impl TreeNodeRewriter for DecryptToEncrypt {
+impl TreeNodeRewriter for CipherReplace {
     type Node = Expr;
 
     fn f_up(&mut self, expr: Expr) -> Result<Transformed<Expr>, DataFusionError> {
-        // here we expect the expr to be is_rewritable_decrypt, and return at any point
-        // where it is not. we can do a is_rewritable_decrypt call fist and early return,
-        // but then we will have to do the following anyways to extract the values,
-        // so we do it this way.
+        if !is_rewritable_cipher_call(&expr) {
+            return Ok(Transformed::no(expr));
+        }
 
         // start with extracting individual sides of binary op
         let (left, op, right) = match &expr {
@@ -142,41 +149,53 @@ impl TreeNodeRewriter for DecryptToEncrypt {
             _ => return Ok(Transformed::no(expr)),
         };
 
-        // extract args from the decrypt call, so we get the table col and key name
-        let decrypt_args = match left.as_ref() {
+        // Here we can be certain that exactly one of the left and right is
+        // cipher call and the other is literal because of the is_rewritable_cipher check above
+
+        let (cipher, literal) = if matches!(left.as_ref(), Expr::ScalarFunction(_)) {
+            (left.as_ref(), right.as_ref())
+        } else {
+            (right.as_ref(), left.as_ref())
+        };
+
+        // extract args from the cipher call, so we get the table col and key name
+        let (cipher_args, cipher_type) = match cipher {
             Expr::ScalarFunction(ScalarFunction { func, args }) => {
-                if func.name() != DECRYPT_UDF_NAME {
+                if func.name() != DECRYPT_UDF_NAME && func.name() != ENCRYPT_UDF_NAME {
                     return Ok(Transformed::no(expr));
                 }
-                args
+                (args, func.name())
             }
             _ => return Ok(Transformed::no(expr)),
         };
 
-        // then get the value we are comparing it to
-        let compared_const = match right.as_ref() {
-            Expr::Literal(ScalarValue::Utf8(_)) => right.as_ref().to_owned(),
-            _ => return Ok(Transformed::no(expr)),
-        };
-
         // sanity check
-        if decrypt_args.len() != 2 {
+        if cipher_args.len() != 2 {
             return Err(DataFusionError::Internal(
                 "decrypt function requires 2 arguments".to_string(),
             ));
         }
 
-        let col_expr = decrypt_args[0].clone();
-        let key_name = decrypt_args[1].clone();
+        let col_expr = cipher_args[0].clone();
+        let key_name = cipher_args[1].clone();
+
+        let _cipher = match cipher_type {
+            DECRYPT_UDF_NAME => ENCRYPT_UDF.clone(),
+            ENCRYPT_UDF_NAME => DECRYPT_UDF.clone(),
+            _ => unreachable!("we made sure that type will be only one of these two"),
+        };
 
         // construct the encrypt call over the const value
         let encrypt_call = Expr::ScalarFunction(ScalarFunction {
-            func: Arc::new(ENCRYPT_UDF.clone()),
-            args: vec![compared_const, key_name],
+            func: Arc::new(_cipher),
+            args: vec![literal.to_owned(), key_name],
         });
 
         // construct the new binary op, where we compare col to the encrypted value
         // instead of decrypting col and comparing it to plain value
+        // it doesn't matter where the cipher was in original (left/right)
+        // we always construct in order col op cipher . Because the op can be
+        // only eq/neq , it will hold no matter operand order
         let binary_op = BinaryExpr {
             left: Box::new(col_expr),
             op: *op,
@@ -204,7 +223,7 @@ mod tests {
         prelude::SessionContext,
     };
 
-    use super::RewriteDecrypt;
+    use super::RewriteCipher;
     use crate::service::search::datafusion::udf::{
         cipher_udf::{DECRYPT_UDF, ENCRYPT_UDF},
         match_all_udf::MATCH_ALL_UDF,
@@ -237,6 +256,33 @@ mod tests {
             (
                 "SELECT _timestamp FROM t where decrypt(name, 'test_key') = other_col",
                 "Projection: t._timestamp\n  Filter: decrypt(t.name, Utf8(\"test_key\")) = t.other_col\n    TableScan: t"
+            ),
+            // similar checks for encrypt
+            (
+                "SELECT _timestamp FROM t where encrypt(name, 'test_key') = 'test_val'",
+                "Projection: t._timestamp\n  Filter: t.name = decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t"
+            ),
+            (
+                "SELECT _timestamp FROM t where encrypt(name, 'test_key') != 'test_val'",
+                "Projection: t._timestamp\n  Filter: t.name != decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t"
+            ),
+            (
+                "SELECT _timestamp FROM t where encrypt(name, 'test_key') = other_col",
+                "Projection: t._timestamp\n  Filter: encrypt(t.name, Utf8(\"test_key\")) = t.other_col\n    TableScan: t"
+            ),
+            // checks for revered order in query
+            (
+                "SELECT _timestamp FROM t where 'test_val' = decrypt(name, 'test_key')",
+                "Projection: t._timestamp\n  Filter: t.name = encrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t"
+            ),
+            (
+                "SELECT _timestamp FROM t where 'test_val' != encrypt(name, 'test_key')",
+                "Projection: t._timestamp\n  Filter: t.name != decrypt(Utf8(\"test_val\"), Utf8(\"test_key\"))\n    TableScan: t"
+            ),
+            // no op sanity check
+            (
+                "SELECT _timestamp FROM t where match_all(name, 'test')",
+                "Projection: t._timestamp\n  Filter: match_all(t.name, Utf8(\"test\"))\n    TableScan: t"
             ),
         ];
 
@@ -278,11 +324,11 @@ mod tests {
         ctx.register_udf(DECRYPT_UDF.clone());
         ctx.register_udf(ENCRYPT_UDF.clone());
         ctx.register_udf(MATCH_ALL_UDF.clone());
-        ctx.add_optimizer_rule(Arc::new(RewriteDecrypt::new()));
+        ctx.add_optimizer_rule(Arc::new(RewriteCipher::new()));
 
         for (sql, res) in sqls {
             let plan = ctx.state().create_logical_plan(sql).await.unwrap();
-            let optimizer = Optimizer::with_rules(vec![Arc::new(RewriteDecrypt::new())]);
+            let optimizer = Optimizer::with_rules(vec![Arc::new(RewriteCipher::new())]);
             let optimized_plan = optimizer
                 .optimize(plan, &OptimizerContext::new(), observe)
                 .unwrap();
