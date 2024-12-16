@@ -19,14 +19,21 @@ use config::{get_config, meta::websocket::SearchResultType};
 use dashmap::DashMap;
 use futures::StreamExt;
 use infra::errors::Error;
+use o2_enterprise::enterprise::common::{
+    auditor::{AuditMessage, Protocol, WsMeta},
+    infra::config::get_config as get_o2_config,
+};
 use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
 
-use crate::handler::http::request::websocket::{
-    search,
-    utils::{
-        cancellation_registry_cache_utils, sessions_cache_utils, WsClientEvents, WsServerEvents,
+use crate::{
+    handler::http::request::websocket::{
+        search,
+        utils::{
+            cancellation_registry_cache_utils, sessions_cache_utils, WsClientEvents, WsServerEvents,
+        },
     },
+    service::self_reporting::audit,
 };
 
 // Global cancellation registry for search requests by `trace_id`
@@ -70,7 +77,13 @@ impl WsSession {
     }
 }
 
-pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String, org_id: String) {
+pub async fn run(
+    mut msg_stream: MessageStream,
+    user_id: String,
+    req_id: String,
+    org_id: String,
+    path: String,
+) {
     let cfg = get_config();
     let mut session = if let Some(session) = sessions_cache_utils::get_session(&req_id) {
         session
@@ -95,7 +108,7 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
                             cfg.common.node_role,
                             msg
                         );
-                        handle_text_message(&mut session, &org_id, &user_id, &req_id, msg.to_string()).await;
+                        handle_text_message(&mut session, &org_id, &user_id, &req_id, msg.to_string(), path.clone()).await;
                     }
                     Ok(actix_ws::Message::Close(reason)) => {
                         log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Closing connection with reason: {:?}",
@@ -121,22 +134,33 @@ pub async fn run(mut msg_stream: MessageStream, user_id: String, req_id: String,
     );
 }
 
+/// Handle the incoming text message
+/// Text message is parsed into `WsClientEvents` and processed accordingly
+/// Depending on each event type, audit must be done
+/// Currently audit is done only for the search event
 pub async fn handle_text_message(
     session: &mut WsSession,
     org_id: &str,
     user_id: &str,
     req_id: &str,
     msg: String,
+    path: String,
 ) {
+    #[cfg(feature = "enterprise")]
+    let is_audit_enabled = get_o2_config().common.audit_enabled;
+
     match serde_json::from_str::<WsClientEvents>(&msg) {
         Ok(client_msg) => {
             match client_msg {
-                WsClientEvents::Search(search_req) => {
+                WsClientEvents::Search(ref search_req) => {
                     let mut session = session.clone();
                     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
                     let org_id = org_id.to_string();
                     let user_id = user_id.to_string();
                     let req_id = req_id.to_string();
+                    let search_req = search_req.clone();
+                    let client_msg = client_msg.clone();
+                    let path = path.to_string();
 
                     let task = tokio::spawn(async move {
                         match search::handle_search_request(
@@ -149,6 +173,22 @@ pub async fn handle_text_message(
                         .await
                         {
                             Ok(_) => {
+                                // audit
+                                if is_audit_enabled {
+                                    audit(AuditMessage {
+                                        user_email: user_id,
+                                        org_id,
+                                        _timestamp: chrono::Utc::now().timestamp(),
+                                        protocol: Protocol::Ws(WsMeta {
+                                            path,
+                                            message_type: client_msg.get_type(),
+                                            content: client_msg.to_json(),
+                                            close_reason: "".to_string(),
+                                        }),
+                                    })
+                                    .await;
+                                }
+
                                 // close the session
                                 let close_reason = Some(CloseReason {
                                     code: CloseCode::Normal,
@@ -165,9 +205,28 @@ pub async fn handle_text_message(
                                     search_req.trace_id,
                                     e
                                 );
+                                let err_msg =
+                                    format!("[trace_id: {}, error: {}]", search_req.trace_id, e);
+
+                                // audit
+                                if is_audit_enabled {
+                                    audit(AuditMessage {
+                                        user_email: user_id,
+                                        org_id,
+                                        _timestamp: chrono::Utc::now().timestamp(),
+                                        protocol: Protocol::Ws(WsMeta {
+                                            path,
+                                            message_type: client_msg.get_type(),
+                                            content: client_msg.to_json(),
+                                            close_reason: err_msg.clone(),
+                                        }),
+                                    })
+                                    .await;
+                                }
+
                                 let close_reason = Some(CloseReason {
                                     code: CloseCode::Error,
-                                    description: Some(format!("[trace_id: {}, error: {}]", search_req.trace_id, e)),
+                                    description: Some(err_msg),
                                 });
                                 let err_res = WsServerEvents::error_response(
                                     e,

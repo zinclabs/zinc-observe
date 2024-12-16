@@ -24,13 +24,16 @@ use utils::sessions_cache_utils;
 
 #[get("{org_id}/ws/{request_id}")]
 pub async fn websocket(
-    path: web::Path<(String, String)>,
+    path_params: web::Path<(String, String)>,
     req: HttpRequest,
     stream: web::Payload,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let cfg = get_config();
-    let (org_id, request_id) = path.into_inner();
+    let (org_id, request_id) = path_params.into_inner();
+
+    let prefix = format!("{}/api/", get_config().common.base_uri);
+    let path = req.path().strip_prefix(&prefix).unwrap().to_string();
 
     let user_id = in_req
         .headers()
@@ -50,7 +53,7 @@ pub async fn websocket(
     );
 
     // Spawn the handler
-    actix_web::rt::spawn(session::run(msg_stream, user_id, request_id, org_id));
+    actix_web::rt::spawn(session::run(msg_stream, user_id, request_id, org_id, path));
 
     Ok(res)
 }
