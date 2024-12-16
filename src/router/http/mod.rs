@@ -171,25 +171,14 @@ async fn dispatch(
     let path_columns: Vec<&str> = path.split('/').collect();
     if *path_columns.get(3).unwrap_or(&"") == "ws" {
         let node_role = cfg.common.node_role.clone();
-        log::info!(
-            "[WS_ROUTER] Websocket request received on dispatcher: {}, node role: {}",
-            new_url.value,
-            node_role
-        );
         // Convert the HTTP/HTTPS URL to a WebSocket URL (WS/WSS)
         let ws_url = match convert_to_websocket_url(&new_url.value) {
             Ok(url) => url,
             Err(e) => {
                 log::error!("Error converting URL to WebSocket: {}", e);
-                return Ok(HttpResponse::BadRequest().body(e));
+                return Ok(HttpResponse::BadRequest().body("Invalid WebSocket URL"));
             }
         };
-
-        log::info!(
-            "[WS_ROUTER] Converted websocket url: {}, node_role: {}",
-            ws_url,
-            node_role
-        );
 
         return match ws_proxy(req, payload, ws_url.clone()).await {
             Ok(res) => {
@@ -202,13 +191,9 @@ async fn dispatch(
             }
             Err(e) => {
                 log::error!("[WS_ROUTER] failed: {}", e);
-                Ok(HttpResponse::InternalServerError().body(e.to_string()))
+                Ok(HttpResponse::InternalServerError().body("WebSocket proxy error"))
             }
         };
-    }
-
-    for (key, value) in req.headers() {
-        log::info!("{}: {:?}", key, value);
     }
 
     // send query
