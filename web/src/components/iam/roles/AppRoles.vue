@@ -232,12 +232,14 @@ const deleteUserRole = (role: any) => {
       });
       setupRoles();
     })
-    .catch(() => {
-      q.notify({
-        message: "Error while deleting role!",
-        color: "negative",
-        position: "bottom",
-      });
+    .catch((error: any) => {
+      if (error.response.status != 403) {
+        q.notify({
+          message: "Error while deleting role!",
+          color: "negative",
+          position: "bottom",
+        });
+      }
     });
 };
 
