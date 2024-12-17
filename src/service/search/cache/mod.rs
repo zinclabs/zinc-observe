@@ -604,25 +604,33 @@ pub async fn write_results(
 /// Caches search results to disk after applying filtering and validation strategies.
 ///
 /// # Caching Strategy
-/// 1. **Remove One Hit for Deduplication**:
-///    - Removes either the first or last record based on the `is_descending` flag.
-///      - `is_descending = true`: Removes the last record.
-///      - `is_descending = false`: Removes the first record.
+/// 1. **Select Hit for Deduplication**:
+///    - Selects either the first or last record based on the `is_descending` flag.
+///      - `is_descending = true`: Selects the last record.
+///      - `is_descending = false`: Selects the first record.
 ///
-/// 2. **Skip Caching for Empty or Insufficient Hits**:
+/// 2. **Remove All Hits Within the Same Date, Hour, Minute for Deduplication**:
+///    - Identifies the timestamp of the hit to remove (either the first or last record based on the
+///      `is_descending` flag).
+///    - Removes all hits that fall within the same date, hour, minute (`YYYY-MM-DDTHH:MM`) as the
+///      identified hit.
+///      - Example: If the timestamp to remove is `2024-12-06T04:15:30`, all hits with timestamps
+///        from `2024-12-06T04:15:00` to `2024-12-06T04:15:59` are removed.
+///
+/// 3. **Skip Caching for Empty or Insufficient Hits**:
 ///    - If no hits remain after removing one, caching is skipped.
 ///    - Logs a message: `"No hits found for caching, skipping caching."`
 ///
-/// 3. **Discard Short Time Ranges**:
+/// 4. **Discard Short Time Ranges**:
 ///    - Skips caching if the difference between the first and last record timestamps is smaller
 ///      than the configured `discard_duration`.
 ///
-/// 4. **Adjust Cache Time Range**:
+/// 5. **Adjust Cache Time Range**:
 ///    - Adjusts the cache start and end times based on the smallest and largest timestamps:
 ///      - `start_time = max(smallest_ts, req_query_start_time)`
 ///      - `end_time = min(largest_ts, req_query_end_time)`
 ///
-/// 5. **Cache to Disk**:
+/// 6. **Cache to Disk**:
 ///    - Saves the filtered response to a file named:
 ///      `"<start_time>_<end_time>_<is_aggregate>_<is_descending>.json"`.
 #[allow(clippy::too_many_arguments)]
@@ -647,9 +655,27 @@ pub async fn write_results_v2(
         let ts_value_to_remove = remove_hit.unwrap().get(ts_column).cloned();
 
         if let Some(ts_value) = ts_value_to_remove {
-            local_resp
-                .hits
-                .retain(|hit| hit.get(ts_column) != Some(&ts_value));
+            // Extract the date, hour, minute from the timestamp
+            if let Some(ts_datetime) =
+                chrono::DateTime::from_timestamp_micros(ts_value.as_i64().unwrap_or(0))
+            {
+                let target_date_minute = ts_datetime.format("%Y-%m-%dT%H:%M").to_string(); // e.g., "2024-12-06T04:15"
+
+                // Retain only the hits that do NOT fall within the
+                // same date, hour, minute as the hit to remove
+                local_resp.hits.retain(|hit| {
+                    if let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64()) {
+                        if let Some(hit_ts_datetime) =
+                            chrono::DateTime::from_timestamp_micros(hit_ts)
+                        {
+                            let hit_date_minute =
+                                hit_ts_datetime.format("%Y-%m-%dT%H:%M").to_string();
+                            return hit_date_minute != target_date_minute;
+                        }
+                    }
+                    false
+                });
+            }
         }
 
         local_resp.total = local_resp.hits.len();
