@@ -318,6 +318,7 @@ export default defineComponent({
     const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("all");
     const loadingState = ref(true);
+
     const streamFilterValues = [
       { label: t("logStream.labelAll"), value: "all" },
       { label: t("logStream.labelLogs"), value: "logs" },
@@ -326,7 +327,7 @@ export default defineComponent({
       { label: t("logStream.labelMetadata"), value: "metadata" },
       { label: t("logStream.labelIndex"), value: "index" },
     ];
-    const { getStreams, resetStreams, removeStream } = useStreams();
+    const { getStreams, resetStreams, removeStream, getStream } = useStreams();
     const columns = ref<QTableProps["columns"]>([
       {
         name: "#",
@@ -539,7 +540,7 @@ export default defineComponent({
       { label: "50", value: 50 },
       { label: "100", value: 100 },
       { label: "250", value: 250 },
-      { label: "500", value: 500 }
+      { label: "500", value: 500 },
     ];
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
@@ -584,9 +585,9 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-         if(err.response.status == 403){
-          return;
-         }
+          if (err.response.status == 403) {
+            return;
+          }
           $q.notify({
             color: "negative",
             message: "Error while deleting stream.",
@@ -645,7 +646,7 @@ export default defineComponent({
           getLogStream();
         })
         .catch((error) => {
-          if(error.response.status == 403){
+          if (error.response.status == 403) {
             return;
           }
           $q.notify({
@@ -682,17 +683,51 @@ export default defineComponent({
           } selected`;
     };
 
-    const exploreStream = (props: any) => {
+    /**
+     * Get time range for stream explorer, for enrichment tables it will get the time range from the stream data min and max time
+     * @param stream: Stream object
+     */
+    const getTimeRange = async (stream: any) => {
+      const dateTime: { period?: string; from?: number; to?: number } = {};
+
+      if (stream.stream_type === "enrichment_tables") {
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Redirecting to explorer...",
+          color: "secondary",
+        });
+
+        await getStream(stream.name, stream.stream_type, true)
+          .then((streamResponse) => {
+            dateTime["from"] = streamResponse.stats.doc_time_min - 60000000;
+            dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
+          })
+          .catch((err) => {
+            console.error(err);
+            dateTime["period"] = "15m";
+          })
+          .finally(() => {
+            dismiss();
+          });
+      } else {
+        dateTime["period"] = "15m";
+      }
+
+      return dateTime;
+    };
+
+    const exploreStream = async (props: any) => {
+      const dateTime = await getTimeRange(props.row);
       router.push({
         name: "logs",
         query: {
           stream_type: props.row.stream_type,
           stream: props.row.name,
-          period: "15m",
           refresh: "0",
           query: "",
           type: "stream_explorer",
           org_identifier: store.state.selectedOrganization.identifier,
+          ...dateTime,
         },
       });
     };

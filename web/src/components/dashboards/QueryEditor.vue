@@ -269,9 +269,9 @@ export default defineComponent({
       () => store.state.theme,
       () => {
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme"
+          store.state.theme == "dark" ? "vs-dark" : "myCustomTheme",
         );
-      }
+      },
     );
 
     onMounted(async () => {
@@ -291,6 +291,8 @@ export default defineComponent({
         },
       });
 
+      // Dispose the provider if it already exists before registering a new one
+      provider.value?.dispose();
       registerAutoCompleteProvider();
 
       editorObj = monaco.editor.create(editorRef.value, {
@@ -338,7 +340,7 @@ export default defineComponent({
             emit("run-query");
           }, 300);
         },
-        "ctrlenter"
+        "ctrlenter",
       );
     });
 
@@ -479,7 +481,7 @@ export default defineComponent({
       () => props.readOnly,
       () => {
         editorObj.updateOptions({ readOnly: props.readOnly });
-      }
+      },
     );
 
     // update readonly when prop value changes
@@ -489,7 +491,7 @@ export default defineComponent({
         if (props.readOnly || !editorObj.hasWidgetFocus()) {
           editorObj.getModel().setValue(props.query);
         }
-      }
+      },
     );
 
     const resetEditorLayout = () => {

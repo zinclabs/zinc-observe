@@ -24,7 +24,7 @@ const store = useStore();
 
 export const getDefaultOrganization = async (
   userInfo: any,
-  org_identifier: any
+  org_identifier: any,
 ) => {
   await organizationsService
     .os_list(0, 100000, "id", false, "", org_identifier)
@@ -71,7 +71,7 @@ export const getDefaultOrganization = async (
             //   $store.dispatch("setSelectedOrganization", selectedOrg.value);
           }
           return optiondata;
-        }
+        },
       );
       return res.data.data;
     });

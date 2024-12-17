@@ -293,15 +293,15 @@ export default defineComponent({
     MetricList: defineAsyncComponent(() => import("./MetricList.vue")),
     DateTime: defineAsyncComponent(() => import("@/components/DateTime.vue")),
     AutoRefreshInterval: defineAsyncComponent(
-      () => import("@/components/AutoRefreshInterval.vue")
+      () => import("@/components/AutoRefreshInterval.vue"),
     ),
     QueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue")
+      () => import("@/components/QueryEditor.vue"),
     ),
     AddToDashboard: defineAsyncComponent(() => import("./AddToDashboard.vue")),
     SyntaxGuideMetrics,
     PanelSchemaRenderer: defineAsyncComponent(
-      () => import("@/components/dashboards/PanelSchemaRenderer.vue")
+      () => import("@/components/dashboards/PanelSchemaRenderer.vue"),
     ),
     SanitizedHtmlRenderer,
   },
@@ -440,7 +440,7 @@ export default defineComponent({
           (res) =>
             (logStreams.value = res.list.map((stream) => ({
               name: stream.name,
-            })))
+            }))),
         )
         .finally(() => {
           return Promise.resolve();
@@ -452,7 +452,7 @@ export default defineComponent({
       (metrics) => {
         updateMetricKeywords(metrics);
       },
-      { deep: true }
+      { deep: true },
     );
 
     function getStreamList(isFirstLoad = false) {
@@ -577,7 +577,7 @@ export default defineComponent({
 
           const startTimeStamp = date.subtractFromDate(
             endTimeStamp,
-            JSON.parse(subtractObject)
+            JSON.parse(subtractObject),
           );
 
           return {
@@ -595,7 +595,7 @@ export default defineComponent({
             start = new Date(
               searchObj.data.datetime.absolute.date.from +
                 " " +
-                searchObj.data.datetime.absolute.startTime
+                searchObj.data.datetime.absolute.startTime,
             );
           }
           if (
@@ -607,7 +607,7 @@ export default defineComponent({
             end = new Date(
               searchObj.data.datetime.absolute.date.to +
                 " " +
-                searchObj.data.datetime.absolute.endTime
+                searchObj.data.datetime.absolute.endTime,
             );
           }
           const rVal = {
@@ -634,7 +634,7 @@ export default defineComponent({
         const timestamps: any =
           searchObj.data.datetime.type === "relative"
             ? getConsumableRelativeTime(
-                searchObj.data.datetime.relativeTimePeriod
+                searchObj.data.datetime.relativeTimePeriod,
               )
             : cloneDeep(searchObj.data.datetime);
         dashboardPanelData.meta.dateTime = {
@@ -665,9 +665,12 @@ export default defineComponent({
       ) {
         clearInterval(refreshIntervalID);
 
-        refreshIntervalID = setInterval(() => {
-          if (!searchObj.loading) runQuery();
-        }, parseInt(searchObj.meta.refreshInterval) * 1000);
+        refreshIntervalID = setInterval(
+          () => {
+            if (!searchObj.loading) runQuery();
+          },
+          parseInt(searchObj.meta.refreshInterval) * 1000,
+        );
 
         $q.notify({
           message: `Live mode is enabled`,
@@ -803,7 +806,7 @@ export default defineComponent({
           query =
             dashboardPanelData.data.queries[0].query.slice(
               0,
-              parsedQuery.label.position.end
+              parsedQuery.label.position.end,
             ) +
             (dashboardPanelData.data.queries[0].query[
               parsedQuery.label.position.end - 1
@@ -815,7 +818,7 @@ export default defineComponent({
             label +
             dashboardPanelData.data.queries[0].query.slice(
               parsedQuery.label.position.end,
-              dashboardPanelData.data.queries[0].query.length
+              dashboardPanelData.data.queries[0].query.length,
             );
         }
         metricsQueryEditorRef.value.setValue(query);
@@ -838,7 +841,7 @@ export default defineComponent({
       const queryString = Object.entries(queryObj)
         .map(
           ([key, value]) =>
-            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
         )
         .join("&");
 

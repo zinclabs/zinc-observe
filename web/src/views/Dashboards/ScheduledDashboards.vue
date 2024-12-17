@@ -125,7 +125,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import { ScheduledDashboardReport } from "@/ts/interfaces/dashboard";
+import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToQuasarFormat } from "@/utils/date";
 import { useStore } from "vuex";
@@ -161,7 +161,7 @@ const props = defineProps({
 const { t } = useI18n();
 
 const scheduledReports = ref<ScheduledDashboardReport[]>(
-  props.reports as ScheduledDashboardReport[]
+  props.reports as ScheduledDashboardReport[],
 );
 
 const formattedReports = ref<ScheduledDashboardReport[]>([]);
@@ -192,7 +192,7 @@ watch(
   },
   {
     deep: true,
-  }
+  },
 );
 
 const formatReports = () => {
@@ -209,7 +209,7 @@ const formatReports = () => {
         ? convertUnixToQuasarFormat(report.lastTriggeredAt)
         : "-",
       created_at: convertUnixToQuasarFormat(
-        new Date(report.createdAt).getTime() * 1000
+        new Date(report.createdAt).getTime() * 1000,
       ),
       orgId: report.orgId,
       isCached: !report.destinations.length,
@@ -243,7 +243,7 @@ const filterReports = () => {
         ...report,
         "#": index + 1,
       };
-    }
+    },
   );
 
   resultTotal.value = formattedReports.value.length;

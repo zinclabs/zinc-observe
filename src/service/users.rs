@@ -632,6 +632,12 @@ pub async fn remove_user_from_org(
         let ret_user = db::user::get_db_user(email_id).await;
         match ret_user {
             Ok(mut user) => {
+                if is_root_user(user.email.as_str()) {
+                    return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                        http::StatusCode::FORBIDDEN.into(),
+                        "Not Allowed".to_string(),
+                    )));
+                }
                 if !user.organizations.is_empty() {
                     let mut orgs = user.clone().organizations;
                     if orgs.len() == 1 {

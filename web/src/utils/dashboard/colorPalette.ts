@@ -116,13 +116,13 @@ export const shadeColor = (
   } else {
     percent = (value - min) / (max - min);
   }
-  let num = parseInt(color.replace("#", ""), 16),
+  const num = parseInt(color.replace("#", ""), 16),
     amt = Math.round(1.55 * percent * 100),
     R = ((num >> 16) & 0xff) + amt,
     G = ((num >> 8) & 0xff) + amt,
     B = (num & 0xff) + amt;
 
-  let newColor = (
+  const newColor = (
     0x1000000 +
     (R < 255 ? (R < 0 ? 0 : R) : 255) * 0x10000 +
     (G < 255 ? (G < 0 ? 0 : G) : 255) * 0x100 +

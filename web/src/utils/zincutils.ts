@@ -962,6 +962,10 @@ export const arraysMatch = (arr1: Array<any>, arr2: Array<any>) => {
   return true;
 };
 
+export const deepCopy = (value: any) => {
+  return JSON.parse(JSON.stringify(value));
+};
+
 export const getWebSocketUrl = (request_id: string, org_identifier: string) => {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${store.state.API_ENDPOINT.split("//")[1]}/api/${org_identifier}/ws/${request_id}`;

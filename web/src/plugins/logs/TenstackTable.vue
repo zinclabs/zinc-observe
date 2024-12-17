@@ -555,6 +555,10 @@ watch(
       props.wrap ? "tw-break-words" : "",
     ];
   },
+  {
+    immediate: true,
+    deep: true,
+  },
 );
 
 const updateTableWidth = async () => {

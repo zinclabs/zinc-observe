@@ -1,0 +1,14 @@
+protocol_number,keyword,protocol_description
+0,HOPOPT,IPv6 Hop-by-Hop Option
+1,ICMP,Internet Control Message
+2,IGMP,Internet Group Management
+3,GGP,Gateway-to-Gateway
+4,IPv4,IPv4 encapsulation
+5,ST,Stream
+6,TCP,Transmission Control
+7,CBT,CBT
+8,EGP,Exterior Gateway Protocol
+9,IGP,any private interior gateway (used by Cisco for their IGRP)
+10,BBN-RCC-MON,BBN RCC Monitoring
+11,NVP-II,Network Voice Protocol
+12,PUP,PUP

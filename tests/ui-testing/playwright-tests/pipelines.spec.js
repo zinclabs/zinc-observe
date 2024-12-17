@@ -4,8 +4,8 @@ import { log } from "console";
 import logsdata from "../../test-data/logs_data.json";
 import PipelinePage from "../pages/pipelinePage";
 import { pipeline } from "stream";
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+import fs from "fs";
+import { v4 as uuidv4 } from "uuid";
 
 test.describe.configure({ mode: "parallel" });
 
@@ -79,16 +79,11 @@ test.describe("Pipeline testcases", () => {
     await expect.poll(async () => (await search).status()).toBe(200);
     // await search.hits.FIXME_should("be.an", "array");
   }
-  // tebefore(async function () {
-  //   // logData("log");
-  //   // const data = page;
-  //   // logData = data;
-
-  //   console.log("--logData--", logData);
-  // });
+ 
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.waitForTimeout(5000);
+    
 
     // ("ingests logs via API", () => {
     const orgId = process.env["ORGNAME"];
@@ -192,7 +187,7 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(1000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
 
     // Generate a random pipeline name and save
@@ -224,7 +219,7 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
-    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
 
     // Delete the pipeline and confirm
@@ -251,10 +246,10 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
     await page.waitForTimeout(3000);
-    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
-    await page.locator('button').filter({ hasText: 'edit' }).hover();
-  await page.getByRole('img', { name: 'Output Stream' }).click();
+    await page.locator("button").filter({ hasText: "edit" }).hover();
+    await page.getByRole("img", { name: "Output Stream" }).click();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
@@ -352,10 +347,10 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.saveInputNodeStream();
     // await pipelinePage.selectAndDragFunction(); // Function drag
     await page.waitForTimeout(2000);
-  await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
-  await page.locator('[data-test="confirm-button"]').click()
-    await page.locator('button').filter({ hasText: 'edit' }).hover();
-    await page.getByRole('img', { name: 'Function',exact: true }).click();
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
+    await page.locator('[data-test="confirm-button"]').click();
+    await page.locator("button").filter({ hasText: "edit" }).hover();
+    await page.getByRole("img", { name: "Function", exact: true }).click();
     await pipelinePage.toggleCreateFunction();
     await pipelinePage.enterFunctionName(randomFunctionName);
     await page.locator(".view-lines").click();
@@ -376,8 +371,8 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(3000);
     await pipelinePage.saveFunction();
     await page.waitForTimeout(3000);
-    await page.getByRole('button', { name: randomFunctionName }).hover();
-    await page.getByRole('img', { name: 'Output Stream' }).click();
+    await page.getByRole("button", { name: randomFunctionName }).hover();
+    await page.getByRole("img", { name: "Output Stream" }).click();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
@@ -407,7 +402,6 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.verifyPipelineDeleted();
   });
 
-
   test("should display error when function name is not added", async ({
     page,
   }) => {
@@ -421,8 +415,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.toggleCreateFunction();
     await page.waitForTimeout(1000);
     await pipelinePage.saveFunction();
-    await pipelinePage. assertFunctionNameRequiredErrorVisible() 
-   
+    await pipelinePage.assertFunctionNameRequiredErrorVisible();
   });
 
   test("should display error when function name added but function is not added", async ({
@@ -439,11 +432,12 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(1000);
     await pipelinePage.enterFunctionName(randomFunctionName);
     await pipelinePage.saveFunction();
-    await pipelinePage.assertFunctionRequiredErrorVisible()
+    await pipelinePage.assertFunctionRequiredErrorVisible();
   });
 
-
-  test.skip("should display error if query added without sql", async ({ page }) => {
+  test.skip("should display error if query added without sql", async ({
+    page,
+  }) => {
     const pipelinePage = new PipelinePage(page);
 
     // Open the pipeline menu and wait for a moment
@@ -459,11 +453,8 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.saveQuery();
     await page.waitForTimeout(2000);
     // TODO: Change the locator to the correct one, once fixed
-    await page.getByText('Invalid SQL Query').click()
-
+    await page.getByText("Invalid SQL Query").click();
   });
-
-
 
   test("should display error when save clicked directly while adding destination", async ({
     page,
@@ -476,7 +467,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.selectAndDragSecondStream();
     await page.waitForTimeout(2000);
     await pipelinePage.saveStream();
-    await pipelinePage.assertStreamSelectionErrorVisible()
+    await pipelinePage.assertStreamSelectionErrorVisible();
   });
 
   test("should add source, condition & destination node and then delete the pipeline", async ({
@@ -498,21 +489,29 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
     await page.waitForTimeout(2000);
-    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
-    await page.locator('button').filter({ hasText: 'edit' }).hover();
-    await page.getByRole('img', { name: 'Stream',exact: true }).click();
-    await page.getByPlaceholder('Column').click();
-    await page.getByPlaceholder('Column').fill('container_name');
-    await page.getByRole('option', { name: 'kubernetes_container_name' }).click();
-    await page.locator('div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native').click();
-    await page.getByText('Contains', { exact: true }).click();
-    await page.getByPlaceholder('Value').click();
-    await page.getByPlaceholder('Value').fill('prometheus');
-    await pipelinePage.saveCondition()
+    await page.locator("button").filter({ hasText: "edit" }).hover();
+    await page.getByRole("img", { name: "Stream", exact: true }).click();
+    await page.getByPlaceholder("Column").click();
+    await page.getByPlaceholder("Column").fill("container_name");
+    await page
+      .getByRole("option", { name: "kubernetes_container_name" })
+      .click();
+    await page
+      .locator(
+        "div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native"
+      )
+      .click();
+    await page.getByText("Contains", { exact: true }).click();
+    await page.getByPlaceholder("Value").click();
+    await page.getByPlaceholder("Value").fill("prometheus");
+    await pipelinePage.saveCondition();
     await page.waitForTimeout(2000);
-    await page.getByRole('button', { name: 'kubernetes_container_name' }).hover();
-    await page.getByRole('img', { name: 'Output Stream' }).click();
+    await page
+      .getByRole("button", { name: "kubernetes_container_name" })
+      .hover();
+    await page.getByRole("img", { name: "Output Stream" }).click();
     await pipelinePage.toggleCreateStream();
     await page.getByLabel("Name *").click();
     await page.getByLabel("Name *").fill("destination-node");
@@ -543,7 +542,6 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.verifyPipelineDeleted();
   });
 
-
   test("should display error when function is not selected under select function", async ({
     page,
   }) => {
@@ -558,7 +556,6 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.verifyFieldRequiredError();
   });
 
-
   test("should display error when condition is not added but user clicks save", async ({
     page,
   }) => {
@@ -566,12 +563,11 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.openPipelineMenu();
     await page.waitForTimeout(1000);
     await pipelinePage.addPipeline();
-    await pipelinePage.selectAndDragCondition() // Function drag;
+    await pipelinePage.selectAndDragCondition(); // Function drag;
     await page.waitForTimeout(1000);
-    await pipelinePage.saveCondition()
+    await pipelinePage.saveCondition();
     await pipelinePage.verifyFieldRequiredError();
   });
-
 
   test("should add source & destination node without connection and error to be displayed", async ({
     page,
@@ -592,7 +588,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.selectStreamOption();
     await pipelinePage.saveInputNodeStream();
     await page.waitForTimeout(1000);
-    await page.locator('button').filter({ hasText: 'delete' }).nth(1).click();
+    await page.locator("button").filter({ hasText: "delete" }).nth(1).click();
     await page.locator('[data-test="confirm-button"]').click();
     await pipelinePage.dragStreamToTarget(pipelinePage.streamButton); // First stream drag
 
@@ -617,60 +613,211 @@ test.describe("Pipeline testcases", () => {
     const pipelineName = `pipeline-${Math.random().toString(36).substring(7)}`;
     await pipelinePage.enterPipelineName(pipelineName);
     await pipelinePage.savePipeline();
-    await page.getByText('Please connect all nodes').click();
-  
+    await page.getByText("Please connect all nodes").click();
   });
 
-  test('should upload an enrichment table under functions', async ({ page }) => {
-    await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+  test("should upload an enrichment table under functions", async ({
+    page,
+  }) => {
+    const pipelinePage = new PipelinePage(page);
+    await pipelinePage.navigateToAddEnrichmentTable();
   
-    // Click the enrichment table tab
-    await page.click('[data-test="function-enrichment-table-tab"] > .q-tab__content > .q-tab__label', { force: true });
-  
-    // Click on 'Add Enrichment Table'
-    await page.getByText('Add Enrichment Table').click();
-  
-    // Generate a unique file name
-    const fileName = `enrichment_info_${uuidv4()}.csv`;
-    const fileContent = '../test-data/enrichment_info.csv';
-  
+    // Generate a unique file name and replace hyphens with underscores
+    let fileName = `enrichment_info_${uuidv4()}_csv`.replace(/-/g, "_");
+    console.log("Generated File Name:", fileName);
+
+    // Set the file to be uploaded
+    const fileContentPath = "../test-data/enrichment_info.csv";
     const inputFile = await page.locator('input[type="file"]');
-    await inputFile.setInputFiles(fileContent);
-  
-    // Wait for the upload to process
-    await page.waitForTimeout(5000);
-  
+    await inputFile.setInputFiles(fileContentPath);
+
     // Enter the file name
-    await page.fill('.q-input > .q-field__inner > .q-field__control', fileName);
-  
+    await page.fill(".q-input > .q-field__inner > .q-field__control", fileName);
+
     // Click on 'Save'
-    await page.getByText('Save').click({ force: true });
-    await page.waitForTimeout(5000);
-    await page.getByRole('button', { name: 'Explore' }).nth(1).click();
+    await page.getByText("Save").click({ force: true });
+
+    // Wait for the process to complete
+    await page.reload();
+    await page.waitForTimeout(3000);
+    await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
+    await page.waitForTimeout(3000);
+    // Explore the uploaded table
+    await page.getByRole("button", { name: "Explore" }).click();
     await page.locator('[data-test="log-table-column-0-_timestamp"]').click();
     await page.locator('[data-test="close-dialog"]').click();
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
+
+    // Return to the pipeline menu and verify the uploaded table
     await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
     await page.locator('[data-test="function-enrichment-table-tab"]').click();
 
-  
-    // Locate rows in the table
-    const rows = await page.locator('tbody tr');
-  
-    // Iterate through each row to find and delete the function
-    for (let i = 0; i < await rows.count(); i++) {
-      const row = rows.nth(i);
-      const functionName = await row.locator('td.text-left').nth(1).textContent();
-  
-      if (functionName?.includes('enrichment_info')) {
-        // Click the 'Delete Function' button
-        await row.locator('[title="Delete Function"]').click();
-  
-        // Handle the confirmation dialog
-        await page.locator('[data-test="confirm-button"]').click();
-      }
-    }
+    // Verify and delete enrichment tables
+    await pipelinePage.deleteEnrichmentTableByName(fileName)
   });
 
-});
+  test.skip("should upload an enrichment table under functions with VRL", async ({
+    page,
+  }) => {
+    const pipelinePage = new PipelinePage(page);
+    await pipelinePage.navigateToAddEnrichmentTable();
 
+    // Generate a unique file name
+    let fileName = `protocols_${uuidv4()}_csv`;
+    console.log("Generated File Name:", fileName);
+    fileName = fileName.replace(/-/g, "_");
+
+    // Set the file to be uploaded
+    const fileContentPath = "../test-data/protocols.csv";
+    const inputFile = await page.locator('input[type="file"]');
+    await inputFile.setInputFiles(fileContentPath);
+
+    // Enter the file name
+    await page.fill(".q-input > .q-field__inner > .q-field__control", fileName);
+
+    // Click on 'Save'
+    await page.getByText("Save").click({ force: true });
+
+    // Reload the page to ensure table is updated
+    await page.reload();
+    await page.waitForTimeout(3000);
+
+    // Search for the uploaded file name
+    await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
+    await page.waitForTimeout(3000);
+
+    // Verify the file name in the enrichment table
+    const rows = await page.locator("tbody tr");
+    let fileFound = false;
+
+    for (let i = 0; i < (await rows.count()); i++) {
+      const row = rows.nth(i);
+      const displayedName = await row
+        .locator("td.text-left")
+        .nth(1)
+        .textContent();
+      if (displayedName?.trim() === fileName) {
+        fileFound = true;
+        console.log("File found in table:", displayedName);
+        break;
+      }
+    }
+
+    if (!fileFound) {
+      throw new Error(`File name "${fileName}" not found in the table.`);
+    }
+
+    // Explore the file
+    await page.getByRole("button", { name: "Explore" }).click();
+    await page.locator("#fnEditor").getByLabel("Editor content;Press Alt+F1")
+      .fill(`
+abc, err = get_enrichment_table_record("${fileName}", {
+  "protocol_number": to_string!(.protocol_number)
+})
+.protocol_keyword = abc.keyword
+`);
+
+    // Wait briefly to allow input processing
+    await page.waitForTimeout(1000);
+
+    // Apply the query
+    await applyQueryButton(page);
+
+    // Verify that no warning is shown for query execution
+    const warningElement = page.locator("text=warning Query execution");
+    await expect(warningElement).toBeHidden();
+
+    // Expand the first row in the logs table
+    await page.waitForTimeout(3000);
+    await page
+      .locator(
+        '[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]'
+      )
+      .click();
+      await page.waitForTimeout(1000);
+    await page
+      .locator('[data-test="log-expand-detail-key-protocol_keyword-text"]')
+      .click();
+    // Return to the pipeline menu and delete the uploaded table
+    await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+    await page.locator('[data-test="function-enrichment-table-tab"]').click();
+    await pipelinePage.deleteEnrichmentTableByName(fileName)
+
+  });
+
+
+  test("should display error when CSV not added in enrichment table", async ({
+    page,
+  }) => {
+    const pipelinePage = new PipelinePage(page);
+    await pipelinePage.navigateToAddEnrichmentTable();
+    await page.getByLabel('Name').fill('test')
+  
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByText('CSV File is required!').click();
+  })
+
+
+  test("should append an enrichment table under functions", async ({ page }) => {
+    const pipelinePage = new PipelinePage(page);
+    await pipelinePage.navigateToAddEnrichmentTable();
+  
+    // Generate a unique file name and replace hyphens with underscores
+    let fileName = `append_${uuidv4()}_csv`.replace(/-/g, "_");
+    console.log("Generated File Name:", fileName);
+  
+    // First upload step
+    const fileContentPath = "../test-data/append.csv";
+    const inputFile = await page.locator('input[type="file"]');
+    await inputFile.setInputFiles(fileContentPath);
+  
+    // Enter the file name
+    await page.fill(".q-input > .q-field__inner > .q-field__control", fileName);
+  
+    // Click on 'Save'
+    await page.getByText("Save").click({ force: true });
+  
+    // Wait for the process to complete
+    await page.reload();
+    await page.waitForTimeout(3000);
+    await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
+    await page.waitForTimeout(3000);
+  
+    // Explore the uploaded table
+    await page.getByRole("button", { name: "Explore" }).click();
+    await page.locator('[data-test="log-table-column-0-_timestamp"]').click();
+    await page.locator('[data-test="close-dialog"]').click();
+    await page.waitForTimeout(3000);
+  
+    // Navigate to append data to the existing enrichment table
+    await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+    await page.locator('[data-test="function-enrichment-table-tab"]').click();
+    await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
+    await page.getByRole("button", { name: "Enrichment Tables" }).click();
+  
+    // Select the append toggle
+    await page.getByLabel("Append data to existing").locator("div").first().click();
+ 
+  
+    // Upload the CSV again for appending
+    await inputFile.setInputFiles(fileContentPath);
+    await page.waitForTimeout(3000);
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.waitForTimeout(3000);
+    await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
+    await page.waitForTimeout(3000);
+  
+    // Explore the uploaded table
+    await page.getByRole("button", { name: "Explore" }).click();
+
+    const showingText = page.getByText('Showing 1 to 2 out of 2');
+  await expect(showingText).toBeVisible()
+
+  await page.locator('[data-test="menu-link-\\/pipeline-item"]').click();
+  await page.locator('[data-test="function-enrichment-table-tab"]').click();
+  await page.getByPlaceholder("Search Enrichment Table").fill(fileName);
+  await pipelinePage.deleteEnrichmentTableByName(fileName)
+  
+   });
+  
+});

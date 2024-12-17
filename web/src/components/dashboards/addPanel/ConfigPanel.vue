@@ -32,6 +32,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
+    <div v-if="showTrellisConfig" class="q-mb-sm">
+      <q-select
+        :label="t('dashboard.trellisLayout')"
+        data-test="dashboard-trellis-chart"
+        outlined
+        v-model="dashboardPanelData.data.config.trellis.layout"
+        :options="trellisOptions"
+        dense
+        class="showLabelOnTop"
+        stack-label
+        emit-value
+        :display-value="`${
+          dashboardPanelData.data.config.trellis?.layout ?? 'None'
+        }`"
+        :disable="isBreakdownFieldEmpty"
+      >
+        <template v-slot:label>
+          <div class="row items-center all-pointer-events">
+            {{ t("dashboard.trellisLayout") }}
+            <div>
+              <q-icon
+                class="q-ml-xs"
+                size="20px"
+                name="info"
+                data-test="dashboard-config-top_results-info"
+              />
+              <q-tooltip
+                class="bg-grey-8"
+                anchor="top middle"
+                self="bottom middle"
+                max-width="250px"
+              >
+                <b> {{ t("dashboard.trellisTooltip") }}</b>
+              </q-tooltip>
+            </div>
+          </div>
+        </template>
+      </q-select>
+
+      <template
+        v-if="dashboardPanelData.data.config.trellis?.layout === 'custom'"
+      >
+        <q-input
+          outlined
+          v-model.number="dashboardPanelData.data.config.trellis.num_of_columns"
+          color="input-border"
+          :label="t('dashboard.numOfColumns')"
+          bg-color="input-bg"
+          class="q-mr-sm showLabelOnTop"
+          stack-label
+          filled
+          dense
+          :type="'number'"
+          placeholder="Auto"
+          data-test="trellis-chart-num-of-columns"
+          :disable="isBreakdownFieldEmpty"
+          :min="1"
+          :max="16"
+          @update:model-value="
+            (value: any) =>
+              dashboardPanelData.data.config.trellis.num_of_columns > 16
+                ? (dashboardPanelData.data.config.trellis.num_of_columns = 16)
+                : value
+          "
+        >
+          <template v-slot:label>
+            <div class="row items-center all-pointer-events">
+              {{ t("dashboard.numOfColumns") }}
+              <div>
+                <q-icon
+                  class="q-ml-xs"
+                  size="20px"
+                  name="info"
+                  data-test="dashboard-config-top_results-info"
+                />
+                <q-tooltip
+                  class="bg-grey-8"
+                  anchor="top middle"
+                  self="bottom middle"
+                  max-width="250px"
+                >
+                  <b> {{ t("dashboard.trellisTooltip") }}</b>
+                </q-tooltip>
+              </div>
+            </div>
+          </template>
+        </q-input>
+      </template>
+    </div>
+
     <q-toggle
       v-if="
         dashboardPanelData.data.type != 'table' &&
@@ -1297,6 +1387,13 @@ export default defineComponent({
         };
       }
 
+      if (!dashboardPanelData.data.config.trellis) {
+        dashboardPanelData.data.config.trellis = {
+          layout: null,
+          num_of_columns: 1,
+        };
+      }
+
       if (!dashboardPanelData.data.config.axis_border_show) {
         dashboardPanelData.data.config.axis_border_show = false;
       }
@@ -1362,8 +1459,8 @@ export default defineComponent({
       }
 
       // Initialize map_type configuration
-      if(!dashboardPanelData.data.config.map_type) {
-        dashboardPanelData.data.config.map_type = { type: 'world' }
+      if (!dashboardPanelData.data.config.map_type) {
+        dashboardPanelData.data.config.map_type = { type: "world" };
       }
     });
 
@@ -1421,6 +1518,26 @@ export default defineComponent({
         value: "by Value",
       },
     ];
+
+    const trellisOptions = [
+      {
+        label: t("common.none"),
+        value: null,
+      },
+      {
+        label: t("common.auto"),
+        value: "auto",
+      },
+      {
+        label: t("common.vertical"),
+        value: "vertical",
+      },
+      {
+        label: t("common.custom"),
+        value: "custom",
+      },
+    ];
+
     // options for legends position
     const legendsPositionOptions = [
       {
@@ -1677,6 +1794,28 @@ export default defineComponent({
       ].includes(dashboardPanelData.data.type);
     });
 
+    const showTrellisConfig = computed(() => {
+      const supportedTypes = [
+        "area",
+        "area-stacked",
+        "bar",
+        "h-bar",
+        "line",
+        "scatter",
+        "stacked",
+        "h-stacked",
+      ];
+      return supportedTypes.includes(dashboardPanelData.data.type);
+    });
+
+    const isBreakdownFieldEmpty = computed(() => {
+      return (
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ]?.fields?.breakdown?.length == 0
+      );
+    });
+
     return {
       t,
       dashboardPanelData,
@@ -1699,6 +1838,9 @@ export default defineComponent({
       addTimeShift,
       removeTimeShift,
       showColorPalette,
+      trellisOptions,
+      showTrellisConfig,
+      isBreakdownFieldEmpty,
     };
   },
 });

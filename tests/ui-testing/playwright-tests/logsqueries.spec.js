@@ -131,7 +131,7 @@ test.describe("Logs Queries testcases", () => {
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
     await page.locator('button').filter({ hasText: 'savesaved_search' }).click();
     await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill('streamslogsnavigate');
+    await page.locator('[data-test="add-alert-name-input"]').fill('streamslognave');
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click({ force: true });
     await page.waitForTimeout(5000);
     await page.locator('[data-test="menu-link-\\/streams-item"]').click({ force: true });
@@ -142,13 +142,13 @@ test.describe("Logs Queries testcases", () => {
     await page.waitForSelector('[data-test="logs-search-saved-views-btn"]')
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
     await page.locator('[data-test="log-search-saved-view-field-search-input"]').click({ force: true });
-    await page.locator('[data-test="log-search-saved-view-field-search-input"]').fill('streamslogsnavigate');
+    await page.locator('[data-test="log-search-saved-view-field-search-input"]').fill('streamslognave');
     await page.waitForTimeout(3000);
-    await page.waitForSelector(':text("streamslogsnavigate")');
-    await page.click(':text("streamslogsnavigate")');
+    await page.waitForSelector(':text("streamslognav")');
+    await page.click(':text("streamslognave")');
     await page.locator('[data-test="logs-search-saved-views-btn"]').getByLabel('Expand').click();
     await page.locator('[data-test="log-search-saved-view-field-search-input"]').click();
-    await page.getByTitle('streamslogsnavigate').click();
+    await page.getByTitle('streamslognave').click();
     await page.getByText('delete').click();
     await page.locator('[data-test="confirm-button"]').click();
 

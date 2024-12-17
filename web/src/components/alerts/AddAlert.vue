@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div class="o2-input flex justify-start items-center">
+            <div class="o2-input flex justify-start items-start q-mt-sm">
               <div
                 data-test="add-alert-destination-title"
                 class="text-bold q-pb-sm"
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model="formData.destinations"
                   :options="getFormattedDestinations"
                   color="input-border"
-                  bg-color="input-bg q-mt-sm"
+                  bg-color="input-bg "
                   class="no-case"
                   stack-label
                   outlined
@@ -321,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   use-input
                   fill-input
                   :rules="[(val: any) => !!val || 'Field is required!']"
-                  style="width: 250px"
+                  style="width: 200px"
                 >
                   <template v-slot:option="option">
                     <q-list dense>
@@ -346,6 +346,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </q-list>
                   </template>
                 </q-select>
+              </div>
+              <div class="q-pl-sm">
+                <q-btn
+                data-test="create-destination-btn"
+                icon="refresh"
+                title="Refresh latest Destinations"
+                class="text-bold no-border"
+                no-caps
+                flat
+                dense
+                @click="$emit('refresh:destinations')"
+              />
+              </div>
+              <div class="q-pl-sm">
+                <q-btn
+                data-test="create-destination-btn"
+                label="Create Destination"
+                class="text-bold no-border"
+                color="secondary"
+                no-caps
+                @click="routeToCreateDestination"
+
+              />
               </div>
             </div>
 
@@ -543,7 +566,7 @@ export default defineComponent({
       default: () => [],
     },
   },
-  emits: ["update:list", "cancel:hideform"],
+  emits: ["update:list", "cancel:hideform", "refresh:destinations"],
   components: {
     ScheduledAlert: defineAsyncComponent(() => import("./ScheduledAlert.vue")),
     RealTimeAlert: defineAsyncComponent(() => import("./RealTimeAlert.vue")),
@@ -720,6 +743,15 @@ export default defineComponent({
 
       onInputUpdate("stream_name", stream_name);
     };
+    watch(
+      () => props.destinations.length, // Watch for length changes
+      (newLength, oldLength) => {
+        formData.value.destinations  = formData.value.destinations.filter((destination : any) => {
+          return props.destinations.some((dest:any) => {
+            return dest.name === destination});
+        });
+      }
+    );
 
     watch(
       triggerCols.value,
@@ -1194,6 +1226,17 @@ export default defineComponent({
       }
     };
 
+    const routeToCreateDestination = () => {
+      const url = router.resolve({
+          name: "alertDestinations",
+          query: {
+            action: "add",
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }).href;
+      window.open(url, "_blank");
+    };
+
     return {
       t,
       q,
@@ -1258,6 +1301,7 @@ export default defineComponent({
       getTimezonesByOffset,
       showTimezoneWarning,
       updateMultiTimeRange,
+      routeToCreateDestination,
     };
   },
 

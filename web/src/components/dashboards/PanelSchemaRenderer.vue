@@ -16,8 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div style="width: 100%; height: 100%" @mouseleave="hideDrilldownPopUp">
-    <div ref="chartPanelRef" style="height: 100%; position: relative">
-      <div v-if="!errorDetail" style="height: 100%; width: 100%">
+    <div
+      ref="chartPanelRef"
+      style="height: 100%; position: relative"
+      :class="chartPanelClass"
+    >
+      <div
+        v-if="!errorDetail"
+        :style="{ height: chartPanelHeight, width: '100%' }"
+      >
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
@@ -272,6 +279,10 @@ export default defineComponent({
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
     const drilldownArray: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
+    const chartPanelStyle = ref({
+      height: "100%",
+      width: "100%",
+    });
 
     // get refs from props
     const {
@@ -396,6 +407,7 @@ export default defineComponent({
               hoveredSeriesState,
               resultMetaData,
               metadata.value,
+              chartPanelStyle.value,
             );
 
             errorDetail.value = "";
@@ -815,7 +827,9 @@ export default defineComponent({
           );
 
           if (!dashboardData) {
-            console.error(`Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.dashboard}"`);
+            console.error(
+              `Dashboard "${drilldownData.data.dashboard}" not found in folder "${drilldownData.data.folder}"`,
+            );
             return;
           }
 
@@ -912,6 +926,30 @@ export default defineComponent({
       }
     };
 
+    const chartPanelHeight = computed(() => {
+      if (
+        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        panelSchema.value.config?.trellis?.layout &&
+        !loading.value
+      ) {
+        return chartPanelStyle.value.height;
+      }
+
+      return "100%";
+    });
+
+    const chartPanelClass = computed(() => {
+      if (
+        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        panelSchema.value.config?.trellis?.layout &&
+        !loading.value
+      ) {
+        return "overflow-auto";
+      }
+
+      return "";
+    });
+
     return {
       store,
       chartPanelRef,
@@ -928,6 +966,8 @@ export default defineComponent({
       openDrilldown,
       drilldownPopUpRef,
       hideDrilldownPopUp,
+      chartPanelClass,
+      chartPanelHeight,
     };
   },
 });

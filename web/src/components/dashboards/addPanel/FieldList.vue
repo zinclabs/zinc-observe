@@ -221,8 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       props.row.type == 'Utf8'
                         ? 'text_fields'
                         : props.row.type == 'Int64'
-                        ? 'tag'
-                        : 'toggle_off'
+                          ? 'tag'
+                          : 'toggle_off'
                     "
                     color="grey-6"
                     class="q-mr-xs"
@@ -671,7 +671,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
-      "dashboard"
+      "dashboard",
     );
 
     const userDefinedSchemaBtnGroupOption = [
@@ -748,7 +748,7 @@ export default defineComponent({
           it.name ==
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream
+          ].fields.stream,
       )?.metrics_meta?.metric_type;
     });
 
@@ -762,7 +762,7 @@ export default defineComponent({
       streamDataLoading.execute(
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream_type
+        ].fields.stream_type,
       );
     };
 
@@ -774,7 +774,7 @@ export default defineComponent({
         ].fields.stream_type,
       async () => {
         loadStreamsListBasedOnType();
-      }
+      },
     );
 
     onMounted(() => {
@@ -784,7 +784,7 @@ export default defineComponent({
     const getStreamFields = useLoading(
       async (fieldName: string, streamType: string) => {
         return await getStream(fieldName, streamType, true);
-      }
+      },
     );
 
     // update the selected stream fields list
@@ -810,7 +810,7 @@ export default defineComponent({
             it.stream_type ==
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
-              ].fields.stream_type
+              ].fields.stream_type,
         );
 
         // if fields found and stream result is of same type
@@ -825,11 +825,11 @@ export default defineComponent({
             await extractFields();
           } catch (error: any) {
             showErrorNotification(
-              error?.message ?? "Failed to get stream fields"
+              error?.message ?? "Failed to get stream fields",
             );
           }
         }
-      }
+      },
     );
 
     watch(
@@ -877,7 +877,7 @@ export default defineComponent({
                 it.name ==
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
-                ].fields.stream
+                ].fields.stream,
             )
           ) {
             dashboardPanelData.data.queries[currentIndex].fields.stream =
@@ -889,7 +889,7 @@ export default defineComponent({
               dashboardPanelData.meta.stream.streamResults[0]?.name;
           }
         }
-      }
+      },
     );
     // update the current list fields if any of the lists changes
     watch(
@@ -929,7 +929,7 @@ export default defineComponent({
         customQueryFieldsLength.value =
           dashboardPanelData.meta.stream.customQueryFields.length +
           dashboardPanelData.meta.stream.vrlFunctionFieldList.length;
-      }
+      },
     );
 
     watch(
@@ -938,7 +938,7 @@ export default defineComponent({
         // set the custom query fields length
         customQueryFieldsLength.value =
           dashboardPanelData.meta.stream.customQueryFields.length;
-      }
+      },
     );
 
     // get the stream list by making an API call
@@ -991,7 +991,7 @@ export default defineComponent({
               .includes(terms)
           ) {
             filtered.push(
-              selectedStreamFieldsBasedOnUserDefinedSchema.value[i]
+              selectedStreamFieldsBasedOnUserDefinedSchema.value[i],
             );
           }
         }
@@ -1045,7 +1045,7 @@ export default defineComponent({
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.stream_type ?? "logs",
-            true
+            true,
           ).then((res) => {
             return res;
           });
@@ -1193,7 +1193,7 @@ export default defineComponent({
       pagesNumber: computed(() => {
         return Math.ceil(
           dashboardPanelData.meta.stream.selectedStreamFields.length /
-            pagination.value.rowsPerPage
+            pagination.value.rowsPerPage,
         );
       }),
     };

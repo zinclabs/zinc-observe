@@ -40,6 +40,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20241119_000002_populate_dashboards_table::Migration),
             Box::new(m20241119_000003_delete_metas::Migration),
             Box::new(m20241204_143100_create_table_search_queue::Migration),
+            Box::new(m20241209_120000_create_alerts_table::Migration),
             Box::new(m20241215_190333_delete_metas::Migration),
         ]
     }
