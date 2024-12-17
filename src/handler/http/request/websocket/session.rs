@@ -85,30 +85,24 @@ pub async fn run(
     path: String,
 ) {
     let cfg = get_config();
-    let mut session = if let Some(session) = sessions_cache_utils::get_session(&req_id) {
-        session
-    } else {
-        log::error!("[WS_HANDLER]: Request Id: {} Session not found", req_id);
-        return;
-    };
 
     loop {
         tokio::select! {
             Some(msg) = msg_stream.next() => {
                 match msg {
-                    Ok(actix_ws::Message::Ping(bytes)) => {
-                        if session.pong(&bytes).await.is_err() {
-                            log::error!("[WS_HANDLER]: Pong failed for request_id: {}", req_id);
-                            break;
-                        }
-                    }
+                    // Ok(actix_ws::Message::Ping(bytes)) => {
+                    //     if session.pong(&bytes).await.is_err() {
+                    //         log::error!("[WS_HANDLER]: Pong failed for request_id: {}", req_id);
+                    //         break;
+                    //     }
+                    // }
                     Ok(actix_ws::Message::Text(msg)) => {
                         log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Received message: {}",
                             req_id,
                             cfg.common.node_role,
                             msg
                         );
-                        handle_text_message(&mut session, &org_id, &user_id, &req_id, msg.to_string(), path.clone()).await;
+                        handle_text_message(&org_id, &user_id, &req_id, msg.to_string(), path.clone()).await;
                     }
                     Ok(actix_ws::Message::Close(reason)) => {
                         log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Closing connection with reason: {:?}",
@@ -139,7 +133,6 @@ pub async fn run(
 /// Depending on each event type, audit must be done
 /// Currently audit is done only for the search event
 pub async fn handle_text_message(
-    session: &mut WsSession,
     org_id: &str,
     user_id: &str,
     req_id: &str,
@@ -153,7 +146,6 @@ pub async fn handle_text_message(
         Ok(client_msg) => {
             match client_msg {
                 WsClientEvents::Search(ref search_req) => {
-                    let mut session = session.clone();
                     let mut accumulated_results: Vec<SearchResultType> = Vec::new();
                     let org_id = org_id.to_string();
                     let user_id = user_id.to_string();
@@ -166,7 +158,7 @@ pub async fn handle_text_message(
 
                     let task = tokio::spawn(async move {
                         match search::handle_search_request(
-                            &mut session,
+                            &req_id,
                             &mut accumulated_results,
                             &org_id,
                             &user_id,
@@ -204,6 +196,17 @@ pub async fn handle_text_message(
                                     .await;
                                 }
 
+                                let mut session = if let Some(session) =
+                                    sessions_cache_utils::get_session(&req_id)
+                                {
+                                    session
+                                } else {
+                                    log::error!(
+                                        "[WS_HANDLER]: req_id: {} session not found",
+                                        req_id
+                                    );
+                                    return;
+                                };
                                 let _ = session.close(close_reason).await;
                             }
                             Err(e) => {
@@ -244,8 +247,18 @@ pub async fn handle_text_message(
                                     Some(search_req.trace_id),
                                     Some(req_id.to_string()),
                                 );
-                                let _ =
-                                    send_message(&mut session, err_res.to_json().to_string()).await;
+                                let _ = send_message(&req_id, err_res.to_json().to_string()).await;
+                                let mut session = if let Some(session) =
+                                    sessions_cache_utils::get_session(&req_id)
+                                {
+                                    session
+                                } else {
+                                    log::error!(
+                                        "[WS_HANDLER]: req_id: {} session not found",
+                                        req_id
+                                    );
+                                    return;
+                                };
                                 let _ = session.close(close_reason).await;
                             }
                         }
@@ -265,11 +278,18 @@ pub async fn handle_text_message(
 
                     let res = search::handle_cancel(&trace_id, org_id).await;
                     // close the session if send_message failed
-                    let _ = send_message(session, res.to_json().to_string()).await;
+                    let _ = send_message(req_id, res.to_json().to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
                         description: Some(format!("[trace_id {}] Search canceled", trace_id)),
                     });
+                    let mut session =
+                        if let Some(session) = sessions_cache_utils::get_session(req_id) {
+                            session
+                        } else {
+                            log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
+                            return;
+                        };
                     let _ = session.close(close_reason).await;
                 }
                 WsClientEvents::Benchmark { id } => {
@@ -288,11 +308,18 @@ pub async fn handle_text_message(
                         "id": id,
                         "took": delay,
                     });
-                    let _ = send_message(session, response.to_string()).await;
+                    let _ = send_message(req_id, response.to_string()).await;
                     let close_reason = Some(CloseReason {
                         code: CloseCode::Normal,
                         description: Some(format!("[id {}] benchmark completed", id)),
                     });
+                    let mut session =
+                        if let Some(session) = sessions_cache_utils::get_session(req_id) {
+                            session
+                        } else {
+                            log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
+                            return;
+                        };
                     let _ = session.close(close_reason).await;
                 }
             }
@@ -305,17 +332,32 @@ pub async fn handle_text_message(
                 e
             );
             let err_res = WsServerEvents::error_response(e.into(), Some(req_id.to_string()), None);
-            let _ = send_message(session, err_res.to_json().to_string()).await;
+            let _ = send_message(req_id, err_res.to_json().to_string()).await;
             let close_reason = Some(CloseReason {
                 code: CloseCode::Error,
                 description: Some(format!("[req_id {}] Request Error", req_id)),
             });
+            let mut session = if let Some(session) = sessions_cache_utils::get_session(req_id) {
+                session
+            } else {
+                log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
+                return;
+            };
             let _ = session.close(close_reason).await;
         }
     }
 }
 
-pub async fn send_message(session: &mut WsSession, msg: String) -> Result<(), Error> {
+pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
+    let mut session = if let Some(session) = sessions_cache_utils::get_session(req_id) {
+        session
+    } else {
+        log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
+        return Err(Error::Message(format!(
+            "[req_id {}] session not found",
+            req_id
+        )));
+    };
     session.text(msg).await.map_err(|e| {
         log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
         Error::Message(e.to_string())

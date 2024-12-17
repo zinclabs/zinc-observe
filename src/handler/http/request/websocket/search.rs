@@ -30,7 +30,7 @@ use infra::errors::Error;
 use proto::cluster_rpc::SearchQuery;
 use tracing::Instrument;
 
-use super::{session::WsSession, utils::cancellation_registry_cache_utils};
+use super::utils::cancellation_registry_cache_utils;
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
@@ -79,7 +79,7 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
 }
 
 pub async fn handle_search_request(
-    session: &mut WsSession,
+    req_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
     org_id: &str,
     user_id: &str,
@@ -109,7 +109,7 @@ pub async fn handle_search_request(
         Err(e) => {
             let err_res =
                 WsServerEvents::error_response(Error::Message(e.to_string()), Some(trace_id), None);
-            send_message(session, err_res.to_json().to_string()).await?;
+            send_message(req_id, err_res.to_json().to_string()).await?;
             return Ok(());
         }
     };
@@ -121,7 +121,7 @@ pub async fn handle_search_request(
             enterprise_utils::check_permissions(stream_name, stream_type, user_id, org_id).await
         {
             let err_res = WsServerEvents::error_response(Error::Message(e), Some(trace_id), None);
-            send_message(session, err_res.to_json().to_string()).await?;
+            send_message(req_id, err_res.to_json().to_string()).await?;
             return Ok(());
         }
     }
@@ -218,7 +218,7 @@ pub async fn handle_search_request(
             }; // hours
 
             handle_cache_responses_and_deltas(
-                session,
+                req_id,
                 &req,
                 trace_id.clone(),
                 req_size,
@@ -246,7 +246,7 @@ pub async fn handle_search_request(
             }; // hours
 
             do_partitioned_search(
-                session,
+                req_id,
                 &mut req,
                 &trace_id,
                 req_size,
@@ -280,7 +280,7 @@ pub async fn handle_search_request(
             trace_id,
             search_res.hits.len()
         );
-        send_message(session, ws_search_res.to_json().to_string()).await?;
+        send_message(req_id, ws_search_res.to_json().to_string()).await?;
     }
 
     // Once all searches are complete, write the accumulated results to a file
@@ -288,7 +288,7 @@ pub async fn handle_search_request(
     let end_res = WsServerEvents::End {
         trace_id: Some(trace_id.clone()),
     };
-    send_message(session, end_res.to_json().to_string()).await?;
+    send_message(req_id, end_res.to_json().to_string()).await?;
 
     // Remove the cancellation flag
     cancellation_registry_cache_utils::remove_cancellation_flag(&trace_id);
@@ -362,7 +362,7 @@ async fn is_partition_request(
 
 #[allow(clippy::too_many_arguments)]
 async fn handle_cache_responses_and_deltas(
-    session: &mut WsSession,
+    req_id: &str,
     req: &SearchEventReq,
     trace_id: String,
     req_size: i64,
@@ -445,7 +445,7 @@ async fn handle_cache_responses_and_deltas(
                     order_by
                 );
                 process_delta(
-                    session,
+                    req_id,
                     req,
                     trace_id.clone(),
                     delta,
@@ -462,7 +462,7 @@ async fn handle_cache_responses_and_deltas(
             } else {
                 // Send cached response
                 send_cached_responses(
-                    session,
+                    req_id,
                     &trace_id,
                     req_size,
                     cached,
@@ -479,7 +479,7 @@ async fn handle_cache_responses_and_deltas(
                 trace_id
             );
             process_delta(
-                session,
+                req_id,
                 req,
                 trace_id.clone(),
                 delta,
@@ -496,7 +496,7 @@ async fn handle_cache_responses_and_deltas(
         } else if let Some(cached) = cached_resp_iter.next() {
             // Process remaining cached responses
             send_cached_responses(
-                session,
+                req_id,
                 &trace_id,
                 req_size,
                 cached,
@@ -523,7 +523,7 @@ async fn handle_cache_responses_and_deltas(
 // Process a single delta (time range not covered by cache)
 #[allow(clippy::too_many_arguments)]
 async fn process_delta(
-    session: &mut WsSession,
+    req_id: &str,
     req: &SearchEventReq,
     trace_id: String,
     delta: &QueryDelta,
@@ -635,7 +635,7 @@ async fn process_delta(
                 result_cache_ratio,
                 accumulated_results.len()
             );
-            send_message(session, ws_search_res.to_json().to_string()).await?;
+            send_message(req_id, ws_search_res.to_json().to_string()).await?;
         }
 
         // Stop if `remaining_query_range` is less than 0
@@ -660,7 +660,7 @@ async fn process_delta(
             };
             // passs original start_time and end_time partition end time
             let _ = send_partial_search_resp(
-                session,
+                req_id,
                 &trace_id,
                 MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE,
                 new_start_time,
@@ -714,7 +714,7 @@ async fn get_partitions(
 }
 
 async fn send_cached_responses(
-    session: &mut WsSession,
+    req_id: &str,
     trace_id: &str,
     req_size: i64,
     cached: &CachedQueryResponse,
@@ -769,7 +769,7 @@ async fn send_cached_responses(
         cached.cached_response.result_cache_ratio,
         accumulated_results.len()
     );
-    send_message(session, ws_search_res.to_json().to_string()).await?;
+    send_message(req_id, ws_search_res.to_json().to_string()).await?;
 
     Ok(())
 }
@@ -777,7 +777,7 @@ async fn send_cached_responses(
 // Do partitioned search without cache
 #[allow(clippy::too_many_arguments)]
 async fn do_partitioned_search(
-    session: &mut WsSession,
+    req_id: &str,
     req: &mut SearchEventReq,
     trace_id: &str,
     req_size: i64,
@@ -869,7 +869,7 @@ async fn do_partitioned_search(
                 results: Box::new(search_res.clone()),
                 time_offset: end_time,
             };
-            send_message(session, ws_search_res.to_json().to_string()).await?;
+            send_message(req_id, ws_search_res.to_json().to_string()).await?;
         }
 
         // Stop if reached the requested result size
@@ -894,14 +894,14 @@ async fn do_partitioned_search(
             results: Box::new(Response::default()),
             time_offset: req.payload.query.end_time,
         };
-        send_message(session, ws_search_res.to_json().to_string()).await?;
+        send_message(req_id, ws_search_res.to_json().to_string()).await?;
     }
 
     Ok(())
 }
 
 async fn send_partial_search_resp(
-    session: &mut WsSession,
+    req_id: &str,
     trace_id: &str,
     error: &str,
     new_start_time: i64,
@@ -933,7 +933,7 @@ async fn send_partial_search_resp(
         trace_id
     );
 
-    send_message(session, ws_search_res.to_json().to_string()).await?;
+    send_message(req_id, ws_search_res.to_json().to_string()).await?;
 
     Ok(())
 }

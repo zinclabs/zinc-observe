@@ -102,9 +102,11 @@ pub mod sessions_cache_utils {
         WS_SESSIONS.remove(session_id);
     }
 
-    /// Get a session from the cache
-    pub fn get_session(session_id: &str) -> Option<WsSession> {
-        WS_SESSIONS.get(session_id).map(|entry| entry.clone())
+    // Return a mutable reference to the session
+    pub fn get_session(
+        session_id: &str,
+    ) -> Option<dashmap::mapref::one::RefMut<'_, String, WsSession>> {
+        WS_SESSIONS.get_mut(session_id)
     }
 
     /// Check if a session exists in the cache

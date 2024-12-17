@@ -663,7 +663,7 @@ pub async fn write_results_v2(
                 // same date, hour, minute as the hit to remove
                 local_resp.hits.retain(|hit| {
                     if let Some(hit_ts) = hit.get(ts_column) {
-                        if let Some(hit_ts_datetime) = convert_ts_value_to_datetime(&hit_ts) {
+                        if let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts) {
                             dbg!(hit_ts, hit_ts_datetime);
                             let hit_date_minute =
                                 hit_ts_datetime.format("%Y-%m-%dT%H:%M").to_string();
