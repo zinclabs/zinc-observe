@@ -656,7 +656,6 @@ pub async fn write_results_v2(
         if let Some(ts_value) = ts_value_to_remove {
             // Extract the date, hour, minute from the timestamp
             if let Some(ts_datetime) = convert_ts_value_to_datetime(&ts_value) {
-                dbg!(remove_hit, ts_value, ts_datetime);
                 let target_date_minute = ts_datetime.format("%Y-%m-%dT%H:%M").to_string(); // e.g., "2024-12-06T04:15"
 
                 // Retain only the hits that do NOT fall within the
@@ -664,7 +663,6 @@ pub async fn write_results_v2(
                 local_resp.hits.retain(|hit| {
                     if let Some(hit_ts) = hit.get(ts_column) {
                         if let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts) {
-                            dbg!(hit_ts, hit_ts_datetime);
                             let hit_date_minute =
                                 hit_ts_datetime.format("%Y-%m-%dT%H:%M").to_string();
                             return hit_date_minute != target_date_minute;
