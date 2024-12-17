@@ -19,6 +19,7 @@ use config::{get_config, meta::websocket::SearchResultType};
 use dashmap::DashMap;
 use futures::StreamExt;
 use infra::errors::Error;
+#[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, WsMeta},
     infra::config::get_config as get_o2_config,
@@ -26,15 +27,14 @@ use o2_enterprise::enterprise::common::{
 use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
 
-use crate::{
-    handler::http::request::websocket::{
-        search,
-        utils::{
-            cancellation_registry_cache_utils, sessions_cache_utils, WsClientEvents, WsServerEvents,
-        },
-    },
-    service::self_reporting::audit,
+#[allow(unused_imports)]
+use crate::handler::http::request::websocket::utils::cancellation_registry_cache_utils;
+use crate::handler::http::request::websocket::{
+    search,
+    utils::{sessions_cache_utils, WsClientEvents, WsServerEvents},
 };
+#[cfg(feature = "enterprise")]
+use crate::service::self_reporting::audit;
 
 // Global cancellation registry for search requests by `trace_id`
 pub static CANCELLATION_FLAGS: Lazy<DashMap<String, bool>> = Lazy::new(DashMap::new);
@@ -159,7 +159,9 @@ pub async fn handle_text_message(
                     let user_id = user_id.to_string();
                     let req_id = req_id.to_string();
                     let search_req = search_req.clone();
+                    #[cfg(feature = "enterprise")]
                     let client_msg = client_msg.clone();
+                    #[allow(unused_variables)]
                     let path = path.to_string();
 
                     let task = tokio::spawn(async move {
@@ -173,7 +175,17 @@ pub async fn handle_text_message(
                         .await
                         {
                             Ok(_) => {
+                                // close the session
+                                let close_reason = Some(CloseReason {
+                                    code: CloseCode::Normal,
+                                    description: Some(format!(
+                                        "[trace_id {}] Search completed",
+                                        search_req.trace_id.clone()
+                                    )),
+                                });
+
                                 // audit
+                                #[cfg(feature = "enterprise")]
                                 if is_audit_enabled {
                                     audit(AuditMessage {
                                         user_email: user_id,
@@ -183,20 +195,15 @@ pub async fn handle_text_message(
                                             path,
                                             message_type: client_msg.get_type(),
                                             content: client_msg.to_json(),
-                                            close_reason: "".to_string(),
+                                            close_reason: format!(
+                                                "{:#?}",
+                                                close_reason.clone().unwrap()
+                                            ),
                                         }),
                                     })
                                     .await;
                                 }
 
-                                // close the session
-                                let close_reason = Some(CloseReason {
-                                    code: CloseCode::Normal,
-                                    description: Some(format!(
-                                        "[trace_id {}] Search completed",
-                                        search_req.trace_id.clone()
-                                    )),
-                                });
                                 let _ = session.close(close_reason).await;
                             }
                             Err(e) => {
@@ -207,8 +214,13 @@ pub async fn handle_text_message(
                                 );
                                 let err_msg =
                                     format!("[trace_id: {}, error: {}]", search_req.trace_id, e);
+                                let close_reason = Some(CloseReason {
+                                    code: CloseCode::Error,
+                                    description: Some(err_msg.clone()),
+                                });
 
                                 // audit
+                                #[cfg(feature = "enterprise")]
                                 if is_audit_enabled {
                                     audit(AuditMessage {
                                         user_email: user_id,
@@ -218,16 +230,15 @@ pub async fn handle_text_message(
                                             path,
                                             message_type: client_msg.get_type(),
                                             content: client_msg.to_json(),
-                                            close_reason: err_msg.clone(),
+                                            close_reason: format!(
+                                                "{:#?}",
+                                                close_reason.clone().unwrap()
+                                            ),
                                         }),
                                     })
                                     .await;
                                 }
 
-                                let close_reason = Some(CloseReason {
-                                    code: CloseCode::Error,
-                                    description: Some(err_msg),
-                                });
                                 let err_res = WsServerEvents::error_response(
                                     e,
                                     Some(search_req.trace_id),

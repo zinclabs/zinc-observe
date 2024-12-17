@@ -104,7 +104,6 @@ pub async fn handle_search_request(
     }
 
     // get stream name
-    #[allow(unused_variables)]
     let stream_names = match resolve_stream_names(&req.payload.query.sql) {
         Ok(v) => v.clone(),
         Err(e) => {
