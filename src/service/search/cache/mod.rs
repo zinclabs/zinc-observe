@@ -423,7 +423,7 @@ pub fn merge_response(
 
     cache_response.scan_size = 0;
 
-    let mut files_cache_ratio = 0;
+    let mut files_cache_hits = 0;
     let mut result_cache_len = 0;
 
     let mut res_took = ResponseTook::default();
@@ -432,8 +432,7 @@ pub fn merge_response(
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
-        // Todo: fix its percentage `cached_ratio`
-        files_cache_ratio += res.cached_ratio;
+        files_cache_hits += res.cached_ratio * res.hits.len();
         cache_response.histogram_interval = res.histogram_interval;
 
         result_cache_len += res.total;
@@ -468,7 +467,7 @@ pub fn merge_response(
     }
 
     if !search_response.is_empty() {
-        cache_response.cached_ratio = files_cache_ratio / search_response.len();
+        cache_response.cached_ratio = files_cache_hits / search_response.len();
     }
     cache_response.size = cache_response.hits.len() as i64;
     log::info!(
@@ -923,16 +922,17 @@ pub fn merge_response_v2(
 
     let cache_hits_len = merged_response.hits.len();
 
-    let mut files_cache_ratio = 0;
+    let mut files_cache_hits = 0;
     let mut result_cache_len = 0;
+
+    let mut res_took = ResponseTook::default();
 
     // aggregate search responses
     for s_resp in search_responses.clone() {
         merged_response.total += s_resp.total;
         merged_response.scan_size += s_resp.scan_size;
         merged_response.took += s_resp.took;
-        // TODO: fix its percentage `cached_ratio`
-        files_cache_ratio += s_resp.cached_ratio;
+        files_cache_hits += s_resp.cached_ratio * s_resp.hits.len();
         merged_response.histogram_interval = s_resp.histogram_interval;
 
         result_cache_len += s_resp.total;
@@ -942,6 +942,17 @@ pub fn merge_response_v2(
         }
 
         // TODO: took_detail
+        // TODO: here we can't plus cluster_total, it is query in parallel
+        // TODO: and, use this value also is wrong, the cluster_total should be the total time of
+        // TODO: the query, here only calculate the time of the delta query
+        if let Some(mut took_details) = s_resp.took_detail {
+            res_took.cluster_total += took_details.cluster_total;
+            res_took.cluster_wait_queue += took_details.cluster_wait_queue;
+            res_took.idx_took += took_details.idx_took;
+            res_took.wait_queue += took_details.wait_queue;
+            res_took.total += took_details.total;
+            res_took.nodes.append(&mut took_details.nodes);
+        }
 
         if !s_resp.function_error.is_empty() {
             fn_error = s_resp.function_error.clone();
@@ -959,7 +970,7 @@ pub fn merge_response_v2(
     }
 
     if !search_responses.is_empty() {
-        merged_response.cached_ratio = files_cache_ratio / search_responses.len();
+        merged_response.cached_ratio = files_cache_hits / search_responses.len();
     }
     merged_response.size = merged_response.hits.len() as i64;
 
