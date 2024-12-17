@@ -12,7 +12,7 @@ test.describe("Join for logs", () => {
         ingestionPage = new IngestionPage(page);
         logsPage = new LogsPage(page);
         await loginPage.gotoLoginPage();
-        await loginPage.login();
+        await loginPage.login(); // Login as root user
         await ingestionPage.ingestion();
         await ingestionPage.ingestionJoin();
     });

@@ -1260,6 +1260,7 @@ export default defineComponent({
     };
 
     const updateQueryValue = (value: string) => {
+      searchObj.data.editorValue = value;
       if (searchObj.meta.quickMode === true) {
         const parsedSQL = fnParsedSQL();
         if (

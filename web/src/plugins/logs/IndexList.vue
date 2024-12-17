@@ -946,7 +946,9 @@ export default defineComponent({
         }
         let countTotal = streams.length;
         for (const selectedStream of streams) {
-          query_context = "select * from [INDEX_NAME]";
+          if (streams.length > 1) {
+            query_context = "select * from [INDEX_NAME]";
+          }
           if (searchObj.data.stream.selectedStream.length > 1) {
             query_context = queries[selectedStream];
           }

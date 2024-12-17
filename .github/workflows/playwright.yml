@@ -112,6 +112,7 @@ jobs:
             "reportsUpdated.spec.js",
             "join.spec.js",
             "changeOrg.spec.js",
+            "serviceAccount.spec.js",
             
             
           ]

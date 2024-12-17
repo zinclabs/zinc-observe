@@ -62,9 +62,14 @@ class PipelinePage {
     this.columnInput = page.getByPlaceholder('Column'); // Locator for the "Column" input field
     this.columnOption = page.getByRole('option', { name: 'kubernetes_container_name' })
     this.fieldRequiredError = page.getByText('Field is required!')
-
-this.functionNameInput = page.locator('[data-test="add-function-node-routing-section"] input[aria-label="Name"]');
-this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
+    this.tableRowsLocator = page.locator("tbody tr");
+    this.confirmButton = page.locator('[data-test="confirm-button"]');
+    this.functionNameInput = page.locator('[data-test="add-function-node-routing-section"] input[aria-label="Name"]');
+    this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
+    this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
+    this.enrichmentTableTab =
+      '[data-test="function-enrichment-table-tab"] > .q-tab__content > .q-tab__label';
+    this.addEnrichmentTableButton = 'text=Add Enrichment Table';
 
 
 
@@ -266,6 +271,68 @@ async saveCondition() {
 async verifyFieldRequiredError() {
   await this.fieldRequiredError.waitFor({ state: 'visible' });
   await this.fieldRequiredError.click();
+}
+
+async navigateToAddEnrichmentTable() {
+  await this.page.locator(this.pipelineMenu).click();
+  await this.page.click(this.enrichmentTableTab, { force: true });
+  await this.page.getByText("Add Enrichment Table").click();
+}
+
+async uploadEnrichmentTable(fileName, fileContentPath) {
+  // Set the file to be uploaded
+  const inputFile = await this.page.locator(this.fileInput);
+  await inputFile.setInputFiles(fileContentPath);
+
+  // Enter the file name
+  await this.page.fill(this.fileNameInput, fileName);
+
+  // Click on 'Save'
+  await this.page.getByText(this.saveButton).click({ force: true });
+
+  // Wait for the process to complete
+  await this.page.reload();
+  await this.page.waitForTimeout(3000);
+
+  // Search for the uploaded file
+  await this.page.getByPlaceholder(this.searchPlaceholder).fill(fileName);
+  await this.page.waitForTimeout(3000);
+}
+async deleteEnrichmentTableByName(fileName) {
+  const rows = await this.tableRowsLocator;
+  let fileFound = false;
+
+  for (let i = 0; i < (await rows.count()); i++) {
+    const row = rows.nth(i);
+    const functionName = await row
+      .locator("td.text-left")
+      .nth(1)
+      .textContent();
+
+    if (functionName?.trim() === fileName) {
+      fileFound = true;
+      console.log("Uploaded file found:", functionName);
+
+      // Click the 'Delete Function' button
+      await row.locator('[title="Delete Function"]').click();
+
+      // Confirm the deletion
+      await this.confirmButton.click();
+      break;
+    }
+  }
+
+  if (!fileFound) {
+    throw new Error(
+      `Uploaded file "${fileName}" not found in the enrichment table.`
+    );
+  }
+
+}
+
+async navigateToEnrichmentTableTab() {
+  await this.pipelineMenuLink.click();
+  await this.enrichmentTableTab.click();
 }
 
 }
