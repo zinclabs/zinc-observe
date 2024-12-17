@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::Utc;
+use chrono::{TimeZone, Utc};
 use config::{
     get_config,
     meta::{
@@ -655,18 +655,16 @@ pub async fn write_results_v2(
 
         if let Some(ts_value) = ts_value_to_remove {
             // Extract the date, hour, minute from the timestamp
-            if let Some(ts_datetime) =
-                chrono::DateTime::from_timestamp_micros(ts_value.as_i64().unwrap_or(0))
-            {
+            if let Some(ts_datetime) = convert_ts_value_to_datetime(&ts_value) {
+                dbg!(remove_hit, ts_value, ts_datetime);
                 let target_date_minute = ts_datetime.format("%Y-%m-%dT%H:%M").to_string(); // e.g., "2024-12-06T04:15"
 
                 // Retain only the hits that do NOT fall within the
                 // same date, hour, minute as the hit to remove
                 local_resp.hits.retain(|hit| {
-                    if let Some(hit_ts) = hit.get(ts_column).and_then(|v| v.as_i64()) {
-                        if let Some(hit_ts_datetime) =
-                            chrono::DateTime::from_timestamp_micros(hit_ts)
-                        {
+                    if let Some(hit_ts) = hit.get(ts_column) {
+                        if let Some(hit_ts_datetime) = convert_ts_value_to_datetime(&hit_ts) {
+                            dbg!(hit_ts, hit_ts_datetime);
                             let hit_date_minute =
                                 hit_ts_datetime.format("%Y-%m-%dT%H:%M").to_string();
                             return hit_date_minute != target_date_minute;
@@ -989,4 +987,30 @@ pub fn merge_response_v2(
         merged_response.function_error = fn_error;
     }
     merged_response
+}
+
+pub fn convert_ts_value_to_datetime(ts_value: &serde_json::Value) -> Option<chrono::DateTime<Utc>> {
+    match ts_value {
+        // Handle the case where ts_value is a number (microseconds)
+        serde_json::Value::Number(num) => {
+            if let Some(micros) = num.as_i64() {
+                // Convert microseconds to DateTime<Utc>
+                chrono::DateTime::<Utc>::from_timestamp_micros(micros)
+            } else {
+                None
+            }
+        }
+        // Handle the case where ts_value is a string (ISO 8601 format)
+        serde_json::Value::String(ts_str) => {
+            // Parse the string timestamp into a NaiveDateTime
+            if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(ts_str, "%Y-%m-%dT%H:%M:%S")
+            {
+                // Convert NaiveDateTime to DateTime<Utc>
+                Some(Utc.from_utc_datetime(&naive_dt))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
 }
