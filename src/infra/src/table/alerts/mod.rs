@@ -25,8 +25,8 @@ use config::meta::{
 use hashbrown::HashMap;
 use itertools::Itertools;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, PaginatorTrait,
+    QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 use svix_ksuid::KsuidLike;
 
