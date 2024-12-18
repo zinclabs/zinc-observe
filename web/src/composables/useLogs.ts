@@ -4801,11 +4801,10 @@ const useLogs = () => {
     response: any,
   ) => {
     removeTraceId(traceId);
-    // check for total records update for the partition and update pagination accordingly
-    // searchObj.data.queryResults.partitionDetail.partitions.forEach(
-    //   (item: any, index: number) => {
-    searchObj.data.queryResults.scan_size = response.content.results.scan_size;
-    searchObj.data.queryResults.took += response.content.results.took;
+
+    if (searchObj.data.queryResults.aggs == null) {
+      searchObj.data.queryResults.aggs = [];
+    }
 
     let regeratePaginationFlag = false;
     if (
@@ -4815,7 +4814,10 @@ const useLogs = () => {
       regeratePaginationFlag = true;
     }
 
-    searchObj.data.queryResults.aggs = response.content.results.hits;
+    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    searchObj.data.queryResults.scan_size += response.content.results.scan_size;
+    searchObj.data.queryResults.took += response.content.results.took;
+
     // if total records in partition is greater than recordsPerPage then we need to update pagination
     // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
     refreshPagination(regeratePaginationFlag);
@@ -4830,6 +4832,7 @@ const useLogs = () => {
   ) => {
     searchObjDebug["histogramProcessingStartTime"] = performance.now();
     searchObj.loading = false;
+
     if (searchObj.data.queryResults.aggs == null) {
       searchObj.data.queryResults.aggs = [];
     }
@@ -4947,6 +4950,8 @@ const useLogs = () => {
       return;
     }
 
+    searchObj.data.queryResults.aggs = [];
+
     if (shouldShowHistogram) {
       searchObj.meta.refreshHistogram = false;
       if (searchObj.data.queryResults.hits.length > 0) {
@@ -4954,7 +4959,6 @@ const useLogs = () => {
         resetHistogramError();
 
         searchObj.loadingHistogram = true;
-        searchObj.data.queryResults.aggs = [];
 
         await generateHistogramSkeleton();
 
