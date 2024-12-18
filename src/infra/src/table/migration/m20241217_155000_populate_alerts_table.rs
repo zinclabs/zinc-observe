@@ -613,6 +613,7 @@ mod meta_table_alerts {
     }
 
     #[derive(Default, Deserialize, Serialize)]
+    #[allow(clippy::upper_case_acronyms)]
     pub enum QueryType {
         #[default]
         #[serde(rename = "custom")]
@@ -658,6 +659,7 @@ mod meta_table_alerts {
 
     #[derive(Deserialize, Serialize)]
     #[serde(rename_all = "lowercase")]
+    #[allow(clippy::upper_case_acronyms)]
     pub enum SearchEventType {
         UI,
         Dashboards,
@@ -698,7 +700,7 @@ impl TryFrom<MetaAlertWithFolder> for alerts_table::ActiveModel {
         let folder_id = m
             .folder_id()
             .ok_or("Alert in meta table references folder that does not exist")?;
-        let meta_alert: meta_table_alerts::Alert = serde_json::from_str(&m.alert_json())
+        let meta_alert: meta_table_alerts::Alert = serde_json::from_str(m.alert_json())
             .map_err(|_| "Alert in meta table could not be deserialized")?;
         let id = svix_ksuid::Ksuid::new(None, None).to_string();
 
