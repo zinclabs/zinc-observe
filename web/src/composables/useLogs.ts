@@ -154,7 +154,7 @@ const defaultObject = {
       selectedStreamFields: <any>[],
       selectedFields: <string[]>[],
       filterField: "",
-      addToFilter: "",
+      addToFilter: { field: "", field_value: "", action: "" },
       functions: <any>[],
       streamType: "logs",
       interestingFieldList: <string[]>[],
@@ -378,7 +378,7 @@ const useLogs = () => {
     searchObj.data.stream.selectedStreamFields = [];
     searchObj.data.stream.selectedFields = [];
     searchObj.data.stream.filterField = "";
-    searchObj.data.stream.addToFilter = "";
+    searchObj.data.stream.addToFilter = { field: "", field_value: "", action: "" };
     searchObj.data.stream.functions = [];
     searchObj.data.stream.streamType =
       (router.currentRoute.value.query.stream_type as string) || "logs";
@@ -1818,6 +1818,26 @@ const useLogs = () => {
   const fnParsedSQL = () => {
     try {
       const filteredQuery = searchObj.data.query
+        .split("\n")
+        .filter((line: string) => !line.trim().startsWith("--"))
+        .join("\n");
+      return parser.astify(filteredQuery);
+
+      // return convertPostgreToMySql(parser.astify(filteredQuery));
+    } catch (e: any) {
+      return {
+        columns: [],
+        orderby: null,
+        limit: null,
+        groupby: null,
+        where: null,
+      };
+    }
+  };
+
+  const fnParsedInputSQL = (query: string) => {
+    try {
+      const filteredQuery = query
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
@@ -4376,6 +4396,7 @@ const useLogs = () => {
     generateHistogramSkeleton,
     fnParsedSQL,
     fnUnparsedSQL,
+    fnParsedInputSQL,
     getRegionInfo,
     validateFilterForMultiStream,
     cancelQuery,

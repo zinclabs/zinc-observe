@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               Math.max(
                 1,
                 searchObj.data.queryResults?.partitionDetail?.paginations
-                  ?.length || 0
+                  ?.length || 0,
               )
             "
             :input="false"
@@ -114,7 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="margin: 30px 0px"
           v-if="searchObj.data.histogram.errorCode != 0"
         >
-          <q-icon name="warning" color="warning" size="30px"></q-icon> Error
+          <q-icon name="warning"
+color="warning" size="30px"></q-icon> Error
           while fetching histogram data.
           <q-btn
             @click="toggleErrorDetails"
@@ -191,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             redirectToTraces(
               searchObj.data.queryResults.hits[
                 searchObj.meta.resultGrid.navigation.currentRowIndex
-              ]
+              ],
             )
           "
         />
@@ -227,7 +228,7 @@ export default defineComponent({
   components: {
     DetailTable: defineAsyncComponent(() => import("./DetailTable.vue")),
     ChartRenderer: defineAsyncComponent(
-      () => import("@/components/dashboards/panels/ChartRenderer.vue")
+      () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     SanitizedHtmlRenderer,
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
@@ -293,7 +294,7 @@ export default defineComponent({
           this.searchObj.data.resultGrid.currentPage <=
           Math.round(
             this.searchObj.data.queryResults.total /
-              this.searchObj.meta.resultGrid.rowsPerPage
+              this.searchObj.meta.resultGrid.rowsPerPage,
           )
         ) {
           this.searchObj.data.resultGrid.currentPage =
@@ -312,7 +313,7 @@ export default defineComponent({
         if (
           this.pageNumberInput >
           Math.ceil(
-            this.searchObj.data.queryResults.partitionDetail.paginations.length
+            this.searchObj.data.queryResults.partitionDetail.paginations.length,
           )
         ) {
           this.$q.notify({
@@ -410,7 +411,7 @@ export default defineComponent({
         plotChart.value = convertLogData(
           searchObj.data.histogram.xData,
           searchObj.data.histogram.yData,
-          searchObj.data.histogram.chartParams
+          searchObj.data.histogram.chartParams,
         );
         // plotChart.value.forceReLayout();
       }
@@ -437,7 +438,7 @@ export default defineComponent({
       const newIndex = getRowIndex(
         isNext,
         isPrev,
-        Number(searchObj.meta.resultGrid.navigation.currentRowIndex)
+        Number(searchObj.meta.resultGrid.navigation.currentRowIndex),
       );
       searchObj.meta.resultGrid.navigation.currentRowIndex = newIndex;
     };
@@ -452,7 +453,7 @@ export default defineComponent({
         field_value,
         action,
       );
-      searchObj.data.stream.addToFilter = searchExpression;
+      searchObj.data.stream.addToFilter = { field, field_value, action };
     };
 
     const removeSearchTerm = (term: string) => {
@@ -472,7 +473,7 @@ export default defineComponent({
       if (searchObj.data.stream.selectedFields.includes(fieldName)) {
         searchObj.data.stream.selectedFields =
           searchObj.data.stream.selectedFields.filter(
-            (v: any) => v !== fieldName
+            (v: any) => v !== fieldName,
           );
       } else {
         searchObj.data.stream.selectedFields.push(fieldName);
@@ -490,7 +491,7 @@ export default defineComponent({
           type: "positive",
           message: "Content Copied Successfully!",
           timeout: 1000,
-        })
+        }),
       );
     };
 
@@ -539,7 +540,7 @@ export default defineComponent({
 
     const getColumns = computed(() => {
       return searchObj.data?.resultGrid?.columns?.filter(
-        (col: any) => !!col.id
+        (col: any) => !!col.id,
       );
     });
 

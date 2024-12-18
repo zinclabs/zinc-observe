@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     style="margin-right: 0.375rem"
                     size="0.4rem"
                     class="q-mr-sm"
-                    @click.stop="addToFilter(`${props.row.name}=''`)"
+                    @click.stop="addToFilter(`${props.row.name}`)"
                     round
                   />
                   <q-icon
@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         style="margin-right: 0.375rem"
                         size="0.4rem"
                         class="q-mr-sm"
-                        @click.stop="addToFilter(`${props.row.name}=''`)"
+                        @click.stop="addToFilter(`${props.row.name}`)"
                         round
                       />
                       <q-icon
@@ -785,7 +785,11 @@ export default defineComponent({
     };
 
     const addToFilter = (field: any) => {
-      searchObj.data.stream.addToFilter = field;
+      searchObj.data.stream.addToFilter = {
+        field,
+        field_value: "''",
+        action: "include",
+      };
     };
 
     function clickFieldFn(row: { name: never }, pageIndex: number) {
@@ -1044,7 +1048,7 @@ export default defineComponent({
       );
 
       if (expression) {
-        searchObj.data.stream.addToFilter = expression;
+        searchObj.data.stream.addToFilter = { field, field_value, action };
       } else {
         $q.notify({
           type: "negative",
