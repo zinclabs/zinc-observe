@@ -124,11 +124,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="(existingUser || beingUpdated) && (
               (userRole !== 'member' &&
                 store.state.userInfo.email !== formData.email) 
-              
             )"
             v-model="formData.role"
             :label="t('user.role') + ' *'"
-            :options="combinedRoles"
+            :options="roles" 
             color="input-border"
             bg-color="input-bg"
             class="q-pt-md q-pb-md showLabelOnTop"
@@ -139,8 +138,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             :rules="[(val: any) => !!val || 'Field is required']"
-          />
-
+            />
+          <q-select
+              v-if="(existingUser || beingUpdated) && (
+                (userRole !== 'member' &&
+                  store.state.userInfo.email !== formData.email) 
+                )"
+              v-model="formData.custom_role"
+              :label="t('user.customRole')"
+              :options="filterdOption"
+              color="input-border"
+              bg-color="input-bg"
+              class="q-pt-md q-pb-md showLabelOnTop"
+              multiple
+              emit-value
+              map-options
+              stack-label
+              outlined
+              filled
+              dense
+              use-input
+              @filter="filterFn"
+            />
           <div v-if="beingUpdated">
             <q-toggle
               v-model="formData.change_password"
@@ -371,7 +390,7 @@ export default defineComponent({
     const loadingOrganizations = ref(true);
     const logout_confirm = ref(false);
     const loggedInUserEmail = ref(store.state.userInfo.email);
-
+    const filterdOption = ref(props.customRoles);
 
     onActivated(() => {
       formData.value.organization = store.state.selectedOrganization.identifier;
@@ -420,7 +439,20 @@ export default defineComponent({
       getImageURL,
       loadingOrganizations,
       logout_confirm,
-      loggedInUserEmail
+      loggedInUserEmail,
+      filterdOption,
+      filterFn (val, update) {
+        if (val === '') {
+          update(() => {
+            filterdOption.value = props.customRoles
+          })
+          return
+        }
+        update(() => {
+          const needle = val.toLowerCase()
+          filterdOption.value = props.customRoles.filter((v:any) => v.toLowerCase().indexOf(needle) > -1)
+        })
+      }
     };
   },
   created() {
@@ -437,6 +469,7 @@ export default defineComponent({
       this.formData = {...this.modelValue};
       this.formData.change_password = false;
       this.formData.password = "";
+      this.fetchUserRoles(this.modelValue.email)
     }
   },
   methods: {
@@ -499,11 +532,12 @@ export default defineComponent({
       } else {
         if (this.existingUser) {
           const userEmail = this.formData.email;
-
+         
           userServiece
             .updateexistinguser(
               { 
                 role: this.formData.role,
+                custom_role: this.formData.custom_role 
               },
               selectedOrg,
               userEmail
@@ -551,6 +585,16 @@ export default defineComponent({
               dismiss();
             });
         }
+      }
+    },
+    async fetchUserRoles(userEmail:any) {
+      const orgId = this.store.state.selectedOrganization.identifier;
+      try {
+        const response = await userServiece.getUserRoles(orgId, userEmail);
+        const existingUserRoles = response.data; 
+        this.formData.custom_role = existingUserRoles
+      } catch (error) {
+        console.error("Error fetching user roles:", error);
       }
     },
   },

@@ -30,52 +30,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #no-data>
         <NoData></NoData>
       </template>
-      <template #body-cell-role="props">
-        <q-td :props="props" v-if="props?.row?.enableChangeRole">
-          <q-select
-            dense
-            borderless
-            v-model="props.row.role"
-            :options="options"
-            emit-value
-            map-options
-            style="width: 70px"
-            @update:model-value="updateUserRole(props.row)"
-          />
-        </q-td>
-        <q-td :props="props" v-else>
-          {{ props.row.role }}
-        </q-td>
+      <template v-slot:header="props">
+        <q-tr :props="props">
+          <q-th auto-width />
+          <q-th v-for="col in props.cols" :key="col.name" :props="props">
+
+            <span>{{ col.label }}</span>
+          </q-th>
+        </q-tr>
       </template>
-      <template #body-cell-actions="props">
-        <q-td :props="props" side>
-          <q-btn
-            v-if="props.row.enableDelete"
-            :icon="outlinedDelete"
-            :title="t('user.delete')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="confirmDeleteAction(props)"
-            style="cursor: pointer !important"
-          />
-          <q-btn
-            v-if="props.row.enableEdit"
-            icon="edit"
-            :title="t('user.update')"
-            class="q-ml-xs"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
-            @click="addRoutePush(props)"
-            style="cursor: pointer !important"
-          />
-        </q-td>
+      <template v-slot:body="props">
+        <q-tr :props="props">
+          <q-td auto-width>
+            <q-btn
+              size="xs" 
+              flat 
+              round 
+              dense 
+              @click="toggleExpand(props.row)"
+              :icon="props.row.showGroups ? 'remove' : 'add'"
+            />
+          </q-td>
+          <q-td v-for="col in props.cols" :key="col.name" :props="props">
+            <template v-if="col.name === 'role'">
+              <q-select
+                dense
+                borderless
+                v-model="props.row.role"
+                :options="options"
+                emit-value
+                map-options
+                style="width: 70px"
+                @update:model-value="updateUserRole(props.row)"
+              />
+            </template>
+            <template v-else-if="col.name === 'actions'">
+              <q-btn
+                v-if="props.row.enableDelete"
+                :icon="outlinedDelete"
+                :title="t('user.delete')"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                @click="confirmDeleteAction(props)"
+                style="cursor: pointer !important"
+              />
+              <q-btn
+                v-if="props.row.enableEdit"
+                icon="edit"
+                :title="t('user.update')"
+                class="q-ml-xs"
+                padding="sm"
+                unelevated
+                size="sm"
+                round
+                flat
+                @click="addRoutePush(props)"
+                style="cursor: pointer !important"
+              />
+              </template>
+            <template v-else>
+              {{ col.value }}
+            </template>
+          </q-td>
+        </q-tr>
+        <q-tr v-show="props.row.showGroups" :props="props">
+          <q-td colspan="100%">
+            <div class="flex">
+              <div class="q-px-lg" >
+                <p class="q-mb-sm" v-if="props.row.user_groups "><strong>User Group : </strong> <span> {{props.row.user_groups}}</span></p>
+                <p class="q-mb-sm" v-if="props.row.user_roles"><strong>Custom Roles : </strong><span> {{ props.row.user_roles }}</span></p>
+              </div>
+            </div>
+          </q-td>
+        </q-tr>
       </template>
       <template #top="scope">
         <div
@@ -121,7 +152,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:changeRecordPerPage="changePagination"
         />
       </template>
-
       <template #bottom="scope">
         <QTablePagination
           :scope="scope"
@@ -275,7 +305,7 @@ export default defineComponent({
       updateUserActions();
     });
 
-    const columns: any = ref<QTableProps["columns"]>([
+    const columns: any = ref<QTableProps["columns"]>([ 
       {
         name: "#",
         label: "#",
@@ -309,7 +339,7 @@ export default defineComponent({
         label: t("user.role"),
         align: "left",
         sortable: true,
-      },
+      }
     ]);
     const userEmail: any = ref("");
     const options = ref([{ label: "Admin", value: "admin" }]);
@@ -560,7 +590,52 @@ export default defineComponent({
         });
       }
     };
-
+    const toggleExpand = (row:any) => {
+      if (!row.showGroups) {
+        row.showGroups = true;
+        fetchUserGroups(row.email);
+        fetchUserRoles(row.email);
+      } else {
+        row.showGroups = false;
+      }
+    };
+    const fetchUserGroups = (userEmail:any) =>  {
+      const orgId = store.state.selectedOrganization.identifier;
+      usersService.getUserGroups(orgId, userEmail)
+        .then((response) => {
+          // Update the user_groups property in the row object
+          const updatedUsers = usersState.users.map((user) => {
+            if (user.email === userEmail) {
+              return { 
+                ...user, 
+                user_groups: response.data.join(', ') 
+                // user_groups: response.data
+              };
+            }
+            return user;
+          });
+          usersState.users = updatedUsers; 
+        })
+    }
+    const fetchUserRoles = (userEmail:any) =>  {
+      const orgId = store.state.selectedOrganization.identifier;
+      usersService.getUserRoles(orgId, userEmail)
+        .then((response) => {
+          // Update the user_roles property in the row object
+          const updatedUsers = usersState.users.map((user) => {
+            if (user.email === userEmail) {
+              return { 
+                ...user, 
+                user_roles: response.data.join(', ') 
+                // user_roles: response.data 
+              };
+            }
+            return user;
+          });
+          usersState.users = updatedUsers; 
+        })
+    }
+    
     const updateMember = (data: any) => {
       if (data.data != undefined) {
         usersState.users.forEach((member: any, key: number) => {
@@ -741,6 +816,8 @@ export default defineComponent({
       changeMaxRecordToReturn,
       outlinedDelete,
       filterQuery: ref(""),
+      fetchUserGroups,
+      toggleExpand,
       filterData(rows: any, terms: any) {
         var filtered = [];
         terms = terms.toLowerCase();

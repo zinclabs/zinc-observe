@@ -81,6 +81,12 @@ const users = {
   logout: () => {
     return http().get(`/config/logout`);
   },
+  getUserGroups:(orgId:any, userEmail:any) => {
+    return http().get(`api/${orgId}/users/${userEmail}/groups`);
+  },
+  getUserRoles:(orgId:any, userEmail:any) => {
+    return http().get(`api/${orgId}/users/${userEmail}/roles`);
+  }
 };
 
 export default users;
