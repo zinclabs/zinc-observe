@@ -42,7 +42,6 @@ use config::{
 use cron::Schedule;
 use infra::table::{self, folders::FolderType};
 use lettre::{message::MultiPart, AsyncTransport, Message};
-use serde_json::de;
 
 use crate::{
     common::{

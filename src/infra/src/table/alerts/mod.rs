@@ -173,85 +173,7 @@ pub async fn put<C: ConnectionTrait>(
     folder_id: &str,
     alert: MetaAlert,
 ) -> Result<MetaAlert, errors::Error> {
-    // Prepare the values of mutable fields. Do this first so that if a
-    // conversion fails then the whole function fails before a call to the DB is
-    // made.
-    let is_real_time = alert.is_real_time;
-    let destinations = serde_json::to_value(alert.destinations)?;
-    let context_attributes = alert
-        .context_attributes
-        .map(serde_json::to_value)
-        .transpose()?;
-    let row_template = Some(alert.row_template).filter(|s| !s.is_empty());
-    let description = Some(alert.description).filter(|s| !s.is_empty());
-    let enabled = alert.enabled;
-    let tz_offset = alert.tz_offset;
-    let last_triggered_at = alert.last_triggered_at;
-    let last_satisfied_at = alert.last_satisfied_at;
-    let query_type: i16 = intermediate::QueryType::from(alert.query_condition.query_type).into();
-    let query_conditions = alert
-        .query_condition
-        .conditions
-        .map(|cs| {
-            cs.into_iter()
-                .map(intermediate::QueryCondition::from)
-                .collect_vec()
-        })
-        .map(serde_json::to_value)
-        .transpose()?;
-    let query_sql = alert.query_condition.sql.filter(|s| !s.is_empty());
-    let query_promql = alert.query_condition.promql.filter(|s| !s.is_empty());
-    let query_promql_condition = alert
-        .query_condition
-        .promql_condition
-        .map(intermediate::QueryCondition::from)
-        .map(serde_json::to_value)
-        .transpose()?;
-    let query_aggregation = alert
-        .query_condition
-        .aggregation
-        .map(intermediate::QueryAggregation::from)
-        .map(serde_json::to_value)
-        .transpose()?;
-    let query_vrl_function = alert.query_condition.vrl_function.filter(|s| !s.is_empty());
-    let query_search_event_type: Option<i16> = alert
-        .query_condition
-        .search_event_type
-        .map(intermediate::QuerySearchEventType::from)
-        .map(|t| t.into());
-    let query_multi_time_range = alert
-        .query_condition
-        .multi_time_range
-        .map(|ds| {
-            ds.into_iter()
-                .map(intermediate::QueryCompareHistoricData::from)
-                .collect_vec()
-        })
-        .map(serde_json::to_value)
-        .transpose()?;
-    let trigger_threshold_operator: String =
-        intermediate::TriggerThresholdOperator::try_from(alert.trigger_condition.operator)
-            .map_err(|_| {
-                errors::DbError::PutAlert(errors::PutAlertError::IntoTriggerThresholdOperator(
-                    alert.trigger_condition.operator,
-                ))
-            })?
-            .to_string();
-    let trigger_period_seconds = alert.trigger_condition.period * 60;
-    let trigger_threshold_count = alert.trigger_condition.threshold;
-    let trigger_frequency_type: i16 =
-        intermediate::TriggerFrequencyType::from(alert.trigger_condition.frequency_type).into();
-    let trigger_frequency_seconds = alert.trigger_condition.frequency;
-    let trigger_frequency_cron = Some(alert.trigger_condition.cron).filter(|s| !s.is_empty());
-    let trigger_frequency_cron_timezone =
-        alert.trigger_condition.timezone.filter(|s| !s.is_empty());
-    let trigger_silence_seconds = alert.trigger_condition.silence;
-    let trigger_tolerance_seconds = alert.trigger_condition.tolerance_in_secs;
-    let owner = alert.owner.filter(|s| !s.is_empty());
-    let last_edited_by = alert.last_edited_by.filter(|s| !s.is_empty());
-    let updated_at: i64 = chrono::Utc::now().timestamp();
-
-    let (folder_m, mut alert_am) = match get_model_by_name(
+    match get_model_by_name(
         conn,
         org_id,
         folder_id,
@@ -264,106 +186,41 @@ pub async fn put<C: ConnectionTrait>(
         None => {
             // Destination folder does not exist so the alert can neither be
             // created nor updated.
-            Err(errors::DbError::PutAlert(
-                errors::PutAlertError::FolderDoesNotExist,
-            ))
+            Err(errors::DbError::PutAlert(errors::PutAlertError::FolderDoesNotExist).into())
         }
         Some((folder_m, Some(alert_m))) => {
             // Destination folder exists and alert already exists, so convert
-            // the dashboard model to an active model that will be updated.
-            Ok((folder_m, alert_m.into()))
+            // the alert model to an active model and update it.
+            let mut alert_am: alerts::ActiveModel = alert_m.into();
+            update_mutable_fields(&mut alert_am, folder_m, alert)?;
+            let model: alerts::Model = alert_am.update(conn).await?.try_into_model()?;
+            let alert = model.try_into()?;
+            Ok(alert)
         }
         Some((folder_m, None)) => {
             // Destination folder exists and alert does not exist, so create an
             // active model for creating a new record.
             let id = svix_ksuid::Ksuid::new(None, None).to_string();
-            let name = alert.name;
             let stream_type = intermediate::StreamType::from(alert.stream_type).to_string();
-            let stream_name = alert.stream_name;
-
-            let alert_am = alerts::ActiveModel {
+            let stream_name = alert.stream_name.clone();
+            let alert_name = alert.name.clone();
+            let mut alert_am = alerts::ActiveModel {
                 // The following fields can only be set on creation.
                 id: Set(id),
                 org: Set(org_id.to_owned()),
                 stream_type: Set(stream_type),
                 stream_name: Set(stream_name),
-                name: Set(name),
-                // The remaining fields can be set on creation or updated so
+                name: Set(alert_name),
+                // All remaining fields can be set on creation or updated so
                 // they are set below.
-                folder_id: NotSet,
-                is_real_time: NotSet,
-                destinations: NotSet,
-                context_attributes: NotSet,
-                row_template: NotSet,
-                description: NotSet,
-                enabled: NotSet,
-                tz_offset: NotSet,
-                last_triggered_at: NotSet,
-                last_satisfied_at: NotSet,
-                query_type: NotSet,
-                query_conditions: NotSet,
-                query_sql: NotSet,
-                query_promql: NotSet,
-                query_promql_condition: NotSet,
-                query_aggregation: NotSet,
-                query_vrl_function: NotSet,
-                query_search_event_type: NotSet,
-                query_multi_time_range: NotSet,
-                trigger_threshold_operator: NotSet,
-                trigger_period_seconds: NotSet,
-                trigger_threshold_count: NotSet,
-                trigger_frequency_type: NotSet,
-                trigger_frequency_seconds: NotSet,
-                trigger_frequency_cron: NotSet,
-                trigger_frequency_cron_timezone: NotSet,
-                trigger_silence_seconds: NotSet,
-                trigger_tolerance_seconds: NotSet,
-                owner: NotSet,
-                last_edited_by: NotSet,
-                updated_at: NotSet,
+                ..Default::default()
             };
-            Ok((folder_m, alert_am))
+            update_mutable_fields(&mut alert_am, folder_m, alert)?;
+            let model: alerts::Model = alert_am.insert(conn).await?.try_into_model()?;
+            let alert = model.try_into()?;
+            Ok(alert)
         }
-    }?;
-
-    // All the following fields can be either set on creation or updated so we
-    // set them on the active model regardless of whether the active model will
-    // be used to create or update a record.
-    alert_am.folder_id = Set(folder_m.id);
-    alert_am.is_real_time = Set(is_real_time);
-    alert_am.destinations = Set(destinations);
-    alert_am.context_attributes = Set(context_attributes);
-    alert_am.row_template = Set(row_template);
-    alert_am.description = Set(description);
-    alert_am.enabled = Set(enabled);
-    alert_am.tz_offset = Set(tz_offset);
-    alert_am.last_triggered_at = Set(last_triggered_at);
-    alert_am.last_satisfied_at = Set(last_satisfied_at);
-    alert_am.query_type = Set(query_type);
-    alert_am.query_conditions = Set(query_conditions);
-    alert_am.query_sql = Set(query_sql);
-    alert_am.query_promql = Set(query_promql);
-    alert_am.query_promql_condition = Set(query_promql_condition);
-    alert_am.query_aggregation = Set(query_aggregation);
-    alert_am.query_vrl_function = Set(query_vrl_function);
-    alert_am.query_search_event_type = Set(query_search_event_type);
-    alert_am.query_multi_time_range = Set(query_multi_time_range);
-    alert_am.trigger_threshold_operator = Set(trigger_threshold_operator);
-    alert_am.trigger_period_seconds = Set(trigger_period_seconds);
-    alert_am.trigger_threshold_count = Set(trigger_threshold_count);
-    alert_am.trigger_frequency_type = Set(trigger_frequency_type);
-    alert_am.trigger_frequency_seconds = Set(trigger_frequency_seconds);
-    alert_am.trigger_frequency_cron = Set(trigger_frequency_cron);
-    alert_am.trigger_frequency_cron_timezone = Set(trigger_frequency_cron_timezone);
-    alert_am.trigger_silence_seconds = Set(trigger_silence_seconds);
-    alert_am.trigger_tolerance_seconds = Set(trigger_tolerance_seconds);
-    alert_am.owner = Set(owner);
-    alert_am.last_edited_by = Set(last_edited_by);
-    alert_am.updated_at = Set(Some(updated_at));
-
-    let model: alerts::Model = alert_am.save(conn).await?.try_into_model()?;
-    let alert = model.try_into()?;
-    Ok(alert)
+    }
 }
 
 /// Deletes an alert by its name.
@@ -500,4 +357,127 @@ async fn list_models<C: ConnectionTrait>(
         .filter_map(|(d, maybe_f)| maybe_f.map(|f| (f, d)))
         .collect();
     Ok(folders_and_dashboards)
+}
+
+/// Updates all mutable fields on the [alerts::ActiveModel].
+///
+/// For some fields the values will be extracted from and transformed from the
+/// given [MetaAlert] or [folders::Model]. Other fields such as updated
+/// timestamps may be generated from the current timestamp.
+///
+/// Fields which should only be set on initial creation of an alert and which
+/// should be treated as immutable will not be updated.
+fn update_mutable_fields(
+    alert_am: &mut alerts::ActiveModel,
+    folder_m: folders::Model,
+    alert: MetaAlert,
+) -> Result<(), errors::Error> {
+    let is_real_time = alert.is_real_time;
+    let destinations = serde_json::to_value(alert.destinations)?;
+    let context_attributes = alert
+        .context_attributes
+        .map(serde_json::to_value)
+        .transpose()?;
+    let row_template = Some(alert.row_template).filter(|s| !s.is_empty());
+    let description = Some(alert.description).filter(|s| !s.is_empty());
+    let enabled = alert.enabled;
+    let tz_offset = alert.tz_offset;
+    let last_triggered_at = alert.last_triggered_at;
+    let last_satisfied_at = alert.last_satisfied_at;
+    let query_type: i16 = intermediate::QueryType::from(alert.query_condition.query_type).into();
+    let query_conditions = alert
+        .query_condition
+        .conditions
+        .map(|cs| {
+            cs.into_iter()
+                .map(intermediate::QueryCondition::from)
+                .collect_vec()
+        })
+        .map(serde_json::to_value)
+        .transpose()?;
+    let query_sql = alert.query_condition.sql.filter(|s| !s.is_empty());
+    let query_promql = alert.query_condition.promql.filter(|s| !s.is_empty());
+    let query_promql_condition = alert
+        .query_condition
+        .promql_condition
+        .map(intermediate::QueryCondition::from)
+        .map(serde_json::to_value)
+        .transpose()?;
+    let query_aggregation = alert
+        .query_condition
+        .aggregation
+        .map(intermediate::QueryAggregation::from)
+        .map(serde_json::to_value)
+        .transpose()?;
+    let query_vrl_function = alert.query_condition.vrl_function.filter(|s| !s.is_empty());
+    let query_search_event_type: Option<i16> = alert
+        .query_condition
+        .search_event_type
+        .map(intermediate::QuerySearchEventType::from)
+        .map(|t| t.into());
+    let query_multi_time_range = alert
+        .query_condition
+        .multi_time_range
+        .map(|ds| {
+            ds.into_iter()
+                .map(intermediate::QueryCompareHistoricData::from)
+                .collect_vec()
+        })
+        .map(serde_json::to_value)
+        .transpose()?;
+    let trigger_threshold_operator: String =
+        intermediate::TriggerThresholdOperator::try_from(alert.trigger_condition.operator)
+            .map_err(|_| {
+                errors::DbError::PutAlert(errors::PutAlertError::IntoTriggerThresholdOperator(
+                    alert.trigger_condition.operator,
+                ))
+            })?
+            .to_string();
+    let trigger_period_seconds = alert.trigger_condition.period * 60;
+    let trigger_threshold_count = alert.trigger_condition.threshold;
+    let trigger_frequency_type: i16 =
+        intermediate::TriggerFrequencyType::from(alert.trigger_condition.frequency_type).into();
+    let trigger_frequency_seconds = alert.trigger_condition.frequency;
+    let trigger_frequency_cron = Some(alert.trigger_condition.cron).filter(|s| !s.is_empty());
+    let trigger_frequency_cron_timezone =
+        alert.trigger_condition.timezone.filter(|s| !s.is_empty());
+    let trigger_silence_seconds = alert.trigger_condition.silence;
+    let trigger_tolerance_seconds = alert.trigger_condition.tolerance_in_secs;
+    let owner = alert.owner.filter(|s| !s.is_empty());
+    let last_edited_by = alert.last_edited_by.filter(|s| !s.is_empty());
+    let updated_at: i64 = chrono::Utc::now().timestamp();
+
+    alert_am.folder_id = Set(folder_m.id);
+    alert_am.is_real_time = Set(is_real_time);
+    alert_am.destinations = Set(destinations);
+    alert_am.context_attributes = Set(context_attributes);
+    alert_am.row_template = Set(row_template);
+    alert_am.description = Set(description);
+    alert_am.enabled = Set(enabled);
+    alert_am.tz_offset = Set(tz_offset);
+    alert_am.last_triggered_at = Set(last_triggered_at);
+    alert_am.last_satisfied_at = Set(last_satisfied_at);
+    alert_am.query_type = Set(query_type);
+    alert_am.query_conditions = Set(query_conditions);
+    alert_am.query_sql = Set(query_sql);
+    alert_am.query_promql = Set(query_promql);
+    alert_am.query_promql_condition = Set(query_promql_condition);
+    alert_am.query_aggregation = Set(query_aggregation);
+    alert_am.query_vrl_function = Set(query_vrl_function);
+    alert_am.query_search_event_type = Set(query_search_event_type);
+    alert_am.query_multi_time_range = Set(query_multi_time_range);
+    alert_am.trigger_threshold_operator = Set(trigger_threshold_operator);
+    alert_am.trigger_period_seconds = Set(trigger_period_seconds);
+    alert_am.trigger_threshold_count = Set(trigger_threshold_count);
+    alert_am.trigger_frequency_type = Set(trigger_frequency_type);
+    alert_am.trigger_frequency_seconds = Set(trigger_frequency_seconds);
+    alert_am.trigger_frequency_cron = Set(trigger_frequency_cron);
+    alert_am.trigger_frequency_cron_timezone = Set(trigger_frequency_cron_timezone);
+    alert_am.trigger_silence_seconds = Set(trigger_silence_seconds);
+    alert_am.trigger_tolerance_seconds = Set(trigger_tolerance_seconds);
+    alert_am.owner = Set(owner);
+    alert_am.last_edited_by = Set(last_edited_by);
+    alert_am.updated_at = Set(Some(updated_at));
+
+    Ok(())
 }
