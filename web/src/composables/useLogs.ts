@@ -4940,8 +4940,7 @@ const useLogs = () => {
 
     if (searchObj.data.stream.selectedStream.length > 1) {
       const errMsg = "Histogram is not available for multi stream search.";
-      searchObj.data.histogram = resetHistogramWithError(errMsg, 0);
-      return;
+      resetHistogramWithError(errMsg, 0);
     }
 
     if (!searchObj.data.queryResults?.hits?.length) {
