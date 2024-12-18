@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-toggle
           v-model="enableWebsocketSearch"
           :label="t('settings.enableWebsocketSearch')"
+          data-test="general-settings-enable-websocket"
           class="q-py-md showLabelOnTop"
         />
         <span>&nbsp;</span>
