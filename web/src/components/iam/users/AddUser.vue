@@ -441,7 +441,7 @@ export default defineComponent({
       logout_confirm,
       loggedInUserEmail,
       filterdOption,
-      filterFn (val, update) {
+      filterFn (val:any, update:any) {
         if (val === '') {
           update(() => {
             filterdOption.value = props.customRoles
@@ -512,7 +512,7 @@ export default defineComponent({
         userServiece
           .update(this.formData, selectedOrg, userEmail)
           .then((res: any) => {
-            if (this.formData.change_password == true && this.loggedInUserEmail === this.modelValue.email) {
+            if (this.formData.change_password == true && this.loggedInUserEmail === this.modelValue?.email) {
               this.logout_confirm = true;
             } else {
               dismiss();

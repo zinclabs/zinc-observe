@@ -272,7 +272,7 @@ onBeforeMount(async () => {
     }));
 
     // Sort the organization options alphabetically by label
-    otherOrgOptions.sort((a, b) => a.label.localeCompare(b.label));
+    otherOrgOptions.sort((a:any, b:any) => a.label.localeCompare(b.label));
 
     // Prepend "All" option to the sorted list
     orgOptions.value = [{ label: "All", value: "all" }, ...otherOrgOptions];
