@@ -36,10 +36,10 @@ impl From<FolderError> for HttpResponse {
                 MetaHttpResponse::bad_request("Can't update default folder")
             }
             FolderError::DeleteWithDashboards => MetaHttpResponse::bad_request(
-                "Dashboard folder contains dashboards, please move/delete dashboards from folder",
+                "Folder contains dashboards, please move/delete dashboards from folder",
             ),
             FolderError::DeleteWithAlerts => MetaHttpResponse::bad_request(
-                "Dashboard folder contains alerts, please move/delete alerts from folder",
+                "Folder contains alerts, please move/delete alerts from folder",
             ),
             FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
             FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),

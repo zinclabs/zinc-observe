@@ -26,7 +26,7 @@ use hashbrown::HashMap;
 use itertools::Itertools;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, Set, TryIntoModel,
+    QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel,
 };
 use svix_ksuid::KsuidLike;
 
@@ -145,6 +145,7 @@ pub async fn get_by_name<C: ConnectionTrait>(
     stream_name: &str,
     alert_name: &str,
 ) -> Result<Option<(MetaFolder, MetaAlert)>, errors::Error> {
+    let _lock = super::get_lock().await;
     let models = get_model_by_name(
         conn,
         org_id,
@@ -167,14 +168,16 @@ pub async fn get_by_name<C: ConnectionTrait>(
 
 /// Creates a new alert or updates an existing alert in the database. Returns
 /// the new or updated alert.
-pub async fn put<C: ConnectionTrait>(
+pub async fn put<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
     folder_id: &str,
     alert: MetaAlert,
 ) -> Result<MetaAlert, errors::Error> {
-    match get_model_by_name(
-        conn,
+    let _lock = super::get_lock().await;
+    let txn = conn.begin().await?;
+    let rslt: Result<alerts::Model, errors::Error> = match get_model_by_name(
+        &txn,
         org_id,
         folder_id,
         alert.stream_type,
@@ -186,16 +189,17 @@ pub async fn put<C: ConnectionTrait>(
         None => {
             // Destination folder does not exist so the alert can neither be
             // created nor updated.
-            Err(errors::DbError::PutAlert(errors::PutAlertError::FolderDoesNotExist).into())
+            return Err(
+                errors::DbError::PutAlert(errors::PutAlertError::FolderDoesNotExist).into(),
+            );
         }
         Some((folder_m, Some(alert_m))) => {
             // Destination folder exists and alert already exists, so convert
             // the alert model to an active model and update it.
             let mut alert_am: alerts::ActiveModel = alert_m.into();
             update_mutable_fields(&mut alert_am, folder_m, alert)?;
-            let model: alerts::Model = alert_am.update(conn).await?.try_into_model()?;
-            let alert = model.try_into()?;
-            Ok(alert)
+            let model: alerts::Model = alert_am.update(&txn).await?.try_into_model()?;
+            Ok(model)
         }
         Some((folder_m, None)) => {
             // Destination folder exists and alert does not exist, so create an
@@ -216,11 +220,13 @@ pub async fn put<C: ConnectionTrait>(
                 ..Default::default()
             };
             update_mutable_fields(&mut alert_am, folder_m, alert)?;
-            let model: alerts::Model = alert_am.insert(conn).await?.try_into_model()?;
-            let alert = model.try_into()?;
-            Ok(alert)
+            let model: alerts::Model = alert_am.insert(&txn).await?.try_into_model()?;
+            Ok(model)
         }
-    }
+    };
+    let alert = rslt?.try_into()?;
+    txn.commit().await?;
+    Ok(alert)
 }
 
 /// Deletes an alert by its name.
@@ -232,6 +238,7 @@ pub async fn delete_by_name<C: ConnectionTrait>(
     stream_name: &str,
     alert_name: &str,
 ) -> Result<(), errors::Error> {
+    let _lock = super::get_lock().await;
     let model = get_model_by_name(
         conn,
         org_id,
@@ -255,6 +262,7 @@ pub async fn list<C: ConnectionTrait>(
     conn: &C,
     params: ListAlertsParams,
 ) -> Result<Vec<(MetaFolder, MetaAlert)>, errors::Error> {
+    let _lock = super::get_lock().await;
     let alerts = list_models(conn, params)
         .await?
         .into_iter()

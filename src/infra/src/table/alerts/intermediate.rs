@@ -486,7 +486,7 @@ impl TryFrom<i16> for QuerySearchEventType {
             Self::DERIVED_STREAM => Ok(QuerySearchEventType::DerivedStream),
             _ => Err(FromI16Error {
                 value,
-                ty: "SeachEventType".to_owned(),
+                ty: "SearchEventType".to_owned(),
             }),
         }
     }
