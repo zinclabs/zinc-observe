@@ -38,6 +38,9 @@ impl From<FolderError> for HttpResponse {
             FolderError::DeleteWithDashboards => MetaHttpResponse::bad_request(
                 "Dashboard folder contains dashboards, please move/delete dashboards from folder",
             ),
+            FolderError::DeleteWithAlerts => MetaHttpResponse::bad_request(
+                "Dashboard folder contains alerts, please move/delete alerts from folder",
+            ),
             FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
             FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
             FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),

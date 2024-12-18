@@ -29,6 +29,7 @@ use config::{
             destinations::{DestinationType, DestinationWithTemplate, HTTPType},
             FrequencyType, Operator, QueryType,
         },
+        folder::{Folder, DEFAULT_FOLDER},
         search::{SearchEventContext, SearchEventType},
         stream::StreamType,
     },
@@ -39,7 +40,9 @@ use config::{
     SMTP_CLIENT,
 };
 use cron::Schedule;
+use infra::table::{self, folders::FolderType};
 use lettre::{message::MultiPart, AsyncTransport, Message};
+use serde_json::de;
 
 use crate::{
     common::{
@@ -48,7 +51,7 @@ use crate::{
     },
     service::{
         alerts::{build_sql, destinations, QueryConditionExt},
-        db,
+        db, folders,
         search::sql::RE_ONLY_SELECT,
         short_url,
     },
@@ -61,6 +64,17 @@ pub async fn save(
     mut alert: Alert,
     create: bool,
 ) -> Result<(), anyhow::Error> {
+    // Currently all alerts are stored in the default folder so create the
+    // default folder for the org if it doesn't exist yet.
+    if !table::folders::exists(org_id, DEFAULT_FOLDER, FolderType::Alerts).await? {
+        let default_folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_owned(),
+            name: "default".to_owned(),
+            description: "default".to_owned(),
+        };
+        folders::save_folder(org_id, default_folder, FolderType::Alerts, true).await?;
+    };
+
     if !name.is_empty() {
         alert.name = name.to_string();
     }
