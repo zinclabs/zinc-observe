@@ -28,6 +28,10 @@ pub enum Error {
     DbError(#[from] DbError),
     #[error("EtcdError# {0}")]
     EtcdError(#[from] etcd_client::Error),
+    #[error("FromStrError# {0}")]
+    FromStrError(#[from] FromStrError),
+    #[error("FromI16Error# {0}")]
+    FromI16Error(#[from] FromI16Error),
     #[error("SerdeJsonError# {0}")]
     SerdeJsonError(#[from] json::Error),
     #[error("ArrowError# {0}")]
@@ -79,6 +83,20 @@ pub enum Error {
 unsafe impl Send for Error {}
 
 #[derive(ThisError, Debug)]
+#[error("cannot parse \"{value}\" as {ty}")]
+pub struct FromStrError {
+    pub value: String,
+    pub ty: String,
+}
+
+#[derive(ThisError, Debug)]
+#[error("cannot convert \"{value}\" to {ty}")]
+pub struct FromI16Error {
+    pub value: i16,
+    pub ty: String,
+}
+
+#[derive(ThisError, Debug)]
 pub enum DbError {
     #[error("key {0} does not exist")]
     KeyNotExists(String),
@@ -92,6 +110,8 @@ pub enum DbError {
     GetDashboardError(#[from] GetDashboardError),
     #[error("PutDashbord# {0}")]
     PutDashboard(#[from] PutDashboardError),
+    #[error("PutAlert# {0}")]
+    PutAlert(#[from] PutAlertError),
 }
 
 #[derive(ThisError, Debug)]
@@ -112,8 +132,14 @@ pub enum PutDashboardError {
     MissingOwner,
     #[error("error putting dashboard with missing inner data for version {0}")]
     MissingInnerData(i32),
-    #[error("error converting created timestamp with timezone to Unix timestamp")]
-    ConvertingCreatedTimestamp,
+}
+
+#[derive(ThisError, Debug)]
+pub enum PutAlertError {
+    #[error("error putting alert with folder that does not exist")]
+    FolderDoesNotExist,
+    #[error("cannot convert {0} into a trigger threshold operator")]
+    IntoTriggerThresholdOperator(config::meta::alerts::Operator),
 }
 
 #[derive(ThisError, Debug)]

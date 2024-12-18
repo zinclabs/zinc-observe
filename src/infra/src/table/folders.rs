@@ -29,12 +29,14 @@ use crate::{
 #[derive(Debug, Clone, Copy)]
 pub enum FolderType {
     Dashboards,
+    Alerts,
 }
 
 impl From<FolderType> for i16 {
     fn from(value: FolderType) -> Self {
         match value {
             FolderType::Dashboards => 0,
+            FolderType::Alerts => 1,
         }
     }
 }
