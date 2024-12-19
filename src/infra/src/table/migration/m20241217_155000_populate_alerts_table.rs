@@ -18,8 +18,8 @@
 
 use itertools::{self, Itertools};
 use sea_orm::{
-    ActiveValue::NotSet, EntityTrait, FromQueryResult, Paginator, PaginatorTrait, SelectModel, Set,
-    Statement, TransactionTrait,
+    ActiveValue::NotSet, ColumnTrait, EntityTrait, FromQueryResult, Paginator, PaginatorTrait,
+    QueryFilter, SelectModel, Set, Statement, TransactionTrait,
 };
 use sea_orm_migration::prelude::*;
 use svix_ksuid::KsuidLike;
@@ -81,6 +81,10 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let db = manager.get_connection();
         alerts_table::Entity::delete_many().exec(db).await?;
+        folders_table::Entity::delete_many()
+            .filter(folders_table::Column::Type.eq(ALERTS_FOLDER_TYPE))
+            .exec(db)
+            .await?;
         Ok(())
     }
 }
