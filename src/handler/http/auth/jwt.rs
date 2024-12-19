@@ -83,8 +83,13 @@ pub async fn process_token(
     let mut custom_roles: Vec<String> = vec![];
     let mut tuples_to_add = HashMap::new();
     if groups.is_empty() {
+        let role = if let Some(role) = &res.0.user_role {
+            role.clone()
+        } else {
+            UserRole::from_str(&o2cfg.dex.default_role).unwrap()
+        };
         source_orgs.push(UserOrg {
-            role: UserRole::from_str(&o2cfg.dex.default_role).unwrap(),
+            role,
             name: o2cfg.dex.default_org.clone(),
             ..UserOrg::default()
         });
@@ -108,7 +113,7 @@ pub async fn process_token(
 
     // Assign users custom roles in RBAC
     if o2cfg.openfga.map_group_to_role {
-        map_group_to_custom_role(&user_email, &name, custom_roles).await;
+        map_group_to_custom_role(&user_email, &name, custom_roles, res.0.user_role).await;
         return;
     }
 
@@ -364,7 +369,12 @@ fn parse_dn(dn: &str) -> Option<RoleOrg> {
 }
 
 #[cfg(feature = "enterprise")]
-async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Vec<String>) {
+async fn map_group_to_custom_role(
+    user_email: &str,
+    name: &str,
+    custom_roles: Vec<String>,
+    default_role: Option<UserRole>,
+) {
     let o2cfg = get_o2_config();
     // Check if the user exists in the database
     let db_user = db::user::get_user_by_email(user_email).await;
@@ -373,6 +383,12 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
     if db_user.is_none() {
         let mut tuples = vec![];
         log::info!("group_to_custom_role: User does not exist in the database");
+
+        let role = if let Some(role) = default_role {
+            role
+        } else {
+            UserRole::from_str(&o2cfg.dex.default_role).unwrap()
+        };
 
         if o2cfg.openfga.enabled {
             get_org_creation_tuples(
@@ -386,7 +402,10 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
             )
             .await;
             tuples.push(get_user_org_tuple(&o2cfg.dex.default_org, user_email));
-            tuples.push(get_user_org_tuple(user_email, user_email));
+            // this check added to avoid service accounts from logging in
+            if !role.eq(&UserRole::ServiceAccount) {
+                tuples.push(get_user_org_tuple(user_email, user_email));
+            }
             let start = std::time::Instant::now();
             check_and_get_crole_tuple_for_new_user(
                 user_email,
@@ -400,6 +419,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
                 start.elapsed()
             );
         }
+
         let updated_db_user = DBUser {
             email: user_email.to_owned(),
             first_name: name.to_owned(),
@@ -407,7 +427,7 @@ async fn map_group_to_custom_role(user_email: &str, name: &str, custom_roles: Ve
             password: "".to_owned(),
             salt: "".to_owned(),
             organizations: vec![UserOrg {
-                role: UserRole::from_str(&o2cfg.dex.default_role).unwrap(),
+                role,
                 name: o2cfg.dex.default_org.clone(),
                 ..UserOrg::default()
             }],

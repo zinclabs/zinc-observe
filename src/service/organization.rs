@@ -25,7 +25,7 @@ use crate::{
                 IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
                 RumIngestionToken,
             },
-            user::UserOrg,
+            user::{UserOrg, UserRole},
         },
         utils::auth::is_root_user,
     },
@@ -67,6 +67,11 @@ pub async fn get_passcode(
     let Ok(Some(user)) = db::user::get(org_id, user_id).await else {
         return Err(anyhow::Error::msg("User not found"));
     };
+    if user.role.eq(&UserRole::ServiceAccount) && user.is_external {
+        return Err(anyhow::Error::msg(
+            "Not allowed for external service accounts",
+        ));
+    }
     Ok(IngestionPasscode {
         user: user.email,
         passcode: user.token,
@@ -104,6 +109,7 @@ pub async fn update_passcode(
     let is_rum_update = false;
     match update_passcode_inner(org_id, user_id, is_rum_update).await {
         Ok(IngestionTokensContainer::Passcode(response)) => Ok(response),
+        Err(e) => Err(e),
         _ => Err(anyhow::Error::msg("User not found")),
     }
 }
@@ -151,6 +157,12 @@ async fn update_passcode_inner(
 
         // Invalidate the local cache
         let org_to_update = &existing_org[0];
+
+        if org_to_update.role.eq(&UserRole::ServiceAccount) && db_user.is_external {
+            return Err(anyhow::Error::msg(
+                "Not allowed for external service accounts",
+            ));
+        }
         USERS_RUM_TOKEN.clone().remove(&format!(
             "{}/{}",
             org_to_update.name,

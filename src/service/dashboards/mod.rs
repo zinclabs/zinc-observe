@@ -18,11 +18,17 @@ use config::{
     meta::{
         dashboards::{Dashboard, ListDashboardsParams},
         folder::{Folder, DEFAULT_FOLDER},
+        stream::{DistinctField, StreamType},
     },
 };
-use infra::table;
+use hashbrown::HashMap;
+use infra::table::{
+    self,
+    distinct_values::{self, DistinctFieldRecord, OriginType},
+    folders::FolderType,
+};
 
-use super::folders;
+use super::{folders, stream::save_stream_settings};
 use crate::common::{
     meta::authz::Authz,
     utils::auth::{remove_ownership, set_ownership},
@@ -77,6 +83,181 @@ pub enum DashboardError {
     /// dashboard.
     #[error("error creating default folder")]
     CreateDefaultFolder,
+
+    /// Error that occurs when updating the distinct values using the
+    /// dashboard variables
+    #[error("error in updating distinct values")]
+    DistinctValueError,
+}
+
+async fn add_distinct_field_entry(
+    dashboard_id: &str,
+    org: &str,
+    stream: &str,
+    stype: String,
+    field: &str,
+) -> Result<(), anyhow::Error> {
+    log::info!(
+        "adding distinct field {stype} {org}/{stream} : {field} for dashboard {dashboard_id}"
+    );
+    let record = DistinctFieldRecord::new(
+        OriginType::Dashboard,
+        dashboard_id,
+        org,
+        stream,
+        stype,
+        field,
+    );
+    distinct_values::add(record)
+        .await
+        .map_err(|e| anyhow::anyhow!("error in adding distinct value record : {e}"))
+}
+
+async fn remove_distinct_field_entry(
+    dashboard_id: &str,
+    org: &str,
+    stream: &str,
+    stype: String,
+    field: &str,
+) -> Result<(), anyhow::Error> {
+    log::info!(
+        "removing distinct field {stype} {org}/{stream} : {field} for dashboard {dashboard_id}"
+    );
+    let record = DistinctFieldRecord::new(
+        OriginType::Dashboard,
+        dashboard_id,
+        org,
+        stream,
+        stype,
+        field,
+    );
+    distinct_values::remove(record)
+        .await
+        .map_err(|e| anyhow::anyhow!("error in removing distinct value record : {e}"))
+}
+
+async fn update_distinct_variables(
+    org_id: &str,
+    old_dash: Option<Dashboard>,
+    new_dash: &Dashboard,
+) -> Result<(), anyhow::Error> {
+    let mut old_variables = get_query_variables(old_dash.as_ref());
+    let new_variables = get_query_variables(Some(new_dash));
+
+    let dashboard_id = new_dash.dashboard_id().unwrap();
+
+    if !new_variables.is_empty() {
+        for ((name, typ), fields) in new_variables.into_iter() {
+            let mut stream_settings = infra::schema::get_settings(org_id, &name, typ)
+                .await
+                .unwrap_or_default();
+            // we only store distinct values for logs and traces -
+            // if anything else, we can ignore.
+            if !matches!(typ, StreamType::Logs | StreamType::Traces) {
+                continue;
+            }
+            // get entry from previous variables corresponding to this stream
+            let old_fields = old_variables
+                .remove(&(name.to_owned(), typ))
+                .unwrap_or_default();
+            let mut _new_added = false;
+
+            for f in fields.iter() {
+                // we ignore full text search no matter what
+                if stream_settings.full_text_search_keys.contains(f) {
+                    continue;
+                }
+                // we add entry for all the fields, because we need mappings for each individual
+                // origin-stream-field mapping. The duplicates are handled in add function, so
+                // we can call it for each field without issues
+                add_distinct_field_entry(dashboard_id, org_id, &name, typ.to_string(), f).await?;
+                let _temp = DistinctField {
+                    name: f.to_owned(),
+                    added_ts: chrono::Utc::now().timestamp_micros(),
+                };
+                if !stream_settings.distinct_value_fields.contains(&_temp) {
+                    stream_settings.distinct_value_fields.push(_temp);
+                    _new_added = true;
+                }
+            }
+            // here we check if any of the fields used in previous version are no longer used
+            // if so, remove their entry.
+            for f in old_fields {
+                if !fields.contains(&f) {
+                    remove_distinct_field_entry(dashboard_id, org_id, &name, typ.to_string(), &f)
+                        .await?;
+                }
+            }
+            if _new_added {
+                save_stream_settings(org_id, &name, typ, stream_settings).await?;
+            }
+        }
+
+        // finally, whatever stream remains in the old variables
+        // it has all corresponding fields removed, so remove those as well
+        for ((name, typ), fields) in old_variables.into_iter() {
+            for f in fields {
+                remove_distinct_field_entry(dashboard_id, org_id, &name, typ.to_string(), &f)
+                    .await?;
+            }
+        }
+    } else {
+        // I guess all the variables were removed from the dashboard.
+        // we can batch remove all entries belonging to this dashboard.
+        distinct_values::batch_remove(OriginType::Dashboard, dashboard_id).await?
+    }
+    Ok(())
+}
+
+macro_rules! _get_variables {
+    ($map:ident, $dash:ident) => {
+        if let Some(vars) = &$dash.variables {
+            for v in vars.list.iter() {
+                if let Some(ref qd) = v.query_data {
+                    $map.entry((qd.stream.clone(), qd.stream_type))
+                        .or_default()
+                        .push(qd.field.clone());
+                }
+            }
+        }
+    };
+}
+
+pub fn get_query_variables(
+    dashboard: Option<&Dashboard>,
+) -> HashMap<(String, StreamType), Vec<String>> {
+    let mut map: HashMap<(String, StreamType), Vec<String>> = HashMap::new();
+    let dashboard = if let Some(d) = dashboard {
+        d
+    } else {
+        return map;
+    };
+    match dashboard.version {
+        1 => {
+            let dash = dashboard.v1.as_ref().unwrap();
+            _get_variables!(map, dash);
+        }
+        2 => {
+            let dash = dashboard.v2.as_ref().unwrap();
+            _get_variables!(map, dash);
+        }
+        3 => {
+            let dash = dashboard.v3.as_ref().unwrap();
+            _get_variables!(map, dash);
+        }
+        4 => {
+            let dash = dashboard.v4.as_ref().unwrap();
+            _get_variables!(map, dash);
+        }
+        5 => {
+            let dash = dashboard.v5.as_ref().unwrap();
+            _get_variables!(map, dash);
+        }
+        _ => {
+            unreachable!("we only have 5 dashboard versions")
+        }
+    }
+    map
 }
 
 #[tracing::instrument(skip(dashboard))]
@@ -88,7 +269,7 @@ pub async fn create_dashboard(
     // NOTE: Overwrite whatever `dashboard_id` the client has sent us
     // If folder is default folder & doesn't exist then create it
 
-    if table::folders::exists(org_id, folder_id).await? {
+    if table::folders::exists(org_id, folder_id, FolderType::Dashboards).await? {
         let dashboard_id = ider::generate();
         let saved = put(org_id, &dashboard_id, folder_id, dashboard, None).await?;
         set_ownership(
@@ -108,7 +289,7 @@ pub async fn create_dashboard(
             name: DEFAULT_FOLDER.to_string(),
             description: DEFAULT_FOLDER.to_string(),
         };
-        folders::save_folder(org_id, folder, true)
+        folders::save_folder(org_id, folder, FolderType::Dashboards, true)
             .await
             .map_err(|_| DashboardError::CreateDefaultFolder)?;
         let dashboard_id = ider::generate();
@@ -163,6 +344,7 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
         return Err(DashboardError::DashboardNotFound);
     };
     table::dashboards::delete_from_folder(org_id, &folder.folder_id, dashboard_id).await?;
+    distinct_values::batch_remove(OriginType::Dashboard, dashboard_id).await?;
     remove_ownership(
         org_id,
         "dashboards",
@@ -194,7 +376,7 @@ pub async fn move_dashboard(
     };
 
     // make sure the destination folder exists
-    if !table::folders::exists(org_id, to_folder).await? {
+    if !table::folders::exists(org_id, to_folder, FolderType::Dashboards).await? {
         return Err(DashboardError::MoveDestinationFolderNotFound);
     };
 
@@ -215,18 +397,25 @@ async fn put(
     mut dashboard: Dashboard,
     hash: Option<&str>,
 ) -> Result<Dashboard, DashboardError> {
-    if let Some(existing_dash) =
-        table::dashboards::get_from_folder(org_id, folder_id, dashboard_id).await?
-    {
-        let existing_dash_hash = existing_dash.hash;
+    let old_version = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id).await?;
+    if let Some(existing_dash) = &old_version {
+        let existing_dash_hash = &existing_dash.hash;
 
         let Some(Ok(hash_val)) = hash.map(|hash_str| hash_str.parse::<u64>()) else {
             return Err(DashboardError::UpdateMissingHash);
         };
-        if hash_val.to_string() != existing_dash_hash {
+        if hash_val.to_string() != *existing_dash_hash {
             return Err(DashboardError::UpdateConflictingHash);
         }
     };
+
+    match update_distinct_variables(org_id, old_version, &dashboard).await {
+        Ok(_) => {}
+        Err(e) => {
+            log::error!("error in updating distinct values while updating dashboard : {e}");
+            return Err(DashboardError::DistinctValueError);
+        }
+    }
 
     let title = dashboard
         .title()

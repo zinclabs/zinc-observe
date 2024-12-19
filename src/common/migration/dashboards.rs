@@ -27,7 +27,7 @@ use infra::{
     },
 };
 
-use crate::service::stream::save_stream_settings;
+use crate::service::{dashboards::get_query_variables, stream::save_stream_settings};
 
 type SettingsCache = HashMap<(String, String, StreamType), StreamSettings>;
 
@@ -165,41 +165,4 @@ macro_rules! _get_variables {
             }
         }
     };
-}
-
-fn get_query_variables(
-    dashboard: Option<&Dashboard>,
-) -> HashMap<(String, StreamType), Vec<String>> {
-    let mut map: HashMap<(String, StreamType), Vec<String>> = HashMap::new();
-    let dashboard = if let Some(d) = dashboard {
-        d
-    } else {
-        return map;
-    };
-    match dashboard.version {
-        1 => {
-            let dash = dashboard.v1.as_ref().unwrap();
-            _get_variables!(map, dash);
-        }
-        2 => {
-            let dash = dashboard.v2.as_ref().unwrap();
-            _get_variables!(map, dash);
-        }
-        3 => {
-            let dash = dashboard.v3.as_ref().unwrap();
-            _get_variables!(map, dash);
-        }
-        4 => {
-            let dash = dashboard.v4.as_ref().unwrap();
-            _get_variables!(map, dash);
-        }
-        5 => {
-            let dash = dashboard.v5.as_ref().unwrap();
-            _get_variables!(map, dash);
-        }
-        _ => {
-            unreachable!("we only have 5 dashboard versions")
-        }
-    }
-    map
 }

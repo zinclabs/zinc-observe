@@ -41,6 +41,7 @@ impl From<DashboardError> for HttpResponse {
             DashboardError::MoveDestinationFolderNotFound => MetaHttpResponse::not_found("Folder not found"),
             DashboardError::CreateFolderNotFound => MetaHttpResponse::not_found("Folder not found"),
             DashboardError::CreateDefaultFolder => MetaHttpResponse::internal_error("Error saving default folder"),
+            DashboardError::DistinctValueError => MetaHttpResponse::internal_error("Error in updating distinct values")
         }
     }
 }

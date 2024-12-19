@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
+use infra::table::folders::FolderType;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -75,7 +76,8 @@ pub async fn create_folder(
 ) -> impl Responder {
     let org_id = path.into_inner();
     let folder = body.into_inner().into();
-    match folders::save_folder(&org_id, folder, false).await {
+    let folder_type = FolderType::Dashboards;
+    match folders::save_folder(&org_id, folder, folder_type, false).await {
         Ok(folder) => {
             let body: CreateFolderResponseBody = folder.into();
             HttpResponse::Ok().json(body)
@@ -116,7 +118,8 @@ pub async fn update_folder(
 ) -> impl Responder {
     let (org_id, folder_id) = path.into_inner();
     let folder = body.into_inner().into();
-    match folders::update_folder(&org_id, &folder_id, folder).await {
+    let folder_type = FolderType::Dashboards;
+    match folders::update_folder(&org_id, &folder_id, folder_type, folder).await {
         Ok(_) => HttpResponse::Ok().body("Folder updated"),
         Err(err) => err.into(),
     }
@@ -150,7 +153,8 @@ pub async fn list_folders(path: web::Path<String>, req: HttpRequest) -> impl Res
         return HttpResponse::Forbidden().finish();
     };
 
-    match folders::list_folders(&org_id, user_id).await {
+    let folder_type = FolderType::Dashboards;
+    match folders::list_folders(&org_id, user_id, folder_type).await {
         Ok(folders) => {
             let body: ListFoldersResponseBody = folders.into();
             HttpResponse::Ok().json(body)
@@ -179,7 +183,8 @@ pub async fn list_folders(path: web::Path<String>, req: HttpRequest) -> impl Res
 #[get("/{org_id}/folders/{folder_id}")]
 pub async fn get_folder(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, folder_id) = path.into_inner();
-    match folders::get_folder(&org_id, &folder_id).await {
+    let folder_type = FolderType::Dashboards;
+    match folders::get_folder(&org_id, &folder_id, folder_type).await {
         Ok(folder) => {
             let body: CreateFolderResponseBody = folder.into();
             HttpResponse::Ok().json(body)
@@ -209,7 +214,8 @@ pub async fn get_folder(path: web::Path<(String, String)>) -> impl Responder {
 #[delete("/{org_id}/folders/{folder_id}")]
 async fn delete_folder(path: web::Path<(String, String)>) -> impl Responder {
     let (org_id, folder_id) = path.into_inner();
-    match folders::delete_folder(&org_id, &folder_id).await {
+    let folder_type = FolderType::Dashboards;
+    match folders::delete_folder(&org_id, &folder_id, folder_type).await {
         Ok(()) => HttpResponse::Ok().body("Folder deleted"),
         Err(err) => err.into(),
     }

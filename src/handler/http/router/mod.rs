@@ -311,6 +311,7 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
             .service(status::dex_login)
             .service(status::refresh_token_with_dex)
             .service(status::logout)
+            .service(users::service_accounts::exchange_token)
             .service(web::scope("/reload").service(status::config_reload)),
     );
 }

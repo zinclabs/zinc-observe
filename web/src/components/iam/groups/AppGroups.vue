@@ -237,12 +237,14 @@ const deleteUserGroup = (group: any) => {
       });
       setupGroups();
     })
-    .catch(() => {
-      q.notify({
-        message: "Error while deleting group!",
-        color: "negative",
-        position: "bottom",
-      });
+    .catch((error: any) => {
+      if (error.response.status != 403) {
+        q.notify({
+          message: "Error while deleting group!",
+          color: "negative",
+          position: "bottom",
+        });
+      }
     });
 };
 

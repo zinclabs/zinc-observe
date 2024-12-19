@@ -53,7 +53,7 @@ use {
             infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
             settings::{get_logo, get_logo_text},
         },
-        dex::service::auth::{exchange_code, get_dex_login, get_jwks, refresh_token},
+        dex::service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
     },
     std::io::ErrorKind,
 };
@@ -480,10 +480,15 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
         Ok(login_data) => {
             let login_url;
             let access_token = login_data.access_token;
-            let keys = get_jwks().await;
-            let token_ver =
-                verify_decode_token(&access_token, &keys, &get_o2_config().dex.client_id, true)
-                    .await;
+            let keys = get_dex_jwks().await;
+            let token_ver = verify_decode_token(
+                &access_token,
+                &keys,
+                &get_o2_config().dex.client_id,
+                true,
+                true,
+            )
+            .await;
             let id_token;
             match token_ver {
                 Ok(res) => {

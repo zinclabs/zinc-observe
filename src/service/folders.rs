@@ -20,7 +20,7 @@ use config::{
         folder::{Folder, DEFAULT_FOLDER},
     },
 };
-use infra::table;
+use infra::table::{self, folders::FolderType};
 
 use crate::common::{
     meta::authz::Authz,
@@ -66,6 +66,7 @@ pub enum FolderError {
 pub async fn save_folder(
     org_id: &str,
     mut folder: Folder,
+    folder_type: FolderType,
     is_internal: bool,
 ) -> Result<Folder, FolderError> {
     folder.name = folder.name.trim().to_string();
@@ -81,7 +82,7 @@ pub async fn save_folder(
         folder.folder_id = ider::generate();
     }
 
-    let folder = table::folders::put(org_id, folder).await?;
+    let folder = table::folders::put(org_id, folder, folder_type).await?;
     set_ownership(org_id, "folders", Authz::new(&folder.folder_id)).await;
     Ok(folder)
 }
@@ -90,6 +91,7 @@ pub async fn save_folder(
 pub async fn update_folder(
     org_id: &str,
     folder_id: &str,
+    folder_type: FolderType,
     mut folder: Folder,
 ) -> Result<Folder, FolderError> {
     if folder_id.eq(DEFAULT_FOLDER) {
@@ -97,14 +99,18 @@ pub async fn update_folder(
     }
 
     folder.folder_id = folder_id.to_string();
-    let folder = table::folders::put(org_id, folder).await?;
+    let folder = table::folders::put(org_id, folder, folder_type).await?;
     Ok(folder)
 }
 
 #[tracing::instrument()]
-pub async fn list_folders(org_id: &str, user_id: Option<&str>) -> Result<Vec<Folder>, FolderError> {
+pub async fn list_folders(
+    org_id: &str,
+    user_id: Option<&str>,
+    folder_type: FolderType,
+) -> Result<Vec<Folder>, FolderError> {
     let permitted_folders = permitted_folders(org_id, user_id).await?;
-    let folders = table::folders::list_dashboard_folders(org_id).await?;
+    let folders = table::folders::list_folders(org_id, folder_type).await?;
     let filtered = match permitted_folders {
         Some(permitted_folders) => {
             if permitted_folders.contains(&format!("{}:_all_{}", "dfolder", org_id)) {
@@ -125,26 +131,37 @@ pub async fn list_folders(org_id: &str, user_id: Option<&str>) -> Result<Vec<Fol
 }
 
 #[tracing::instrument()]
-pub async fn get_folder(org_id: &str, folder_id: &str) -> Result<Folder, FolderError> {
-    table::folders::get(org_id, folder_id)
+pub async fn get_folder(
+    org_id: &str,
+    folder_id: &str,
+    folder_type: FolderType,
+) -> Result<Folder, FolderError> {
+    table::folders::get(org_id, folder_id, folder_type)
         .await?
         .ok_or(FolderError::NotFound)
 }
 
 #[tracing::instrument()]
-pub async fn delete_folder(org_id: &str, folder_id: &str) -> Result<(), FolderError> {
-    let filter = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
-    let dashboards = table::dashboards::list(filter).await?;
+pub async fn delete_folder(
+    org_id: &str,
+    folder_id: &str,
+    folder_type: FolderType,
+) -> Result<(), FolderError> {
+    match folder_type {
+        FolderType::Dashboards => {
+            let filter = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
+            let dashboards = table::dashboards::list(filter).await?;
+            if !dashboards.is_empty() {
+                return Err(FolderError::DeleteWithDashboards);
+            }
+        }
+    };
 
-    if !dashboards.is_empty() {
-        return Err(FolderError::DeleteWithDashboards);
-    }
-
-    if !table::folders::exists(org_id, folder_id).await? {
+    if !table::folders::exists(org_id, folder_id, folder_type).await? {
         return Err(FolderError::NotFound);
     }
 
-    table::folders::delete(org_id, folder_id).await?;
+    table::folders::delete(org_id, folder_id, folder_type).await?;
     remove_ownership(org_id, "folders", Authz::new(folder_id)).await;
     Ok(())
 }

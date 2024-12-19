@@ -285,13 +285,15 @@ export default defineComponent({
           }));
           updateRoute();
         })
-        .catch(() => {
+        .catch((err) => {
+          if(err.response.status != 403){
+            q.notify({
+              type: "negative",
+              message: "Error while pulling destinations.",
+              timeout: 2000,
+            });
+          }
           dismiss();
-          q.notify({
-            type: "negative",
-            message: "Error while pulling destinations.",
-            timeout: 2000,
-          });
         })
         .finally(() => dismiss());
     };

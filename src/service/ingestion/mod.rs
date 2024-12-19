@@ -128,7 +128,7 @@ pub fn apply_vrl_fn(
                     "{}/{:?} vrl failed at processing result {:?} on record {:?}. Returning original row.",
                     org_id, stream_name, err, row
                 );
-                log::error!("{err_msg}");
+                log::warn!("{err_msg}");
                 (row, Some(err_msg))
             }
         },
@@ -145,7 +145,7 @@ pub fn apply_vrl_fn(
                 "{}/{:?} vrl runtime failed at getting result {:?} on record {:?}. Returning original row.",
                 org_id, stream_name, err, row
             );
-            log::error!("{err_msg}");
+            log::warn!("{err_msg}");
             (row, Some(err_msg))
         }
     }

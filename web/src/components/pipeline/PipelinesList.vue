@@ -358,8 +358,9 @@ const updateActiveTab = () => {
 
 
 const toggleAlertState = (row : any) =>{
-  row.enabled = !row.enabled;
+  const newState = !row.enabled;
   pipelineService.toggleState(store.state.selectedOrganization.identifier,row.pipeline_id,row.enabled).then((response) => {
+    row.enabled = newState;
     const message = row.enabled 
     ? `${row.name} state resumed successfully` 
     : `${row.name} state paused successfully`;
@@ -370,12 +371,14 @@ const toggleAlertState = (row : any) =>{
       timeout: 3000,
     });
   }).catch((error) => {
-    q.notify({
+    if(error.response.status != 403){
+      q.notify({
       message: error.response?.data?.message || "Error while updating pipeline state",
       color: "negative",
       position: "bottom",
       timeout: 3000,
     });
+    }
   });
 }
 
@@ -536,6 +539,7 @@ const savePipeline = (data: any) => {
     })
     .then(() => {
       getPipelines();
+      dismiss();
       showCreatePipeline.value = false;
       q.notify({
         message: "Pipeline created successfully",
@@ -545,16 +549,16 @@ const savePipeline = (data: any) => {
       });
     })
     .catch((error) => {
-      q.notify({
+      dismiss();
+      if(error.response.status != 403){
+        q.notify({
         message: error.response?.data?.message || "Error while saving pipeline",
         color: "negative",
         position: "bottom",
         timeout: 3000,
       });
+      } 
     })
-    .finally(() => {
-      dismiss();
-    });
 };
 
 const deletePipeline = async () => {
@@ -580,12 +584,14 @@ const deletePipeline = async () => {
       });
     })
     .catch((error) => {
-      q.notify({
-        message: error.response?.data?.message || "Error while saving pipeline",
+      if(error.response.status != 403){
+        q.notify({
+        message: error.response?.data?.message || "Error while deleting pipeline",
         color: "negative",
         position: "bottom",
         timeout: 3000,
       });
+      }
     })
     .finally(async () => {
       await getPipelines();

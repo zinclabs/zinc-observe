@@ -528,7 +528,7 @@ async fn process_node(
                                     "Dynamic Stream Name resolved to empty. Record dropped"
                                         .to_string()
                                 };
-                                log::error!("{err_msg}");
+                                log::warn!("{err_msg}");
                                 if let Err(send_err) = error_sender
                                     .send((node.id.to_string(), node.node_type(), err_msg))
                                     .await

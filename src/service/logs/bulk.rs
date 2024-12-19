@@ -104,6 +104,31 @@ pub async fn ingest(
             }
             (action, stream_name, doc_id) = ret.unwrap();
 
+            if stream_name.is_empty() || stream_name == "_" || stream_name == "/" {
+                let err_msg = format!("Invalid stream name: {}", line);
+                log::warn!("{}", err_msg);
+                bulk_res.errors = true;
+                let err = BulkResponseError::new(
+                    err_msg.to_string(),
+                    stream_name.clone(),
+                    err_msg,
+                    "0".to_string(),
+                );
+                let mut item = HashMap::new();
+                item.insert(
+                    action.clone(),
+                    BulkResponseItem::new_failed(
+                        stream_name.clone(),
+                        doc_id.clone().unwrap_or_default(),
+                        err,
+                        Some(value),
+                        stream_name.clone(),
+                    ),
+                );
+                bulk_res.items.push(item);
+                continue; // skip
+            }
+
             if !cfg.common.skip_formatting_stream_name {
                 stream_name = format_stream_name(&stream_name);
             }
@@ -534,7 +559,7 @@ pub fn add_record_status(
                 failure_type,
                 stream_name.clone(),
                 failure_reason.unwrap(),
-                "0".to_owned(), // TODO check
+                "0".to_owned(),
             );
 
             item.insert(

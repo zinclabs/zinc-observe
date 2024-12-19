@@ -293,33 +293,12 @@ pub async fn search(
         Some(user_id),
         &req,
         use_cache,
+        range_error,
     )
     .instrument(http_span)
     .await;
     match res {
-        Ok(mut res) => {
-            if res.is_partial {
-                res.function_error = if res.function_error.is_empty() {
-                    PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
-                } else {
-                    format!(
-                        "{} \n {}",
-                        PARTIAL_ERROR_RESPONSE_MESSAGE, res.function_error
-                    )
-                };
-            }
-            if !range_error.is_empty() {
-                res.is_partial = true;
-                res.function_error = if res.function_error.is_empty() {
-                    range_error
-                } else {
-                    format!("{} \n {}", range_error, res.function_error)
-                };
-                res.new_start_time = Some(req.query.start_time);
-                res.new_end_time = Some(req.query.end_time);
-            }
-            Ok(HttpResponse::Ok().json(res))
-        }
+        Ok(res) => Ok(HttpResponse::Ok().json(res)),
         Err(err) => {
             http_report_metrics(start, &org_id, stream_type, "", "500", "_search");
             log::error!("[trace_id {trace_id}] search error: {}", err);
@@ -949,17 +928,23 @@ async fn values_v1(
             sql_where.clone()
         };
 
-        let distinct_prefix = if use_distinct_stream {
-            format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str())
-        } else {
-            "".to_owned()
-        };
+        let distinct_prefix;
+        let count_fn;
+        let actual_stream_type;
 
-        let actual_stream_type = if use_distinct_stream {
-            StreamType::Metadata
+        if use_distinct_stream {
+            distinct_prefix = format!("{}_{}_", DISTINCT_STREAM_PREFIX, stream_type.as_str());
+            // if we are using distinct stream, we have already partially aggregated
+            // the counts, so we need to sum over that field
+            count_fn = "SUM(count)";
+            // distinct_values_* stream is metadata
+            actual_stream_type = StreamType::Metadata;
         } else {
-            stream_type
-        };
+            distinct_prefix = "".to_owned();
+            // for non-distinct fields, we need the actual count
+            count_fn = "COUNT(*)";
+            actual_stream_type = stream_type;
+        }
 
         let sql = if no_count {
             format!(
@@ -967,7 +952,7 @@ async fn values_v1(
             )
         } else {
             format!(
-                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
+                "SELECT histogram(_timestamp) AS zo_sql_time, {field} AS zo_sql_key, {count_fn} AS zo_sql_num FROM \"{distinct_prefix}{stream_name}\" {sql_where} GROUP BY zo_sql_time, zo_sql_key ORDER BY zo_sql_time ASC, zo_sql_num DESC"
             )
         };
         let mut req = req.clone();
@@ -980,6 +965,7 @@ async fn values_v1(
             Some(user_id.to_string()),
             &req,
             use_cache,
+            "".to_string(),
         )
         .instrument(http_span)
         .await;

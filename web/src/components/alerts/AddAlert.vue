@@ -1486,15 +1486,15 @@ export default defineComponent({
               });
             })
             .catch((err: any) => {
-              if(err.response?.status == 403){
-                return;
-              }
               dismiss();
-              this.q.notify({
+              if(err.response?.status != 403){
+                this.q.notify({
                 type: "negative",
                 message:
                   err.response?.data?.error || err.response?.data?.message,
-              });
+                });
+              }
+              
             });
           segment.track("Button Click", {
             button: "Update Alert",
@@ -1525,15 +1525,15 @@ export default defineComponent({
               });
             })
             .catch((err: any) => {
-              if(err.response?.status == 403){
-                return;
-              }
               dismiss();
-              this.q.notify({
+              if(err.response?.status != 403){
+                this.q.notify({
                 type: "negative",
                 message:
                   err.response?.data?.error || err.response?.data?.message,
-              });
+                });
+              }
+              
             });
           segment.track("Button Click", {
             button: "Save Alert",

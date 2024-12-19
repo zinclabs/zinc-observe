@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #body-cell-actions="props">
         <q-td :props="props" side>
           <q-btn
+          data-test="service-accounts-refresh"
           icon="refresh"
           :title="t('serviceAccounts.refresh')"
           class="q-ml-xs"
@@ -96,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="confirmRefreshAction(props.row)"
           />
           <q-btn
+            data-test="service-accounts-edit"
             icon="edit"
             :title="t('serviceAccounts.update')"
             class="q-ml-xs"
@@ -108,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="cursor: pointer !important"
           />
           <q-btn
+            data-test="service-accounts-delete"
             :icon="outlinedDelete"
             :title="t('serviceAccounts.delete')"
             class="q-ml-xs"
@@ -200,10 +203,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn
+            v-close-popup="true"
+            unelevated
+            no-caps
+            class="q-mr-sm"
+            data-test="cancel-refresh-service-token"
+          >
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
+            data-test="confirm-refresh-service-token"
             v-close-popup="true"
             unelevated
             no-caps
@@ -457,13 +467,13 @@ export default defineComponent({
         if(fromColum) row.token = res.data.token;
         else serviceToken.value = res.data.token;
        }).catch((err)=>{
-        if(err.response?.status == 403){
-            return;
-          }
-        $q.notify({
+        if(err.response?.status != 403){
+          $q.notify({
           color: "negative",
           message: `Error fetching token: ${err.response?.data?.message || 'Unknown error'}`,
-        });
+          });
+        }
+        
        }).finally(()=>{
         row.isLoading = false;
        });
@@ -500,9 +510,6 @@ export default defineComponent({
             resolve(true);
           })
           .catch((err) => {
-            if(err.response?.status == 403){
-              return;
-            }
             dismiss();
             reject(false);
           });
@@ -624,13 +631,13 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          if(err.response?.status == 403){
-            return;
-          }
-          $q.notify({
+          if(err.response?.status != 403){
+            $q.notify({
             color: "negative",
             message: err.response?.data?.message || "Error while deleting user.",
-          });
+            });
+          }
+
         });
     };
 
@@ -647,13 +654,13 @@ export default defineComponent({
           message: "Service token refreshed successfully.",
         });
       }).catch((err)=>{
-        if(err.response?.status == 403){
-            return;
-          }
-        $q.notify({
+        if(err.response?.status != 403){
+          $q.notify({
           color: "negative",
           message: err.response?.data?.message || "Error while refreshing token.",
-        });
+          });
+        }
+        
       }).finally(()=>{
         row.isLoading = false;
       });

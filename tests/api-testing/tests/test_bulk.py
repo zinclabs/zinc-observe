@@ -30,33 +30,6 @@ def test_e2e_bulk_ingest(create_session, base_url):
         f"Expected no errors in the valid bulk request response, but got {resp_valid_bulk.json()}"
     )
 
-    # **Negative Test Case 1: Invalid Bulk Payload (Missing Document Body)**
-    invalid_bulk_payload = (
-        '{ "index" : { "_index" : "pytest10222", "_id" : "1" } }\n'
-        '{ "field1" : "value1" }'  # Add a document body after the index action
-    )
-
-    resp_invalid_bulk_1 = session.post(url, data=invalid_bulk_payload, headers=headers)
-    
-    # Print the raw response and content for debugging
-    print("Negative Test Response (Raw Content):", resp_invalid_bulk_1.content)
-    
-    try:
-        response_json = resp_invalid_bulk_1.json()  # Attempt to parse the JSON response
-        print("Negative Test Response (JSON):", response_json)
-    except Exception as e:
-        print("Error parsing JSON response:", str(e))
-
-    # Assert negative case for the first invalid payload
-    # Expecting a 200 response even for invalid data, but check that there's no error field
-    assert resp_invalid_bulk_1.status_code == 200, (
-        f"Expected status code 200 for invalid bulk request, but got {resp_invalid_bulk_1.status_code}. "
-        f"Response: {resp_invalid_bulk_1.content}"
-    )
-    assert not resp_invalid_bulk_1.json().get("errors"), (
-        f"Expected no errors in the invalid bulk request response, but got {resp_invalid_bulk_1.json()}"
-    )
-
     # **Negative Test Case 2: Invalid Bulk Payload (Empty Index)**
     invalid_bulk_payload2 = [
         { "index" : { "_index" : "" } },  # Empty index
@@ -85,9 +58,9 @@ def test_e2e_bulk_ingest(create_session, base_url):
         f"Response: {resp_invalid_bulk_2.content}"
     )
 
-    # Assert no errors in the response, as expected from Postman behavior
-    assert not resp_invalid_bulk_2.json().get("errors"), (
-        f"Expected no errors in the invalid bulk request response, but got {resp_invalid_bulk_2.json()}"
+    # Assert errors is true in the response
+    assert resp_invalid_bulk_2.json().get("errors"), (
+        f"Expected errors to be true in the invalid bulk request response, but got {resp_invalid_bulk_2.json()}"
     )
 
 

@@ -375,6 +375,7 @@ class="padding-none" />
               </q-item>
               <q-separator />
               <q-item
+                data-test="menu-link-logout-item"
                 v-ripple="true"
                 v-close-popup="true"
                 clickable

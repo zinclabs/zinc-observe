@@ -638,9 +638,17 @@ pub async fn remove_user_from_org(
                         "Not Allowed".to_string(),
                     )));
                 }
+
                 if !user.organizations.is_empty() {
                     let mut orgs = user.clone().organizations;
                     if orgs.len() == 1 {
+                        if orgs[0].role.eq(&UserRole::ServiceAccount) && user.is_external {
+                            return Ok(HttpResponse::Forbidden().json(MetaHttpResponse::error(
+                                http::StatusCode::FORBIDDEN.into(),
+                                "Not Allowed".to_string(),
+                            )));
+                        }
+
                         let _ = db::user::delete(email_id).await;
                         #[cfg(feature = "enterprise")]
                         {
@@ -667,6 +675,14 @@ pub async fn remove_user_from_org(
                         let mut is_service_account = false;
                         #[cfg(feature = "enterprise")]
                         for org in orgs.iter() {
+                            if org.role.eq(&UserRole::ServiceAccount) && user.is_external {
+                                return Ok(HttpResponse::Forbidden().json(
+                                    MetaHttpResponse::error(
+                                        http::StatusCode::FORBIDDEN.into(),
+                                        "Not Allowed".to_string(),
+                                    ),
+                                ));
+                            }
                             if org.name.eq(&org_id.to_string()) {
                                 let user_role = &org.role;
                                 is_service_account = user_role.eq(&UserRole::ServiceAccount);

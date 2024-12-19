@@ -55,6 +55,7 @@ pub async fn search(
     user_id: Option<String>,
     in_req: &search::Request,
     use_cache: bool,
+    range_error: String,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
@@ -331,10 +332,39 @@ pub async fn search(
     )
     .await;
 
+    if res.is_partial {
+        let partial_err = "Please be aware that the response is based on partial data";
+        res.function_error = if res.function_error.is_empty() {
+            partial_err.to_string()
+        } else {
+            format!("{} \n {}", partial_err, res.function_error)
+        };
+    }
+    if !range_error.is_empty() {
+        res.is_partial = true;
+        res.function_error = if res.function_error.is_empty() {
+            range_error
+        } else {
+            format!("{} \n {}", range_error, res.function_error)
+        };
+        res.new_start_time = Some(req.query.start_time);
+        res.new_end_time = Some(req.query.end_time);
+    }
+
+    // There are 3 types of partial responses:
+    // 1. VRL error
+    // 2. Super cluster error
+    // 3. Range error (max_query_limit)
+    // Cache partial results only if there is a range error
+    let skip_cache_results = (res.is_partial
+        && (res.new_start_time.is_none() || res.new_end_time.is_none()))
+        || (!res.function_error.is_empty() && res.function_error.contains("vrl"));
+
     // result cache save changes start
     if cfg.common.result_cache_enabled
         && should_exec_query
         && c_resp.cache_query_response
+        && !skip_cache_results
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {

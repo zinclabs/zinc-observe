@@ -18,6 +18,7 @@ pub(crate) async fn verify_decode_token(
     jwks: &str,
     aud: &str,
     get_decode_token: bool,
+    login_flow: bool,
 ) -> Result<
     (
         TokenValidationResponse,
@@ -26,6 +27,8 @@ pub(crate) async fn verify_decode_token(
     anyhow::Error,
 > {
     use infra::errors::JwtError;
+
+    use crate::common::meta::user::UserRole;
 
     let jwks: jwk::JwkSet = serde_json::from_str(jwks).unwrap();
     let header = decode_header(token)?;
@@ -43,37 +46,61 @@ pub(crate) async fn verify_decode_token(
                     Algorithm::from_str(j.common.key_algorithm.unwrap().to_string().as_str())
                         .unwrap(),
                 );
-                validation.validate_exp = true;
-                validation.set_audience(&[aud]);
+                if login_flow {
+                    validation.validate_exp = true;
+                    validation.set_audience(&[aud]);
+                } else {
+                    // we are decoding the token for the service account, which is issued by the dex
+                    // hence we don't need to validate the exp and aud
+                    validation.validate_exp = false;
+                    validation.validate_aud = false;
+                };
                 let decoded_token = decode::<HashMap<String, serde_json::Value>>(
                     token,
                     &decoding_key,
                     &validation,
                 )?;
+                let mut final_claims = HashMap::new();
+                let claims = decoded_token.clone().claims;
+                if let Some(federated_claims) = claims.get("federated_claims") {
+                    if let Some(map) = federated_claims.as_object() {
+                        for (key, value) in map.iter() {
+                            final_claims.insert(key.to_string(), value.clone());
+                        }
+                    }
+                };
 
-                let user_email = if let Some(email) = decoded_token.claims.get("email") {
+                final_claims.extend(claims);
+
+                let user_email = if let Some(email) = final_claims.get("email") {
                     email.as_str().unwrap()
+                } else if let Some(user_id) = final_claims.get("user_id") {
+                    user_id.as_str().unwrap()
                 } else {
                     ""
                 };
 
-                let user_name = if let Some(name) = decoded_token.claims.get("name") {
+                let user_name = if let Some(name) = final_claims.get("name") {
                     name.as_str().unwrap()
                 } else {
                     ""
                 };
 
-                let family_name = if let Some(family_name) = decoded_token.claims.get("family_name")
-                {
+                let family_name = if let Some(family_name) = final_claims.get("family_name") {
                     family_name.as_str().unwrap()
                 } else {
                     ""
                 };
 
-                let given_name = if let Some(given_name) = decoded_token.claims.get("given_name") {
+                let given_name = if let Some(given_name) = final_claims.get("given_name") {
                     given_name.as_str().unwrap()
                 } else {
                     ""
+                };
+                let user_role = if login_flow {
+                    None
+                } else {
+                    Some(UserRole::ServiceAccount)
                 };
 
                 Ok((
@@ -84,7 +111,7 @@ pub(crate) async fn verify_decode_token(
                         family_name: family_name.to_owned(),
                         given_name: given_name.to_owned(),
                         is_internal_user: false,
-                        user_role: None,
+                        user_role,
                     },
                     if get_decode_token {
                         Some(decoded_token)

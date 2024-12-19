@@ -1941,11 +1941,13 @@ const saveRole = () => {
       removedUsers.value = new Set([]);
     })
     .catch((err) => {
-      q.notify({
-        type: "negative",
-        message: `Error while updating role!`,
-        timeout: 3000,
-      });
+      if(err.response.status != 403){
+        q.notify({
+          type: "negative",
+          message: `Error while updating role!`,
+          timeout: 3000,
+        });
+      }
       console.log(err);
     });
 };

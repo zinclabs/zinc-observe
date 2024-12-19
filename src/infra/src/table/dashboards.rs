@@ -29,6 +29,7 @@ use sea_orm::{
 use serde_json::Value as JsonValue;
 
 use super::{
+    distinct_values::{self, OriginType},
     entity::{dashboards, folders},
     folders::FolderType,
 };
@@ -144,7 +145,7 @@ pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard
     Ok(dashboards)
 }
 
-/// Lists all dashboards belonging to the given org and folder.
+/// Lists all existing dashboards
 pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let dashboards = list_all_models(client)
@@ -272,6 +273,17 @@ pub async fn delete_from_folder(
 /// Deletes all dashboards.
 pub async fn delete_all() -> Result<(), errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let dashboards = list_all().await?;
+    let ids: Vec<_> = dashboards
+        .iter()
+        .map(|(_, d)| d.dashboard_id().unwrap())
+        .collect();
+    // remove all distinct values
+    for id in ids {
+        distinct_values::batch_remove(OriginType::Dashboard, id).await?;
+    }
+
     dashboards::Entity::delete_many().exec(client).await?;
     Ok(())
 }
@@ -368,7 +380,7 @@ async fn list_models(
     Ok(folders_and_dashboards)
 }
 
-/// Lists all dashboard ORM models that belong to the given org and folder.
+/// Lists all existing dashboard ORM models
 async fn list_all_models(
     db: &DatabaseConnection,
 ) -> Result<Vec<(String, dashboards::Model)>, sea_orm::DbErr> {

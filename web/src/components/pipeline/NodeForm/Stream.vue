@@ -231,15 +231,17 @@ async function getUsedStreamsList() {
   try {
     const res = await pipelineService.getPipelineStreams(org_identifier);
     usedStreams.value = res.data.list;
-  } catch (error) {
-    console.error('Failed to fetch pipeline streams:', error);
+  } catch (error:any) {
     usedStreams.value = [];
-    $q.notify({
-      message: "Failed to fetch Streams that are used in pipelines",
+    if(error.response.status != 403){
+      $q.notify({
+      message: error.response?.data?.message || "Error fetching used streams",
       color: "negative",
       position: "bottom",
       timeout: 2000,
     });
+    }
+   
   }
 }
 async function getStreamList() {
@@ -362,7 +364,7 @@ const saveStream = () => {
 const filterStreams = (val: string, update: any) => {
   const streamType = pipelineObj.currentSelectedNodeData.data.stream_type || 'logs';
   if( pipelineObj.currentSelectedNodeData.hasOwnProperty("type") &&  pipelineObj.currentSelectedNodeData.type === 'input') {
-    const filtered = streams.value[streamType].filter((stream :any) => {
+    const filtered = streams.value[streamType]?.filter((stream :any) => {
     return stream.name.toLowerCase().includes(val.toLowerCase());
   }).map((stream : any) => ({
     label: stream.name,
