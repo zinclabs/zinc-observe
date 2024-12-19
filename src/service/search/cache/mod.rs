@@ -497,7 +497,8 @@ pub fn merge_response(
     }
 
     if !search_response.is_empty() {
-        cache_response.cached_ratio = files_cache_hits / search_response.len();
+        cache_response.cached_ratio =
+            ((files_cache_hits as f64 / search_response.len() as f64) * 100.0) as usize;
     }
     cache_response.size = cache_response.hits.len() as i64;
     log::info!(
@@ -1000,7 +1001,8 @@ pub fn merge_response_v2(
     }
 
     if !search_responses.is_empty() {
-        merged_response.cached_ratio = files_cache_hits / search_responses.len();
+        merged_response.cached_ratio =
+            ((files_cache_hits as f64 / search_responses.len() as f64) * 100.0) as usize;
     }
     merged_response.size = merged_response.hits.len() as i64;
 
