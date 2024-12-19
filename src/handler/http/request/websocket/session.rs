@@ -90,12 +90,23 @@ pub async fn run(
         tokio::select! {
             Some(msg) = msg_stream.next() => {
                 match msg {
-                    // Ok(actix_ws::Message::Ping(bytes)) => {
-                    //     if session.pong(&bytes).await.is_err() {
-                    //         log::error!("[WS_HANDLER]: Pong failed for request_id: {}", req_id);
-                    //         break;
-                    //     }
-                    // }
+                    Ok(actix_ws::Message::Ping(bytes)) => {
+                        let mut session = if let Some(session) =
+                                    sessions_cache_utils::get_session(&req_id)
+                                {
+                                    session
+                                } else {
+                                    log::error!(
+                                        "[WS_HANDLER]: req_id: {} session not found",
+                                        req_id
+                                    );
+                                    return;
+                                };
+                        if session.pong(&bytes).await.is_err() {
+                            log::error!("[WS_HANDLER]: Pong failed for request_id: {}", req_id);
+                            break;
+                        }
+                    }
                     Ok(actix_ws::Message::Text(msg)) => {
                         log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Received message: {}",
                             req_id,
@@ -105,11 +116,20 @@ pub async fn run(
                         handle_text_message(&org_id, &user_id, &req_id, msg.to_string(), path.clone()).await;
                     }
                     Ok(actix_ws::Message::Close(reason)) => {
-                        log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Closing connection with reason: {:?}",
-                            req_id,
-                            cfg.common.node_role,
-                            reason
-                        );
+                        if let Some(reason) = reason {
+                            match reason.code {
+                                CloseCode::Normal | CloseCode::Error => {
+                                    log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Closing connection with reason: {:?}",
+                                        req_id,
+                                        cfg.common.node_role,
+                                        reason
+                                    );
+                                },
+                                _ => {
+                                    log::error!("[WS_HANDLER]: Request Id: {} Node Role: {} Abnormal closure with reason: {:?}",req_id,cfg.common.node_role,reason);
+                                },
+                            }
+                        }
                         break;
                     }
                     _ => ()

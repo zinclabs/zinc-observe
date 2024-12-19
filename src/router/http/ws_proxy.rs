@@ -122,9 +122,10 @@ fn from_actix_message(msg: Message) -> tungstenite::protocol::Message {
         Message::Binary(bin) => tungstenite::protocol::Message::Binary(bin.to_vec()),
         Message::Ping(msg) => tungstenite::protocol::Message::Ping(msg.to_vec()),
         Message::Pong(msg) => tungstenite::protocol::Message::Pong(msg.to_vec()),
-        Message::Close(None) => {
+        Message::Close(reason) => {
             log::info!(
-                "[WS_PROXY] Received a Message::Close from internal client, closing connection to proxied server"
+                "[WS_PROXY] Received a Message::Close with reason: {:#?}, closing connection to proxied server",
+                reason
             );
             tungstenite::protocol::Message::Close(None)
         }
