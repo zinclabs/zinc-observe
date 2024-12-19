@@ -13,9 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! This module contains models that can be serialized and deserialized as JSON
-//! for HTTP responses and requests.
+use config::meta::alerts::alert as meta_alerts;
+use serde::Deserialize;
+use utoipa::ToSchema;
 
-pub mod alerts;
-pub mod dashboards;
-pub mod folders;
+use super::Alert;
+
+/// HTTP request body for `SaveAlert` endpoint.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct SaveAlertRequestBody(pub Alert);
+
+/// HTTP request body for `UpdateAlert` endpoint.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct UpdateAlertRequestBody(pub Alert);
+
+impl From<SaveAlertRequestBody> for meta_alerts::Alert {
+    fn from(value: SaveAlertRequestBody) -> Self {
+        value.0.into()
+    }
+}
+
+impl From<UpdateAlertRequestBody> for meta_alerts::Alert {
+    fn from(value: UpdateAlertRequestBody) -> Self {
+        value.0.into()
+    }
+}
