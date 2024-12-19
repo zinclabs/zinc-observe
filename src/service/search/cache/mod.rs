@@ -608,13 +608,14 @@ pub async fn write_results(
 ///      - `is_descending = true`: Selects the last record.
 ///      - `is_descending = false`: Selects the first record.
 ///
-/// 2. **Remove All Hits Within the Same Date, Hour, Minute for Deduplication**:
-///    - Identifies the timestamp of the hit to remove (either the first or last record based on the
-///      `is_descending` flag).
-///    - Removes all hits that fall within the same date, hour, minute (`YYYY-MM-DDTHH:MM`) as the
-///      identified hit.
-///      - Example: If the timestamp to remove is `2024-12-06T04:15:30`, all hits with timestamps
-///        from `2024-12-06T04:15:00` to `2024-12-06T04:15:59` are removed.
+/// 2. **Remove All Hits Within the Same Date, Hour, Minute, and Second for Deduplication**:
+///    - Identifies the timestamp of the hit to remove (based on the `is_descending` flag, 
+///      either the first or the last record is chosen).
+///    - Removes all hits that match the exact same date, hour, minute, and second 
+///      (`YYYY-MM-DDTHH:MM:SS`) as the identified hit.
+///      - Example: If the timestamp to remove is `2024-12-06T04:15:30`, only hits with the 
+///        exact timestamp `2024-12-06T04:15:30` are removed, while others with different 
+///        seconds (e.g., `2024-12-06T04:15:29` or `2024-12-06T04:15:31`) are retained.
 ///
 /// 3. **Skip Caching for Empty or Insufficient Hits**:
 ///    - If no hits remain after removing one, caching is skipped.
