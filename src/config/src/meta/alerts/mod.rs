@@ -39,7 +39,7 @@ pub struct TriggerCondition {
     #[serde(default)]
     pub frequency_type: FrequencyType,
     #[serde(default)]
-    /// (seconds)
+    /// (minutes)
     pub silence: i64, // silence for 10 minutes after fire an alert
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,

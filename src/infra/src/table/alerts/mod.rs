@@ -127,7 +127,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
                 frequency: value.trigger_frequency_seconds,
                 cron: value.trigger_frequency_cron.unwrap_or_default(),
                 frequency_type: trigger_frequency_type.into(),
-                silence: value.trigger_silence_seconds,
+                silence: value.trigger_silence_seconds / 60,
                 timezone: value.trigger_frequency_cron_timezone,
                 tolerance_in_secs: value.trigger_tolerance_seconds,
             },
@@ -449,7 +449,7 @@ fn update_mutable_fields(
     let trigger_frequency_cron = Some(alert.trigger_condition.cron).filter(|s| !s.is_empty());
     let trigger_frequency_cron_timezone =
         alert.trigger_condition.timezone.filter(|s| !s.is_empty());
-    let trigger_silence_seconds = alert.trigger_condition.silence;
+    let trigger_silence_seconds = alert.trigger_condition.silence * 60;
     let trigger_tolerance_seconds = alert.trigger_condition.tolerance_in_secs;
     let owner = alert.owner.filter(|s| !s.is_empty());
     let last_edited_by = alert.last_edited_by.filter(|s| !s.is_empty());
