@@ -656,16 +656,19 @@ pub async fn write_results_v2(
         if let Some(ts_value) = ts_value_to_remove {
             // Extract the date, hour, minute from the timestamp
             if let Some(ts_datetime) = convert_ts_value_to_datetime(&ts_value) {
-                let target_date_minute = ts_datetime.format("%Y-%m-%dT%H:%M").to_string(); // e.g., "2024-12-06T04:15"
+                // Extract the target date, hour, minute, and second (e.g., "2024-12-06T04:15:23")
+                let target_date_hour_minute_second =
+                    ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
 
                 // Retain only the hits that do NOT fall within the
                 // same date, hour, minute as the hit to remove
                 local_resp.hits.retain(|hit| {
                     if let Some(hit_ts) = hit.get(ts_column) {
                         if let Some(hit_ts_datetime) = convert_ts_value_to_datetime(hit_ts) {
-                            let hit_date_minute =
-                                hit_ts_datetime.format("%Y-%m-%dT%H:%M").to_string();
-                            return hit_date_minute != target_date_minute;
+                            // Extract the date, hour, minute, and second for the current hit
+                            let hit_date_hour_minute_second =
+                                hit_ts_datetime.format("%Y-%m-%dT%H:%M:%S").to_string();
+                            return hit_date_hour_minute_second != target_date_hour_minute_second;
                         }
                     }
                     false
