@@ -49,8 +49,8 @@ pub struct Alert {
     #[serde(default)]
     pub enabled: bool,
     #[serde(default)]
-    /// Timezone offset in minutes.
-    /// The negative secs means the Western Hemisphere
+    /// Timezone offset in minutes. Negative seconds means the western
+    /// hemisphere
     pub tz_offset: i32,
     #[serde(default)]
     pub last_triggered_at: Option<i64>,
@@ -67,19 +67,19 @@ pub struct Alert {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TriggerCondition {
-    pub period: i64, // 10 minutes
+    pub period: i64,
     #[serde(default)]
-    pub operator: Operator, // >=
+    pub operator: Operator,
     #[serde(default)]
-    pub threshold: i64, // 3 times
+    pub threshold: i64,
     #[serde(default)]
-    pub frequency: i64, // 1 minute
+    pub frequency: i64,
     #[serde(default)]
-    pub cron: String, // Cron Expression
+    pub cron: String,
     #[serde(default)]
     pub frequency_type: FrequencyType,
     #[serde(default)]
-    pub silence: i64, // silence for 10 minutes after fire an alert
+    pub silence: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
     #[serde(default)]
@@ -405,6 +405,7 @@ impl From<meta_stream::StreamType> for StreamType {
 impl From<Alert> for meta_alerts::alert::Alert {
     fn from(value: Alert) -> Self {
         Self {
+            id: None,
             name: value.name,
             org_id: value.org_id,
             stream_type: value.stream_type.into(),

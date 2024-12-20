@@ -6186,6 +6186,7 @@ dependencies = [
  "snap",
  "sqlparser",
  "strum 0.25.0",
+ "svix-ksuid",
  "sysinfo",
  "syslog_loose 0.18.0",
  "tantivy",

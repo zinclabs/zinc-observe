@@ -20,11 +20,16 @@ use config::meta::{
     alerts::alert::{Alert, AlertListFilter},
     dashboards::datetime_now,
 };
+use svix_ksuid::Ksuid;
 
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::{auth::UserEmail, http::get_stream_type_from_request},
+    },
+    handler::http::models::alerts::{
+        requests::{ListAlertsQuery, ListAlertsQueryStreamParams},
+        responses::{ListAlertsResponseBody, ListAlertsResponseBodyItem},
     },
     service::alerts::alert,
 };
@@ -33,13 +38,12 @@ use crate::{
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
-    operation_id = "SaveAlert",
+    operation_id = "CreateAlert",
     security(
         ("Authorization"= [])
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name"),
       ),
     request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
     responses(
@@ -47,16 +51,17 @@ use crate::{
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("/{org_id}/{stream_name}/alerts")]
-pub async fn save_alert(
-    path: web::Path<(String, String)>,
+#[post("/{org_id}/alerts")]
+pub async fn create_alert(
+    path: web::Path<String>,
     alert: web::Json<Alert>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
+    let org_id = path.into_inner();
+    let mut alert = alert.into_inner();
+    let stream_name = alert.stream_name.clone();
 
     // Hack for frequency: convert minutes to seconds
-    let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
     alert.owner = Some(user_email.user_id.clone());
     alert.last_edited_by = Some(user_email.user_id);
@@ -80,8 +85,7 @@ pub async fn save_alert(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name"),
-        ("alert_name" = String, Path, description = "Alert name"),
+        ("alert_id" = Ksuid, Path, description = "Alert ID"),
       ),
     request_body(content = Alert, description = "Alert data", content_type = "application/json"),    
     responses(
@@ -89,85 +93,23 @@ pub async fn save_alert(
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("/{org_id}/{stream_name}/alerts/{alert_name}")]
+#[put("/{org_id}/alerts/{alert_id}")]
 pub async fn update_alert(
-    path: web::Path<(String, String, String)>,
+    path: web::Path<(String, Ksuid)>,
     alert: web::Json<Alert>,
     user_email: UserEmail,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name, name) = path.into_inner();
+    let (org_id, _alert_id) = path.into_inner();
 
     // Hack for frequency: convert minutes to seconds
     let mut alert = alert.into_inner();
+    let stream_name = alert.stream_name.clone();
+    let alert_name = alert.name.clone();
     alert.trigger_condition.frequency *= 60;
     alert.last_edited_by = Some(user_email.user_id);
     alert.updated_at = Some(datetime_now());
-    match alert::save(&org_id, &stream_name, &name, alert, false).await {
+    match alert::save(&org_id, &stream_name, &alert_name, alert, false).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Alert Updated")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
-    }
-}
-
-/// ListStreamAlerts
-#[utoipa::path(
-    context_path = "/api",
-    tag = "Alerts",
-    operation_id = "ListStreamAlerts",
-    security(
-        ("Authorization"= [])
-    ),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name"),
-      ),
-    responses(
-        (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
-        (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
-    )
-)]
-#[get("/{org_id}/{stream_name}/alerts")]
-async fn list_stream_alerts(
-    path: web::Path<(String, String)>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
-    let (org_id, stream_name) = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v,
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
-    let user_filter = query.get("owner").map(|v| v.to_string());
-    let enabled_filter = query
-        .get("enabled")
-        .and_then(|field| match field.parse::<bool>() {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        });
-    let alert_filter = AlertListFilter {
-        owner: user_filter,
-        enabled: enabled_filter,
-    };
-    match alert::list(
-        &org_id,
-        stream_type,
-        Some(stream_name.as_str()),
-        None,
-        alert_filter,
-    )
-    .await
-    {
-        Ok(mut data) => {
-            // Hack for frequency: convert seconds to minutes
-            for alert in data.iter_mut() {
-                alert.trigger_condition.frequency /= 60;
-            }
-
-            let mut mapdata = HashMap::new();
-            mapdata.insert("list", data);
-            Ok(MetaHttpResponse::json(mapdata))
-        }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
@@ -182,6 +124,7 @@ async fn list_stream_alerts(
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
+        ListAlertsQuery
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = HttpResponse),
@@ -190,7 +133,12 @@ async fn list_stream_alerts(
 #[get("/{org_id}/alerts")]
 async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
+    let Ok(query) = web::Query::<ListAlertsQuery>::from_query(req.query_string()) else {
+        return Ok(MetaHttpResponse::bad_request(
+            "Error parsing query parameters",
+        ));
+    };
+    let query = query.0;
 
     let mut _alert_list_from_rbac = None;
     // Get List of allowed objects
@@ -217,15 +165,15 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpRe
         // Get List of allowed objects ends
     }
 
-    let user_filter = query.get("owner").map(|v| v.to_string());
-    let enabled_filter = query
-        .get("enabled")
-        .and_then(|field| match field.parse::<bool>() {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        });
-    let stream_type_filter = get_stream_type_from_request(&query).unwrap_or_default();
-    let stream_name_filter = query.get("stream_name").map(|v| v.as_str());
+    let user_filter = query.owner;
+    let enabled_filter = query.enabled;
+    let (stream_type_filter, stream_name_filter) = match query.stream {
+        Some(ListAlertsQueryStreamParams {
+            stream_type,
+            stream_name,
+        }) => (Some(stream_type.into()), stream_name),
+        None => (None, None),
+    };
 
     let alert_filter = AlertListFilter {
         owner: user_filter,
@@ -234,7 +182,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpRe
     match alert::list(
         &org_id,
         stream_type_filter,
-        stream_name_filter,
+        stream_name_filter.as_deref(),
         _alert_list_from_rbac,
         alert_filter,
     )
@@ -242,19 +190,25 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpRe
     {
         Ok(mut data) => {
             // Hack for frequency: convert seconds to minutes
-            for alert in data.iter_mut() {
+            for (_folder, alert) in data.iter_mut() {
                 alert.trigger_condition.frequency /= 60;
             }
 
-            let mut mapdata = HashMap::new();
-            mapdata.insert("list", data);
-            Ok(MetaHttpResponse::json(mapdata))
+            let items_rslt: Result<Vec<_>, _> = data
+                .into_iter()
+                .map(ListAlertsResponseBodyItem::try_from)
+                .collect();
+            let Ok(items) = items_rslt else {
+                return Ok(MetaHttpResponse::internal_error("Unexpected error"));
+            };
+            let resp_body = ListAlertsResponseBody { list: items };
+            Ok(MetaHttpResponse::json(resp_body))
         }
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }
 
-/// GetAlertByName
+/// GetAlert
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -264,15 +218,14 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpRe
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("stream_name" = String, Path, description = "Stream name"),
-        ("alert_name" = String, Path, description = "Alert name"),
+        ("alert_id" = Ksuid, Path, description = "Alert ID"),
       ),
     responses(
         (status = 200, description = "Success",  content_type = "application/json", body = Alert),
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("/{org_id}/{stream_name}/alerts/{alert_name}")]
+#[get("/{org_id}/{alert_id}")]
 async fn get_alert(
     path: web::Path<(String, String, String)>,
     req: HttpRequest,
@@ -298,6 +251,7 @@ async fn get_alert(
 }
 
 /// DeleteAlert
+#[deprecated]
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -339,6 +293,7 @@ async fn delete_alert(
 }
 
 /// EnableAlert
+#[deprecated]
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",
@@ -387,6 +342,7 @@ async fn enable_alert(
 }
 
 /// TriggerAlert
+#[deprecated]
 #[utoipa::path(
     context_path = "/api",
     tag = "Alerts",

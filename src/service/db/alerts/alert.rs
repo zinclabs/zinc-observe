@@ -18,6 +18,7 @@ use std::sync::Arc;
 use config::{
     meta::{
         alerts::alert::{Alert, ListAlertsParams},
+        folder::Folder,
         stream::StreamType,
     },
     utils::json,
@@ -152,7 +153,7 @@ pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
-) -> Result<Vec<Alert>, anyhow::Error> {
+) -> Result<Vec<(Folder, Alert)>, anyhow::Error> {
     let params = ListAlertsParams::new(org_id).in_folder("default");
     let params = if let Some(stream_name) = stream_name {
         params.for_stream(stream_type.unwrap_or_default(), stream_name)
@@ -161,11 +162,7 @@ pub async fn list(
     };
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let items = table::list(client, params)
-        .await?
-        .into_iter()
-        .map(|(_f, a)| a)
-        .collect();
+    let items = table::list(client, params).await?.into_iter().collect();
     Ok(items)
 }
 

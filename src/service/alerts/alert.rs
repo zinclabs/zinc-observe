@@ -260,13 +260,13 @@ pub async fn list(
     stream_name: Option<&str>,
     permitted: Option<Vec<String>>,
     filter: AlertListFilter,
-) -> Result<Vec<Alert>, anyhow::Error> {
+) -> Result<Vec<(Folder, Alert)>, anyhow::Error> {
     match db::alerts::alert::list(org_id, stream_type, stream_name).await {
-        Ok(alerts) => {
+        Ok(list) => {
             let owner = filter.owner;
             let enabled = filter.enabled;
             let mut result = Vec::new();
-            for alert in alerts {
+            for (folder, alert) in list {
                 if permitted.is_none()
                     || permitted
                         .as_ref()
@@ -283,7 +283,7 @@ pub async fn list(
                     if enabled.is_some() && enabled.unwrap() != alert.enabled {
                         continue;
                     }
-                    result.push(alert);
+                    result.push((folder, alert));
                 }
             }
             Ok(result)

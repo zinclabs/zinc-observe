@@ -153,6 +153,7 @@ snafu.workspace = true
 snap.workspace = true
 sqlparser.workspace = true
 strum = { version = "0.25", features = ["derive"] }
+svix-ksuid.workspace = true
 sysinfo.workspace = true
 syslog_loose = "0.18.0"
 thiserror.workspace = true

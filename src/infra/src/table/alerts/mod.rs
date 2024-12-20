@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use config::meta::{
     alerts::{
@@ -28,13 +30,13 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, PaginatorTrait,
     QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel,
 };
-use svix_ksuid::KsuidLike;
+use svix_ksuid::{Ksuid, KsuidLike};
 
 use super::{
     entity::{alerts, folders},
     folders::FolderType,
 };
-use crate::errors;
+use crate::errors::{self, FromStrError};
 
 pub mod intermediate;
 
@@ -42,6 +44,11 @@ impl TryFrom<alerts::Model> for MetaAlert {
     type Error = errors::Error;
 
     fn try_from(value: alerts::Model) -> Result<Self, Self::Error> {
+        let id: Ksuid = Ksuid::from_str(&value.id).map_err(|_| FromStrError {
+            value: value.id,
+            ty: "svix_ksuid::Ksuid".to_owned(),
+        })?;
+
         // Transform database string values into intermediate types which can be
         // directly translated into service layer types.
         let stream_type: intermediate::StreamType = value.stream_type.parse()?;
@@ -90,6 +97,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .map(|dt| dt.into());
 
         let alert = Self {
+            id: Some(id),
             name: value.name,
             org_id: value.org,
             stream_type: stream_type.into(),

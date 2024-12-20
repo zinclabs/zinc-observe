@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod alert;
+pub mod alert_deprecated;
+pub mod alert_v2;
 pub mod destinations;
 pub mod templates;
