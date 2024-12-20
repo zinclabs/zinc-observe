@@ -27,6 +27,8 @@ pub struct Request {
     pub time_range: Option<(i64, i64)>,
     pub search_event_type: Option<String>, // node rule
     pub use_inverted_index: bool,
+    pub streaming_output: bool,
+    pub streaming_id: Option<String>,
 }
 
 impl Default for Request {
@@ -41,6 +43,8 @@ impl Default for Request {
             time_range: None,
             search_event_type: None,
             use_inverted_index: false,
+            streaming_output: false,
+            streaming_id: None,
         }
     }
 }
@@ -66,6 +70,8 @@ impl Request {
             time_range,
             search_event_type,
             use_inverted_index: false,
+            streaming_output: false,
+            streaming_id: None,
         }
     }
 
@@ -88,6 +94,11 @@ impl Request {
     pub fn set_use_inverted_index(&mut self, use_inverted_index: bool) {
         self.use_inverted_index = use_inverted_index;
     }
+
+    pub fn set_streaming_output(&mut self, streaming_output: bool, streaming_id: Option<String>) {
+        self.streaming_output = streaming_output;
+        self.streaming_id = streaming_id;
+    }
 }
 
 impl From<FlightSearchRequest> for Request {
@@ -102,6 +113,8 @@ impl From<FlightSearchRequest> for Request {
             time_range: Some((req.search_info.start_time, req.search_info.end_time)),
             search_event_type: req.super_cluster_info.search_event_type,
             use_inverted_index: req.index_info.use_inverted_index,
+            streaming_output: false,
+            streaming_id: None,
         }
     }
 }

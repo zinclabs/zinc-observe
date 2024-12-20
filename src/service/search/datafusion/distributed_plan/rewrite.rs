@@ -26,7 +26,10 @@ use datafusion::{
 use hashbrown::HashMap;
 use proto::cluster_rpc::KvItem;
 
-use super::{empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec};
+use super::{
+    empty_exec::NewEmptyExec, node::RemoteScanNodes, remote_scan::RemoteScanExec,
+    streaming_aggs_exec::StreamingAggsExec,
+};
 use crate::service::search::{index::IndexCondition, request::Request};
 
 // add remote scan to physical plan
@@ -161,5 +164,32 @@ impl<'n> TreeNodeVisitor<'n> for TableNameVisitor {
         } else {
             Ok(TreeNodeRecursion::Continue)
         }
+    }
+}
+
+pub struct StreamingAggsRewriter {
+    id: String,
+}
+
+impl StreamingAggsRewriter {
+    pub fn new(id: String) -> Self {
+        Self { id }
+    }
+}
+
+impl TreeNodeRewriter for StreamingAggsRewriter {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
+        if node.name() == "RemoteScanExec"
+            && !node.children().is_empty()
+            && node.children().first().unwrap().name() == "AggregateExec"
+            && config::get_config().common.feature_query_streaming_aggs
+        {
+            let streaming_node: Arc<dyn ExecutionPlan> =
+                Arc::new(StreamingAggsExec::new(self.id.clone(), node)) as _;
+            return Ok(Transformed::yes(streaming_node));
+        }
+        Ok(Transformed::no(node))
     }
 }

@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
   >
     <div class="col-auto">
+      <!-- stream type selection will be hidden for metrics page -->
       <q-select
+        v-if="dashboardPanelDataPageKey !== 'metrics'"
         v-model="
           dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
@@ -823,6 +825,17 @@ export default defineComponent({
         ) {
           try {
             await extractFields();
+
+            // if promql mode
+            if (promqlMode.value) {
+              // set the query
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ].query =
+                dashboardPanelData.data.queries[
+                  dashboardPanelData.layout.currentQueryIndex
+                ].fields.stream?.toString() + "{}";
+            }
           } catch (error: any) {
             showErrorNotification(
               error?.message ?? "Failed to get stream fields",
@@ -1148,6 +1161,7 @@ export default defineComponent({
     };
 
     return {
+      dashboardPanelDataPageKey,
       t,
       store,
       router,

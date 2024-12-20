@@ -697,6 +697,8 @@ async fn get_partitions(
         regions: search_payload.regions.clone(),
         clusters: search_payload.clusters.clone(),
         query_fn: search_payload.query.query_fn.clone(),
+        // TODO: fix this for streaming aggregate queries
+        streaming_output: false,
     };
 
     let res = SearchService::search_partition(

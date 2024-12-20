@@ -266,6 +266,8 @@ pub async fn get_latest_traces(
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            streaming_output: false,
+            streaming_id: None,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],

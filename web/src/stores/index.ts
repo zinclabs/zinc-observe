@@ -35,6 +35,7 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
 const organizationObj = {
   organizationPasscode: "",
   allDashboardList: {},
+  allDashboardData: {},
   allDashboardListHash: {},
   rumToken: {
     rum_token: "",
@@ -127,6 +128,9 @@ export default createStore({
     // },
     setAllDashboardList(state, payload) {
       state.organizationData.allDashboardList = payload;
+    },
+    setDashboardData(state, payload) {
+      state.organizationData.allDashboardData = payload;
     },
     setAllDashboardListHash(state, payload) {
       state.organizationData.allDashboardListHash = payload;
@@ -243,6 +247,9 @@ export default createStore({
     // },
     setAllDashboardList(context, payload) {
       context.commit("setAllDashboardList", payload);
+    },
+    setDashboardData(context, payload) {
+      context.commit("setDashboardData", payload);
     },
     setAllDashboardListHash(context, payload) {
       context.commit("setAllDashboardListHash", payload);

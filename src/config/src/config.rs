@@ -594,6 +594,8 @@ pub struct Common {
     pub feature_query_without_index: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
     pub feature_query_remove_filter_with_index: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = false)]
+    pub feature_query_streaming_aggs: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
     pub ui_enabled: bool,
     #[env_config(name = "ZO_UI_SQL_BASE64_ENABLED", default = false)]
@@ -1070,8 +1072,18 @@ pub struct Limit {
     pub distinct_values_hourly: bool,
     #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 100)]
     pub consistent_hash_vnodes: usize,
-    #[env_config(name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES", default = 100000)]
+    #[env_config(
+        name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_ENTRIES",
+        default = 100000,
+        help = "Maximum number of entries in the file stat cache. Higher values increase memory usage but may improve query performance."
+    )]
     pub datafusion_file_stat_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_ENTRIES",
+        default = 100000,
+        help = "Maximum number of entries in the streaming aggs cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub datafusion_streaming_aggs_cache_max_entries: usize,
     #[env_config(name = "ZO_DATAFUSION_MIN_PARTITION_NUM", default = 2)]
     pub datafusion_min_partition_num: usize,
     #[env_config(

@@ -35,7 +35,6 @@ pub const AGGREGATE_UDF_LIST: [&str; 9] = [
 
 pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
     let ast = Parser::parse_sql(&GenericDialect {}, query)?;
-
     for statement in ast.iter() {
         if let Statement::Query(query) = statement {
             if is_aggregate_in_select(query)
@@ -44,6 +43,23 @@ pub fn is_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::Parser
                 || has_join(query)
                 || has_subquery(statement)
                 || has_union(query)
+            {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+// Only select from one table, have no join, no subquery, no union, and has aggreation
+pub fn is_simple_aggregate_query(query: &str) -> Result<bool, sqlparser::parser::ParserError> {
+    let ast = Parser::parse_sql(&GenericDialect {}, query)?;
+    for statement in ast.iter() {
+        if let Statement::Query(query) = statement {
+            if is_aggregate_in_select(query)
+                && !has_join(query)
+                && !has_subquery(statement)
+                && !has_union(query)
             {
                 return Ok(true);
             }

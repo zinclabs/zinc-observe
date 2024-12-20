@@ -113,6 +113,7 @@ jobs:
             "join.spec.js",
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
+            "enrichment.spec.js",
             
             
           ]

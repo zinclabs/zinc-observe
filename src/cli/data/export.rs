@@ -66,6 +66,8 @@ impl Context for Export {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            streaming_output: false,
+            streaming_id: None,
         };
 
         let req = search::Request {

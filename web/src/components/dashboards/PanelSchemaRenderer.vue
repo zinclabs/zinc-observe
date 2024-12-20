@@ -182,7 +182,7 @@ import {
 import { useStore } from "vuex";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
-import { getAllDashboardsByFolderId, getFoldersList } from "@/utils/commons";
+import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { onUnmounted } from "vue";
 import { b64EncodeUnicode } from "@/utils/zincutils";
@@ -822,9 +822,13 @@ export default defineComponent({
             store,
             folderId,
           );
-          const dashboardData = allDashboardData.find(
-            (dashboard: any) => dashboard.title == drilldownData.data.dashboard,
-          );
+
+          const dashboardId = allDashboardData?.find(
+            (dashboard: any) =>
+              dashboard.title === drilldownData.data.dashboard
+          )?.dashboardId;
+
+          const dashboardData = await getDashboard(store, dashboardId, folderId);
 
           if (!dashboardData) {
             console.error(

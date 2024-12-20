@@ -49,7 +49,10 @@ use crate::{
     common::infra::cluster as infra_cluster,
     service::search::{
         datafusion::{
-            distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
+            distributed_plan::{
+                remote_scan::RemoteScanExec,
+                rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+            },
             exec::{prepare_datafusion_context, register_udf},
             optimizer::generate_optimizer_rules,
             table_provider::empty_table::NewEmptyTable,
@@ -369,6 +372,9 @@ pub async fn run_datafusion(
         }
     }
 
+    let streaming_output = req.streaming_output;
+    let streaming_id = req.streaming_id.clone();
+
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
         req,
@@ -393,6 +399,13 @@ pub async fn run_datafusion(
                 .remote_scan_nodes
                 .get_remote_node(table_name.as_str()),
         )?);
+    }
+
+    // TODO: how to clean up the streaming cache
+    // check for streaming aggregation query
+    if streaming_output {
+        let mut rewriter = StreamingAggsRewriter::new(streaming_id.unwrap());
+        physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
     }
 
     if cfg.common.print_key_sql {

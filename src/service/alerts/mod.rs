@@ -334,6 +334,8 @@ impl QueryConditionExt for QueryCondition {
                         None
                     },
                     skip_wal: false,
+                    streaming_output: false,
+                    streaming_id: None,
                 },
                 encoding: config::meta::search::RequestEncoding::Empty,
                 regions: vec![],

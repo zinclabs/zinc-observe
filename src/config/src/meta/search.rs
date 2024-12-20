@@ -117,6 +117,11 @@ pub struct Query {
     pub query_fn: Option<String>,
     #[serde(default)]
     pub skip_wal: bool,
+    // streaming output
+    #[serde(default)]
+    pub streaming_output: bool,
+    #[serde(default)]
+    pub streaming_id: Option<String>,
 }
 
 fn default_size() -> i64 {
@@ -138,6 +143,8 @@ impl Default for Query {
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
+            streaming_output: false,
+            streaming_id: None,
         }
     }
 }
@@ -351,6 +358,8 @@ pub struct SearchPartitionRequest {
     pub clusters: Vec<String>,
     #[serde(default)]
     pub query_fn: Option<String>,
+    #[serde(default)]
+    pub streaming_output: bool,
 }
 
 impl SearchPartitionRequest {
@@ -385,6 +394,9 @@ pub struct SearchPartitionResponse {
     pub max_query_range: i64, // hours, for histogram
     pub partitions: Vec<[i64; 2]>,
     pub order_by: OrderBy,
+    pub streaming_output: bool,
+    pub streaming_aggs: bool,
+    pub streaming_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, ToSchema)]
@@ -440,6 +452,8 @@ impl SearchHistoryRequest {
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
+                streaming_output: false,
+                streaming_id: None,
             },
             encoding: RequestEncoding::Empty,
             regions: Vec::new(),
@@ -878,6 +892,8 @@ pub struct MultiSearchPartitionRequest {
     pub clusters: Vec<String>,
     #[serde(default)]
     pub query_fn: Option<String>,
+    #[serde(default)]
+    pub streaming_output: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
@@ -1003,6 +1019,8 @@ impl MultiStreamRequest {
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn,
                     skip_wal: self.skip_wal,
+                    streaming_output: false,
+                    streaming_id: None,
                 },
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),
@@ -1088,6 +1106,8 @@ mod tests {
                 uses_zo_fn: false,
                 query_fn: None,
                 skip_wal: false,
+                streaming_output: false,
+                streaming_id: None,
             },
             encoding: "base64".into(),
             regions: vec![],

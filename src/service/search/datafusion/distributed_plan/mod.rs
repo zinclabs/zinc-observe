@@ -28,6 +28,7 @@ pub mod empty_exec;
 pub mod node;
 pub mod remote_scan;
 pub mod rewrite;
+pub mod streaming_aggs_exec;
 
 pub struct NewEmptyExecVisitor {
     data: Option<Arc<dyn ExecutionPlan>>,

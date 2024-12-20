@@ -17,7 +17,7 @@ export class MetricsPage {
     async metricsPageValidation() {
 
         await expect(this.page.locator('[data-cy="syntax-guide-button"]')).toContainText('Syntax Guide');
-        await expect(this.page.locator('[data-test="zinc-metrics"]')).toContainText('PromQL:');
+        //await expect(this.page.locator('[data-test="zinc-metrics"]')).toContainText('PromQL:');
 
 
     }

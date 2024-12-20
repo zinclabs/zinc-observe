@@ -28,13 +28,16 @@ use datafusion::{
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes, Result};
 use o2_enterprise::enterprise::super_cluster::search::get_cluster_nodes;
-use proto::cluster_rpc::{self};
+use proto::cluster_rpc;
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::search::{
     cluster::flight::{generate_context, register_table},
-    datafusion::distributed_plan::{remote_scan::RemoteScanExec, rewrite::RemoteScanRewriter},
+    datafusion::distributed_plan::{
+        remote_scan::RemoteScanExec,
+        rewrite::{RemoteScanRewriter, StreamingAggsRewriter},
+    },
     request::Request,
     sql::Sql,
     utils::ScanStatsVisitor,
@@ -51,6 +54,7 @@ pub async fn search(
     trace_id: &str,
     sql: Arc<Sql>,
     mut req: Request,
+    _query: cluster_rpc::SearchQuery,
     req_regions: Vec<String>,
     req_clusters: Vec<String>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, usize, bool, usize, String)> {
@@ -214,6 +218,9 @@ async fn run_datafusion(
         })
         .collect::<HashMap<_, _>>();
 
+    let streaming_output = req.streaming_output;
+    let streaming_id = req.streaming_id.clone();
+
     let context = tracing::Span::current().context();
     let mut rewrite = RemoteScanRewriter::new(
         req,
@@ -241,6 +248,13 @@ async fn run_datafusion(
             physical_plan,
             rewrite.remote_scan_nodes.get_remote_node(table_name),
         )?);
+    }
+
+    // TODO: how to clean up the streaming cache
+    // check for streaming aggregation query
+    if streaming_output {
+        let mut rewriter = StreamingAggsRewriter::new(streaming_id.unwrap());
+        physical_plan = physical_plan.rewrite(&mut rewriter)?.data;
     }
 
     if cfg.common.print_key_sql {

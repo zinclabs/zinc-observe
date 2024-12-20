@@ -537,16 +537,30 @@ export default defineComponent({
           spinner: true,
           message: "Please wait while loading dashboards...",
         });
-        await getAllDashboardsByFolderId(store, activeFolderId.value);
-        dismiss();
-        searchAcrossFolders.value = false;
-        router.push({
-          path: "/dashboards",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-            folder: activeFolderId.value,
-          },
-        });
+        try {
+          const response = await getAllDashboardsByFolderId(
+            store,
+            activeFolderId.value,
+          );
+
+          dashboardList.value = response || [];
+        } catch (error) {
+          console.error("Error loading dashboards:", error);
+          showErrorNotification(
+            error?.message ||
+              "Failed to load dashboards for the selected folder.",
+          );
+        } finally {
+          dismiss();
+          searchAcrossFolders.value = false;
+          router.push({
+            path: "/dashboards",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+            },
+          });
+        }
       },
       { deep: true },
     );
@@ -634,71 +648,76 @@ export default defineComponent({
     };
 
     const routeToViewD = (row) => {
-      const selectedDashboard = store.state.organizationData.allDashboardList[
-        activeFolderId.value
-      ].find((dashboard) => dashboard.dashboardId === row.id);
-      let selectedTabId = null;
-      if(!searchAcrossFolders.value){
-        selectedTabId = selectedDashboard
-        ? selectedDashboard?.tabs[0]?.tabId
-        : null;
-      }
-      else{
-        selectedTabId = row.tabs?.[0]?.tabId || null;
-      }      
       return router.push({
         path: "/dashboards/view",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.id,
-          folder:  searchAcrossFolders.value ? row.folder_id : (activeFolderId.value || "default"),
-          tab: selectedTabId,
+          folder: searchAcrossFolders.value
+            ? row.folder_id
+            : activeFolderId.value || "default",
+          // tab: selectedTabId,
         },
       });
     };
+    const dashboardList = ref([]);
     const getDashboards = async () => {
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading dashboards...",
       });
-      await getAllDashboards(store, activeFolderId.value ?? "default");
-      dismiss();
-    };
-    const dashboards = computed(function () {
-      if(!searchAcrossFolders.value || searchQuery.value == ""){
-       const dashboardList = toRaw(
-        store.state.organizationData?.allDashboardList[activeFolderId.value] ??
-          [],
-      );
-      return dashboardList.map((board: any, index) => {
-        return {
-          "#": index < 9 ? `0${index + 1}` : index + 1,
-          id: board.dashboardId,
-          name: board.title,
-          identifier: board.dashboardId,
-          description: board.description,
-          owner: board.owner,
-          created: date.formatDate(board.created, "YYYY-MM-DDTHH:mm:ssZ"),
-          actions: "true",
-        };
-      });
+      try {
+        const response = await getAllDashboards(
+          store,
+          activeFolderId.value ?? "default",
+        );
+        dashboardList.value = response;
+      } catch (err) {
+        showErrorNotification(err?.message || "Failed to load dashboards.");
+      } finally {
+        dismiss();
       }
-      else{
-        return filteredResults.value.map((board: any, index) => {
-        return {
-          "#": index < 9 ? `0${index + 1}` : index + 1,
-          id: board.dashboard.dashboardId,
-          folder: board.folder_name,
-          folder_id: board.folder_id,
-          name: board.dashboard.title,
-          identifier: board.dashboard.dashboardId,
-          tabs: board.dashboard.tabs,
-          description: board.dashboard.description,
-          owner: board.dashboard.owner,
-          created: date.formatDate(board.dashboard.created, "YYYY-MM-DDTHH:mm:ssZ"),
-          actions: "true",
-        };
-      });
+    };
+
+    const mapDashboard = (
+      board: any,
+      index: number,
+      folderInfo?: { name: string; id: string },
+    ) => ({
+      "#": index < 9 ? `0${index + 1}` : index + 1,
+      id: folderInfo ? board.dashboard.dashboardId : board.dashboardId,
+      ...(folderInfo && {
+        folder: folderInfo.name,
+        folder_id: folderInfo.id,
+      }),
+      name: folderInfo ? board.dashboard.title : board.title,
+      identifier: folderInfo ? board.dashboard.dashboardId : board.dashboardId,
+      description: folderInfo ? board.dashboard.description : board.description,
+      owner: folderInfo ? board.dashboard.owner : board.owner,
+      created: date.formatDate(
+        folderInfo ? board.dashboard.created : board.created,
+        "YYYY-MM-DDTHH:mm:ssZ",
+      ),
+      actions: "true",
+    });
+
+    const dashboards = computed(function () {
+      if (!searchAcrossFolders.value || searchQuery.value == "") {
+        const dashboardList = toRaw(
+          store.state.organizationData?.allDashboardList[
+            activeFolderId.value
+          ] ?? [],
+        );
+        return dashboardList.map((board: any, index) =>
+          mapDashboard(board, index),
+        );
+      } else {
+        return filteredResults.value.map((board: any, index) =>
+          mapDashboard(board, index, {
+            name: board.folder_name,
+            id: board.folder_id,
+          }),
+        );
       }
     });
 

@@ -68,6 +68,7 @@ pub async fn search(
             &trace_id,
             sql.clone(),
             req,
+            query,
             _req_regions,
             _req_clusters,
         )

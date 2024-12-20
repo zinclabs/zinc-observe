@@ -28,7 +28,11 @@ use config::{
         stream::{FileKey, StreamParams, StreamPartition, StreamType},
     },
     metrics,
-    utils::{base64, json, schema::filter_source_by_partition_key, sql::is_aggregate_query},
+    utils::{
+        base64, json,
+        schema::filter_source_by_partition_key,
+        sql::{is_aggregate_query, is_simple_aggregate_query},
+    },
 };
 use hashbrown::HashMap;
 use infra::{
@@ -156,7 +160,7 @@ pub async fn search(
 
     let query: SearchQuery = in_req.query.clone().into();
     let req_query = query.clone();
-    let request = crate::service::search::request::Request::new(
+    let mut request = crate::service::search::request::Request::new(
         trace_id.clone(),
         org_id.to_string(),
         stream_type,
@@ -165,6 +169,9 @@ pub async fn search(
         Some((query.start_time, query.end_time)),
         in_req.search_type.map(|v| v.to_string()),
     );
+    if in_req.query.streaming_output {
+        request.set_streaming_output(true, in_req.query.streaming_id.clone());
+    }
 
     let span = tracing::span::Span::current();
     let handle = tokio::task::spawn(
@@ -570,7 +577,18 @@ pub async fn search_partition(
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
     let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
-    let skip_get_file_list = ts_column.is_none() || apply_over_hits;
+    let is_streaming_aggregate = ts_column.is_none()
+        && is_simple_aggregate_query(&req.sql).unwrap_or(false)
+        && cfg.common.feature_query_streaming_aggs;
+    let mut skip_get_file_list = ts_column.is_none() || apply_over_hits;
+
+    // if need streaming output and is simple query, we shouldn't skip file list
+    if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
+        log::info!(
+            "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
+        );
+        skip_get_file_list = false;
+    }
 
     let mut files = Vec::new();
 
@@ -663,6 +681,13 @@ pub async fn search_partition(
         histogram_interval: sql.histogram_interval,
         partitions: vec![],
         order_by: OrderBy::Desc,
+        streaming_output: req.streaming_output,
+        streaming_aggs: req.streaming_output && is_streaming_aggregate,
+        streaming_id: if req.streaming_output && is_streaming_aggregate {
+            Some(ider::uuid())
+        } else {
+            None
+        },
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -1139,6 +1164,7 @@ pub async fn search_partition_multi(
                 regions: req.regions.clone(),
                 clusters: req.clusters.clone(),
                 query_fn: req.query_fn.clone(),
+                streaming_output: req.streaming_output,
             },
         )
         .await

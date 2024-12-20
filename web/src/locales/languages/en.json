@@ -68,6 +68,7 @@
     "auto": "Auto"
   },
   "search": {
+    "metrics": "Metrics",
     "selectIndex": "Select Stream First",
     "typeSearch": "Type your search query here.",
     "searchField": "Search for a field",
