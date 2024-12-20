@@ -56,11 +56,10 @@ pub fn fuzzy_match_expr_impl() -> ScalarFunctionImplementation {
         }
         let args = ColumnarValue::values_to_arrays(args)?;
 
-        // 1. cast both arguments to string. These casts MUST be aligned with the signature or this
-        //    function panics!
-        let haystack = as_string_array(&args[0]).expect("cast failed");
-        let needle = as_string_array(&args[1]).expect("cast failed");
-        let distance = as_int64_array(&args[2]).expect("cast failed");
+        // 1. cast both arguments to be aligned with the signature
+        let haystack = as_string_array(&args[0])?;
+        let needle = as_string_array(&args[1])?;
+        let distance = as_int64_array(&args[2])?;
 
         // 2. perform the computation
         let array = zip(haystack.iter(), zip(needle.iter(), distance.iter()))

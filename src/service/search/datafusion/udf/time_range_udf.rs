@@ -18,9 +18,10 @@ use std::{iter::zip, sync::Arc};
 use config::utils::{str, time};
 use datafusion::{
     arrow::{
-        array::{ArrayRef, BooleanArray, Int64Array, StringArray},
+        array::{ArrayRef, BooleanArray},
         datatypes::DataType,
     },
+    common::cast::{as_int64_array, as_string_array},
     error::DataFusionError,
     logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
@@ -57,20 +58,10 @@ pub fn time_range_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Result
 
     let args = ColumnarValue::values_to_arrays(args)?;
 
-    // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
-    //    function panics!
-    let base = &args[0]
-        .as_any()
-        .downcast_ref::<Int64Array>()
-        .expect("cast failed");
-    let min = &args[1]
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .expect("cast failed");
-    let max = &args[2]
-        .as_any()
-        .downcast_ref::<StringArray>()
-        .expect("cast failed");
+    // 1. cast both arguments to be aligned with the signature
+    let base = as_int64_array(&args[0])?;
+    let min = as_string_array(&args[1])?;
+    let max = as_string_array(&args[2])?;
 
     // 2. perform the computation
     let array = zip(base.iter(), zip(min.iter(), max.iter()))
@@ -113,6 +104,7 @@ pub fn time_range_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Result
 mod tests {
     use datafusion::{
         arrow::{
+            array::{Int64Array, StringArray},
             datatypes::{Field, Schema},
             record_batch::RecordBatch,
         },

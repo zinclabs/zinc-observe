@@ -58,11 +58,10 @@ pub fn date_format_expr_impl(args: &[ColumnarValue]) -> datafusion::error::Resul
     }
     let args = ColumnarValue::values_to_arrays(args)?;
 
-    // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
-    //    function panics!
-    let timestamp = as_int64_array(&args[0]).expect("cast failed");
-    let format = as_string_array(&args[1]).expect("cast failed");
-    let timezone = as_string_array(&args[2]).expect("cast failed");
+    // 1. cast both arguments to be aligned with the signature
+    let timestamp = as_int64_array(&args[0])?;
+    let format = as_string_array(&args[1])?;
+    let timezone = as_string_array(&args[2])?;
 
     // 2. perform the computation
     let array = zip(timestamp.iter(), zip(format.iter(), timezone.iter()))

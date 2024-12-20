@@ -45,8 +45,7 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
     }
 
     let now = config::utils::time::now();
-    let date = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
-    let data_lifecycle_end = date.format("%Y-%m-%d").to_string();
+    let data_lifecycle_end = now - Duration::try_days(cfg.compact.data_retention_days).unwrap();
 
     let orgs = db::schema::list_organizations_from_cache().await;
     for org_id in orgs {
@@ -70,16 +69,19 @@ pub async fn run_retention() -> Result<(), anyhow::Error> {
                         .await
                         .unwrap_or_default();
                 let stream_data_retention_end = if stream_settings.data_retention > 0 {
-                    let date = now - Duration::try_days(stream_settings.data_retention).unwrap();
-                    date.format("%Y-%m-%d").to_string()
+                    now - Duration::try_days(stream_settings.data_retention).unwrap()
                 } else {
-                    data_lifecycle_end.clone()
+                    data_lifecycle_end
                 };
+
+                let extended_retention_days = &stream_settings.extended_retention_days;
+                // creates jobs to delete data
                 if let Err(e) = retention::delete_by_stream(
                     &stream_data_retention_end,
                     &org_id,
                     stream_type,
                     &stream_name,
+                    extended_retention_days,
                 )
                 .await
                 {

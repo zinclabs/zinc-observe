@@ -386,7 +386,7 @@ mod tests {
 
     async fn e2e_post_stream_settings() {
         let auth = setup();
-        let body_str = r#"{"partition_keys":{"add":[{"field":"test_key"}],"remove":[]}, "full_text_search_keys":{"add":["log"],"remove":[]}}"#;
+        let body_str = r#"{"partition_keys":{"add":[{"field":"test_key"}],"remove":[]}, "full_text_search_keys":{"add":["city"],"remove":[]}}"#;
         // app
         let thread_id: usize = 0;
         let app = test::init_service(

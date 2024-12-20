@@ -262,7 +262,11 @@ async fn get_remote_batch(
     let start = std::time::Instant::now();
 
     // the schema should be the first message returned, else client should error
-    let flight_data = stream.message().await.unwrap().unwrap();
+    let flight_data = match stream.message().await {
+        Ok(Some(flight_data)) => flight_data,
+        Ok(None) => return Err(DataFusionError::Execution("No schema returned".to_string())),
+        Err(e) => return Err(DataFusionError::Execution(e.to_string())),
+    };
     // convert FlightData to a stream
     let schema = Arc::new(Schema::try_from(&flight_data)?);
 

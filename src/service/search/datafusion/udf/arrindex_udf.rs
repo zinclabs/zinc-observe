@@ -60,12 +60,11 @@ pub fn arr_index_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Colum
     let args = ColumnarValue::values_to_arrays(args)?;
     // log::debug!("Got the args: {:#?}", args);
 
-    // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
-    //    function panics!
-    let arr_field1 = as_string_array(&args[0]).expect("cast failed");
-    let start = as_int64_array(&args[1]).expect("cast failed");
+    // 1. cast both arguments to be aligned with the signature
+    let arr_field1 = as_string_array(&args[0])?;
+    let start = as_int64_array(&args[1])?;
     let end = if args.len() == 3 {
-        let end = as_int64_array(&args[2]).expect("cast failed");
+        let end = as_int64_array(&args[2])?;
         if !end.is_empty() {
             Some(end.value(0))
         } else {

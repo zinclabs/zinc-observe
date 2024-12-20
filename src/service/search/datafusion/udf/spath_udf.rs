@@ -55,10 +55,9 @@ pub fn spath_impl(args: &[ColumnarValue]) -> datafusion::error::Result<ColumnarV
     let args = ColumnarValue::values_to_arrays(args)?;
     // log::debug!("Got the args: {:#?}", args);
 
-    // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
-    //    function panics!
-    let field = as_string_array(&args[0]).expect("cast failed");
-    let path = as_string_array(&args[1]).expect("cast failed");
+    // 1. cast both arguments to be aligned with the signature
+    let field = as_string_array(&args[0])?;
+    let path = as_string_array(&args[1])?;
 
     // 2. perform the computation
     let array = zip(field.iter(), path.iter())

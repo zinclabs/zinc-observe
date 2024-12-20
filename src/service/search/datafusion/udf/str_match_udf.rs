@@ -66,10 +66,9 @@ pub fn str_match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementati
         }
         let args = ColumnarValue::values_to_arrays(args)?;
 
-        // 1. cast both arguments to string. These casts MUST be aligned with the signature or this
-        //    function panics!
-        let haystack = as_string_array(&args[0]).expect("cast failed");
-        let needle = as_string_array(&args[1]).expect("cast failed");
+        // 1. cast both arguments to be aligned with the signature
+        let haystack = as_string_array(&args[0])?;
+        let needle = as_string_array(&args[1])?;
 
         // 2. perform the computation
         let array = haystack

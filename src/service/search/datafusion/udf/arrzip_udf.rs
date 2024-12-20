@@ -57,11 +57,10 @@ pub fn arr_zip_impl(args: &[ColumnarValue]) -> datafusion::error::Result<Columna
     let args = ColumnarValue::values_to_arrays(args)?;
     // log::debug!("Got the args: {:#?}", args);
 
-    // 1. cast both arguments to Union. These casts MUST be aligned with the signature or this
-    //    function panics!
-    let arr_field1 = as_string_array(&args[0]).expect("cast failed");
-    let arr_field2 = as_string_array(&args[1]).expect("cast failed");
-    let delim = as_string_array(&args[2]).expect("cast failed");
+    // 1. cast both arguments to be aligned with the signature
+    let arr_field1 = as_string_array(&args[0])?;
+    let arr_field2 = as_string_array(&args[1])?;
+    let delim = as_string_array(&args[2])?;
 
     // 2. perform the computation
     let array = zip(arr_field1.iter(), zip(arr_field2.iter(), delim.iter()))

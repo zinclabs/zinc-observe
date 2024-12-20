@@ -21,6 +21,7 @@ use datafusion::{
         array::{Array, ArrayRef, StringArray},
         datatypes::DataType,
     },
+    common::cast::as_string_array,
     error::Result,
     logical_expr::{ColumnarValue, ScalarUDF, Volatility},
     prelude::create_udf,
@@ -85,10 +86,7 @@ fn get_udf_vrl(
         for i in 0..len {
             let mut obj_str = String::from("");
             for (j, arg) in args.iter().enumerate() {
-                let col = arg
-                    .as_any()
-                    .downcast_ref::<StringArray>()
-                    .expect("cast failed");
+                let col = as_string_array(&arg)?;
                 obj_str.push_str(&format!(
                     " .{} = \"{}\" \n",
                     in_params.get(j).unwrap(),

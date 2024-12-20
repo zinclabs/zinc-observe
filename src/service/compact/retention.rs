@@ -13,41 +13,149 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
 use config::{
     cluster::LOCAL_NODE,
     get_config, is_local_disk_storage,
     meta::stream::{
-        FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType,
+        FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType, TimeRange,
     },
-    utils::time::BASE_TIME,
+    utils::time::{hour_micros, BASE_TIME},
 };
 use infra::{cache, dist_lock, file_list as infra_file_list};
+use itertools::Itertools;
 
 use crate::{
     common::infra::cluster::get_node_by_uuid,
     service::{db, file_list},
 };
 
+/// This function will split the original time range based on the exclude range
+/// It expects a mutable reference to a Vec which will be populated with the split time ranges
+/// The limit for the red day retention period considered is extended_data_retention_days +
+/// data_retention_days.
+/// The original time range will change as per the exclude range. There are two cases which can
+/// occur
+/// 1. The exclude range is completely inside the original time range
+///   - in this case the original time range will be updated to the last split range
+/// 2. The exclude range is partially inside the original time range
+///   - in this case the original time range will be updated to an empty range
+///
+/// Returns the number of jobs created
+fn generate_time_ranges_for_deletion(
+    extended_retention_ranges: Vec<TimeRange>,
+    original_time_range: TimeRange,
+    last_retained_time: i64,
+) -> Vec<TimeRange> {
+    // first we flatten out the overlapping red days
+    let extended_retention_ranges_iter =
+        TimeRange::flatten_overlapping_ranges(extended_retention_ranges).into_iter();
+
+    log::debug!(
+        "[COMPACT] populate_time_ranges_for_deletion exclude_range: {}, original_time_range: {}",
+        extended_retention_ranges_iter.clone().join(", "),
+        original_time_range.clone()
+    );
+
+    let filtered_extended_ranges = extended_retention_ranges_iter
+        // filter out the ranges which are out of scope and mutate the ranges which are partially
+        // inside the original time range
+        .filter_map(|range| {
+            if range.start > original_time_range.end {
+                None
+            } else if range.end > original_time_range.end {
+                Some(TimeRange::new(
+                    range.start,
+                    original_time_range.end,
+                ))
+            } else {
+                Some(range)
+            }
+        })
+        // filter out the ranges which are older than the last retained time
+        .filter_map(|range| {
+            if range.end < last_retained_time {
+                None
+            } else if range.start < last_retained_time {
+                Some(TimeRange::new(
+                    last_retained_time,
+                    range.end,
+                ))
+            } else {
+                Some(range)
+            }
+        })
+        // sort the ranges by start time
+        .sorted_by(|x, x1| x.start.cmp(&x1.start))
+        .collect::<Vec<TimeRange>>();
+
+    let mut time_ranges_for_deletion = vec![];
+    let mut last_split_range_opt = Some(original_time_range);
+
+    for mut extended_range in filtered_extended_ranges {
+        if let Some(ref last_split_range) = last_split_range_opt {
+            if extended_range.end + hour_micros(24) != last_split_range.end {
+                extended_range.end += hour_micros(24); // add one day to make it exclusive
+            }
+            match last_split_range.split_by_range(&extended_range) {
+                Ok((Some(left), Some(right))) => {
+                    time_ranges_for_deletion.push(left);
+                    last_split_range_opt = Some(right);
+                }
+                Ok((None, Some(right))) => {
+                    last_split_range_opt = Some(right);
+                }
+                Ok((Some(left), None)) => {
+                    time_ranges_for_deletion.push(left);
+                    last_split_range_opt = None;
+                    break;
+                }
+                Ok((None, None)) => {
+                    last_split_range_opt = None;
+                    break;
+                }
+                Err(_) => {
+                    // if the split fails then we can skip the range
+                    continue;
+                }
+            }
+        } else {
+            break;
+        }
+    }
+
+    if let Some(range) = last_split_range_opt {
+        time_ranges_for_deletion.push(range);
+    }
+
+    log::debug!(
+        "[COMPACT] populate_time_ranges_for_deletion time_ranges_for_deletion: {}",
+        time_ranges_for_deletion.iter().join(", ")
+    );
+
+    time_ranges_for_deletion
+}
+
+/// Creates delete jobs for the stream based on the stream settings
+/// Returns the number of jobs created
 pub async fn delete_by_stream(
-    lifecycle_end: &str,
+    lifecycle_end: &DateTime<Utc>,
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
-) -> Result<(), anyhow::Error> {
+    extended_retentions: &[TimeRange],
+) -> Result<u32, anyhow::Error> {
     // get schema
     let stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
     let created_at = stats.doc_time_min;
     if created_at == 0 {
-        return Ok(()); // no data, just skip
+        return Ok(0); // no data, just skip
     }
     let created_at: DateTime<Utc> = Utc.timestamp_nanos(created_at * 1000);
-    let lifecycle_start = created_at.format("%Y-%m-%d").to_string();
-    let lifecycle_start = lifecycle_start.as_str();
-    if lifecycle_start.ge(lifecycle_end) {
-        return Ok(()); // created_at is after lifecycle_end, just skip
+    if created_at >= *lifecycle_end {
+        return Ok(0); // created_at is after lifecycle end, just skip
     }
 
     log::debug!(
@@ -55,31 +163,70 @@ pub async fn delete_by_stream(
         org_id,
         stream_type,
         stream_name,
-        lifecycle_start,
-        lifecycle_end
+        created_at.format("%Y-%m-%d").to_string().as_str(),
+        lifecycle_end.format("%Y-%m-%d").to_string().as_str(),
     );
 
-    // Hack for 1970-01-01
-    if lifecycle_start.le("1970-01-01") {
-        let lifecycle_end = created_at + Duration::try_days(1).unwrap();
-        let lifecycle_end = lifecycle_end.format("%Y-%m-%d").to_string();
-        return db::compact::retention::delete_stream(
+    if created_at.ge(lifecycle_end) {
+        return Ok(0); // created_at is after lifecycle end, just skip
+    }
+
+    // last extended retention time
+    let last_retained_time = (*lifecycle_end
+        - Duration::try_days(get_config().compact.extended_data_retention_days).unwrap())
+    .timestamp_micros();
+    // time range of deletion
+    let original_deletion_time_range = TimeRange::new(
+        created_at.timestamp_micros(),
+        lifecycle_end.timestamp_micros(),
+    );
+
+    let final_deletion_time_ranges = generate_time_ranges_for_deletion(
+        extended_retentions.to_vec(),
+        original_deletion_time_range,
+        last_retained_time,
+    );
+
+    log::debug!(
+        "[COMPACT] extended_retentions: {}, final_deletion_time_ranges: {}",
+        extended_retentions.iter().join(", "),
+        final_deletion_time_ranges.iter().join(", ")
+    );
+
+    let job_nos = final_deletion_time_ranges.len();
+
+    for time_range in final_deletion_time_ranges {
+        let time_range_start = Utc
+            .timestamp_nanos(time_range.start * 1000)
+            .format("%Y-%m-%d")
+            .to_string();
+        let time_range_end = Utc
+            .timestamp_nanos(time_range.end * 1000)
+            .format("%Y-%m-%d")
+            .to_string();
+        if time_range_start >= time_range_end {
+            continue;
+        }
+
+        log::debug!(
+            "[COMPACT] delete_by_stream {}/{}/{}/{},{}",
             org_id,
             stream_type,
             stream_name,
-            Some((lifecycle_start, lifecycle_end.as_str())),
+            time_range_start,
+            time_range_end,
+        );
+
+        db::compact::retention::delete_stream(
+            org_id,
+            stream_type,
+            stream_name,
+            Some((time_range_start.as_str(), time_range_end.as_str())),
         )
-        .await;
+        .await?;
     }
 
-    // delete files
-    db::compact::retention::delete_stream(
-        org_id,
-        stream_type,
-        stream_name,
-        Some((lifecycle_start, lifecycle_end)),
-    )
-    .await
+    Ok(job_nos as u32)
 }
 
 pub async fn delete_all(
@@ -233,18 +380,15 @@ pub async fn delete_by_date(
 
     let cfg = get_config();
     if is_local_disk_storage() {
-        while date_start <= date_end {
-            let data_dir = format!(
-                "{}files/{org_id}/{stream_type}/{stream_name}/{}",
-                cfg.common.data_stream_dir,
-                date_start.format("%Y/%m/%d")
-            );
-            let path = std::path::Path::new(&data_dir);
-            if path.exists() {
-                tokio::fs::remove_dir_all(path).await?;
-            }
-            date_start += Duration::try_days(1).unwrap();
+        let dirs_to_delete =
+            generate_local_dirs(org_id, stream_type, stream_name, date_start, date_end);
+
+        // Delete all collected directories in parallel
+        let mut delete_tasks = vec![];
+        for dir in dirs_to_delete {
+            delete_tasks.push(tokio::fs::remove_dir_all(dir));
         }
+        futures::future::try_join_all(delete_tasks).await?;
     } else {
         // delete files from s3
         // first fetch file list from local cache
@@ -339,6 +483,7 @@ async fn delete_from_file_list(
 
     let mut hours_files: HashMap<String, Vec<FileKey>> = HashMap::with_capacity(24);
     for file in files {
+        let index_size = file.meta.index_size;
         stream_stats = stream_stats - file.meta;
         let file_name = file.key.clone();
         let columns: Vec<_> = file_name.split('/').collect();
@@ -349,7 +494,10 @@ async fn delete_from_file_list(
         let entry = hours_files.entry(hour_key).or_default();
         entry.push(FileKey {
             key: file_name,
-            meta: FileMeta::default(),
+            meta: FileMeta {
+                index_size,
+                ..Default::default()
+            },
             deleted: true,
             segment_ids: None,
         });
@@ -434,8 +582,103 @@ async fn write_file_list(
     Ok(())
 }
 
+fn generate_local_dirs(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    mut date_start: DateTime<Utc>,
+    date_end: DateTime<Utc>,
+) -> Vec<PathBuf> {
+    let cfg = get_config();
+    let mut dirs_to_delete = Vec::new();
+    while date_start <= date_end {
+        // Handle yearly chunks
+        if date_start.month() == 1
+            && date_start.day() == 1
+            && (date_start + Duration::days(365)).year() <= date_end.year()
+        {
+            // stream data
+            let year_dir = format!(
+                "{}files/{org_id}/{stream_type}/{stream_name}/{}",
+                cfg.common.data_stream_dir,
+                date_start.format("%Y")
+            );
+            let year_path = std::path::Path::new(&year_dir);
+            if year_path.exists() {
+                dirs_to_delete.push(year_path.to_path_buf());
+            }
+            // index data
+            let year_dir = format!(
+                "{}files/{org_id}/index/{stream_name}_{stream_type}/{}",
+                cfg.common.data_stream_dir,
+                date_start.format("%Y")
+            );
+            let year_path = std::path::Path::new(&year_dir);
+            if year_path.exists() {
+                dirs_to_delete.push(year_path.to_path_buf());
+            }
+            date_start += Duration::days(365);
+            continue;
+        }
+
+        // Handle monthly chunks
+        if date_start.day() == 1 && (date_start + Duration::days(30)).month() != date_start.month()
+        {
+            // stream data
+            let month_dir = format!(
+                "{}files/{org_id}/{stream_type}/{stream_name}/{}",
+                cfg.common.data_stream_dir,
+                date_start.format("%Y/%m")
+            );
+            let month_path = std::path::Path::new(&month_dir);
+            if month_path.exists() {
+                dirs_to_delete.push(month_path.to_path_buf());
+            }
+            // index data
+            let month_dir = format!(
+                "{}files/{org_id}/index/{stream_name}_{stream_type}/{}",
+                cfg.common.data_stream_dir,
+                date_start.format("%Y/%m")
+            );
+            let month_path = std::path::Path::new(&month_dir);
+            if month_path.exists() {
+                dirs_to_delete.push(month_path.to_path_buf());
+            }
+            date_start += Duration::days(30); // Move to the next month
+            continue;
+        }
+
+        // Handle leftover day ranges
+        // stream data
+        let day_dir = format!(
+            "{}files/{org_id}/{stream_type}/{stream_name}/{}",
+            cfg.common.data_stream_dir,
+            date_start.format("%Y/%m/%d")
+        );
+        let day_path = std::path::Path::new(&day_dir);
+        if day_path.exists() {
+            dirs_to_delete.push(day_path.to_path_buf());
+        }
+        // index data
+        let day_dir = format!(
+            "{}files/{org_id}/index/{stream_name}_{stream_type}/{}",
+            cfg.common.data_stream_dir,
+            date_start.format("%Y/%m/%d")
+        );
+        let day_path = std::path::Path::new(&day_dir);
+        if day_path.exists() {
+            dirs_to_delete.push(day_path.to_path_buf());
+        }
+        date_start += Duration::days(1); // Move to the next day
+    }
+
+    dirs_to_delete
+}
+
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+
     use super::*;
 
     #[tokio::test]
@@ -444,8 +687,10 @@ mod tests {
         let org_id = "test";
         let stream_name = "test";
         let stream_type = config::meta::stream::StreamType::Logs;
-        let lifecycle_end = "2023-01-01";
-        delete_by_stream(lifecycle_end, org_id, stream_type, stream_name)
+        let lifecycle_end = DateTime::parse_from_rfc3339("2023-01-01T00:00:00Z")
+            .unwrap()
+            .to_utc();
+        delete_by_stream(&lifecycle_end, org_id, stream_type, stream_name, &[])
             .await
             .unwrap();
     }
@@ -457,5 +702,103 @@ mod tests {
         let stream_name = "test";
         let stream_type = config::meta::stream::StreamType::Logs;
         delete_all(org_id, stream_type, stream_name).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_populate_time_ranges() {
+        let now = Utc::now();
+        let exclude_range = TimeRange::new(
+            (now - Duration::try_days(2).unwrap()).timestamp_micros(),
+            (now - Duration::try_days(1).unwrap()).timestamp_micros(),
+        );
+        let original_time_range = TimeRange::new(
+            (now - Duration::try_days(2).unwrap()).timestamp_micros(),
+            now.timestamp_micros(),
+        );
+        let last_retained_time = (now - Duration::try_days(5).unwrap()).timestamp_micros();
+        println!("original time range : {}", original_time_range);
+        println!("red day time range : {}", exclude_range);
+        let time_ranges_to_delete = generate_time_ranges_for_deletion(
+            vec![exclude_range],
+            original_time_range.clone(),
+            last_retained_time,
+        );
+        assert_eq!(time_ranges_to_delete.len(), 1);
+        println!(
+            "res time ranges : {}",
+            time_ranges_to_delete.iter().join(", ")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_populate_time_ranges_contains() {
+        let now = Utc::now();
+        let original_time_range = TimeRange::new(
+            (now - Duration::try_days(15).unwrap()).timestamp_micros(),
+            now.timestamp_micros(),
+        );
+        let exclude_range = TimeRange::new(
+            (now - Duration::try_days(3).unwrap()).timestamp_micros(),
+            (now - Duration::try_days(2).unwrap()).timestamp_micros(),
+        );
+        let last_retained_time = (now - Duration::try_days(5).unwrap()).timestamp_micros();
+        println!("original time range : {}", original_time_range);
+        println!("red day time range : {}", exclude_range);
+        let res_time_ranges = generate_time_ranges_for_deletion(
+            vec![exclude_range],
+            original_time_range.clone(),
+            last_retained_time,
+        );
+        assert_eq!(res_time_ranges.len(), 2);
+        println!("res time ranges : {}", res_time_ranges.iter().join(", "));
+        assert!(res_time_ranges[0].intersects(&original_time_range));
+    }
+
+    #[tokio::test]
+    async fn test_populate_time_ranges_intersecting_ext_ret_days() {
+        let now = Utc::now();
+        let exclude_range_1 = TimeRange::new(
+            (now - Duration::try_days(20).unwrap()).timestamp_micros(),
+            (now - Duration::try_days(10).unwrap()).timestamp_micros(),
+        );
+        let exclude_range_2 = TimeRange::new(
+            (now - Duration::try_days(15).unwrap()).timestamp_micros(),
+            (now - Duration::try_days(5).unwrap()).timestamp_micros(),
+        );
+
+        let time_range =
+            TimeRange::flatten_overlapping_ranges(vec![exclude_range_1, exclude_range_2]);
+
+        assert_eq!(time_range.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_populate_time_ranges_out_of_last_retained_period() {
+        let now = Utc::now();
+        let exclude_ranges = vec![
+            TimeRange::new(
+                (now - Duration::try_days(20).unwrap()).timestamp_micros(),
+                (now - Duration::try_days(10).unwrap()).timestamp_micros(),
+            ),
+            TimeRange::new(
+                (now - Duration::try_days(8).unwrap()).timestamp_micros(),
+                (now - Duration::try_days(5).unwrap()).timestamp_micros(),
+            ),
+        ];
+
+        let original_time_range = TimeRange::new(
+            (now - Duration::try_days(30).unwrap()).timestamp_micros(),
+            now.timestamp_micros(),
+        );
+        let last_retained_time = (now - Duration::try_days(5).unwrap()).timestamp_micros();
+        let res_time_ranges = generate_time_ranges_for_deletion(
+            exclude_ranges,
+            original_time_range.clone(),
+            last_retained_time,
+        );
+
+        println!("original time range : {}", original_time_range);
+        println!("res time ranges : {}", res_time_ranges.iter().join(", "));
+        assert_eq!(res_time_ranges.len(), 2);
     }
 }
