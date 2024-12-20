@@ -230,6 +230,7 @@ pub enum WsServerEvents {
         trace_id: String,
         results: Box<config::meta::search::Response>,
         time_offset: i64,
+        streaming_aggs: bool,
     },
     #[cfg(feature = "enterprise")]
     CancelResponse {

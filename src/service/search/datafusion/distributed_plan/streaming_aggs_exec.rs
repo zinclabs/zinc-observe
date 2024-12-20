@@ -93,6 +93,7 @@ impl Default for StreamingAggsCache {
 }
 
 #[allow(dead_code)]
+// Remove cache by streaming id
 pub fn remove_cache(id: &str) {
     GLOBAL_CACHE.remove(id);
 }

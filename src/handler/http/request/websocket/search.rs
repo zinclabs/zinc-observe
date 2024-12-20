@@ -21,13 +21,11 @@ use config::{
             PARTIAL_ERROR_RESPONSE_MESSAGE,
         },
         sql::{resolve_stream_names, OrderBy},
-        stream::StreamType,
         websocket::{SearchEventReq, SearchResultType, MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE},
     },
     utils::sql::is_aggregate_query,
 };
 use infra::errors::Error;
-use proto::cluster_rpc::SearchQuery;
 use tracing::Instrument;
 
 use super::utils::cancellation_registry_cache_utils;
@@ -43,10 +41,7 @@ use crate::{
     },
     handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
     service::search::{
-        cache,
-        cache::cacher::get_ts_col_order_by,
-        sql::Sql,
-        {self as SearchService},
+        self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec, sql::Sql,
     },
 };
 
@@ -159,41 +154,40 @@ pub async fn handle_search_request(
     // Set cancel flag to stop search when cancel event is received
     cancellation_registry_cache_utils::add_cancellation_flag(&trace_id);
 
-    // search result cache only when
-    // is_partition_request and
-    // from is 0 i.e. the first page/histogram queries
-    if is_partition_request(&req.payload, stream_type, org_id).await && req.payload.query.from == 0
-    {
-        log::info!(
-            "[WS_SEARCH] trace_id: {}, Searching Cache, req_size: {}",
-            req.trace_id,
-            req_size
-        );
-        // search result cache
-        let c_resp =
-            cache::check_cache_v2(&trace_id, org_id, stream_type, &req.payload, req.use_cache)
-                .await?;
-        let local_c_resp = c_resp.clone();
-        let cached_resp = local_c_resp.cached_response;
-        let mut deltas = local_c_resp.deltas;
-        deltas.sort();
-        deltas.dedup();
+    // Search start
+    // if is_aggregate_query & don't write to result cache
+    let is_aggregate_query = is_aggregate_query(req.payload.query.sql.as_str())
+        .map_err(|e| Error::Message(e.to_string()))?;
 
-        let cached_hits = cached_resp
-            .iter()
-            .fold(0, |acc, c| acc + c.cached_response.hits.len());
+    log::info!(
+        "[WS_SEARCH] trace_id: {}, Searching Cache, req_size: {}",
+        req.trace_id,
+        req_size
+    );
+    // Step 1: Search result cache
+    let c_resp =
+        cache::check_cache_v2(&trace_id, org_id, stream_type, &req.payload, req.use_cache).await?;
+    let local_c_resp = c_resp.clone();
+    let cached_resp = local_c_resp.cached_response;
+    let mut deltas = local_c_resp.deltas;
+    deltas.sort();
+    deltas.dedup();
 
-        let c_start_time = cached_resp
-            .first()
-            .map(|c| c.response_start_time)
-            .unwrap_or_default();
+    let cached_hits = cached_resp
+        .iter()
+        .fold(0, |acc, c| acc + c.cached_response.hits.len());
 
-        let c_end_time = cached_resp
-            .last()
-            .map(|c| c.response_end_time)
-            .unwrap_or_default();
+    let c_start_time = cached_resp
+        .first()
+        .map(|c| c.response_start_time)
+        .unwrap_or_default();
 
-        log::info!(
+    let c_end_time = cached_resp
+        .last()
+        .map(|c| c.response_end_time)
+        .unwrap_or_default();
+
+    log::info!(
             "[WS_SEARCH] trace_id: {}, found cache responses len:{}, with hits: {}, cache_start_time: {:#?}, cache_end_time: {:#?}",
             trace_id,
             cached_resp.len(),
@@ -202,85 +196,67 @@ pub async fn handle_search_request(
             c_end_time
         );
 
-        // handle cache responses and deltas
-        if !cached_resp.is_empty() && cached_hits > 0 {
-            // `max_query_range` is used initialize `remaining_query_range`
-            // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
-            // for cache only search
-            let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
-            let remaining_query_range = if max_query_range == 0
+    // handle cache responses and deltas
+    if !cached_resp.is_empty() && cached_hits > 0 {
+        // `max_query_range` is used initialize `remaining_query_range`
+        // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
+        // for cache only search
+        let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
+        let remaining_query_range = if max_query_range == 0
                 // disable limit for `Alerts`
                 ||  req.search_type == SearchEventType::Alerts
-            {
-                i64::MAX
-            } else {
-                max_query_range
-            }; // hours
-
-            handle_cache_responses_and_deltas(
-                req_id,
-                &req,
-                trace_id.clone(),
-                req_size,
-                cached_resp,
-                deltas,
-                accumulated_results,
-                org_id,
-                user_id,
-                max_query_range,
-                remaining_query_range,
-                &order_by,
-            )
-            .await?;
+        {
+            i64::MAX
         } else {
-            // no caches found process req directly
-            log::info!(
-                "[WS_SEARCH] trace_id: {} No cache found, processing search request",
-                trace_id
-            );
-            // disable `max_query_range` for Alerts
-            let max_query_range = if req.search_type == SearchEventType::Alerts {
-                0
-            } else {
-                get_max_query_range(&stream_names, org_id, stream_type).await
-            }; // hours
+            max_query_range
+        }; // hours
 
-            do_partitioned_search(
-                req_id,
-                &mut req,
-                &trace_id,
-                req_size,
-                org_id,
-                user_id,
-                accumulated_results,
-                max_query_range,
-            )
-            .await?;
-        }
-        // cache only the first page
-        if req.payload.query.from == 0 {
-            write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await?;
-        }
+        // Step 1(a): handle cache responses & query the deltas
+        handle_cache_responses_and_deltas(
+            req_id,
+            &req,
+            trace_id.clone(),
+            req_size,
+            cached_resp,
+            deltas,
+            accumulated_results,
+            org_id,
+            user_id,
+            max_query_range,
+            remaining_query_range,
+            &order_by,
+        )
+        .await?;
     } else {
-        // Single search (non-partitioned) for aggregate queries
+        // Step 2: Search without cache
+        // no caches found process req directly
         log::info!(
-            "[WS_SEARCH] trace_id: {} Non-partitioned search",
-            req.trace_id
+            "[WS_SEARCH] trace_id: {} No cache found, processing search request",
+            trace_id
         );
-        let end_time = req.payload.query.end_time;
-        let search_res = do_search(&req, org_id, user_id).await?;
+        // disable `max_query_range` for Alerts
+        let max_query_range = if req.search_type == SearchEventType::Alerts {
+            0
+        } else {
+            get_max_query_range(&stream_names, org_id, stream_type).await
+        }; // hours
 
-        let ws_search_res = WsServerEvents::SearchResponse {
-            trace_id: trace_id.clone(),
-            results: Box::new(search_res.clone()),
-            time_offset: end_time,
-        };
-        log::info!(
-            "[WS_SEARCH] trace_id: {} Sending single search response, hits: {}",
-            trace_id,
-            search_res.hits.len()
-        );
-        send_message(req_id, ws_search_res.to_json().to_string()).await?;
+        do_partitioned_search(
+            req_id,
+            &mut req,
+            &trace_id,
+            req_size,
+            org_id,
+            user_id,
+            accumulated_results,
+            max_query_range,
+        )
+        .await?;
+    }
+    // Step 3: Write to results cache
+    // cache only if from is 0 and is not an aggregate_query
+    if req.payload.query.from == 0 && !is_aggregate_query {
+        write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await?;
     }
 
     // Once all searches are complete, write the accumulated results to a file
@@ -328,36 +304,6 @@ fn handle_partial_response(mut res: Response) -> Response {
         };
     }
     res
-}
-
-async fn is_partition_request(
-    req: &config::meta::search::Request,
-    stream_type: StreamType,
-    org_id: &str,
-) -> bool {
-    let cfg = get_config();
-
-    let query = SearchQuery {
-        start_time: req.query.start_time,
-        end_time: req.query.end_time,
-        sql: req.query.sql.clone(),
-        ..Default::default()
-    };
-
-    let sql = match Sql::new(&query, org_id, stream_type).await {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!("[WS_HANDLER] Failed to create SQL query: {:?}", e);
-            return false;
-        }
-    };
-
-    // if there is no _timestamp field in the query, return single partition
-    let is_aggregate = is_aggregate_query(&req.query.sql).unwrap_or_default();
-    let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
-    let ts_column = res_ts_column.map(|(v, _)| v);
-
-    ts_column.is_some()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -553,6 +499,13 @@ async fn process_delta(
         return Ok(());
     }
 
+    // check if `streaming_aggs` is supported
+    let is_streaming_aggs = partition_resp.streaming_aggs;
+    if is_streaming_aggs {
+        req.payload.query.streaming_output = true;
+        req.payload.query.streaming_id = partition_resp.streaming_id.clone();
+    }
+
     log::info!(
         "[WS_SEARCH] Found {} partitions for trace_id: {}",
         partitions.len(),
@@ -564,7 +517,7 @@ async fn process_delta(
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
     }
 
-    for &[start_time, end_time] in partitions.iter() {
+    for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
         if cancellation_registry_cache_utils::is_cancelled(&trace_id) {
             log::info!(
@@ -612,7 +565,14 @@ async fn process_delta(
             }
 
             // Accumulate the result
-            accumulated_results.push(SearchResultType::Search(search_res.clone()));
+            if is_streaming_aggs {
+                // Only accumulate the results of the last partition
+                if idx == partitions.len() - 1 {
+                    accumulated_results.push(SearchResultType::Search(search_res.clone()));
+                }
+            } else {
+                accumulated_results.push(SearchResultType::Search(search_res.clone()));
+            }
 
             // `result_cache_ratio` will be 0 for delta search
             let result_cache_ratio = search_res.result_cache_ratio;
@@ -621,6 +581,7 @@ async fn process_delta(
                 trace_id: trace_id.clone(),
                 results: Box::new(search_res.clone()),
                 time_offset: end_time,
+                streaming_aggs: is_streaming_aggs,
             };
             log::info!(
                 "[WS_SEARCH]: Processing deltas for trace_id: {}, hits: {:?}",
@@ -666,6 +627,7 @@ async fn process_delta(
                 new_start_time,
                 new_end_time,
                 search_res.order_by,
+                is_streaming_aggs,
             )
             .await;
             break;
@@ -679,6 +641,11 @@ async fn process_delta(
             );
             break;
         }
+    }
+
+    // Remove the streaming_aggs cache
+    if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+        streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
     }
 
     Ok(())
@@ -697,8 +664,7 @@ async fn get_partitions(
         regions: search_payload.regions.clone(),
         clusters: search_payload.clusters.clone(),
         query_fn: search_payload.query.query_fn.clone(),
-        // TODO: fix this for streaming aggregate queries
-        streaming_output: false,
+        streaming_output: true,
     };
 
     let res = SearchService::search_partition(
@@ -763,6 +729,7 @@ async fn send_cached_responses(
         trace_id: trace_id.to_string(),
         results: Box::new(cached.cached_response.clone()),
         time_offset: cached.response_end_time,
+        streaming_aggs: false, // streaming aggs is not supported for cached responses
     };
     log::info!(
         "[WS_SEARCH]: Sending cached search response for trace_id: {}, hits: {}, result_cache_ratio: {}, accumulated_result len: {}",
@@ -807,11 +774,18 @@ async fn do_partitioned_search(
         );
     }
 
-    let partitions_resp = get_partitions(req, org_id).await?;
-    let mut partitions = partitions_resp.partitions;
+    let partition_resp = get_partitions(req, org_id).await?;
+    let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
         return Ok(());
+    }
+
+    // check if `streaming_aggs` is supported
+    let is_streaming_aggs = partition_resp.streaming_aggs;
+    if is_streaming_aggs {
+        req.payload.query.streaming_output = true;
+        req.payload.query.streaming_id = partition_resp.streaming_id.clone();
     }
 
     // sort partitions in desc by _timestamp for dashboards
@@ -828,7 +802,7 @@ async fn do_partitioned_search(
         &partitions
     );
 
-    for &[start_time, end_time] in partitions.iter() {
+    for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
         if cancellation_registry_cache_utils::is_cancelled(trace_id) {
             log::info!(
@@ -863,13 +837,21 @@ async fn do_partitioned_search(
             }
 
             // Accumulate the result
-            accumulated_results.push(SearchResultType::Search(search_res.clone()));
+            if is_streaming_aggs {
+                // Only accumulate the results of the last partition
+                if idx == partitions.len() - 1 {
+                    accumulated_results.push(SearchResultType::Search(search_res.clone()));
+                }
+            } else {
+                accumulated_results.push(SearchResultType::Search(search_res.clone()));
+            }
 
             // Send the cached response
             let ws_search_res = WsServerEvents::SearchResponse {
                 trace_id: trace_id.to_string(),
                 results: Box::new(search_res.clone()),
                 time_offset: end_time,
+                streaming_aggs: is_streaming_aggs,
             };
             send_message(req_id, ws_search_res.to_json().to_string()).await?;
         }
@@ -895,10 +877,15 @@ async fn do_partitioned_search(
             trace_id: trace_id.to_string(),
             results: Box::new(Response::default()),
             time_offset: req.payload.query.end_time,
+            streaming_aggs: is_streaming_aggs,
         };
         send_message(req_id, ws_search_res.to_json().to_string()).await?;
     }
 
+    // Remove the streaming_aggs cache
+    if is_streaming_aggs && partition_resp.streaming_id.is_some() {
+        streaming_aggs_exec::remove_cache(&partition_resp.streaming_id.unwrap())
+    }
     Ok(())
 }
 
@@ -909,6 +896,7 @@ async fn send_partial_search_resp(
     new_start_time: i64,
     new_end_time: i64,
     order_by: Option<OrderBy>,
+    is_streaming_aggs: bool,
 ) -> Result<(), Error> {
     let error = if error.is_empty() {
         PARTIAL_ERROR_RESPONSE_MESSAGE.to_string()
@@ -929,6 +917,7 @@ async fn send_partial_search_resp(
         trace_id: trace_id.to_string(),
         results: Box::new(s_resp),
         time_offset: 0,
+        streaming_aggs: is_streaming_aggs,
     };
     log::info!(
         "[WS_SEARCH]: trace_id: {} Sending partial search response",
