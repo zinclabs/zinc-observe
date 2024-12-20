@@ -155,10 +155,6 @@ pub async fn handle_search_request(
     cancellation_registry_cache_utils::add_cancellation_flag(&trace_id);
 
     // Search start
-    // if is_aggregate_query & don't write to result cache
-    let is_aggregate_query = is_aggregate_query(req.payload.query.sql.as_str())
-        .map_err(|e| Error::Message(e.to_string()))?;
-
     log::info!(
         "[WS_SEARCH] trace_id: {}, Searching Cache, req_size: {}",
         req.trace_id,
@@ -255,7 +251,7 @@ pub async fn handle_search_request(
     }
     // Step 3: Write to results cache
     // cache only if from is 0 and is not an aggregate_query
-    if req.payload.query.from == 0 && !is_aggregate_query {
+    if req.payload.query.from == 0 {
         write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await?;
     }
 
