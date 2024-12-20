@@ -63,8 +63,10 @@ pub struct OrgSummary {
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct StreamSummary {
     pub num_streams: i64,
+    pub total_records: i64,
     pub total_storage_size: f64,
     pub total_compressed_size: f64,
+    pub total_index_size: f64,
 }
 
 /// A container for passcodes and rumtokens

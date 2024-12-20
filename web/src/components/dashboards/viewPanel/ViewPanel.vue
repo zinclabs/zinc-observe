@@ -66,14 +66,24 @@
         <q-btn
           v-else
           class="q-ml-sm"
-          outline
+          :outline="isVariablesChanged ? true : false"
           padding="xs"
           no-caps
           icon="refresh"
           @click="refreshData"
           data-test="dashboard-viewpanel-refresh-data-btn"
           :disable="disable"
-        />
+          :color="isVariablesChanged ? '' : 'warning'"
+          :text-color="store.state.theme == 'dark' ? 'white' : 'black'"
+        >
+          <q-tooltip>
+            {{
+              isVariablesChanged
+                ? "Refresh"
+                : "Refresh to apply latest variable changes"
+            }}
+          </q-tooltip>
+        </q-btn>
         <q-btn
           no-caps
           @click="goBack"
@@ -121,7 +131,7 @@
                   :dashboard-id="dashboardId"
                   :folder-id="folderId"
                   :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                  :variablesData="variablesData"
+                  :variablesData="currentVariablesDataRef"
                   :width="6"
                   :searchType="searchType"
                   @error="handleChartApiError"
@@ -158,7 +168,11 @@ import {
 } from "vue";
 
 import { useI18n } from "vue-i18n";
-import { getDashboard, getPanel } from "../../../utils/commons";
+import {
+  getDashboard,
+  getPanel,
+  checkIfVariablesAreLoaded,
+} from "../../../utils/commons";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/useDashboardPanel";
@@ -175,6 +189,7 @@ import HistogramIntervalDropDown from "@/components/dashboards/addPanel/Histogra
 import { inject, provide, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
+import { isEqual } from "lodash-es";
 
 export default defineComponent({
   name: "ViewPanel",
@@ -220,6 +235,9 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+
+    const currentVariablesDataRef: any = reactive({});
+
     let parser: any;
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -234,8 +252,28 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
+    const initialVariableValues = ref<any>({}); // Store the initial variable values
+    const isVariablesChanged = ref(false); // Flag to track if variables have changed
+    let needsVariablesAutoUpdate = true;
+
     const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
+      try {
+        // update the variables data
+        Object.assign(variablesData, data);
+
+        if (needsVariablesAutoUpdate) {
+          // check if the length is > 0
+          if (checkIfVariablesAreLoaded(variablesData)) {
+            needsVariablesAutoUpdate = false;
+          }
+
+          Object.assign(currentVariablesDataRef, variablesData);
+        }
+
+        return;
+      } catch (error) {
+        console.error("Error updating variables data:", error);
+      }
 
       // resize the chart when variables data is updated
       // because if variable requires some more space then need to resize chart
@@ -334,7 +372,7 @@ export default defineComponent({
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-      }
+      },
     );
 
     const onDataZoom = (event: any) => {
@@ -420,10 +458,32 @@ export default defineComponent({
         refreshInterval.value = parseDuration(params.refresh);
       }
     });
-
+    watch(
+      () => variablesData,
+      (newVal) => {
+        const isValueChanged =
+          currentVariablesDataRef?.values?.length > 0 &&
+          variablesData.values.every((variable: any, index: number) => {
+            const prevValue = currentVariablesDataRef.values[index]?.value;
+            const newValue = variable.value;
+            // Compare current and previous values; handle both string and array cases
+            return Array.isArray(newValue)
+              ? isEqual(prevValue, newValue)
+              : prevValue === newValue;
+          });
+        // Set the `isChanged` flag if values are different
+        isVariablesChanged.value = isValueChanged;
+      },
+      { deep: true },
+    );
     const refreshData = () => {
       if (!disable.value) {
         dateTimePickerRef.value.refresh();
+        Object.assign(
+          currentVariablesDataRef,
+          JSON.parse(JSON.stringify(variablesData)),
+        );
+        isVariablesChanged.value = false;
       }
     };
 
@@ -568,6 +628,9 @@ export default defineComponent({
       cancelViewPanelQuery,
       disable,
       config,
+      currentVariablesDataRef,
+      isVariablesChanged,
+      store
     };
   },
 });

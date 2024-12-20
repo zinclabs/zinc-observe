@@ -437,7 +437,6 @@ export const updatePanel = async (
       (panel: any) => panel.id == panelData.id,
     );
     tab.panels[panelIndex] = panelData;
-    console.log("panelData", JSON.parse(JSON.stringify(panelData)));
     return await updateDashboard(
       store,
       store.state.selectedOrganization.identifier,
@@ -853,4 +852,17 @@ export const moveDashboardToAnotherFolder = async (
   } catch (error) {
     throw error;
   }
+};
+
+export const checkIfVariablesAreLoaded = (variablesData: any): boolean => {
+  if (
+    variablesData?.values?.length > 0 &&
+    variablesData?.values?.every(
+      (it: any) => !it.isLoading && !it.isVariableLoadingPending,
+    ) &&
+    !variablesData?.isVariablesLoading
+  ) {
+    return true;
+  }
+  return false;
 };

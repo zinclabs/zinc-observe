@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :multiple="variableItem.multiSelect"
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
+      @blur="applyChanges"
     >
       <template v-slot:no-option>
         <q-item>
@@ -94,6 +95,9 @@ export default defineComponent({
   props: ["modelValue", "variableItem"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
+
+    const variableName = props.variableItem?.label || props.variableItem?.name
+
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
 
@@ -130,10 +134,22 @@ export default defineComponent({
       }
     };
 
+    const applyChanges = () => {
+      if(props.variableItem.multiSelect) {
+        emitSelectedValues();
+      }
+    }
+
     // update selected value
     watch(selectedValue, () => {
-      emit("update:modelValue", selectedValue.value);
+      if(!props.variableItem.multiSelect) {
+        emitSelectedValues()
+      }
     });
+
+    const emitSelectedValues = () => {
+      emit("update:modelValue", selectedValue.value);
+    }
 
     // Display the selected value
     const displayValue = computed(() => {
@@ -172,6 +188,7 @@ export default defineComponent({
       isAllSelected,
       toggleSelectAll,
       displayValue,
+      applyChanges
     };
   },
 });

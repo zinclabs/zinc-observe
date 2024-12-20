@@ -159,6 +159,8 @@ test.describe("dashboard variables setting", () => {
     await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
     await page.getByText('kubernetes_namespace_name').click();
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-settings-close-btn"]').click();
     await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
   });
 
@@ -191,6 +193,8 @@ test.describe("dashboard variables setting", () => {
     await page.locator('[data-test="dashboard-variable-max-record-size"]').fill('2');
     await page.locator('[data-test="dashboard-query_values-show_multiple_values"] div').nth(2).click();
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-settings-close-btn"]').click();
     await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
   });
 
@@ -291,6 +295,7 @@ test.describe("dashboard variables setting", () => {
     await page.locator('[data-test="dashboard-variable-constant-value"]').fill('200');
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
     await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-settings-close-btn"]').click();
     await page.locator('[data-test="dashboard-variable-constant-selector"]').click();
   })
 
@@ -342,6 +347,7 @@ test.describe("dashboard variables setting", () => {
     await page.locator('[data-test="dashboard-variable-textbox-default-value"]').fill('500');
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
     await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-settings-close-btn"]').click();
     await page.locator('[data-test="dashboard-variable-textbox-selector"]').click();
     await page.locator('[data-test="dashboard-variable-textbox-selector"]').fill('800');
     await expect(page.locator('[data-test="dashboard-variable-textbox-selector"]')).toHaveValue('800');
@@ -403,7 +409,8 @@ test.describe("dashboard variables setting", () => {
     await page.locator('[data-test="dashboard-custom-variable-0-checkbox"]').click();
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
     await page.waitForTimeout(2000);
-    await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
+    await page.locator('[data-test="dashboard-settings-close-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-custom-value-selector"]').click();
   })
 
   test("should verify that multi select is working properly", async ({ page, }) => {
@@ -438,7 +445,9 @@ test.describe("dashboard variables setting", () => {
     await page.locator('[data-test="dashboard-custom-variable-0-checkbox"]').click();
     await page.locator('[data-test="dashboard-custom-variable-1-checkbox"]').click();
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
-    await page.locator('[data-test="dashboard-variable-query-value-selector"]').click();
+    await page.waitForTimeout(2000);
+    await page.locator('[data-test="dashboard-settings-close-btn"]').click();
+    await page.locator('[data-test="dashboard-variable-custom-value-selector"]').click();
   })
 
   test("should verify that hide on custom variable dashboard is working", async ({ page, }) => {

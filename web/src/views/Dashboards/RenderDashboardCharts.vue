@@ -57,13 +57,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="panels[0] || {}"
           :dashboardId="dashboardData.dashboardId"
           :folderId="folderId"
-          :reportId= "folderId"
+          :reportId="folderId"
           :selectedTimeDate="
             (panels[0]?.id ? currentTimeObj[panels[0].id] : undefined) ||
             currentTimeObj['__global'] ||
             {}
           "
-          :variablesData="variablesData"
+          :variablesData="
+            currentVariablesDataRef[panels[0].id] ||
+            currentVariablesDataRef['__global']
+          "
           :forceLoad="forceLoad"
           :searchType="searchType"
           @updated:data-zoom="$emit('updated:data-zoom', $event)"
@@ -118,7 +121,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :selectedTimeDate="
                 currentTimeObj[item.id] || currentTimeObj['__global'] || {}
               "
-              :variablesData="variablesData"
+              :variablesData="
+                currentVariablesDataRef[item.id] ||
+                currentVariablesDataRef['__global']
+              "
+              :currentVariablesData="variablesData"
               :width="getPanelLayout(item, 'w')"
               :height="getPanelLayout(item, 'h')"
               :forceLoad="forceLoad"
@@ -182,7 +189,10 @@ import { useRouter } from "vue-router";
 import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import { useRoute } from "vue-router";
-import { updateDashboard } from "../../utils/commons";
+import {
+  checkIfVariablesAreLoaded,
+  updateDashboard,
+} from "../../utils/commons";
 import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
@@ -200,6 +210,7 @@ export default defineComponent({
     "onDeletePanel",
     "onViewPanel",
     "variablesData",
+    "refreshedVariablesDataUpdated",
     "updated:data-zoom",
     "refreshPanelRequest",
     "refresh",
@@ -261,6 +272,7 @@ export default defineComponent({
           )?.panels ?? [])
         : [];
     });
+
     const {
       showPositiveNotification,
       showErrorNotification,
@@ -275,7 +287,8 @@ export default defineComponent({
     };
 
     // variables data
-    const variablesData = reactive({});
+    const variablesData = ref({});
+    const currentVariablesDataRef: any = ref({ __global: {} });
 
     // ======= [START] dashboard PrintMode =======
 
@@ -313,6 +326,34 @@ export default defineComponent({
     watch(isDashboardVariablesAndPanelsDataLoaded, () => {
       emit("panelsValues", isDashboardVariablesAndPanelsDataLoaded.value);
     });
+
+    // watch on currentTimeObj to update the variablesData
+    watch(
+      () => props?.currentTimeObj?.__global,
+      () => {
+        currentVariablesDataRef.value = {
+          __global: JSON.parse(JSON.stringify(variablesData.value)),
+        };
+      },
+    );
+
+    watch(
+      () => currentVariablesDataRef.value,
+      () => {
+        if (currentVariablesDataRef.value?.__global) {
+          emit("variablesData", currentVariablesDataRef.value?.__global);
+        }
+      },
+      { deep: true },
+    );
+
+    watch(
+      () => variablesData.value,
+      () => {
+        emit("refreshedVariablesDataUpdated", variablesData.value);
+      },
+      { deep: true },
+    );
 
     const currentQueryTraceIds = computed(() => {
       const traceIds = Object.values(
@@ -354,27 +395,22 @@ export default defineComponent({
       }
     });
 
+    let needsVariablesAutoUpdate = true;
+
     const variablesDataUpdated = (data: any) => {
       try {
         // update the variables data
-        Object.assign(variablesData, data);
-
-        // emit the variables data
-        emit("variablesData", variablesData);
-
-        // update the loading state
-        if (variablesAndPanelsDataLoadingState) {
-          variablesAndPanelsDataLoadingState.variablesData =
-            variablesData?.values?.reduce(
-              (obj: any, item: any) => ({
-                ...obj,
-                [item.name]: item.isLoading,
-              }),
-              {},
-            );
+        variablesData.value = data;
+        if (needsVariablesAutoUpdate) {
+          // check if the length is > 0
+          if (checkIfVariablesAreLoaded(variablesData.value)) {
+            needsVariablesAutoUpdate = false;
+          }
+          currentVariablesDataRef.value = { __global: variablesData.value };
         }
+        return;
       } catch (error) {
-        console.log(error);
+        console.error("Error in variablesDataUpdated", error);
       }
     };
 
@@ -533,6 +569,11 @@ export default defineComponent({
 
     const refreshPanelRequest = (panelId) => {
       emit("refreshPanelRequest", panelId);
+
+      currentVariablesDataRef.value = {
+        ...currentVariablesDataRef.value,
+        [panelId]: variablesData.value,
+      };
     };
 
     const openEditLayout = (id: string) => {
@@ -566,6 +607,7 @@ export default defineComponent({
       currentQueryTraceIds,
       openEditLayout,
       saveDashboard,
+      currentVariablesDataRef,
     };
   },
   methods: {

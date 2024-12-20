@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :dashboard-id="queryParams?.dashboard"
                           :folder-id="queryParams?.folder"
                           :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="variablesData"
+                          :variablesData="updatedVariablesData"
                           :width="6"
                           @error="handleChartApiError"
                           @updated:data-zoom="onDataZoom"
@@ -353,6 +353,7 @@ import FieldList from "../../../components/dashboards/addPanel/FieldList.vue";
 import { useI18n } from "vue-i18n";
 import {
   addPanel,
+  checkIfVariablesAreLoaded,
   getDashboard,
   getPanel,
   updatePanel,
@@ -476,6 +477,7 @@ export default defineComponent({
     const showTutorial = () => {
       window.open("https://short.openobserve.ai/dashboard-tutorial");
     };
+    let needsVariablesAutoUpdate = true;
 
     const variablesDataUpdated = (data: any) => {
       Object.assign(variablesData, data);
@@ -499,6 +501,7 @@ export default defineComponent({
           variableObj[`var-${variable.name}`] = variable.value;
         }
       });
+
       router.replace({
         query: {
           ...route.query,
@@ -507,13 +510,11 @@ export default defineComponent({
         },
       });
 
-      // when this is called 1st time, we need to set the data for the updated variables data as well
-      // from the second time, it will only be updated after the apply button is clicked
-      if (
-        !updatedVariablesData?.values?.length && // Previous value of variables is empty
-        variablesData?.values?.length > 0 // new values of variables is NOT empty
-      ) {
-        // assign the variables so that it can allow the panel to wait for them to load which is manual after hitting "Apply"
+      if (needsVariablesAutoUpdate) {
+        // check if the length is > 0
+        if (checkIfVariablesAreLoaded(variablesData)) {
+          needsVariablesAutoUpdate = false;
+        }
         Object.assign(updatedVariablesData, variablesData);
       }
     };

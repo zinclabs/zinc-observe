@@ -73,20 +73,24 @@ export const convertPanelData = async (
         };
       } else {
         // chartpanelref will be used to get width and height of the chart element from DOM
-
-        return {
-          chartType: panelSchema.type,
-          ...(await convertMultiSQLData(
-            panelSchema,
-            data,
-            store,
-            chartPanelRef,
-            hoveredSeriesState,
-            resultMetaData,
-            metadata,
-            chartPanelStyle,
-          )),
-        };
+        try {
+          return {
+            chartType: panelSchema.type,
+            ...(await convertMultiSQLData(
+              panelSchema,
+              data,
+              store,
+              chartPanelRef,
+              hoveredSeriesState,
+              resultMetaData,
+              metadata,
+              chartPanelStyle,
+            )),
+          };
+        } catch (error) {
+          console.error(error);
+          return {};
+        }
       }
     }
     case "table": {

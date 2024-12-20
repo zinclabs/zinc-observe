@@ -168,9 +168,6 @@ test.describe("dashboard general setting", () => {
     await page.locator('[data-test="dashboard-general-setting-description"]').fill('test');
     await page.locator('[data-test="dashboard-general-setting-dynamic-filter"] div').nth(2).click();
     await page.locator('[data-test="dashboard-general-setting-save-btn"]').click();
-    await page.locator('[data-test="dashboard-setting-btn"]').click();
-    await page.locator('[data-test="dashboard-general-setting-dynamic-filter"] div').nth(2).click();
-    await page.locator('[data-test="dashboard-general-setting-save-btn"]').click();
     await expect(page.getByText("Dashboard updated successfully")).toBeVisible({
       timeout: 30000,
     });

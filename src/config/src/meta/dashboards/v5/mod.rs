@@ -379,6 +379,10 @@ pub struct DrillDownData {
     pass_all_variables: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     variables: Option<Vec<DrillDownVariables>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logs_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logs_query: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, ToSchema)]
