@@ -121,6 +121,16 @@ const removeHandler = (
   }
 };
 
+const closeSocket = (socketId: string) => {
+  const socket = sockets[socketId];
+  if (socket) {
+    socket.close();
+    clearInterval(pingIntervals[socketId]);
+    delete sockets[socketId];
+    delete pingIntervals[socketId];
+  }
+};
+
 // Composable
 const useWebSocket = () => {
   onUnmounted(() => {
@@ -142,6 +152,7 @@ const useWebSocket = () => {
   return {
     connect,
     sendMessage,
+    closeSocket,
     getWebSocketBasedOnSocketId,
     addMessageHandler: (socketId: string, handler: MessageHandler) =>
       addHandler(messageHandlers, socketId, handler),
