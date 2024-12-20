@@ -227,6 +227,7 @@ const defaultObject = {
       { requestId: string; traceId: string }[]
     >[],
     isOperationCancelled: false,
+    searchRetriesCount: <{ [key: string]: number }>{},
   },
 };
 
@@ -297,6 +298,7 @@ const useLogs = () => {
     fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
     cancelSearchQueryBasedOnRequestId,
+    closeSocketBasedOnRequestId,
   } = useSearchWebSocket();
 
   const { updateFieldKeywords } = useSqlSuggestions();
@@ -2057,6 +2059,7 @@ const useLogs = () => {
 
       if (searchObj.data.isOperationCancelled) {
         notificationMsg.value = "Search operation is cancelled.";
+
         searchObj.loading = false;
         searchObj.data.isOperationCancelled = false;
         return;
@@ -2394,6 +2397,7 @@ const useLogs = () => {
           .then(async (res: any) => {
             removeTraceId(traceId);
             searchObjDebug["histogramProcessingStartTime"] = performance.now();
+
             searchObj.loading = false;
             if (searchObj.data.queryResults.aggs == null) {
               searchObj.data.queryResults.aggs = [];
@@ -3626,6 +3630,7 @@ const useLogs = () => {
         })
         .finally(() => {
           removeTraceId(traceId);
+
           searchObj.loading = false;
         });
     } catch (e: any) {
@@ -4608,6 +4613,8 @@ const useLogs = () => {
 
       addRequestId(requestId, traceId);
     } catch (e: any) {
+      console.error("Error while getting data through web socket", e);
+
       searchObj.loading = false;
       showErrorNotification(
         notificationMsg.value || "Error occurred during the search operation.",
@@ -4618,6 +4625,11 @@ const useLogs = () => {
 
   const sendSearchMessage = (requestId: string, queryReq: any) => {
     try {
+      if (searchObj.data.isOperationCancelled) {
+        closeSocketBasedOnRequestId(requestId);
+        return;
+      }
+
       sendSearchMessageBasedOnRequestId(requestId, {
         type: "search",
         content: {
@@ -4784,6 +4796,10 @@ const useLogs = () => {
 
       searchObj.loading = false;
 
+      if (!isPagination) {
+        processHistogramRequest(queryReq);
+      }
+
       searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
     } catch (e: any) {
       searchObj.loading = false;
@@ -4831,6 +4847,7 @@ const useLogs = () => {
     response: any,
   ) => {
     searchObjDebug["histogramProcessingStartTime"] = performance.now();
+
     searchObj.loading = false;
 
     if (searchObj.data.queryResults.aggs == null) {
@@ -5045,20 +5062,58 @@ const useLogs = () => {
     payload: any,
     response: any,
   ) => {
-    if (payload.traceId) removeTraceId(payload.traceId);
-
     if (requestId) removeRequestId(requestId);
+
+    // Any case where below logic may end in recursion
+    if (searchObj.data.isOperationCancelled) {
+      searchObj.loading = false;
+      searchObj.loadingHistogram = false;
+      searchObj.data.isOperationCancelled = false;
+      return;
+    }
+
+    if (response.code === 1001 || response.code === 1006) {
+      if (!searchObj.data.searchRetriesCount[payload.traceId]) {
+        searchObj.data.searchRetriesCount[payload.traceId] = 1;
+      } else {
+        searchObj.data.searchRetriesCount[payload.traceId] += 1;
+      }
+
+      if (searchObj.data.searchRetriesCount[payload.traceId] <= 2) {
+        if (payload.type === "search") searchObj.loading = true;
+        if (payload.type === "histogram") searchObj.loadingHistogram = true;
+
+        const requestId = fetchQueryDataWithWebSocket(payload, {
+          open: sendSearchMessage,
+          close: handleSearchClose,
+          error: handleSearchError,
+          message: handleSearchResponse,
+        });
+
+        addRequestId(requestId, payload.traceId);
+        return;
+      } else {
+        handleSearchError(requestId, payload, {
+          content: {
+            message:
+              "WebSocket connection terminated unexpectedly. Please check your network and try again",
+            trace_id: payload.traceId,
+            code: response.code,
+            error_detail: "",
+          },
+        });
+      }
+    }
+
+    if (searchObj.data.searchRetriesCount[payload.traceId]) {
+      delete searchObj.data.searchRetriesCount[payload.traceId];
+    }
+
+    if (payload.traceId) removeTraceId(payload.traceId);
 
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
-
-    if (payload.type === "search" && !payload.isPagination) {
-      processHistogramRequest(payload.queryReq);
-    }
-
-    if (payload.type === "cancel") {
-      searchObj.data.isOperationCancelled = false;
-    }
+    searchObj.data.isOperationCancelled = false;
   };
 
   const handleSearchError = (requestId: string, request: any, err: any) => {

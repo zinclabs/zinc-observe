@@ -65,26 +65,28 @@ const useSearchWebSocket = () => {
     const socket = webSocket.getWebSocketBasedOnSocketId(requestId);
 
     // check state of socket
-    if (socket && socket.readyState !== WebSocket.OPEN) {
-      socket?.close();
-      return;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      webSocket.sendMessage(
+        requestId,
+        JSON.stringify({
+          type: "cancel",
+          content: {
+            trace_id: trace_id,
+          },
+        }),
+      );
     }
+  };
 
-    webSocket.sendMessage(
-      requestId,
-      JSON.stringify({
-        type: "cancel",
-        content: {
-          trace_id: trace_id,
-        },
-      }),
-    );
+  const closeSocketBasedOnRequestId = (requestId: string) => {
+    webSocket.closeSocket(requestId);
   };
 
   return {
     fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
     cancelSearchQueryBasedOnRequestId,
+    closeSocketBasedOnRequestId,
   };
 };
 

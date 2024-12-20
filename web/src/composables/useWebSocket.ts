@@ -34,7 +34,6 @@ const connect = (
     socket.addEventListener("close", (event) =>
       onClose(socketId, event, interval, maxAttempts, createSocket),
     );
-    socket.addEventListener("error", (event) => onError(socketId, event));
   };
 
   createSocket();
