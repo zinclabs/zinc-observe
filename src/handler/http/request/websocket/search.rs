@@ -23,7 +23,6 @@ use config::{
         sql::{resolve_stream_names, OrderBy},
         websocket::{SearchEventReq, SearchResultType, MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE},
     },
-    utils::sql::is_aggregate_query,
 };
 use infra::errors::Error;
 use tracing::Instrument;
@@ -660,7 +659,8 @@ async fn get_partitions(
         regions: search_payload.regions.clone(),
         clusters: search_payload.clusters.clone(),
         query_fn: search_payload.query.query_fn.clone(),
-        streaming_output: true,
+        // TODO: push a fix for this as an update
+        streaming_output: false,
     };
 
     let res = SearchService::search_partition(

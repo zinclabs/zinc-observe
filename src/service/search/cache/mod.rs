@@ -453,7 +453,7 @@ pub fn merge_response(
 
     cache_response.scan_size = 0;
 
-    let mut files_cache_hits = 0;
+    let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
 
     let mut res_took = ResponseTook::default();
@@ -462,7 +462,7 @@ pub fn merge_response(
         cache_response.total += res.total;
         cache_response.scan_size += res.scan_size;
         cache_response.took += res.took;
-        files_cache_hits += res.cached_ratio * res.hits.len();
+        files_cache_ratio += res.cached_ratio;
         cache_response.histogram_interval = res.histogram_interval;
 
         result_cache_len += res.total;
@@ -497,8 +497,7 @@ pub fn merge_response(
     }
 
     if !search_response.is_empty() {
-        cache_response.cached_ratio =
-            ((files_cache_hits as f64 / search_response.len() as f64) * 100.0) as usize;
+        cache_response.cached_ratio = files_cache_ratio / search_response.len();
     }
     cache_response.size = cache_response.hits.len() as i64;
     log::info!(
@@ -953,7 +952,7 @@ pub fn merge_response_v2(
 
     let cache_hits_len = merged_response.hits.len();
 
-    let mut files_cache_hits = 0;
+    let mut files_cache_ratio = 0;
     let mut result_cache_len = 0;
 
     let mut res_took = ResponseTook::default();
@@ -963,7 +962,7 @@ pub fn merge_response_v2(
         merged_response.total += s_resp.total;
         merged_response.scan_size += s_resp.scan_size;
         merged_response.took += s_resp.took;
-        files_cache_hits += s_resp.cached_ratio * s_resp.hits.len();
+        files_cache_ratio += s_resp.cached_ratio;
         merged_response.histogram_interval = s_resp.histogram_interval;
 
         result_cache_len += s_resp.total;
@@ -1001,8 +1000,7 @@ pub fn merge_response_v2(
     }
 
     if !search_responses.is_empty() {
-        merged_response.cached_ratio =
-            ((files_cache_hits as f64 / search_responses.len() as f64) * 100.0) as usize;
+        merged_response.cached_ratio = files_cache_ratio / search_responses.len();
     }
     merged_response.size = merged_response.hits.len() as i64;
 
