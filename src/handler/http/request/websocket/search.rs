@@ -964,6 +964,7 @@ async fn write_results_to_cache(
             accumulated_results.len()
         );
 
+    let cfg = get_config();
     let mut cached_responses = Vec::new();
     let mut search_responses = Vec::new();
 
@@ -984,23 +985,34 @@ async fn write_results_to_cache(
         c_resp.took,
     );
 
-    cache::write_results_v2(
-        &c_resp.trace_id,
-        &c_resp.ts_column,
-        start_time,
-        end_time,
-        &merged_response,
-        c_resp.file_path.clone(),
-        c_resp.is_aggregate,
-        c_resp.is_descending,
-    )
-    .await;
+    // There are 3 types of partial responses:
+    // 1. VRL error
+    // 2. Super cluster error
+    // 3. Range error (max_query_limit)
+    // Cache partial results only if there is a range error
+    let skip_cache_results = (merged_response.is_partial
+        && (merged_response.new_start_time.is_none() || merged_response.new_end_time.is_none()))
+        || (!merged_response.function_error.is_empty()
+            && merged_response.function_error.contains("vrl"));
 
-    log::info!(
-        "[WS_SEARCH]: Results written to file for trace_id: {}, file_path: {}",
-        c_resp.trace_id,
-        c_resp.file_path,
-    );
+    if cfg.common.result_cache_enabled && !skip_cache_results {
+        cache::write_results_v2(
+            &c_resp.trace_id,
+            &c_resp.ts_column,
+            start_time,
+            end_time,
+            &merged_response,
+            c_resp.file_path.clone(),
+            c_resp.is_aggregate,
+            c_resp.is_descending,
+        )
+        .await;
+        log::info!(
+            "[WS_SEARCH]: Results written to file for trace_id: {}, file_path: {}",
+            c_resp.trace_id,
+            c_resp.file_path,
+        );
+    }
 
     Ok(())
 }
