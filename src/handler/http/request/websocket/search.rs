@@ -290,7 +290,7 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
                     req.trace_id,
                     e
                 );
-                Error::Message(e.to_string());
+                return Err(Error::Message(e.to_string()));
             }
         }
     }
