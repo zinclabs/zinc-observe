@@ -198,10 +198,7 @@ pub async fn handle_search_request(
         // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
         // for cache only search
         let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
-        let remaining_query_range = if max_query_range == 0
-                // disable limit for `Alerts`
-                ||  req.search_type == SearchEventType::Alerts
-        {
+        let remaining_query_range = if max_query_range == 0 {
             i64::MAX
         } else {
             max_query_range
@@ -230,12 +227,7 @@ pub async fn handle_search_request(
             "[WS_SEARCH] trace_id: {} No cache found, processing search request",
             trace_id
         );
-        // disable `max_query_range` for Alerts
-        let max_query_range = if req.search_type == SearchEventType::Alerts {
-            0
-        } else {
-            get_max_query_range(&stream_names, org_id, stream_type).await
-        }; // hours
+        let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
 
         do_partitioned_search(
             req_id,
@@ -282,7 +274,6 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
         match base64::decode_url(vrl) {
             Ok(vrl) => {
                 let vrl = vrl.trim().to_owned();
-                dbg!(&vrl);
                 if !vrl.is_empty() && !vrl.ends_with('.') {
                     let vrl = base64::encode_url(&format!("{vrl} \n ."));
                     req.payload.query.query_fn = Some(vrl);
