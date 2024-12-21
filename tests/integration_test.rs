@@ -1959,7 +1959,7 @@ mod tests {
             "e2e",
             config::meta::stream::StreamType::Logs,
             "olympics_schema",
-            &alert,
+            alert,
             true,
         )
         .await;

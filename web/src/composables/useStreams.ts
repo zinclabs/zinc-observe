@@ -553,6 +553,16 @@ const useStreams = () => {
     return updatedSettings;
   };
 
+  const resetStreamType = (streamType="") => {
+    try {
+      if (streamType != "" && Object.hasOwn(streams, streamType)) {
+        delete streams[streamType];
+      }
+    } catch (e) {
+      console.log("Error while clearing local cache for stream type.", e);
+    }
+  };
+
   return {
     getStreams,
     getStream,
@@ -562,6 +572,7 @@ const useStreams = () => {
     removeStream,
     addStream,
     getUpdatedSettings,
+    resetStreamType,
   };
 };
 

@@ -25,11 +25,13 @@ pub mod templates;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TriggerCondition {
+    /// (minutes)
     pub period: i64, // 10 minutes
     #[serde(default)]
     pub operator: Operator, // >=
     #[serde(default)]
     pub threshold: i64, // 3 times
+    /// (seconds)
     #[serde(default)]
     pub frequency: i64, // 1 minute
     #[serde(default)]
@@ -37,9 +39,11 @@ pub struct TriggerCondition {
     #[serde(default)]
     pub frequency_type: FrequencyType,
     #[serde(default)]
+    /// (minutes)
     pub silence: i64, // silence for 10 minutes after fire an alert
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+    /// (seconds)
     #[serde(default)]
     pub tolerance_in_secs: Option<i64>,
 }
@@ -190,7 +194,7 @@ pub struct Condition {
     pub ignore_case: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum Operator {
     #[serde(rename = "=")]
     EqualTo,

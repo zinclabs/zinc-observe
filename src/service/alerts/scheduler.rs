@@ -311,13 +311,8 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                     super::alert::get(&org_id, stream_type, stream_name, alert_name).await?
                 {
                     alert.enabled = false;
-                    if let Err(e) = db::alerts::alert::set_without_updating_trigger(
-                        &org_id,
-                        stream_type,
-                        stream_name,
-                        &alert,
-                    )
-                    .await
+                    if let Err(e) =
+                        db::alerts::alert::set_without_updating_trigger(&org_id, alert).await
                     {
                         log::error!("Failed to update alert: {alert_name} after trigger: {e}",);
                     }
@@ -579,14 +574,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
     if let Some(last_satisfied_at) = last_satisfied_at {
         old_alert.last_satisfied_at = Some(last_satisfied_at);
     }
-    if let Err(e) = db::alerts::alert::set_without_updating_trigger(
-        &org_id,
-        stream_type,
-        stream_name,
-        &old_alert,
-    )
-    .await
-    {
+    if let Err(e) = db::alerts::alert::set_without_updating_trigger(&org_id, old_alert).await {
         log::error!("Failed to update alert: {alert_name} after trigger: {e}");
     }
     // publish the triggers as stream

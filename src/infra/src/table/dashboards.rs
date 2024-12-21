@@ -35,7 +35,7 @@ use super::{
 };
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
-    errors::{self, GetDashboardError, PutDashboardError},
+    errors::{self, GetDashboardError},
 };
 
 impl TryFrom<dashboards::Model> for Dashboard {
@@ -130,7 +130,7 @@ pub async fn get_by_id(
     Ok(Some((folder, dash)))
 }
 
-/// Lists all dashboards belonging to the given org and folder.
+/// Lists dashboards.
 pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let dashboards = list_models(client, params)
@@ -213,12 +213,7 @@ pub async fn put(
                 let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
                     created_at_tz.timestamp()
                 } else {
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map_err(|_| PutDashboardError::ConvertingCreatedTimestamp)?
-                        .as_secs()
-                        .try_into()
-                        .map_err(|_| PutDashboardError::ConvertingCreatedTimestamp)?
+                    chrono::Utc::now().timestamp()
                 };
 
                 let dash_am = dashboards::ActiveModel {

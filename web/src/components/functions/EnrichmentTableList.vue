@@ -205,7 +205,7 @@ export default defineComponent({
         sortable: false,
       },
     ]);
-    const { getStreams } = useStreams();
+    const { getStreams, resetStreamType } = useStreams();
 
     onBeforeMount(() => {
       getLookupTables();
@@ -314,6 +314,7 @@ export default defineComponent({
         },
       });
       showAddJSTransformDialog.value = false;
+      resetStreamType("enrichment_tables");
       getLookupTables();
     };
 
@@ -340,6 +341,7 @@ export default defineComponent({
               color: "positive",
               message: `${selectedDelete.value.name} deleted successfully.`,
             });
+            resetStreamType("enrichment_tables");
             getLookupTables();
           }
         })

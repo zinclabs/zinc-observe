@@ -34,6 +34,7 @@ use config::{
         sql::{is_aggregate_query, is_simple_aggregate_query},
     },
 };
+use datafusion::distributed_plan::streaming_aggs_exec;
 use hashbrown::HashMap;
 use infra::{
     cache::stats,
@@ -586,10 +587,20 @@ pub async fn search_partition(
 
     // if need streaming output and is simple query, we shouldn't skip file list
     if skip_get_file_list && req.streaming_output && is_streaming_aggregate {
+        skip_get_file_list = false;
+    }
+
+    // check if we need to use streaming_output
+    let streaming_id = if req.streaming_output && is_streaming_aggregate {
+        Some(ider::uuid())
+    } else {
+        None
+    };
+    if let Some(id) = &streaming_id {
         log::info!(
             "[trace_id {trace_id}] search_partition: using streaming_output with streaming_aggregate"
         );
-        skip_get_file_list = false;
+        streaming_aggs_exec::init_cache(id, query.start_time, query.end_time);
     }
 
     let mut files = Vec::new();
@@ -685,11 +696,7 @@ pub async fn search_partition(
         order_by: OrderBy::Desc,
         streaming_output: req.streaming_output,
         streaming_aggs: req.streaming_output && is_streaming_aggregate,
-        streaming_id: if req.streaming_output && is_streaming_aggregate {
-            Some(ider::uuid())
-        } else {
-            None
-        },
+        streaming_id: streaming_id.clone(),
     };
 
     let mut min_step = Duration::try_seconds(1)
@@ -753,7 +760,7 @@ pub async fn search_partition(
 
     // We need to reverse partitions if query is ASC order
     if let Some((field, order_by)) = sql.order_by.first() {
-        if field == &ts_column.unwrap() && order_by == &OrderBy::Asc {
+        if field == &ts_column.unwrap_or_default() && order_by == &OrderBy::Asc {
             resp.order_by = OrderBy::Asc;
             partitions.reverse();
         }

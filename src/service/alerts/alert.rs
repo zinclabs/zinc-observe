@@ -29,6 +29,7 @@ use config::{
             destinations::{DestinationType, DestinationWithTemplate, HTTPType},
             FrequencyType, Operator, QueryType,
         },
+        folder::{Folder, DEFAULT_FOLDER},
         search::{SearchEventContext, SearchEventType},
         stream::StreamType,
     },
@@ -39,6 +40,7 @@ use config::{
     SMTP_CLIENT,
 };
 use cron::Schedule;
+use infra::table::{self, folders::FolderType};
 use lettre::{message::MultiPart, AsyncTransport, Message};
 
 use crate::{
@@ -48,7 +50,7 @@ use crate::{
     },
     service::{
         alerts::{build_sql, destinations, QueryConditionExt},
-        db,
+        db, folders,
         search::sql::RE_ONLY_SELECT,
         short_url,
     },
@@ -61,6 +63,17 @@ pub async fn save(
     mut alert: Alert,
     create: bool,
 ) -> Result<(), anyhow::Error> {
+    // Currently all alerts are stored in the default folder so create the
+    // default folder for the org if it doesn't exist yet.
+    if !table::folders::exists(org_id, DEFAULT_FOLDER, FolderType::Alerts).await? {
+        let default_folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_owned(),
+            name: "default".to_owned(),
+            description: "default".to_owned(),
+        };
+        folders::save_folder(org_id, default_folder, FolderType::Alerts, true).await?;
+    };
+
     if !name.is_empty() {
         alert.name = name.to_string();
     }
@@ -220,10 +233,11 @@ pub async fn save(
     // }
 
     // save the alert
-    match db::alerts::alert::set(org_id, stream_type, stream_name, &alert, create).await {
+    let alert_name = alert.name.clone();
+    match db::alerts::alert::set(org_id, stream_type, stream_name, alert, create).await {
         Ok(_) => {
             if name.is_empty() {
-                set_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
+                set_ownership(org_id, "alerts", Authz::new(&alert_name)).await;
             }
             Ok(())
         }
@@ -319,7 +333,7 @@ pub async fn enable(
         }
     };
     alert.enabled = value;
-    db::alerts::alert::set(org_id, stream_type, stream_name, &alert, false)
+    db::alerts::alert::set(org_id, stream_type, stream_name, alert, false)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }

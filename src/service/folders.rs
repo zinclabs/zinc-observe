@@ -16,11 +16,15 @@
 use config::{
     ider,
     meta::{
+        alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
         folder::{Folder, DEFAULT_FOLDER},
     },
 };
-use infra::table::{self, folders::FolderType};
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    table::{self, folders::FolderType},
+};
 
 use crate::common::{
     meta::authz::Authz,
@@ -46,6 +50,10 @@ pub enum FolderError {
     /// An error that occurs when trying to delete a folder that contains dashboards.
     #[error("Folder contains dashboards. Please move/delete dashboards from folder.")]
     DeleteWithDashboards,
+
+    /// An error that occurs when trying to delete a folder that contains alerts.
+    #[error("Folder contains alerts. Please move/delete alerts from folder.")]
+    DeleteWithAlerts,
 
     /// An error that occurs when trying to delete a folder that cannot be found.
     #[error("Folder not found")]
@@ -149,10 +157,18 @@ pub async fn delete_folder(
 ) -> Result<(), FolderError> {
     match folder_type {
         FolderType::Dashboards => {
-            let filter = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
-            let dashboards = table::dashboards::list(filter).await?;
+            let params = ListDashboardsParams::new(org_id).with_folder_id(folder_id);
+            let dashboards = table::dashboards::list(params).await?;
             if !dashboards.is_empty() {
                 return Err(FolderError::DeleteWithDashboards);
+            }
+        }
+        FolderType::Alerts => {
+            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let params = ListAlertsParams::new(org_id).in_folder(folder_id);
+            let alerts = table::alerts::list(client, params).await?;
+            if !alerts.is_empty() {
+                return Err(FolderError::DeleteWithAlerts);
             }
         }
     };
