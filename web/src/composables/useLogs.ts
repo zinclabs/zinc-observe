@@ -5116,8 +5116,8 @@ const useLogs = () => {
       processHistogramRequest(payload.queryReq);
     }
 
-    if (payload.type === "search") searchObj.loading = true;
-    if (payload.type === "histogram") searchObj.loadingHistogram = true;
+    if (payload.type === "search") searchObj.loading = false;
+    if (payload.type === "histogram") searchObj.loadingHistogram = false;
     searchObj.data.isOperationCancelled = false;
   };
 
