@@ -975,7 +975,7 @@ async fn write_results_to_cache(
         }
     }
 
-    let merged_response = cache::merge_response_v2(
+    let merged_response = cache::merge_response(
         &c_resp.trace_id,
         &mut cached_responses,
         &mut search_responses,
