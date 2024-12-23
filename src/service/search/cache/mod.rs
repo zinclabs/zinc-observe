@@ -368,7 +368,7 @@ pub async fn search(
         && (results.first().is_some_and(|res| !res.hits.is_empty())
             || results.last().is_some_and(|res| !res.hits.is_empty()))
     {
-        write_results(
+        write_results_v2(
             trace_id,
             &c_resp.ts_column,
             req.query.start_time,
@@ -529,7 +529,7 @@ fn sort_response(is_descending: bool, cache_response: &mut search::Response, ts_
 }
 
 #[allow(clippy::too_many_arguments, unused_variables)]
-pub async fn write_results(
+pub async fn _write_results(
     trace_id: &str,
     ts_column: &str,
     req_query_start_time: i64,
@@ -540,8 +540,8 @@ pub async fn write_results(
     is_descending: bool,
 ) {
     // disable write_results_v1
-    return;
-    #[allow(unreachable_code)]
+    // return;
+    // #[allow(unreachable_code)]
     let mut local_resp = res.clone();
     let remove_hit = if is_descending {
         local_resp.hits.last()
