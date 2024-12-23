@@ -604,7 +604,7 @@ export default defineComponent({
         row.showGroups = false;
       }
     };
-    const forceCloseRow = (row) => {
+    const forceCloseRow = (row:any) => {
       if (row.showGroups) {
         row.showGroups = false;
       }
