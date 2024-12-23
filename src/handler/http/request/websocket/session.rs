@@ -237,10 +237,20 @@ pub async fn handle_text_message(
                                 );
                                 let err_msg =
                                     format!("[trace_id: {}, error: {}]", search_req.trace_id, e);
-                                let close_reason = Some(CloseReason {
+                                let mut close_reason = Some(CloseReason {
                                     code: CloseCode::Error,
                                     description: Some(err_msg.clone()),
                                 });
+                                // 20009 is the error code for search cancellation
+                                if e.to_string().contains("20009") {
+                                    close_reason = Some(CloseReason {
+                                        code: CloseCode::Normal,
+                                        description: Some(format!(
+                                            "[trace_id {}] Search canceled",
+                                            search_req.trace_id
+                                        )),
+                                    });
+                                }
 
                                 // audit
                                 #[cfg(feature = "enterprise")]
