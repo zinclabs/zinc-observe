@@ -102,8 +102,11 @@ pub async fn handle_search_request(
     let stream_names = match resolve_stream_names(&req.payload.query.sql) {
         Ok(v) => v.clone(),
         Err(e) => {
-            let err_res =
-                WsServerEvents::error_response(Error::Message(e.to_string()), Some(trace_id), None);
+            let err_res = WsServerEvents::error_response(
+                Error::Message(e.to_string()),
+                Some(req_id.to_string()),
+                Some(trace_id),
+            );
             send_message(req_id, err_res.to_json().to_string()).await?;
             return Ok(());
         }
@@ -115,7 +118,11 @@ pub async fn handle_search_request(
         if let Err(e) =
             enterprise_utils::check_permissions(stream_name, stream_type, user_id, org_id).await
         {
-            let err_res = WsServerEvents::error_response(Error::Message(e), Some(trace_id), None);
+            let err_res = WsServerEvents::error_response(
+                Error::Message(e),
+                Some(req_id.to_string()),
+                Some(trace_id),
+            );
             send_message(req_id, err_res.to_json().to_string()).await?;
             return Ok(());
         }
@@ -161,29 +168,31 @@ pub async fn handle_search_request(
         req_size
     );
     // Step 1: Search result cache
-    let c_resp =
-        cache::check_cache_v2(&trace_id, org_id, stream_type, &req.payload, req.use_cache).await?;
-    let local_c_resp = c_resp.clone();
-    let cached_resp = local_c_resp.cached_response;
-    let mut deltas = local_c_resp.deltas;
-    deltas.sort();
-    deltas.dedup();
+    if req.payload.query.from == 0 {
+        let c_resp =
+            cache::check_cache_v2(&trace_id, org_id, stream_type, &req.payload, req.use_cache)
+                .await?;
+        let local_c_resp = c_resp.clone();
+        let cached_resp = local_c_resp.cached_response;
+        let mut deltas = local_c_resp.deltas;
+        deltas.sort();
+        deltas.dedup();
 
-    let cached_hits = cached_resp
-        .iter()
-        .fold(0, |acc, c| acc + c.cached_response.hits.len());
+        let cached_hits = cached_resp
+            .iter()
+            .fold(0, |acc, c| acc + c.cached_response.hits.len());
 
-    let c_start_time = cached_resp
-        .first()
-        .map(|c| c.response_start_time)
-        .unwrap_or_default();
+        let c_start_time = cached_resp
+            .first()
+            .map(|c| c.response_start_time)
+            .unwrap_or_default();
 
-    let c_end_time = cached_resp
-        .last()
-        .map(|c| c.response_end_time)
-        .unwrap_or_default();
+        let c_end_time = cached_resp
+            .last()
+            .map(|c| c.response_end_time)
+            .unwrap_or_default();
 
-    log::info!(
+        log::info!(
             "[WS_SEARCH] trace_id: {}, found cache responses len:{}, with hits: {}, cache_start_time: {:#?}, cache_end_time: {:#?}",
             trace_id,
             cached_resp.len(),
@@ -192,41 +201,62 @@ pub async fn handle_search_request(
             c_end_time
         );
 
-    // handle cache responses and deltas
-    if !cached_resp.is_empty() && cached_hits > 0 {
-        // `max_query_range` is used initialize `remaining_query_range`
-        // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
-        // for cache only search
-        let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
-        let remaining_query_range = if max_query_range == 0 {
-            i64::MAX
-        } else {
-            max_query_range
-        }; // hours
+        // handle cache responses and deltas
+        if !cached_resp.is_empty() && cached_hits > 0 {
+            // `max_query_range` is used initialize `remaining_query_range`
+            // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
+            // for cache only search
+            let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
+            let remaining_query_range = if max_query_range == 0 {
+                i64::MAX
+            } else {
+                max_query_range
+            }; // hours
 
-        // Step 1(a): handle cache responses & query the deltas
-        handle_cache_responses_and_deltas(
-            req_id,
-            &req,
-            trace_id.clone(),
-            req_size,
-            cached_resp,
-            deltas,
-            accumulated_results,
-            org_id,
-            user_id,
-            max_query_range,
-            remaining_query_range,
-            &order_by,
-        )
-        .await?;
+            // Step 1(a): handle cache responses & query the deltas
+            handle_cache_responses_and_deltas(
+                req_id,
+                &req,
+                trace_id.clone(),
+                req_size,
+                cached_resp,
+                deltas,
+                accumulated_results,
+                org_id,
+                user_id,
+                max_query_range,
+                remaining_query_range,
+                &order_by,
+            )
+            .await?;
+        } else {
+            // Step 2: Search without cache
+            // no caches found process req directly
+            log::info!(
+                "[WS_SEARCH] trace_id: {} No cache found, processing search request",
+                trace_id
+            );
+            let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
+
+            do_partitioned_search(
+                req_id,
+                &mut req,
+                &trace_id,
+                req_size,
+                org_id,
+                user_id,
+                accumulated_results,
+                max_query_range,
+            )
+            .await?;
+        }
+        // Step 3: Write to results cache
+        // cache only if from is 0 and is not an aggregate_query
+        if req.payload.query.from == 0 {
+            write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await?;
+        }
     } else {
-        // Step 2: Search without cache
-        // no caches found process req directly
-        log::info!(
-            "[WS_SEARCH] trace_id: {} No cache found, processing search request",
-            trace_id
-        );
+        // Step 4: Search without cache for req with from > 0
         let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
 
         do_partitioned_search(
@@ -240,11 +270,6 @@ pub async fn handle_search_request(
             max_query_range,
         )
         .await?;
-    }
-    // Step 3: Write to results cache
-    // cache only if from is 0 and is not an aggregate_query
-    if req.payload.query.from == 0 {
-        write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await?;
     }
 
     // Once all searches are complete, write the accumulated results to a file
@@ -540,7 +565,7 @@ async fn process_delta(
                 "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping delta search",
                 trace_id
             );
-            return Ok(()); // Gracefully terminate the delta processing
+            return Ok(());
         }
 
         let mut req = req.clone();
