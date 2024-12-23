@@ -71,6 +71,8 @@ export const usePanelDataLoader = (
   };
   let runCount = 0;
 
+  const searchRetriesCount = ref<{ [key: string]: number }>({});
+
   const {
     fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
@@ -632,6 +634,38 @@ export const usePanelDataLoader = (
     response: any,
   ) => {
     removeRequestId(requestId);
+
+    if (response.code === 1001 || response.code === 1006) {
+      if (!searchRetriesCount.value[payload.traceId]) {
+        searchRetriesCount.value[payload.traceId] = 1;
+      } else {
+        searchRetriesCount.value[payload.traceId] += 1;
+      }
+
+      if (searchRetriesCount.value[payload.traceId] <= 2) {
+        state.loading = true;
+
+        const requestId = fetchQueryDataWithWebSocket(payload, {
+          open: sendSearchMessage,
+          close: handleSearchClose,
+          error: handleSearchError,
+          message: handleSearchResponse,
+        });
+
+        addRequestId(requestId, payload.traceId);
+        return;
+      } else {
+        handleSearchError(requestId, payload, {
+          content: {
+            message:
+              "WebSocket connection terminated unexpectedly. Please check your network and try again",
+            trace_id: payload.traceId,
+            code: response.code,
+            error_detail: "",
+          },
+        });
+      }
+    }
 
     if (response.type === "error") {
       processApiError(response?.content?.meta, "sql");
