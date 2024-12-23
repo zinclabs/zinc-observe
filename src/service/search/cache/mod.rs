@@ -829,10 +829,6 @@ pub async fn check_cache_v2(
 
     let mut should_exec_query = true;
 
-    let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
-    rpc_req.org_id = org_id.to_string();
-    rpc_req.stream_type = stream_type.to_string();
-
     let mut file_path = format!(
         "{}/{}/{}/{}",
         org_id, stream_type, stream_name, hashed_query
@@ -840,7 +836,8 @@ pub async fn check_cache_v2(
     Ok(if use_cache {
         let mut resp = check_cache(
             trace_id,
-            &rpc_req,
+            org_id,
+            stream_type,
             &mut req,
             &mut origin_sql,
             &mut file_path,
@@ -853,7 +850,7 @@ pub async fn check_cache_v2(
         resp.file_path = file_path;
         resp
     } else {
-        let query = rpc_req.clone().query.unwrap();
+        let query = req.query.into();
         match crate::service::search::Sql::new(&query, org_id, stream_type).await {
             Ok(v) => {
                 let (ts_column, is_descending) =
