@@ -85,6 +85,7 @@ pub async fn run(
     path: String,
 ) {
     let cfg = get_config();
+    let mut close_reason: Option<CloseReason> = None;
 
     loop {
         tokio::select! {
@@ -116,7 +117,7 @@ pub async fn run(
                         handle_text_message(&org_id, &user_id, &req_id, msg.to_string(), path.clone()).await;
                     }
                     Ok(actix_ws::Message::Close(reason)) => {
-                        if let Some(reason) = reason {
+                        if let Some(reason) = reason.as_ref() {
                             match reason.code {
                                 CloseCode::Normal | CloseCode::Error => {
                                     log::info!("[WS_HANDLER]: Request Id: {} Node Role: {} Closing connection with reason: {:?}",
@@ -130,6 +131,7 @@ pub async fn run(
                                 },
                             }
                         }
+                        close_reason = reason;
                         break;
                     }
                     _ => ()
@@ -137,15 +139,7 @@ pub async fn run(
             }
         }
     }
-
-    // Remove the session from the cache and close the session
-    sessions_cache_utils::remove_session(&req_id);
-    log::info!(
-        "[WS_HANDLER]: Request Id: {} Node Role: {} Session cache utils len: {}",
-        req_id,
-        cfg.common.node_role,
-        sessions_cache_utils::len_sessions()
-    );
+    cleanup_and_close_session(&req_id, close_reason).await;
 }
 
 /// Handle the incoming text message
@@ -216,18 +210,7 @@ pub async fn handle_text_message(
                                     .await;
                                 }
 
-                                let mut session = if let Some(session) =
-                                    sessions_cache_utils::get_session(&req_id)
-                                {
-                                    session
-                                } else {
-                                    log::error!(
-                                        "[WS_HANDLER]: req_id: {} session not found",
-                                        req_id
-                                    );
-                                    return;
-                                };
-                                let _ = session.close(close_reason).await;
+                                cleanup_and_close_session(&req_id, close_reason).await;
                             }
                             Err(e) => {
                                 log::error!(
@@ -278,18 +261,7 @@ pub async fn handle_text_message(
                                     Some(req_id.to_string()),
                                 );
                                 let _ = send_message(&req_id, err_res.to_json().to_string()).await;
-                                let mut session = if let Some(session) =
-                                    sessions_cache_utils::get_session(&req_id)
-                                {
-                                    session
-                                } else {
-                                    log::error!(
-                                        "[WS_HANDLER]: req_id: {} session not found",
-                                        req_id
-                                    );
-                                    return;
-                                };
-                                let _ = session.close(close_reason).await;
+                                cleanup_and_close_session(&req_id, close_reason).await;
                             }
                         }
                     });
@@ -313,14 +285,7 @@ pub async fn handle_text_message(
                         code: CloseCode::Normal,
                         description: Some(format!("[trace_id {}] Search canceled", trace_id)),
                     });
-                    let mut session =
-                        if let Some(session) = sessions_cache_utils::get_session(req_id) {
-                            session
-                        } else {
-                            log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
-                            return;
-                        };
-                    let _ = session.close(close_reason).await;
+                    cleanup_and_close_session(&req_id, close_reason).await;
                 }
                 WsClientEvents::Benchmark { id } => {
                     // simulate random delay for benchmarking by sleep for 10/20/30/60/90
@@ -343,14 +308,7 @@ pub async fn handle_text_message(
                         code: CloseCode::Normal,
                         description: Some(format!("[id {}] benchmark completed", id)),
                     });
-                    let mut session =
-                        if let Some(session) = sessions_cache_utils::get_session(req_id) {
-                            session
-                        } else {
-                            log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
-                            return;
-                        };
-                    let _ = session.close(close_reason).await;
+                    cleanup_and_close_session(&req_id, close_reason).await;
                 }
             }
         }
@@ -392,4 +350,42 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
         log::error!("[WS_HANDLER]: Failed to send message: {:?}", e);
         Error::Message(e.to_string())
     })
+}
+
+async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
+    if let Some(mut session) = sessions_cache_utils::get_session(req_id) {
+        if let Some(reason) = &close_reason {
+            log::info!(
+                "[WS_HANDLER]: req_id: {} Closing session with reason: {:?}",
+                req_id,
+                reason
+            );
+        } else {
+            log::info!(
+                "[WS_HANDLER]: req_id: {} Closing session with no specific reason",
+                req_id
+            );
+        }
+        // Attempt to close the session
+        if let Err(e) = session.close(close_reason).await {
+            log::error!(
+                "[WS_HANDLER]: req_id: {} Failed to close session: {:?}",
+                req_id,
+                e
+            );
+        }
+    } else {
+        log::error!(
+            "[WS_HANDLER]: req_id: {} Session not found during cleanup",
+            req_id
+        );
+    }
+
+    // Remove the session from the cache
+    sessions_cache_utils::remove_session(req_id);
+    log::info!(
+        "[WS_HANDLER]: req_id: {} Session removed from cache. Remaining sessions: {}",
+        req_id,
+        sessions_cache_utils::len_sessions()
+    );
 }
