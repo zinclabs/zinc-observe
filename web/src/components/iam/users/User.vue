@@ -53,16 +53,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
           <q-td v-for="col in props.cols" :key="col.name" :props="props">
             <template v-if="col.name === 'role'">
-              <q-select
-                dense
-                borderless
-                v-model="props.row.role"
-                :options="options"
-                emit-value
-                map-options
-                style="width: 70px"
-                @update:model-value="updateUserRole(props.row)"
-              />
+               <template v-if="props.row.role === 'root'">
+                {{ props.row.role }}
+              </template>
+              <template v-else>
+                <q-select
+                  dense
+                  borderless
+                  v-model="props.row.role"
+                  :options="options"
+                  emit-value
+                  map-options
+                  style="width: 70px"
+                  @update:model-value="updateUserRole(props.row)"
+                />
+              </template>
             </template>
             <template v-else-if="col.name === 'actions'">
               <q-btn
@@ -78,8 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="confirmDeleteAction(props)"
                 style="cursor: pointer !important"
               />
+                <!-- v-if="props.row.enableEdit" -->
               <q-btn
-                v-if="props.row.enableEdit"
                 icon="edit"
                 :title="t('user.update')"
                 class="q-ml-xs"
@@ -88,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 round
                 flat
-                @click="addRoutePush(props)"
+                @click="addRoutePush(props);forceCloseRow(props.row)"
                 style="cursor: pointer !important"
               />
               </template>
@@ -129,8 +134,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-input>
 
           <div class="col-6">
+              <!-- v-if="showAddUserBtn" -->
             <q-btn
-              v-if="showAddUserBtn"
               class="q-ml-md q-mb-xs text-bold no-border"
               style="float: right; cursor: pointer !important"
               padding="sm lg"
@@ -455,18 +460,18 @@ export default defineComponent({
       qTable.value.setPagination(pagination.value);
     };
 
-    const showAddUserBtn = computed(() => {
-      if (isEnterprise.value) {
-        return (
-          isCurrentUserInternal.value &&
-          (currentUserRole.value == "admin" || currentUserRole.value == "root")
-        );
-      } else {
-        return (
-          currentUserRole.value == "admin" || currentUserRole.value == "root"
-        );
-      }
-    });
+    // const showAddUserBtn = computed(() => {
+    //   if (isEnterprise.value) {
+    //     return (
+    //       isCurrentUserInternal.value &&
+    //       (currentUserRole.value == "admin" || currentUserRole.value == "root")
+    //     );
+    //   } else {
+    //     return (
+    //       currentUserRole.value == "admin" || currentUserRole.value == "root"
+    //     );
+    //   }
+    // });
 
     const currentUser = computed(() => store.state.userInfo.email);
 
@@ -599,6 +604,11 @@ export default defineComponent({
         row.showGroups = false;
       }
     };
+    const forceCloseRow = (row) => {
+      if (row.showGroups) {
+        row.showGroups = false;
+      }
+    };
     const fetchUserGroups = (userEmail:any) =>  {
       const orgId = store.state.selectedOrganization.identifier;
       usersService.getUserGroups(orgId, userEmail)
@@ -660,12 +670,11 @@ export default defineComponent({
     const addMember = (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
       if (res.code == 200) {
-        $q.notify({
-          color: "positive",
-          message: "User added successfully.",
-        });
-
         if (operationType == "created") {
+          $q.notify({
+            color: "positive",
+            message: "User added successfully.",
+          });
           if (
             store.state.selectedOrganization.identifier == data.organization
           ) {
@@ -691,6 +700,10 @@ export default defineComponent({
             usersState.users.push(user);
           }
         } else {
+          $q.notify({
+            color: "positive",
+            message: "User updated successfully.",
+          });
           usersState.users.forEach((member: any, key: number) => {
             if (member.email == data.email) {
               usersState.users[key] = {
@@ -818,6 +831,7 @@ export default defineComponent({
       filterQuery: ref(""),
       fetchUserGroups,
       toggleExpand,
+      forceCloseRow,
       filterData(rows: any, terms: any) {
         var filtered = [];
         terms = terms.toLowerCase();
@@ -843,7 +857,7 @@ export default defineComponent({
       verifyOrganizationStatus,
       isEnterprise,
       isCurrentUserInternal,
-      showAddUserBtn,
+      // showAddUserBtn,
     };
   },
 });

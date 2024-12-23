@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="add-user-dialog column full-height">
-    <q-card-section class="q-px-md q-py-md">
+  <q-card class="add-user-dialog column full-height ">
+    <q-card-section class="q-px-md q-py-md tw-w-full">
       <div class="row items-center no-wrap">
         <div class="col">
           <div v-if="beingUpdated" class="text-h6">
@@ -45,9 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-          <p class="q-pt-sm">Organization : <strong>{{formData.organization}}</strong></p>
-          <p  class="q-pt-sm" v-if="!existingUser">Email : <strong>{{formData.email}}</strong></p>
-          <p  class="q-pt-sm" v-if="(!existingUser && !beingUpdated)">Role : <strong>{{formData.role}}</strong></p>
+          <p class="q-pt-sm tw-truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p>
+          <p class="q-pt-sm tw-truncate" v-if="!existingUser">{{t('user.email')}} : <strong>{{formData.email}}</strong></p>
+          <p class="q-pt-sm tw-truncate" v-if="(!existingUser && !beingUpdated)">{{t('user.roles')}} : <strong>{{formData.role}}</strong></p>
+          <p class="q-pt-sm tw-truncate" v-if="(!existingUser && !beingUpdated && formData?.custom_role?.length)">{{t('user.customRole')}} : <strong>{{formData.custom_role.join(', ')}}</strong></p>
           <q-input
             v-if="existingUser && !beingUpdated"
             v-model="formData.email"
