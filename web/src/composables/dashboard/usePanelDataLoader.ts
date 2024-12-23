@@ -77,6 +77,7 @@ export const usePanelDataLoader = (
     fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
     cancelSearchQueryBasedOnRequestId,
+    closeSocketBasedOnRequestId,
   } = useSearchWebSocket();
 
   /**
@@ -117,6 +118,7 @@ export const usePanelDataLoader = (
     searchWebSocketRequestIdsAndTraceIds: <
       { requestId: string; traceId: string }[]
     >[],
+    isOperationCancelled: false,
   });
 
   // observer for checking if panel is visible on the screen
@@ -605,6 +607,12 @@ export const usePanelDataLoader = (
 
   const sendSearchMessage = async (requestId: string, payload: any) => {
     console.log("send search message through ws");
+
+    // check if query is already canceled, if it is, close the socket
+    if (state.isOperationCancelled) {
+      closeSocketBasedOnRequestId(requestId);
+      return;
+    }
 
     sendSearchMessageBasedOnRequestId(requestId, {
       type: "search",
