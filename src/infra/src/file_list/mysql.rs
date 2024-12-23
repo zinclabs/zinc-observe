@@ -1191,7 +1191,8 @@ SELECT stream, max(id) as id, CAST(COUNT(*) AS SIGNED) AS num
             .with_label_values(&["select", "file_list_jobs"])
             .inc();
         let ret =
-            sqlx::query(r#"SELECT stream, status, count(*) as counts FROM file_list_jobs GROUP BY stream, status ORDER BY status desc;"#)
+            sqlx::query(r#"SELECT stream, status, count(*) as counts FROM file_list_jobs WHERE status = ? GROUP BY stream, status ORDER BY status desc;"#)
+                .bind(super::FileListJobStatus::Pending)
                 .fetch_all(&pool)
                 .await?;
 

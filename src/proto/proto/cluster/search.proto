@@ -12,6 +12,20 @@ service Search {
     rpc QueryStatus(QueryStatusRequest) returns (QueryStatusResponse) {}
     rpc CancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
     rpc ClusterCancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
+    rpc Search(SearchRequest) returns (SearchResponse) {}
+}
+
+message SearchRequest {
+    string             trace_id = 1;
+    string               org_id = 2;
+    string          stream_type = 3;
+    optional string     user_id = 4;
+    bytes               request = 5;
+}
+
+message SearchResponse {
+    string             trace_id = 1;
+    bytes              response = 2;
 }
 
 // Search request query
@@ -28,38 +42,6 @@ message SearchQuery {
     bool        uses_zo_fn = 12;
     string        query_fn = 13;
     bool          skip_wal = 14;
-}
-
-// Search request
-message SearchRequest {
-    Job                            job = 1;
-    string                      org_id = 2;
-    string                 stream_type = 3;
-    SearchQuery                  query = 5;
-    AggregateMode             agg_mode = 6;
-    repeated int64            file_ids = 7;
-    repeated IdxFileName     idx_files = 8;
-    int64                      timeout = 9;
-    string                 work_group = 10;
-    optional string           user_id = 12;
-    optional string search_event_type = 13;
-}
-
-message SearchResponse {
-    Job              job = 1;
-    int32           took = 2;
-    int64          total = 3;
-    int32           from = 4;
-    int32           size = 5;
-    bytes           hits = 6;
-    ScanStats scan_stats = 8;
-    bool      is_partial = 9;
-    int32      idx_took = 10;
-}
-
-enum AggregateMode {
-    Final   = 0;
-    Partial = 1;
 }
 
 message QueryStatusRequest {

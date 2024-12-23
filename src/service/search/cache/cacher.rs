@@ -24,6 +24,7 @@ use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
     meta::ResultCacheMeta,
 };
+use proto::cluster_rpc::SearchQuery;
 
 use crate::{
     common::meta::search::{CacheQueryRequest, CachedQueryResponse, QueryDelta},
@@ -39,12 +40,13 @@ use crate::{
 #[tracing::instrument(
     name = "service:search:cache:cacher:check_cache",
     skip_all,
-    fields(org_id = rpc_req.org_id)
+    fields(org_id = org_id)
 )]
 #[allow(clippy::too_many_arguments)]
 pub async fn check_cache(
     trace_id: &str,
-    rpc_req: &proto::cluster_rpc::SearchRequest,
+    org_id: &str,
+    stream_type: StreamType,
     req: &mut config::meta::search::Request,
     origin_sql: &mut String,
     file_path: &mut String,
@@ -54,10 +56,8 @@ pub async fn check_cache(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let query = rpc_req.clone().query.unwrap();
-    let org_id = rpc_req.org_id.clone();
-    let stream_type = StreamType::from(rpc_req.stream_type.as_str());
-    let sql = match Sql::new(&query, &org_id, stream_type).await {
+    let query: SearchQuery = req.query.clone().into();
+    let sql = match Sql::new(&query, org_id, stream_type).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error parsing sql: {:?}", e);

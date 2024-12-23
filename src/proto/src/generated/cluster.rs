@@ -917,6 +917,31 @@ pub mod metrics_server {
         const NAME: &'static str = "cluster.Metrics";
     }
 }
+#[derive(Eq)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SearchRequest {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub org_id: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub stream_type: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "4")]
+    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(bytes = "vec", tag = "5")]
+    pub request: ::prost::alloc::vec::Vec<u8>,
+}
+#[derive(Eq)]
+#[derive(serde::Serialize)]
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SearchResponse {
+    #[prost(string, tag = "1")]
+    pub trace_id: ::prost::alloc::string::String,
+    #[prost(bytes = "vec", tag = "2")]
+    pub response: ::prost::alloc::vec::Vec<u8>,
+}
 /// Search request query
 #[derive(Eq)]
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -946,58 +971,6 @@ pub struct SearchQuery {
     pub query_fn: ::prost::alloc::string::String,
     #[prost(bool, tag = "14")]
     pub skip_wal: bool,
-}
-/// Search request
-#[derive(Eq)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SearchRequest {
-    #[prost(message, optional, tag = "1")]
-    pub job: ::core::option::Option<Job>,
-    #[prost(string, tag = "2")]
-    pub org_id: ::prost::alloc::string::String,
-    #[prost(string, tag = "3")]
-    pub stream_type: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "5")]
-    pub query: ::core::option::Option<SearchQuery>,
-    #[prost(enumeration = "AggregateMode", tag = "6")]
-    pub agg_mode: i32,
-    #[prost(int64, repeated, tag = "7")]
-    pub file_ids: ::prost::alloc::vec::Vec<i64>,
-    #[prost(message, repeated, tag = "8")]
-    pub idx_files: ::prost::alloc::vec::Vec<IdxFileName>,
-    #[prost(int64, tag = "9")]
-    pub timeout: i64,
-    #[prost(string, tag = "10")]
-    pub work_group: ::prost::alloc::string::String,
-    #[prost(string, optional, tag = "12")]
-    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "13")]
-    pub search_event_type: ::core::option::Option<::prost::alloc::string::String>,
-}
-#[derive(Eq)]
-#[derive(serde::Serialize)]
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SearchResponse {
-    #[prost(message, optional, tag = "1")]
-    pub job: ::core::option::Option<Job>,
-    #[prost(int32, tag = "2")]
-    pub took: i32,
-    #[prost(int64, tag = "3")]
-    pub total: i64,
-    #[prost(int32, tag = "4")]
-    pub from: i32,
-    #[prost(int32, tag = "5")]
-    pub size: i32,
-    #[prost(bytes = "vec", tag = "6")]
-    pub hits: ::prost::alloc::vec::Vec<u8>,
-    #[prost(message, optional, tag = "8")]
-    pub scan_stats: ::core::option::Option<ScanStats>,
-    #[prost(bool, tag = "9")]
-    pub is_partial: bool,
-    #[prost(int32, tag = "10")]
-    pub idx_took: i32,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1055,32 +1028,6 @@ pub struct CancelQueryRequest {
 pub struct CancelQueryResponse {
     #[prost(bool, tag = "1")]
     pub is_success: bool,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-#[repr(i32)]
-pub enum AggregateMode {
-    Final = 0,
-    Partial = 1,
-}
-impl AggregateMode {
-    /// String value of the enum field names used in the ProtoBuf definition.
-    ///
-    /// The values are not transformed in any way and thus are considered stable
-    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
-    pub fn as_str_name(&self) -> &'static str {
-        match self {
-            AggregateMode::Final => "Final",
-            AggregateMode::Partial => "Partial",
-        }
-    }
-    /// Creates an enum from field names used in the ProtoBuf definition.
-    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
-        match value {
-            "Final" => Some(Self::Final),
-            "Partial" => Some(Self::Partial),
-            _ => None,
-        }
-    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
@@ -1268,6 +1215,25 @@ pub mod search_client {
                 .insert(GrpcMethod::new("cluster.Search", "ClusterCancelQuery"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn search(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SearchRequest>,
+        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/cluster.Search/Search");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("cluster.Search", "Search"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -1298,6 +1264,10 @@ pub mod search_server {
             tonic::Response<super::CancelQueryResponse>,
             tonic::Status,
         >;
+        async fn search(
+            &self,
+            request: tonic::Request<super::SearchRequest>,
+        ) -> std::result::Result<tonic::Response<super::SearchResponse>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct SearchServer<T: Search> {
@@ -1501,6 +1471,50 @@ pub mod search_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = ClusterCancelQuerySvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/cluster.Search/Search" => {
+                    #[allow(non_camel_case_types)]
+                    struct SearchSvc<T: Search>(pub Arc<T>);
+                    impl<T: Search> tonic::server::UnaryService<super::SearchRequest>
+                    for SearchSvc<T> {
+                        type Response = super::SearchResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::SearchRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Search>::search(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = SearchSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

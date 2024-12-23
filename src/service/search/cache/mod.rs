@@ -29,6 +29,7 @@ use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
     errors::Error,
 };
+use proto::cluster_rpc::SearchQuery;
 use result_utils::get_ts_value;
 use tracing::Instrument;
 
@@ -97,10 +98,6 @@ pub async fn search(
     let mut should_exec_query = true;
     let mut ext_took_wait = 0;
 
-    let mut rpc_req: proto::cluster_rpc::SearchRequest = req.to_owned().into();
-    rpc_req.org_id = org_id.to_string();
-    rpc_req.stream_type = stream_type.to_string();
-
     let mut file_path = format!(
         "{}/{}/{}/{}",
         org_id, stream_type, stream_name, hashed_query
@@ -109,7 +106,8 @@ pub async fn search(
         // cache layer
         check_cache(
             trace_id,
-            &rpc_req,
+            org_id,
+            stream_type,
             &mut req,
             &mut origin_sql,
             &mut file_path,
@@ -118,7 +116,7 @@ pub async fn search(
         )
         .await
     } else {
-        let query = rpc_req.clone().query.unwrap();
+        let query: SearchQuery = req.query.clone().into();
         match crate::service::search::Sql::new(&query, org_id, stream_type).await {
             Ok(v) => {
                 let (ts_column, is_descending) =

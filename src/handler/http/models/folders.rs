@@ -45,6 +45,14 @@ pub struct ListFoldersResponseBody {
     pub list: Vec<Folder>,
 }
 
+/// Indicates the type of data that the folder can contain.
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum FolderType {
+    Dashboards,
+    Alerts,
+}
+
 /// Common folder fields used in HTTP request and response bodies.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -80,6 +88,15 @@ impl From<config::meta::folder::Folder> for GetFolderResponseBody {
 impl From<UpdateFolderRequestBody> for config::meta::folder::Folder {
     fn from(value: UpdateFolderRequestBody) -> Self {
         value.0.into()
+    }
+}
+
+impl From<FolderType> for infra::table::folders::FolderType {
+    fn from(value: FolderType) -> Self {
+        match value {
+            FolderType::Dashboards => Self::Dashboards,
+            FolderType::Alerts => Self::Alerts,
+        }
     }
 }
 
