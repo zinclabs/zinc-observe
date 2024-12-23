@@ -30,6 +30,15 @@ pub async fn websocket(
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let cfg = get_config();
+
+    if !cfg.common.websocket_enabled {
+        log::info!(
+            "[WS_HANDLER]: Node Role: {} Websocket is disabled",
+            cfg.common.node_role
+        );
+        return Ok(HttpResponse::NotAcceptable().body("WebSocket is disabled"));
+    }
+
     let (org_id, request_id) = path_params.into_inner();
 
     let prefix = format!("{}/api/", get_config().common.base_uri);
