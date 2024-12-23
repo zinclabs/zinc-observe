@@ -36,7 +36,7 @@ pub async fn websocket(
             "[WS_HANDLER]: Node Role: {} Websocket is disabled",
             cfg.common.node_role
         );
-        return Ok(HttpResponse::NotAcceptable().body("WebSocket is disabled"));
+        return Ok(HttpResponse::NotFound().body("WebSocket is disabled"));
     }
 
     let (org_id, request_id) = path_params.into_inner();
