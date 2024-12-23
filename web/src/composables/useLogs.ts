@@ -4680,6 +4680,12 @@ const useLogs = () => {
         console.log("Error in search response", requestId, response);
         handleSearchError(requestId, payload.traceId, response);
       }
+
+      if (payload.type === "cancel_response") {
+        searchObj.loading = false;
+        searchObj.loadingHistogram = false;
+        handleCancelQuery();
+      }
     }
   };
 
@@ -5131,6 +5137,7 @@ const useLogs = () => {
 
     if (code === 20009) {
       handleCancelQuery();
+      return;
     }
 
     if (trace_id) removeTraceId(trace_id);
