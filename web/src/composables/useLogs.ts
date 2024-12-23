@@ -4677,7 +4677,6 @@ const useLogs = () => {
       }
 
       if (payload.type === "error") {
-        console.log("Error in search response", requestId, response);
         handleSearchError(requestId, payload.traceId, response);
       }
 
@@ -4797,10 +4796,6 @@ const useLogs = () => {
       processPostPaginationData();
 
       searchObj.loading = false;
-
-      if (!isPagination && !searchObj.data.isOperationCancelled) {
-        processHistogramRequest(queryReq);
-      }
 
       searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
     } catch (e: any) {
@@ -5068,22 +5063,15 @@ const useLogs = () => {
     console.log(
       "handleSearchClose",
       requestId,
-      payload,
       searchObj.data.isOperationCancelled,
     );
+
     if (searchObj.data.isOperationCancelled) {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
       searchObj.data.isOperationCancelled = false;
       return;
     }
-
-    console.log(
-      "handleSearchClose",
-      requestId,
-      response.code,
-      JSON.parse(JSON.stringify(payload)),
-    );
 
     if (response.code === 1001 || response.code === 1006) {
       if (!searchObj.data.searchRetriesCount[payload.traceId]) {
@@ -5124,8 +5112,12 @@ const useLogs = () => {
 
     if (payload.traceId) removeTraceId(payload.traceId);
 
-    searchObj.loading = false;
-    searchObj.loadingHistogram = false;
+    if (payload.type === "search" && !searchObj.data.isOperationCancelled) {
+      processHistogramRequest(payload.queryReq);
+    }
+
+    if (payload.type === "search") searchObj.loading = true;
+    if (payload.type === "histogram") searchObj.loadingHistogram = true;
     searchObj.data.isOperationCancelled = false;
   };
 
