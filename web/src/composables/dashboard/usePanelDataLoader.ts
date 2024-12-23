@@ -291,6 +291,9 @@ export const usePanelDataLoader = (
 
   const cancelQueryAbort = () => {
     state.loading = false;
+
+    state.isOperationCancelled = true;
+
     // get websocket enable config from store
     // window will have more priority
     // if window has use_web_socket property then use that
@@ -611,6 +614,7 @@ export const usePanelDataLoader = (
     // check if query is already canceled, if it is, close the socket
     if (state.isOperationCancelled) {
       closeSocketBasedOnRequestId(requestId);
+      state.isOperationCancelled = false;
       return;
     }
 
