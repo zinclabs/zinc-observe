@@ -741,6 +741,8 @@ async fn send_cached_responses(
 
     // `result_cache_ratio` for cached response is 100
     cached.cached_response.result_cache_ratio = 100;
+    // `scan_size` is 0, as it is not used for cached responses
+    cached.cached_response.scan_size = 0;
 
     // Send the cached response
     let ws_search_res = WsServerEvents::SearchResponse {
