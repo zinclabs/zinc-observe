@@ -25,7 +25,7 @@ use config::{
     },
     utils::base64,
 };
-use infra::errors::Error;
+use infra::errors::{Error, ErrorCodes};
 use tracing::Instrument;
 
 use super::utils::cancellation_registry_cache_utils;
@@ -565,7 +565,10 @@ async fn process_delta(
                 "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping delta search",
                 trace_id
             );
-            return Ok(());
+            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+                "Search cancel detected for trace_id: {}",
+                trace_id
+            ))));
         }
 
         let mut req = req.clone();
@@ -737,7 +740,10 @@ async fn send_cached_responses(
             "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping cached response",
             trace_id
         );
-        return Ok(());
+        return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+            "Search cancel detected for trace_id: {}",
+            trace_id
+        ))));
     };
 
     log::info!(
@@ -854,7 +860,10 @@ async fn do_partitioned_search(
                 "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping partitioned search",
                 trace_id
             );
-            return Ok(());
+            return Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery(format!(
+                "Search cancel detected for trace_id: {}",
+                trace_id
+            ))));
         }
 
         let mut req = req.clone();

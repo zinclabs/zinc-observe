@@ -18,7 +18,7 @@ use actix_ws::{MessageStream, Session};
 use config::{get_config, meta::websocket::SearchResultType};
 use dashmap::DashMap;
 use futures::StreamExt;
-use infra::errors::Error;
+use infra::errors::{self, Error};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, WsMeta},
@@ -218,22 +218,26 @@ pub async fn handle_text_message(
                                     search_req.trace_id,
                                     e
                                 );
+
+                                // if the error is due to search cancellation, return
+                                // the cancel handler will close the session
+                                if let errors::Error::ErrorCode(
+                                    errors::ErrorCodes::SearchCancelQuery(_),
+                                ) = e
+                                {
+                                    log::info!(
+                                        "[WS_HANDLER]: trace_id: {}, Return from search handler, search canceled",
+                                        search_req.trace_id
+                                    );
+                                    return;
+                                }
+
                                 let err_msg =
-                                    format!("[trace_id: {}, error: {}]", search_req.trace_id, e);
-                                let mut close_reason = Some(CloseReason {
+                                    format!("[trace_id: {}, error: {}]", search_req.trace_id, &e);
+                                let close_reason = Some(CloseReason {
                                     code: CloseCode::Error,
                                     description: Some(err_msg.clone()),
                                 });
-                                // 20009 is the error code for search cancellation
-                                if e.to_string().contains("20009") {
-                                    close_reason = Some(CloseReason {
-                                        code: CloseCode::Normal,
-                                        description: Some(format!(
-                                            "[trace_id {}] Search canceled",
-                                            search_req.trace_id
-                                        )),
-                                    });
-                                }
 
                                 // audit
                                 #[cfg(feature = "enterprise")]
@@ -285,7 +289,7 @@ pub async fn handle_text_message(
                         code: CloseCode::Normal,
                         description: Some(format!("[trace_id {}] Search canceled", trace_id)),
                     });
-                    cleanup_and_close_session(&req_id, close_reason).await;
+                    cleanup_and_close_session(req_id, close_reason).await;
                 }
                 WsClientEvents::Benchmark { id } => {
                     // simulate random delay for benchmarking by sleep for 10/20/30/60/90
@@ -308,7 +312,7 @@ pub async fn handle_text_message(
                         code: CloseCode::Normal,
                         description: Some(format!("[id {}] benchmark completed", id)),
                     });
-                    cleanup_and_close_session(&req_id, close_reason).await;
+                    cleanup_and_close_session(req_id, close_reason).await;
                 }
             }
         }
