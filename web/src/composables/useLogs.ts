@@ -4968,8 +4968,6 @@ const useLogs = () => {
     }
 
     searchObj.data.queryResults.aggs = [];
-    searchObj.data.queryResults.scan_size = 0;
-
     if (shouldShowHistogram) {
       searchObj.meta.refreshHistogram = false;
       if (searchObj.data.queryResults.hits.length > 0) {
