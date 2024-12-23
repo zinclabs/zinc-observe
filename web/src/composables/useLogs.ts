@@ -4105,13 +4105,6 @@ const useLogs = () => {
   const cancelQuery = () => {
     if (searchObj.communicationMethod === "ws") {
       sendCancelSearchMessage();
-      searchObj.data.isOperationCancelled = false;
-      $q.notify({
-        message: "Running query cancelled successfully",
-        color: "positive",
-        position: "bottom",
-        timeout: 4000,
-      });
       return;
     }
 
@@ -4625,6 +4618,7 @@ const useLogs = () => {
 
   const sendSearchMessage = (requestId: string, queryReq: any) => {
     try {
+      console.log("Send search message", searchObj.data.isOperationCancelled);
       if (searchObj.data.isOperationCancelled) {
         closeSocketBasedOnRequestId(requestId);
         return;
@@ -4642,6 +4636,7 @@ const useLogs = () => {
           use_cache: (window as any).use_cache ?? true,
         },
       });
+      // cancelQuery();
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
@@ -4681,8 +4676,9 @@ const useLogs = () => {
         handlePageCountResponse(payload.queryReq, payload.traceId, response);
       }
 
-      if (payload.type === "cancel") {
-        handleCancelSearchResponse(requestId, payload.traceId, response);
+      if (payload.type === "error") {
+        console.log("Error in search response", requestId, response);
+        handleSearchError(requestId, payload.traceId, response);
       }
     }
   };
@@ -4796,7 +4792,7 @@ const useLogs = () => {
 
       searchObj.loading = false;
 
-      if (!isPagination) {
+      if (!isPagination && !searchObj.data.isOperationCancelled) {
         processHistogramRequest(queryReq);
       }
 
@@ -5063,12 +5059,25 @@ const useLogs = () => {
     if (requestId) removeRequestId(requestId);
 
     // Any case where below logic may end in recursion
+    console.log(
+      "handleSearchClose",
+      requestId,
+      payload,
+      searchObj.data.isOperationCancelled,
+    );
     if (searchObj.data.isOperationCancelled) {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
       searchObj.data.isOperationCancelled = false;
       return;
     }
+
+    console.log(
+      "handleSearchClose",
+      requestId,
+      response.code,
+      JSON.parse(JSON.stringify(payload)),
+    );
 
     if (response.code === 1001 || response.code === 1006) {
       if (!searchObj.data.searchRetriesCount[payload.traceId]) {
@@ -5119,6 +5128,10 @@ const useLogs = () => {
     searchObj.loadingHistogram = false;
 
     const { message, trace_id, code, error_detail } = err.content;
+
+    if (code === 20009) {
+      handleCancelQuery();
+    }
 
     if (trace_id) removeTraceId(trace_id);
 
@@ -5244,7 +5257,7 @@ const useLogs = () => {
   };
 
   const sendCancelSearchMessage = () => {
-    console.log("send cancel message through ws");
+    searchObj.data.isOperationCancelled = true;
 
     // loop on all requestIds
     searchObj.data.searchWebSocketRequestIdsAndTraceIds.forEach(
@@ -5254,24 +5267,13 @@ const useLogs = () => {
     );
   };
 
-  const handleCancelSearchResponse = (
-    requestId: string,
-    traceId: string,
-    response: any,
-  ) => {
-    removeTraceId(traceId);
-    removeRequestId(requestId);
-
-    const isCancelled = response?.content?.some((item: any) => item.is_success);
-    if (isCancelled) {
-      searchObj.data.isOperationCancelled = false;
-      $q.notify({
-        message: "Running query cancelled successfully",
-        color: "positive",
-        position: "bottom",
-        timeout: 4000,
-      });
-    }
+  const handleCancelQuery = () => {
+    $q.notify({
+      message: "Running query cancelled successfully",
+      color: "positive",
+      position: "bottom",
+      timeout: 4000,
+    });
   };
 
   const handlePageCountError = (err: any) => {

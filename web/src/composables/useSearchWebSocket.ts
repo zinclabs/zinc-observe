@@ -64,6 +64,12 @@ const useSearchWebSocket = () => {
   ) => {
     const socket = webSocket.getWebSocketBasedOnSocketId(requestId);
 
+    console.log(
+      "cancel search query based on requestId",
+      requestId,
+      trace_id,
+      socket.readyState,
+    );
     // check state of socket
     if (socket && socket.readyState === WebSocket.OPEN) {
       webSocket.sendMessage(
@@ -79,6 +85,7 @@ const useSearchWebSocket = () => {
   };
 
   const closeSocketBasedOnRequestId = (requestId: string) => {
+    console.log("close socket based on requestId", requestId);
     webSocket.closeSocket(requestId);
   };
 

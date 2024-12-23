@@ -68,6 +68,7 @@ const onClose = (
   maxAttempts: number,
   reconnect: () => void,
 ) => {
+  console.log("onClose", socketId, event.code, event.reason);
   clearInterval(pingIntervals[socketId]);
   delete pingIntervals[socketId];
   delete sockets[socketId];
@@ -123,11 +124,12 @@ const removeHandler = (
 
 const closeSocket = (socketId: string) => {
   const socket = sockets[socketId];
-  if (socket) {
-    socket.close();
-    clearInterval(pingIntervals[socketId]);
-    delete sockets[socketId];
-    delete pingIntervals[socketId];
+  console.log("close socket", socketId, socket.readyState);
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    setTimeout(() => {
+      sendMessage(socketId, JSON.stringify({ type: "close" }));
+      socket.close(1000, "search cancelled");
+    });
   }
 };
 
