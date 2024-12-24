@@ -1026,7 +1026,7 @@ export default defineComponent({
 
               return optiondata;
             },
-          );
+          ).sort((a: any, b: any) => a.label.localeCompare(b.label));
         }
 
         if (localOrgFlag == false) {

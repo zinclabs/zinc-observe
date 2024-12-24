@@ -94,11 +94,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :scope="scope"
           :resultTotal="resultTotal"
           :perPageOptions="perPageOptions"
-          :maxRecordToReturn="maxRecordToReturn"
           position="bottom"
           @update:changeRecordPerPage="changePagination"
-          @update:maxRecordToReturn="changeMaxRecordToReturn"
         />
+          <!-- :maxRecordToReturn="maxRecordToReturn" -->
+          <!-- @update:maxRecordToReturn="changeMaxRecordToReturn" -->
       </template>
     </q-table>
     <q-dialog
@@ -226,13 +226,13 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
-      {
-        name: "owner",
-        field: "owner",
-        label: t("organization.owner"),
-        align: "left",
-        sortable: true,
-      },
+      // {
+      //   name: "owner",
+      //   field: "owner",
+      //   label: t("organization.owner"),
+      //   align: "left",
+      //   sortable: true,
+      // },
       ...(config.isCloud == 'true' ? [
         {
           name: "plan_type",
@@ -271,7 +271,7 @@ export default defineComponent({
       { label: "500", value: 500 },
     ];
     const resultTotal = ref<number>(0);
-    const maxRecordToReturn = ref<number>(500);
+    // const maxRecordToReturn = ref<number>(500);
     const selectedPerPage = ref<number>(25);
     const pagination: any = ref({
       rowsPerPage: 25,
@@ -315,10 +315,10 @@ export default defineComponent({
       pagination.value.rowsPerPage = val.value;
       qTable.value.setPagination(pagination.value);
     };
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
-      getOrganizations();
-    };
+    // const changeMaxRecordToReturn = (val: any) => {
+    //   maxRecordToReturn.value = val;
+    //   getOrganizations();
+    // };
 
     const addOrganization = (evt) => {
       router.push({
@@ -357,7 +357,7 @@ export default defineComponent({
             name: data.name,
             identifier: data.identifier,
             type: convertToTitleCase(data.type),
-            owner: data.user_email,
+            // owner: data.user_email,
           };
 
           // Additional fields and logic for cloud configuration
@@ -482,8 +482,8 @@ export default defineComponent({
       perPageOptions,
       selectedPerPage,
       changePagination,
-      maxRecordToReturn,
-      changeMaxRecordToReturn,
+      // maxRecordToReturn,
+      // changeMaxRecordToReturn,
       filterQuery: ref(""),
       filterData(rows: string | any[], terms: string) {
         const filtered = [];

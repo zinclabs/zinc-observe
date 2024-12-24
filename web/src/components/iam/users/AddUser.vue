@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator />
       <div>
         <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-          <p class="q-pt-sm tw-truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p>
+          <!-- <p class="q-pt-sm tw-truncate">{{t('user.organization')}} : <strong>{{formData.organization}}</strong></p> -->
           <p class="q-pt-sm tw-truncate" v-if="!existingUser">{{t('user.email')}} : <strong>{{formData.email}}</strong></p>
           <p class="q-pt-sm tw-truncate" v-if="(!existingUser && !beingUpdated)">{{t('user.roles')}} : <strong>{{formData.role}}</strong></p>
           <p class="q-pt-sm tw-truncate" v-if="(!existingUser && !beingUpdated && formData?.custom_role?.length)">{{t('user.customRole')}} : <strong>{{formData.custom_role.join(', ')}}</strong></p>
@@ -608,6 +608,6 @@ export default defineComponent({
 </script>
 <style scoped lang="scss">
   .add-user-dialog{
-    width: 275px;
+    width: 30vw;
   }
 </style>

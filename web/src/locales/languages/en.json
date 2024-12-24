@@ -316,9 +316,10 @@
     "userName": "User Name",
     "resourceName": "Resource Name",
     "searchRole": "Search Role",
-    "searchGroup": "Search Group",
+    "searchGroup": "Search User Group",
     "object": "Object",
-    "serviceAccounts": "Service Accounts"
+    "serviceAccounts": "Service Accounts",
+    "serviceAccountsName": "Service Accounts Name"
   },
   "ticket": {
     "header": "Support Tickets",

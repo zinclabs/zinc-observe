@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             filled
             dense
             class="q-ml-auto q-mb-xs no-border"
-            placeholder="Search"
+            placeholder="Search Service Accounts"
           >
             <template #prepend>
               <q-icon name="search" class="cursor-pointer" />
@@ -189,14 +189,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       field: "",
       label: "",
       align: "left",
-      sortable: true,
+      sortable: false,
       slot: true,
       slotName: "select",
     },
     {
       name: "email",
       field: "email",
-      label: t("iam.userName"),
+      label: t("iam.serviceAccountsName"),
       align: "left",
       sortable: true,
     },

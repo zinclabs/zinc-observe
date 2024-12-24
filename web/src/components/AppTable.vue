@@ -59,6 +59,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-th>
         </q-tr>
       </template>
+       <template #top="scope">
+        <QTablePagination
+          :scope="scope"
+          :resultTotal="resultTotal"
+          :perPageOptions="perPageOptions"
+          position="top"
+          @update:changeRecordPerPage="changePagination"
+        />
+       </template>
       <template v-slot:body="props">
         <q-tr :props="props" :key="`m_${props.row.index}`">
           <q-td

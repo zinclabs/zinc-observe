@@ -225,7 +225,7 @@ const columns = computed(() => {
       field: "",
       label: "",
       align: "left",
-      sortable: true,
+      sortable: false,
       slot: true,
       slotName: "select",
     },

@@ -179,10 +179,11 @@ onBeforeMount(() => {
 });
 
 const updateTable = () => {
+  let counter = 1;
   rows.value = cloneDeep(
     groupsState.groups.map((group: { group_name: string }, index: number) => ({
       ...group,
-      "#": index + 1,
+      "#": counter <= 9 ? `0${counter++}` : counter++,
     }))
   );
 };

@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   filled
                   dense
                   class="q-mb-xs no-border q-mr-md"
-                  :placeholder="t('common.search')"
+                  :placeholder="`Search Permissions`"
                   style="width: 300px"
                   @update:model-value="onResourceChange"
                 >

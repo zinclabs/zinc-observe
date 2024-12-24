@@ -261,12 +261,14 @@ export default defineComponent({
             // }
           })
           .catch((err: any) => {
-            this.$q.notify({
-              type: "negative",
-              message: JSON.stringify(
-                err.response.data["error"] || "Organization creation failed."
-              ),
-            });
+            if(err.status !== 403){
+              this.$q.notify({
+                type: "negative",
+                message: JSON.stringify(
+                  err.response.data["error"] || "Organization creation failed."
+                ),
+              });
+            }
             dismiss();
           });
       });
