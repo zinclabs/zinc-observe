@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="height: calc(100vh - 57px)"
     :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
   >
-    <div v-if="!showAddAlertDialog" class="full-width alert-list-table">
+    <div v-if="!showImportAlertDialog && !showAddAlertDialog" class="full-width alert-list-table">
       <q-table
         data-test="alert-list-table"
         ref="qTable"
@@ -184,6 +184,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
           <q-btn
+            class="q-ml-md text-bold"
+            padding="sm lg"
+            outline
+            no-caps
+            :label="t(`dashboard.import`)"
+            @click="importAlert"
+            data-test="alert-import"
+          />
+          <q-btn
             data-test="alert-list-add-alert-btn"
             class="q-ml-md q-mb-xs text-bold no-border"
             padding="sm lg"
@@ -216,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </q-table>
     </div>
-    <template v-else>
+    <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
       <AddAlert
         v-model="formData"
         :isUpdated="isUpdated"
@@ -225,6 +234,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @cancel:hideform="hideForm"
         @refresh:destinations="refreshDestination"
       />
+    </template>
+    <template v-else>
+      <ImportAlert
+      
+      :destinations="destinations"
+      :templates="templates"
+      :alerts="alerts"
+      @update:alerts="getAlerts"
+      @update:destinations="refreshDestination"
+      @update:templates="getTemplates"
+       />
     </template>
     <ConfirmDialog
       title="Delete Alert"
@@ -334,6 +354,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
+import ImportAlert from "@/components/alerts/ImportAlert.vue";
 import {
   getImageURL,
   getUUID,
@@ -356,6 +377,7 @@ export default defineComponent({
     ),
     NoData,
     ConfirmDialog,
+    ImportAlert,
   },
   emits: [
     "updated:fields",
@@ -383,6 +405,8 @@ export default defineComponent({
     const streams: any = ref({});
     const isFetchingStreams = ref(false);
     const isSubmitting = ref(false);
+
+    const showImportAlertDialog = ref(false);
 
     const { getStreams } = useStreams();
 
@@ -519,9 +543,11 @@ export default defineComponent({
               ),
             };
           });
+
           alertsRows.value.forEach((alert: AlertListItem) => {
             alertStateLoadingMap.value[alert.uuid as string] = false;
           });
+
           if (router.currentRoute.value.query.action == "add") {
             showAddUpdateFn({ row: undefined });
           }
@@ -530,7 +556,11 @@ export default defineComponent({
             showAddUpdateFn({
               row: getAlertByName(alertName),
             });
+
           }
+            if (router.currentRoute.value.query.action == "import") {
+              showImportAlertDialog.value = true;
+            }
           dismiss();
         })
         .catch((e) => {
@@ -557,7 +587,10 @@ export default defineComponent({
     watch(
       () => router.currentRoute.value.query.action,
       (action) => {
-        if (!action) showAddAlertDialog.value = false;
+        if (!action) {
+          showAddAlertDialog.value = false;
+          showImportAlertDialog.value = false;
+        }
       }
     );
     const getDestinations = async () => {
@@ -925,6 +958,16 @@ export default defineComponent({
 
     }
 
+    const importAlert = () =>{
+      showImportAlertDialog.value = true;
+      router.push({
+        name: "alertList",
+        query: {
+          action: "import",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    }
     return {
       t,
       qTable,
@@ -1012,6 +1055,9 @@ export default defineComponent({
       templates,
       routeTo,
       refreshDestination,
+      showImportAlertDialog,
+      importAlert,
+      getTemplates,
     };
   },
 });
