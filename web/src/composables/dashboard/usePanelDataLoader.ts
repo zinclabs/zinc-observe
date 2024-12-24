@@ -598,6 +598,7 @@ export const usePanelDataLoader = (
     if (response.type === "error") {
       // set loading to false
       state.loading = false;
+      state.isOperationCancelled = false;
 
       processApiError(response?.content?.meta, "sql");
     }
@@ -605,6 +606,7 @@ export const usePanelDataLoader = (
     if (response.type === "end") {
       // set loading to false
       state.loading = false;
+      state.isOperationCancelled = false;
     }
   };
 
@@ -656,6 +658,7 @@ export const usePanelDataLoader = (
 
       if (searchRetriesCount.value[payload.traceId] <= 2) {
         state.loading = true;
+        state.isOperationCancelled = false;
 
         const requestId = fetchQueryDataWithWebSocket(payload, {
           open: sendSearchMessage,
@@ -685,6 +688,7 @@ export const usePanelDataLoader = (
 
     // set loading to false
     state.loading = false;
+    state.isOperationCancelled = false;
   };
 
   const handleSearchError = (
@@ -696,6 +700,7 @@ export const usePanelDataLoader = (
 
     // set loading to false
     state.loading = false;
+    state.isOperationCancelled = false;
 
     processApiError(response, "sql");
   };
@@ -746,6 +751,7 @@ export const usePanelDataLoader = (
     } catch (e: any) {
       state.errorDetail = e?.message || e;
       state.loading = false;
+      state.isOperationCancelled = false;
     }
   };
 
@@ -766,6 +772,7 @@ export const usePanelDataLoader = (
       if (!panelSchema.value.queries?.length || !hasAtLeastOneQuery()) {
         log("loadData: there are no queries to execute");
         state.loading = false;
+        state.isOperationCancelled = false;
         state.data = [];
         state.metadata = {
           queries: [],
@@ -816,6 +823,7 @@ export const usePanelDataLoader = (
         log("loadData: panelcache: isRestoredFromCache", isRestoredFromCache);
         if (isRestoredFromCache) {
           state.loading = false;
+          state.isOperationCancelled = false;
           log("loadData: panelcache: restored from cache");
           runCount++;
           return;
