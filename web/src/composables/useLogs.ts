@@ -1956,7 +1956,7 @@ const useLogs = () => {
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
-          searchObj.data.queryResults.scan_size = res.data.scan_size;
+          searchObj.data.queryResults.scan_size += res.data.scan_size;
           searchObj.data.queryResults.took += res.data.took;
           for (const [
             index,
