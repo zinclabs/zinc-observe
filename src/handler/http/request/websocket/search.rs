@@ -362,9 +362,9 @@ async fn handle_cache_responses_and_deltas(
     remaining_query_range: i64,
     mut order_by: &OrderBy,
 ) -> Result<(), Error> {
-    // Force set order_by to desc for dashboards
+    // Force set order_by to desc for dashboards & histogram
     // so that deltas are processed in the reverse order
-    if req.search_type == SearchEventType::Dashboards {
+    if req.search_type == SearchEventType::Dashboards || req.payload.query.size == -1 {
         order_by = &OrderBy::Desc;
     }
 
@@ -553,7 +553,8 @@ async fn process_delta(
         trace_id
     );
 
-    if req.search_type == SearchEventType::Dashboards {
+    // for dashboards & histograms
+    if req.search_type == SearchEventType::Dashboards || req.payload.query.size == -1 {
         // sort partitions by timestamp in desc
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
     }
@@ -839,8 +840,8 @@ async fn do_partitioned_search(
         req.payload.query.streaming_id = partition_resp.streaming_id.clone();
     }
 
-    // sort partitions in desc by _timestamp for dashboards
-    if req.search_type == SearchEventType::Dashboards {
+    // sort partitions in desc by _timestamp for dashboards & histograms
+    if req.search_type == SearchEventType::Dashboards || req.payload.query.size == -1 {
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
     }
 
