@@ -4479,8 +4479,8 @@ const useLogs = () => {
       }
 
       if (
-        isNaN(searchObj.data.datetime.endTime) ||
-        isNaN(searchObj.data.datetime.startTime)
+        Number.isNaN(searchObj.data.datetime.endTime) ||
+        Number.isNaN(searchObj.data.datetime.startTime)
       ) {
         setDateTime(
           (router.currentRoute.value?.query?.period as string) || "15m",
@@ -4578,31 +4578,14 @@ const useLogs = () => {
         }
       }
 
-      const { traceparent, traceId } = generateTraceContext();
-      addTraceId(traceId);
+      const payload = buildWebSocketPayload(queryReq, isPagination, "search");
+      const requestId = initializeWebSocketConnection(payload);
 
-      const payload: {
-        queryReq: SearchRequestPayload;
-        type: "search" | "histogram" | "pageCount";
-        isPagination: boolean;
-        traceId: string;
-        org_id: string;
-      } = {
-        queryReq,
-        type: "search",
-        isPagination,
-        traceId,
-        org_id: searchObj.organizationIdentifier,
-      };
+      if (!requestId) {
+        throw new Error("Failed to initialize WebSocket connection");
+      }
 
-      const requestId = fetchQueryDataWithWebSocket(payload, {
-        open: sendSearchMessage,
-        close: handleSearchClose,
-        error: handleSearchError,
-        message: handleSearchResponse,
-      });
-
-      addRequestId(requestId, traceId);
+      addRequestId(requestId, payload.traceId);
     } catch (e: any) {
       console.error("Error while getting data through web socket", e);
 
@@ -4612,6 +4595,40 @@ const useLogs = () => {
       );
       notificationMsg.value = "";
     }
+  };
+
+  const buildWebSocketPayload = (
+    queryReq: SearchRequestPayload,
+    isPagination: boolean,
+    type: "search" | "histogram" | "pageCount",
+  ) => {
+    const { traceId } = generateTraceContext();
+    addTraceId(traceId);
+
+    const payload: {
+      queryReq: SearchRequestPayload;
+      type: "search" | "histogram" | "pageCount";
+      isPagination: boolean;
+      traceId: string;
+      org_id: string;
+    } = {
+      queryReq,
+      type,
+      isPagination,
+      traceId,
+      org_id: searchObj.organizationIdentifier,
+    };
+
+    return payload;
+  };
+
+  const initializeWebSocketConnection = (payload: any) => {
+    return fetchQueryDataWithWebSocket(payload, {
+      open: sendSearchMessage,
+      close: handleSearchClose,
+      error: handleSearchError,
+      message: handleSearchResponse,
+    });
   };
 
   const sendSearchMessage = (requestId: string, queryReq: any) => {
@@ -5082,14 +5099,17 @@ const useLogs = () => {
         if (payload.type === "search") searchObj.loading = true;
         if (payload.type === "histogram") searchObj.loadingHistogram = true;
 
-        const requestId = fetchQueryDataWithWebSocket(payload, {
-          open: sendSearchMessage,
-          close: handleSearchClose,
-          error: handleSearchError,
-          message: handleSearchResponse,
-        });
+        setTimeout(() => {
+          const requestId = fetchQueryDataWithWebSocket(payload, {
+            open: sendSearchMessage,
+            close: handleSearchClose,
+            error: handleSearchError,
+            message: handleSearchResponse,
+          });
 
-        addRequestId(requestId, payload.traceId);
+          addRequestId(requestId, payload.traceId);
+        }, 1000);
+
         return;
       } else {
         handleSearchError(requestId, payload, {
