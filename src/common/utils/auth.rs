@@ -262,7 +262,7 @@ impl FromRequest for AuthExtractor {
             }
         } else if url_len == 2 || (url_len > 2 && path_columns[1].starts_with("settings")) {
             // for settings, the post/delete require PUT permissions, GET needs LIST permissions
-            // also the special settings exception is for 3-part urls for logo /text 
+            // also the special settings exception is for 3-part urls for logo /text
             // which are of path /org/settings/logo , which need permission of operating
             // on permission in general
             if path_columns[1].starts_with("settings") {
@@ -340,8 +340,8 @@ impl FromRequest for AuthExtractor {
                 || path_columns[1].starts_with("service_accounts")
                 || path_columns[1].starts_with("cipher_keys")
             {
-                // Similar to the alerts/templates etc, but for other entities such as specific pipeline,
-                // specific stream, specific alert/destination etc.
+                // Similar to the alerts/templates etc, but for other entities such as specific
+                // pipeline, specific stream, specific alert/destination etc.
                 // and these are not "sub-entities" under some other entities, hence
                 // a separate else-if clause
                 // Similarly, for the put/delete or any operation on these
@@ -407,7 +407,8 @@ impl FromRequest for AuthExtractor {
                     path_columns[2]
                 )
             }
-        } else if method.eq("PUT") || method.eq("DELETE") { // this block is for all other urls
+        } else if method.eq("PUT") || method.eq("DELETE") {
+            // this block is for all other urls
             // specifically checking PUT /org_id/streams/stream_name/delete_fields
             // even though method is put, we actually need to check delete permissions
             if path_columns[url_len - 1].eq("delete_fields") {

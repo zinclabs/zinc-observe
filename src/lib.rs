@@ -15,6 +15,7 @@
 
 #![feature(btree_cursors)]
 
+#[cfg(feature = "enterprise")]
 pub mod cipher;
 pub mod cli;
 pub mod common;

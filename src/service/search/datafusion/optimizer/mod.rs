@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use add_sort_and_limit::AddSortAndLimitRule;
 use add_timestamp::AddTimestampRule;
+#[cfg(feature = "enterprise")]
 use cipher::{RewriteCipherCall, RewriteCipherKey};
 use datafusion::optimizer::{
     common_subexpr_eliminate::CommonSubexprEliminate,
@@ -108,7 +109,9 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };
     rules.push(Arc::new(AddTimestampRule::new(start_time, end_time)));
+    #[cfg(feature = "enterprise")]
     rules.push(Arc::new(RewriteCipherCall::new()));
+    #[cfg(feature = "enterprise")]
     rules.push(Arc::new(RewriteCipherKey::new(&sql.org_id)));
     // ************************************
 
