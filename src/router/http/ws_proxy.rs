@@ -98,11 +98,21 @@ pub async fn ws_proxy(
                     }
                 }
                 Message::Close(reason) => {
+                    log::info!(
+                        "[WS_PROXY] Forwarding Close frame from backend to client: {:?}",
+                        reason
+                    );
                     let _ = session.close(reason).await;
                     break;
                 }
-                _ => {
-                    log::warn!("[WS_PROXY] Unsupported message type from backend");
+                Message::Continuation(item) => {
+                    log::warn!(
+                        "[WS_PROXY] Unsupported message type from backend: {:?}",
+                        item
+                    );
+                }
+                Message::Nop => {
+                    log::warn!("[WS_PROXY] Unsupported message type from backend: Nop");
                 }
             }
         }
@@ -127,10 +137,15 @@ fn from_actix_message(msg: Message) -> tungstenite::protocol::Message {
                 "[WS_PROXY] Received a Message::Close with reason: {:#?}, closing connection to proxied server",
                 reason
             );
-            tungstenite::protocol::Message::Close(None)
+            tungstenite::protocol::Message::Close(reason.map(|r| {
+                tungstenite::protocol::CloseFrame {
+                    code: u16::from(r.code).into(),
+                    reason: r.description.unwrap_or_default().into(),
+                }
+            }))
         }
         _ => {
-            log::info!("[WS_PROXY] Unsupported message type");
+            log::info!("[WS_PROXY] Unsupported message type {:?}", msg);
             tungstenite::protocol::Message::Close(None)
         }
     }
@@ -142,9 +157,14 @@ fn from_tungstenite_msg_to_actix_msg(msg: tungstenite::protocol::Message) -> Mes
         tungstenite::protocol::Message::Binary(bin) => Message::Binary(bin.into()),
         tungstenite::protocol::Message::Ping(msg) => Message::Ping(msg.into()),
         tungstenite::protocol::Message::Pong(msg) => Message::Pong(msg.into()),
-        tungstenite::protocol::Message::Close(None) => Message::Close(None),
+        tungstenite::protocol::Message::Close(reason) => {
+            Message::Close(reason.map(|r| actix_ws::CloseReason {
+                code: u16::from(r.code).into(),
+                description: Some(r.reason.to_string()),
+            }))
+        }
         _ => {
-            log::info!("[WS_PROXY] Unsupported message type");
+            log::info!("[WS_PROXY] Unsupported message type {:?}", msg);
             Message::Close(None)
         }
     }
