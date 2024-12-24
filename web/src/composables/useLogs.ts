@@ -5112,7 +5112,11 @@ const useLogs = () => {
 
     if (payload.traceId) removeTraceId(payload.traceId);
 
-    if (payload.type === "search" && !searchObj.data.isOperationCancelled) {
+    if (
+      payload.type === "search" &&
+      !payload.isPagination &&
+      !searchObj.data.isOperationCancelled
+    ) {
       processHistogramRequest(payload.queryReq);
     }
 
@@ -5127,8 +5131,10 @@ const useLogs = () => {
 
     const { message, trace_id, code, error_detail } = err.content;
 
+    // 20009 is the code for query cancelled
     if (code === 20009) {
       handleCancelQuery();
+      return;
     }
 
     if (trace_id) removeTraceId(trace_id);
