@@ -143,6 +143,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`alert-list-${props.row.name}-clone-alert`"
             ></q-btn>
             <q-btn
+              icon="download"
+              title="Export Alert"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              @click.stop="exportAlert(props.row)"
+              data-test="alert-export"
+            ></q-btn>
+            <q-btn
               :data-test="`alert-list-${props.row.name}-delete-alert`"
               :icon="outlinedDelete"
               class="q-ml-xs"
@@ -968,6 +980,43 @@ export default defineComponent({
         },
       });
     }
+    const exportAlert = (row) => {
+  // Find the alert based on uuid
+  const alertToBeExported = alerts.value.find(
+    (alert) => alert.uuid === row.uuid
+  );
+
+  // Ensure that the alert exists before proceeding
+  if (alertToBeExported) {
+    console.log(alertToBeExported, 'row');
+
+    // Convert the alert object to a JSON string
+    const alertJson = JSON.stringify(alertToBeExported, null, 2);
+
+    // Create a Blob from the JSON string
+    const blob = new Blob([alertJson], { type: 'application/json' });
+
+    // Create an object URL for the Blob
+    const url = URL.createObjectURL(blob);
+
+    // Create an anchor element to trigger the download
+    const link = document.createElement('a');
+    link.href = url;
+
+    // Set the filename of the download
+    link.download = `${alertToBeExported.name}.json`;
+
+    // Trigger the download by simulating a click
+    link.click();
+
+    // Clean up the URL object after download
+    URL.revokeObjectURL(url);
+  } else {
+    // Alert not found, handle error or show notification
+    console.error('Alert not found for UUID:', row.uuid);
+  }
+};
+
     return {
       t,
       qTable,
@@ -1058,6 +1107,7 @@ export default defineComponent({
       showImportAlertDialog,
       importAlert,
       getTemplates,
+      exportAlert,
     };
   },
 });

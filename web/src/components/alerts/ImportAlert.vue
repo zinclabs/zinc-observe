@@ -57,6 +57,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator class="q-my-sm q-mx-md" />
 </div>
 <div class="flex">
+ <div class="report-list-tabs flex items-center justify-center q-mx-md">
+  <app-tabs
+          data-test="pipeline-list-tabs"
+          class="q-mr-md "
+          :tabs="tabs"
+          v-model:active-tab="activeTab"
+          @update:active-tab="updateActiveTab"
+        />
+ </div>
 
   <div class="flex">
     <q-splitter
@@ -66,31 +75,104 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: calc(95vw - 20px); height: 100%"
         >
           <template #before>
-            <div class="editor-container">
-              <div class="text-center text-h6 q-mb-md">
-  Import Alert from Json
-</div>
+            <div v-if="activeTab == 'import_json_clipboard'" class="editor-container">
 
-<q-form class="q-mx-md" @submit="onSubmit"> 
-      <query-editor
-            data-test="scheduled-alert-sql-editor"
-            ref="queryEditorRef"
-            editor-id="alerts-query-editor"
-            class="monaco-editor"
-            :debounceTime="300"
-            v-model:query="jsonStr"
-            language="json"
-            :class="
-              jsonStr == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
-            "
-            @focus="queryEditorPlaceholderFlag = false"
-            @blur="queryEditorPlaceholderFlag = true"
-          />
+              <q-form class="q-mx-md q-mt-md" @submit="onSubmit"> 
+                    <query-editor
+                          data-test="scheduled-alert-sql-editor"
+                          ref="queryEditorRef"
+                          editor-id="alerts-query-editor"
+                          class="monaco-editor"
+                          :debounceTime="300"
+                          v-model:query="jsonStr"
+                          language="json"
+                          :class="
+                            jsonStr == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
+                          "
+                          @focus="queryEditorPlaceholderFlag = false"
+                          @blur="queryEditorPlaceholderFlag = true"
+                        />
 
-  <div>
-  </div>
-</q-form>
-</div>
+                <div>
+                </div>
+              </q-form>
+            </div>
+            <div v-if="activeTab == 'import_json_url'" class="editor-container-url">
+              <q-form class="q-mx-md q-mt-md" @submit="onSubmit"> 
+                <div style="width: 100%" class="q-mb-md">
+                    <q-input
+                      v-model="url"
+                      :label="t('dashboard.addURL')"
+                      color="input-border"
+                      bg-color="input-bg"
+                      stack-label
+                      filled
+  
+                      label-slot
+                    />
+              </div>
+                    <query-editor
+                          data-test="scheduled-alert-sql-editor"
+                          ref="queryEditorRef"
+                          editor-id="alerts-query-editor"
+                          class="monaco-editor"
+                          :debounceTime="300"
+                          v-model:query="jsonStr"
+                          language="json"
+                          :class="
+                            jsonStr == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
+                          "
+                          @focus="queryEditorPlaceholderFlag = false"
+                          @blur="queryEditorPlaceholderFlag = true"
+                        />
+
+                <div>
+                </div>
+              </q-form>
+            </div>
+            <div v-if="activeTab == 'import_json_file'" class="editor-container-json">
+              <q-form class="q-mx-md q-mt-md" @submit="onSubmit"> 
+                <div style="width: 100%" class="q-mb-md">
+                <q-file
+                v-model="jsonFiles"
+                  filled
+                  bottom-slots
+                  :label="t('dashboard.dropFileMsg')"
+                  accept=".json"
+                  multiple
+                >
+                  <template v-slot:prepend>
+                    <q-icon name="cloud_upload" @click.stop.prevent />
+                  </template>
+                  <template v-slot:append>
+                    <q-icon
+                      name="close"
+                      @click.stop.prevent="jsonFiles = null"
+                      class="cursor-pointer"
+                    />
+                  </template>
+                  <template v-slot:hint> .json files only </template>
+                </q-file>
+        </div>
+                    <query-editor
+                          data-test="scheduled-alert-sql-editor"
+                          ref="queryEditorRef"
+                          editor-id="alerts-query-editor"
+                          class="monaco-editor"
+                          :debounceTime="300"
+                          v-model:query="jsonStr"
+                          language="json"
+                          :class="
+                            jsonStr == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
+                          "
+                          @focus="queryEditorPlaceholderFlag = false"
+                          @blur="queryEditorPlaceholderFlag = true"
+                        />
+
+                <div>
+                </div>
+              </q-form>
+            </div>
           </template>
           <template #after>
             <div
@@ -103,20 +185,116 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <div v-else class="text-center text-h6">
   Output Messages
 </div>
+<q-separator class="q-mx-md q-mt-md" />
             <div class="error-report-container">
 
-      <div class="error-section" v-if="alertErrorsToDisplay.length > 0">
-      <div class="section-title text-red">Alert Errors</div>
-      <div class="error-list">
+  <!-- Alert Errors Section -->
+  <div class="error-section" v-if="alertErrorsToDisplay.length > 0">
+    <div class="error-list">
       <!-- Iterate through the outer array -->
       <div v-for="(errorGroup, index) in alertErrorsToDisplay" :key="index">
-      <!-- Iterate through each inner array (the individual error message) -->
-      <div v-for="(errorMessage, errorIndex) in errorGroup" :key="errorIndex" class="error-item">
-      {{ errorMessage }}
+        <!-- Iterate through each inner array (the individual error message) -->
+        <div v-for="(errorMessage, errorIndex) in errorGroup" :key="errorIndex" class="error-item">
+          <span class="text-red" v-if="typeof errorMessage === 'object' && !errorMessage.isDestination && errorMessage.isAlert">
+            {{ errorMessage.message }}
+
+            <div style="width: 300px;">
+              <q-input
+                  v-model="userSelectedAlertName"
+                  :label="t('alerts.name') + ' *'"
+                  color="input-border"
+                  bg-color="input-bg"
+                  class="showLabelOnTop"
+                  stack-label
+                  outlined
+                  filled
+                  dense
+                  tabindex="0"
+                  @update:model-value="updateAlertName(userSelectedAlertName)"
+                />
+            </div>
+          </span>
+          <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
+          <span class="text-red" v-else-if="typeof errorMessage === 'object' && !errorMessage.isDestination && !errorMessage.isAlert">
+            {{ errorMessage.message }}
+            <div style="width: 300px;">
+              <q-select
+                    v-model="userSelectedStreamName"
+                    :options="streamList"
+                    :label="t('alerts.stream_name') + ' *'"
+                    :popup-content-style="{ textTransform: 'lowercase' }"
+                    color="input-border"
+                    bg-color="input-bg"
+                    class="q-py-sm showLabelOnTop no-case"
+                    filled
+                    stack-label
+                    dense
+                    use-input
+                    hide-selected
+                    fill-input
+                    :input-debounce="400"
+                    @update:model-value="
+                      updateStreamFields(userSelectedStreamName)
+                    "
+                    behavior="menu"
+                  
+                  />
+            </div>
+          </span>
+          <span class="text-red" v-else-if="typeof errorMessage === 'object' && errorMessage.isDestination">
+            {{ errorMessage.message }}
+            <div>
+              <q-select
+                  v-model="userSelectedDestinations"
+                  :options="getFormattedDestinations"
+                  label="Destinations *"
+                    :popup-content-style="{ textTransform: 'lowercase' }"
+                    color="input-border"
+                    bg-color="input-bg"
+                    class="q-py-sm showLabelOnTop no-case"
+                    filled
+                    stack-label
+                    dense
+                    use-input
+                    hide-selected
+                    fill-input
+                    :input-debounce="400"
+                    behavior="menu"
+                  :rules="[(val: any) => !!val || 'Field is required!']"
+                  style="width: 300px"
+                >
+                  <template v-slot:option="option">
+                    <q-list dense>
+                      <q-item
+                        tag="label"
+                        :data-test="`add-alert-destination-${option.opt}-select-item`"
+                      >
+                        <q-item-section avatar>
+                          <q-checkbox
+                            size="xs"
+                            dense
+                            v-model="userSelectedDestinations"
+                            :val="option.opt"
+                          />
+                        </q-item-section>
+                        <q-item-section>
+                          <q-item-label class="ellipsis"
+                            >{{ option.opt }}
+                          </q-item-label>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </template>
+                </q-select>
+            </div>
+          </span>
+  
+
+          <span v-else>{{ errorMessage }}</span>
+        </div>
       </div>
-      </div>
-      </div>
-      </div>
+    </div>
+  </div>
 
       <div class="error-section" v-if="alertCreators.length > 0">
       <div class="section-title text-primary" >Alert Creation</div>
@@ -140,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent, ref, onMounted, reactive, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -154,6 +332,8 @@ import { json } from "stream/consumers";
 import useStreams from "@/composables/useStreams";
 import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
+
+import AppTabs from "../common/AppTabs.vue";
 
 
 
@@ -190,13 +370,83 @@ export default defineComponent({
     const destinationErrorsToDisplay = ref([]);
 
     const alertErrorsToDisplay = ref([]);
+    const userSelectedDestinations = ref([]);
 
     const tempalteCreators = ref([])
     const destinationCreators = ref([])
     const alertCreators = ref([])
     const queryEditorPlaceholderFlag = ref(true);
-    const splitterModel = ref(60);
+    const streamList = ref([]);
+    const userSelectedStreamName = ref("");
+    const jsonFiles = ref(null);
+    const jsonArrayOfObj = ref([
+      {
 
+      },
+    ]);
+    const activeTab = ref("import_json_file");
+    const splitterModel = ref(60);
+    const getFormattedDestinations = computed(() => {
+      return props.destinations.map((destination) => {
+        return destination.name;
+      });
+    });
+
+    watch(() => userSelectedDestinations.value , (newVal, oldVal) => {
+      if(newVal){
+        jsonArrayOfObj.value.destinations = newVal;
+        jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      }
+    })
+
+   const  updateStreamFields = (stream_name) => {
+      jsonArrayOfObj.value.stream_name = stream_name;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+   }
+
+   const updateAlertName = (alertName) => {
+    jsonArrayOfObj.value.name = alertName;
+    jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+   }
+
+   watch(jsonFiles, (newVal, oldVal) => {
+    if (newVal) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        jsonStr.value = e.target.result;
+      };
+      reader.readAsText(newVal[0]);
+    }
+   })
+
+    const tabs = reactive ([
+
+{
+    label: "File Upload",
+    value: "import_json_file",
+},
+{
+    label: "URL Import",
+    value: "import_json_url",
+},
+{
+    label: "JSON Clipboard",
+    value: "import_json_clipboard",
+},
+
+
+    ]);
+
+    const updateActiveTab = () =>{
+      console.log('here')
+      jsonStr.value = "";
+      jsonFiles.value = null;
+      jsonArrayOfObj.value = [
+        {
+
+        },
+      ];
+    }
 
     onMounted(()=>{
     })
@@ -208,7 +458,7 @@ export default defineComponent({
       destinationErrorsToDisplay.value = [];
       destinationCreators.value = [];
       alertCreators.value = [];
-      let jsonArrayOfObj = [];
+      // userSelectedDestinations.value = [];
 
       try {
   // Check if jsonStr.value is empty or null
@@ -217,7 +467,7 @@ export default defineComponent({
         }
 
         // Try to parse the JSON string
-        jsonArrayOfObj = JSON.parse(jsonStr.value);
+        jsonArrayOfObj.value = JSON.parse(jsonStr.value);
 
 
       } catch (e) {
@@ -234,16 +484,16 @@ export default defineComponent({
 
 
       // Check if jsonArrayOfObj is an array or a single object
-      const isArray = Array.isArray(jsonArrayOfObj);
+      const isArray = Array.isArray(jsonArrayOfObj.value);
 
       // If it's an array, process each object sequentially
       if (isArray) {
-        for (const [index, jsonObj] of jsonArrayOfObj.entries()) {
+        for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
           await processJsonObject(jsonObj, index+1);  // Pass the index along with jsonObj
         }
       } else {
         // If it's a single object, just process it
-        await processJsonObject(jsonArrayOfObj,1);
+        await processJsonObject(jsonArrayOfObj.value,1);
       }
 
 
@@ -251,68 +501,82 @@ export default defineComponent({
 
     const processJsonObject = async (jsonObj: any,index: number) => {
   // Step 1: Validate Template
-  await validateTemplateInputs(jsonObj.templatePayload,index);
+  // await validateTemplateInputs(jsonObj.templatePayload,index);
 
   // Step 2: Validate All Destinations Sequentially
-  for (const [destinationIndex, destination] of jsonObj.destinationPayload.entries()) {
-    await validateDestinationInputs(destination, destinationIndex, jsonObj.alertPayload.destinations, jsonObj.templatePayload.name,index);
-  }
+  // for (const [destinationIndex, destination] of jsonObj.destinationPayload.entries()) {
+  //   await validateDestinationInputs(destination, destinationIndex, jsonObj.alertPayload.destinations, jsonObj.templatePayload.name,index);
+  // }
 
   // Step 3: Validate Alert
-  const isValidAlert = await validateAlertInputs(jsonObj.alertPayload,index);
+  const isValidAlert = await validateAlertInputs(jsonObj,index);
   if (!isValidAlert) {
     return;
   }
 
   // Step 4: Check if there are no errors before proceeding
-  if (alertErrorsToDisplay.value.length === 0 && templateErrorsToDisplay.value.length === 0 && destinationErrorsToDisplay.value.length === 0) {
-    let hasRolledBack = false;
+  if (alertErrorsToDisplay.value.length === 0 ) {
 
     // Step 5: Create Template
-    const hasCreatedTemplate = await createTemplate(jsonObj.templatePayload,index);
-    if (!hasCreatedTemplate) {
-      return;
-    }
+    // const hasCreatedTemplate = await createTemplate(jsonObj.templatePayload,index);
+    // if (!hasCreatedTemplate) {
+    //   return;
+    // }
 
     // Step 6: Create Destinations
-    const results = await Promise.all(
-      jsonObj.destinationPayload.map((destination: any) => createDestination(destination,index))
-    );
+    // const results = await Promise.all(
+    //   jsonObj.destinationPayload.map((destination: any) => createDestination(destination,index))
+    // );
 
-    // Check if all results are successful
-    const allSuccessful = results.every(result => result === true);
+    // // Check if all results are successful
+    // const allSuccessful = results.every(result => result === true);
 
-    if (!allSuccessful && !hasRolledBack) {
-      // Step 7: Rollback Destinations if Creation Failed
-      for (const [destinationIndex, destination] of jsonObj.destinationPayload.entries()) {
-        await rollbackDestination(destination.name,  index, destinationIndex+1);
-      }
+    // if (!allSuccessful && !hasRolledBack) {
+    //   // Step 7: Rollback Destinations if Creation Failed
+    //   for (const [destinationIndex, destination] of jsonObj.destinationPayload.entries()) {
+    //     await rollbackDestination(destination.name,  index, destinationIndex+1);
+    //   }
 
 
       // Step 8: Rollback Template
-      await rollbackTemplate(jsonObj.templatePayload.name,index);
+      // await rollbackTemplate(jsonObj.templatePayload.name,index);
 
-      hasRolledBack = true;
-      return; // Exit after rollback
-    }
+    //   hasRolledBack = true;
+    //   return; // Exit after rollback
+    // }
 
     // Step 9: Create Alert if No Rollback
-    if (!hasRolledBack) {
-      const hasCreatedAlert = await createAlert(jsonObj.alertPayload,index);
+    // if (!hasRolledBack) {
+      const hasCreatedAlert = await createAlert(jsonObj,index);
 
-      if (!hasCreatedAlert) {
-        // Step 10: Rollback Destinations if Alert Creation Failed
-        for (const [destinationIndex, destination] of jsonObj.destinationPayload.entries()) {
-        await rollbackDestination(destination.name,  index, destinationIndex+1);
+      if(hasCreatedAlert) {
+        q.notify({
+            message: "Alert imported successfully",
+            color: "positive",
+            position: "bottom",
+            timeout: 2000,
+          });
+          router.push({
+            name: "alertList",
+            query:{
+              org_identifier: store.state.selectedOrganization.identifier
+            }
+          })
       }
 
-        // Step 11: Rollback Template
-        await rollbackTemplate(jsonObj.templatePayload.name,index);
+      // if (!hasCreatedAlert) {
+      //   // Step 10: Rollback Destinations if Alert Creation Failed
+      //   for (const [destinationIndex, destination] of jsonObj.destinationPayload.entries()) {
+      //   await rollbackDestination(destination.name,  index, destinationIndex+1);
+      // }
 
-        hasRolledBack = true;
-        return; // Exit after rollback
-      }
-    }
+      //   // Step 11: Rollback Template
+      //   await rollbackTemplate(jsonObj.templatePayload.name,index);
+
+      //   hasRolledBack = true;
+      //   return; // Exit after rollback
+      // }
+    // }
   }
 };
 
@@ -321,9 +585,20 @@ export default defineComponent({
 
       // 1. Validate 'name' field
       if (!input.name || typeof input.name !== 'string' || input.name.trim() === '') {
-        alertErrors.push(`Alert - ${index}: Name is mandatory and should be a valid string.`);
+        alertErrors.push({
+          message: `Alert - ${index}: Name is mandatory and should be a valid string.`,
+          isDestination: false,
+          isAlert: true,
+        });
       }
 
+      if (checkAlertsInList(props.alerts, input.name)) {
+        alertErrors.push({
+          message: `Alert - ${index}: "${input.name}" already exists`,
+          isDestination: false,
+          isAlert: true,
+        });
+      }
       const organizationData = store.state.organizations;
       const orgList = organizationData.map(org => org.identifier);
 
@@ -338,17 +613,20 @@ export default defineComponent({
         alertErrors.push(`Alert - ${index}: Stream Type is mandatory and should be one of: 'logs', 'metrics', 'traces'.`);
       }
 
-      let streamsList: string[] = [];
       try {
         const streamResponse = await getStreams(input.stream_type, false);
-        streamsList = streamResponse.list.map(stream => stream.name);
+        streamList.value = streamResponse.list.map(stream => stream.name);
       } catch (e) {
         alertErrorsToDisplay.value = alertErrors;
       }
 
       // 4. Validate 'stream_name' field
-      if (!input.stream_name || typeof input.stream_name !== 'string' || !streamsList.includes(input.stream_name)) {
-        alertErrors.push(`Alert - ${index}: Stream Name is mandatory, should be a string, and must exist in the streams list.`);
+      if (!input.stream_name || typeof input.stream_name !== 'string' || !streamList.value.includes(input.stream_name)) {
+        alertErrors.push({
+          message: `Alert - ${index}: Stream Name is mandatory, should exist in the stream list and should be a valid string.`,
+          isDestination: false,
+          isAlert: false,
+        });
       }
 
       // 5. Validate 'is_real_time' field
@@ -428,7 +706,10 @@ export default defineComponent({
       }
 
       if (!input.destinations || !Array.isArray(input.destinations) || input.destinations.length === 0) {
-        alertErrors.push(`Alert - ${index}: Destinations should not be empty.`);
+        alertErrors.push({
+          message: `Alert - ${index}: Destinations are required and should be an array.`,
+          isDestination: true,
+        });
       }
 
       if (typeof input.enabled !== 'boolean') {
@@ -439,9 +720,15 @@ export default defineComponent({
         alertErrors.push(`Alert - ${index}: Timezone offset should be a number.`);
       }
 
-      if (checkAlertsInList(props.alerts, input.name)) {
-        alertErrors.push(`Alert - ${index}: "${input.name}" already exists`);
+
+      input.destinations.forEach((destination: any)=>{
+        if(!checkDestinationInList(props.destinations, destination)){
+        alertErrors.push({
+          message: `Alert - ${index}: "${destination}" destination does not exist`,
+          isDestination: true,
+        });
       }
+      })
 
       // Log all alert errors at the end
       if (alertErrors.length > 0) {
@@ -731,6 +1018,8 @@ export default defineComponent({
 
 
 
+
+
     const onSubmit = (e) => {
       e.preventDefault();
     };
@@ -749,11 +1038,23 @@ export default defineComponent({
       destinationCreators,
       alertCreators,
       queryEditorPlaceholderFlag,
-      splitterModel
+      splitterModel,
+      tabs,
+      activeTab,
+      userSelectedDestinations,
+      getFormattedDestinations,
+      jsonArrayOfObj,
+      streamList,
+      userSelectedStreamName,
+      updateStreamFields,
+      updateAlertName,
+      jsonFiles,
+      updateActiveTab,
     };
   },
   components: {
     QueryEditor,
+    AppTabs,
   },
 });
 </script>
@@ -772,15 +1073,28 @@ export default defineComponent({
   }
   .editor-container{
     height: calc(80vh - 20px) !important; 
-
+  }
+  .editor-container-url {
+    .monaco-editor {
+      height: calc(72vh - 8px) !important; /* Total editor height */
+      overflow: auto;             /* Allows scrolling if content overflows */
+      resize: none;               /* Remove resize behavior */
+    }
+  }
+  .editor-container-json {
+    .monaco-editor {
+      height: calc(71vh - 20px) !important; /* Total editor height */
+      overflow: auto;             /* Allows scrolling if content overflows */
+      resize: none;               /* Remove resize behavior */
+    }
   }
   .monaco-editor {
-  height: calc(80vh - 20px) !important; /* Total editor height */
+  height: calc(81vh - 14px) !important; /* Total editor height */
   overflow: auto;             /* Allows scrolling if content overflows */
   resize: none;               /* Remove resize behavior */
 }
   .error-report-container {
-  height: calc(82vh - 20px) !important; /* Total editor height */
+  height: calc(78vh - 8px) !important; /* Total editor height */
   overflow: auto;             /* Allows scrolling if content overflows */
   resize: none;      
 }
@@ -810,5 +1124,48 @@ export default defineComponent({
 .error-item {
   padding: 5px 0px;
   font-size: 14px;
+}
+.report-list-tabs {
+    height: fit-content;
+
+    :deep(.rum-tabs) {
+      border: 1px solid #464646;
+    }
+
+    :deep(.rum-tab) {
+      &:hover {
+        background: #464646;
+      }
+
+      &.active {
+        background: #5960b2;
+        color: #ffffff !important;
+      }
+    }
+  }
+  .report-list-tabs {
+  height: fit-content;
+
+  :deep(.rum-tabs) {
+    border: 1px solid #eaeaea;
+    height: fit-content;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  :deep(.rum-tab) {
+    width: fit-content !important;
+    padding: 4px 12px !important;
+    border: none !important;
+
+    &:hover {
+      background: #eaeaea;
+    }
+
+    &.active {
+      background: #5960b2;
+      color: #ffffff !important;
+    }
+  }
 }
 </style>
