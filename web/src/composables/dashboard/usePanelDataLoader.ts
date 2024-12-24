@@ -35,7 +35,11 @@ import {
   formatRateInterval,
   getTimeInSecondsBasedOnUnit,
 } from "@/utils/dashboard/variables/variablesUtils";
-import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
+import {
+  b64EncodeUnicode,
+  generateTraceContext,
+  isWebSocketEnabled,
+} from "@/utils/zincutils";
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
 import { convertOffsetToSeconds } from "@/utils/dashboard/convertDataIntoUnitValue";
@@ -294,15 +298,7 @@ export const usePanelDataLoader = (
 
     state.isOperationCancelled = true;
 
-    // get websocket enable config from store
-    // window will have more priority
-    // if window has use_web_socket property then use that
-    // else use organization settings
-    const shouldUseWebSocket =
-      (window as any).use_web_socket ??
-      store?.state?.organizationData?.organizationSettings
-        ?.enable_websocket_search;
-    if (shouldUseWebSocket && state.searchWebSocketRequestIdsAndTraceIds) {
+    if (isWebSocketEnabled() && state.searchWebSocketRequestIdsAndTraceIds) {
       // loop on state.searchWebSocketRequestIdsAndTraceIds
       state.searchWebSocketRequestIdsAndTraceIds.forEach((it) => {
         cancelSearchQueryBasedOnRequestId(it.requestId, it.traceId);
@@ -1140,16 +1136,7 @@ export const usePanelDataLoader = (
 
               state.metadata.queries[panelQueryIndex] = metadata;
 
-              // get websocket enable config from store
-              // window will have more priority
-              // if window has use_web_socket property then use that
-              // else use organization settings
-              const shouldUseWebSocket =
-                (window as any).use_web_socket ??
-                store?.state?.organizationData?.organizationSettings
-                  ?.enable_websocket_search;
-
-              if (shouldUseWebSocket) {
+              if (isWebSocketEnabled()) {
                 await getDataThroughWebSocket(
                   query,
                   it,
