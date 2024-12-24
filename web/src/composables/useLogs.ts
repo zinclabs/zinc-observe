@@ -5134,7 +5134,6 @@ const useLogs = () => {
     // 20009 is the code for query cancelled
     if (code === 20009) {
       handleCancelQuery();
-      return;
     }
 
     if (trace_id) removeTraceId(trace_id);
