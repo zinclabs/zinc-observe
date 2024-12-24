@@ -1462,7 +1462,7 @@ export const usePanelDataLoader = (
   const removeRequestId = (requestId: string) => {
     state.searchWebSocketRequestIdsAndTraceIds =
       state.searchWebSocketRequestIdsAndTraceIds.filter(
-        (id: any) => id !== requestId,
+        (id: any) => id.requestId !== requestId,
       );
   };
 
