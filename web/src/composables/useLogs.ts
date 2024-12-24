@@ -5138,13 +5138,6 @@ const useLogs = () => {
 
     if (trace_id) removeTraceId(trace_id);
 
-    // const {
-    //   error: responseError,
-    //   message: responseMessage,
-    //   code,
-    //   error_detail,
-    // } = meta.error;
-
     // Default error message
     let errorMsg =
       typeof message === "string" && message
@@ -5159,13 +5152,6 @@ const useLogs = () => {
     if (customMessage) {
       errorMsg = t(customMessage);
     }
-
-    // Check how can we handle this
-    // Handle rate-limiting errors
-    // if (err?.status >= 429) {
-    //   errorMsg = responseMessage || errorMsg;
-    //   searchObj.data.errorDetail = error_detail || "";
-    // }
 
     // Add Trace ID if available
     const finalTraceId = trace_id;

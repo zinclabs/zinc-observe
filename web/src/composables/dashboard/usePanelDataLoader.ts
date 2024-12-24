@@ -600,7 +600,7 @@ export const usePanelDataLoader = (
       state.loading = false;
       state.isOperationCancelled = false;
 
-      processApiError(response?.content?.meta, "sql");
+      processApiError(response?.content, "sql");
     }
 
     if (response.type === "end") {
@@ -683,7 +683,7 @@ export const usePanelDataLoader = (
     }
 
     if (response.type === "error") {
-      processApiError(response?.content?.meta, "sql");
+      processApiError(response?.content, "sql");
     }
 
     // set loading to false
@@ -702,7 +702,7 @@ export const usePanelDataLoader = (
     state.loading = false;
     state.isOperationCancelled = false;
 
-    processApiError(response, "sql");
+    processApiError(response?.content, "sql");
   };
 
   const getDataThroughWebSocket = async (
@@ -1424,7 +1424,8 @@ export const usePanelDataLoader = (
           error?.response?.data.error_detail ||
           error?.response?.data.message ||
           error?.message ||
-          error?.error;
+          error?.error ||
+          error.error_detail;
 
         const trimmedErrorMessage =
           errorDetailValue?.length > 300
