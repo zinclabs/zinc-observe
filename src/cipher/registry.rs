@@ -1,8 +1,7 @@
 use hashbrown::HashMap;
+use o2_enterprise::enterprise::cipher::Cipher;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
-
-use super::cipher::Cipher;
 
 pub static REGISTRY: Lazy<RwLock<Registry>> = Lazy::new(|| RwLock::new(Registry::new()));
 pub struct Registry {
