@@ -1210,7 +1210,13 @@ export const convertSQLData = async (
         .map((yAxis: any) => {
           let yAxisName = getYAxisLabel(yAxis);
 
-          if (breakDownKeys.length) {
+          if (
+            breakDownKeys.length &&
+            (panelSchema.type === "bar" || panelSchema.type === "h-bar")
+          ) {
+            const seriesData = getAxisDataFromKey(yAxis);
+            return getSeriesObj(yAxisName, seriesData, seriesConfig);
+          } else if (breakDownKeys.length) {
             return stackedXAxisUniqueValue?.map((key: any) => {
               // queryData who has the xaxis[1] key as well from xAxisUniqueValue.
               yAxisName = getYAxisLabel(yAxis, key);

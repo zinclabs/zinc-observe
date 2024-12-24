@@ -155,45 +155,26 @@ test.describe("Logs Queries testcases", () => {
   });
 
 
+  
+
+
+
   test("should reset the editor on clicking reset filter button", async ({ page }) => {
-    // Wait for 2 seconds
-    await page.waitForTimeout(2000);
-    // Type the value of a variable into an input field
-    await page.locator(
-      '[data-test="date-time-btn"]').click({ force: true }); await page.locator(
-
-        '[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({
-
-          force: true
-        }); await page.locator(
-
-          '[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
-    await page.click('[data-test="logs-search-bar-query-editor"] > .monaco-editor')
-    await page.keyboard.type(
-
-      "match_all_raw_ignore_case('provide_credentials')"); await page.waitForTimeout(
-        2000); await expect(page.locator(
-          '[data-cy="search-bar-refresh-button"] > .q-btn__content')).toBeVisible(); await page.waitForTimeout(
-            3000); await page.locator(
-              "[data-test='logs-search-bar-refresh-btn']").click({
-
-                force: true
-              });
-    await page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click({
-      force: true
-    });
-    await page.waitForTimeout(5000);
-    //   await page.waitForSelector('[data-test="logs-search-bar-query-editor"]')
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+    await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor').click();
+    await page.keyboard.type("match_all_raw_ignore_case('provide_credentials')");
+    await page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content').waitFor({ state: "visible" });
+    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({ force: true });
+    await page.locator('[data-test="logs-search-bar-reset-filters-btn"]').click({ force: true });
+    await page.locator('[data-test="logs-search-bar-query-editor"] > .monaco-editor .view-lines').waitFor({ state: "visible" });
     const text = await page.evaluate(() => {
-      const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]').querySelector('.view-lines'); // Adjust selector if needed
-      console.log(editor, JSON.stringify(editor))
+      const editor = document.querySelector('[data-test="logs-search-bar-query-editor"]').querySelector('.view-lines');
       return editor ? editor.textContent : null;
     });
-
-    console.log(text);
     await expect(text).toEqual("");
-
   });
+
   test("should add invalid query and display error", async ({ page }) => {
     // Type the value of a variable into an input field
 
@@ -211,15 +192,25 @@ test.describe("Logs Queries testcases", () => {
 
   test("should not display error if match all case added in log query search", async ({ page }) => {
     // Type the value of a variable into an input field
-    await page.waitForTimeout(2000);
     await page.locator('[data-test="date-time-btn"]').click({ force: true });
     await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
-    await page.click('[data-test="logs-search-bar-query-editor"]')
+  
+    // Ensure the query editor is visible and clickable before typing
+    const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+    await expect(queryEditor).toBeVisible();
+    await queryEditor.click();
     await page.keyboard.type("match_all('code')");
-    await page.waitForTimeout(2000);
-    await page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content').click({ sforce: true });
+  
+    // Ensure the refresh button is visible and clickable before clicking
+    const refreshButton = page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content');
+    await expect(refreshButton).toBeVisible();
+    await refreshButton.click({ force: true });
+  
+    // Verify that the expected log table column is visible
     await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
+  
+
 
   test("should change stream settings and click on search stream", async ({ page }) => {
     // Type the value of a variable into an input field
@@ -238,6 +229,7 @@ test.describe("Logs Queries testcases", () => {
     await page.locator("[title=\"Explore\"]").first().click({ force: true });
     await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
   });
+  
 
   test("should display error if blank spaces added under stream name and clicked create stream ", async ({ page }) => {
     await page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
@@ -248,14 +240,17 @@ test.describe("Logs Queries testcases", () => {
     await expect(page.getByText(/Field is required/).first()).toBeVisible();
   });
 
+
+
   test("should display error if create stream is clicked without adding name", async ({ page }) => {
     await page.locator('[data-test="menu-link-/streams-item"]').click({ force: true });
     await page.locator('[data-test="log-stream-add-stream-btn"]').click({ force: true });
-    await page.waitForTimeout(1000);
+    await page.locator('[data-test="save-stream-btn"]').waitFor({ state: "visible" });
+    await page.locator('[data-test="save-stream-btn"]').scrollIntoViewIfNeeded();
     await page.locator('[data-test="save-stream-btn"]').click({ force: true });
     await expect(page.getByText(/Field is required/).first()).toBeVisible();
   });
-
+  
   test("should display enter count query", async ({ page }) => {
     await page.locator(
 
@@ -281,5 +276,19 @@ test.describe("Logs Queries testcases", () => {
     });
 
   });
+
+  test("should display values API text successfully and error to not be displayed", async ({ page }) => {
+    await page.locator('[data-test="log-search-index-list-field-search-input"]').fill('kubernetes_pod_name');
+    await page.getByLabel('Expand "kubernetes_pod_name"').click();
+    const errorMessage = page.getByText('Error while fetching field values');
+    await expect(errorMessage).not.toBeVisible();
+    await page.getByText('ziox-ingester-').click();
+    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await page.getByLabel('Collapse "kubernetes_pod_name"').click();
+    await page.getByLabel('Expand "kubernetes_pod_name"').click();
+    const targetElement = page.locator('[data-test="logs-search-subfield-add-kubernetes_pod_name-ziox-ingester-0"]').getByText('ziox-ingester-');
+    await expect(targetElement).toBeVisible(); // Assertion to ensure visibility
+    await targetElement.click()
+  })
 
 })

@@ -27,7 +27,7 @@ pub async fn get(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<Option<Alert>, anyhow::Error> {
+) -> Result<Option<Alert>, infra::errors::Error> {
     let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
     let mut value: Option<Alert> = if let Some(v) = STREAM_ALERTS.read().await.get(&stream_key) {
         v.iter().find(|x| x.name.eq(name)).cloned()
@@ -50,7 +50,7 @@ pub async fn set(
     stream_name: &str,
     alert: &Alert,
     create: bool,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), infra::errors::Error> {
     let schedule_key = format!("{stream_type}/{stream_name}/{}", alert.name);
     let key = format!("/alerts/{org_id}/{}", &schedule_key);
     match db::put(
@@ -102,7 +102,7 @@ pub async fn set(
                 }
             }
         }
-        Err(e) => Err(anyhow::anyhow!("Error save alert {schedule_key}: {}", e)),
+        Err(e) => Err(e),
     }
 }
 
@@ -132,7 +132,7 @@ pub async fn delete(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), infra::errors::Error> {
     let schedule_key = format!("{stream_type}/{stream_name}/{name}");
     let key = format!("/alerts/{org_id}/{}", &schedule_key);
     match db::delete(&key, false, db::NEED_WATCH, None).await {
@@ -147,7 +147,7 @@ pub async fn delete(
                 }
             }
         }
-        Err(e) => Err(anyhow::anyhow!("Error deleting alert: {e}")),
+        Err(e) => Err(e),
     }
 }
 
@@ -155,7 +155,7 @@ pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
-) -> Result<Vec<Alert>, anyhow::Error> {
+) -> Result<Vec<Alert>, infra::errors::Error> {
     let loc_stream_type = stream_type.unwrap_or_default();
     let key = match stream_name {
         Some(stream_name) => format!("/alerts/{org_id}/{loc_stream_type}/{stream_name}"),

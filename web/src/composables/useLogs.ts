@@ -2082,11 +2082,11 @@ const useLogs = () => {
           delete queryReq.query.track_total_hits;
         }
 
-        // for group by query no need to get total.
-        // if (parsedSQL.groupby != null || hasAggregation(parsedSQL.columns)) {
-        //   searchObj.meta.resultGrid.showPagination = false;
-        //   delete queryReq.query.track_total_hits;
-        // }
+        // if query has aggregation or groupby then we need to set size to -1 to get all records
+        // issue #5432
+        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+          queryReq.query.size = -1;
+        }
       }
 
       const { traceparent, traceId } = generateTraceContext();

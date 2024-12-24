@@ -40,12 +40,18 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_index(Index::drop().name(ALERTS_FOLDER_ID_IDX).to_owned())
+            .drop_index(
+                Index::drop()
+                    .name(ALERTS_FOLDER_ID_IDX)
+                    .table(Alerts::Table)
+                    .to_owned(),
+            )
             .await?;
         manager
             .drop_index(
                 Index::drop()
                     .name(ALERTS_ORG_STREAM_TYPE_STREAM_NAME_NAME_IDX)
+                    .table(Alerts::Table)
                     .to_owned(),
             )
             .await?;

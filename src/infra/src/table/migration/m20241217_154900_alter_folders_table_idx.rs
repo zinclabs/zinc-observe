@@ -31,7 +31,12 @@ const NEW_FOLDERS_ORG_TYPE_FOLDER_ID_IDX: &str = "folders_org_type_folder_id_idx
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_index(Index::drop().name(OLD_FOLDERS_ORG_FOLDER_ID_IDX).to_owned())
+            .drop_index(
+                Index::drop()
+                    .name(OLD_FOLDERS_ORG_FOLDER_ID_IDX)
+                    .table(Folders::Table)
+                    .to_owned(),
+            )
             .await?;
         manager
             .create_index(create_new_folders_org_type_folder_id_idx_stmnt())
@@ -44,6 +49,7 @@ impl MigrationTrait for Migration {
             .drop_index(
                 Index::drop()
                     .name(NEW_FOLDERS_ORG_TYPE_FOLDER_ID_IDX)
+                    .table(Folders::Table)
                     .to_owned(),
             )
             .await?;

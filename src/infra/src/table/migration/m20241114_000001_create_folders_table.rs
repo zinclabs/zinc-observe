@@ -36,10 +36,20 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_index(Index::drop().name(FOLDERS_ORG_FOLDER_ID_IDX).to_owned())
+            .drop_index(
+                Index::drop()
+                    .name(FOLDERS_ORG_FOLDER_ID_IDX)
+                    .table(Folders::Table)
+                    .to_owned(),
+            )
             .await?;
         manager
-            .drop_index(Index::drop().name(FOLDERS_ORG_IDX).to_owned())
+            .drop_index(
+                Index::drop()
+                    .name(FOLDERS_ORG_IDX)
+                    .table(Folders::Table)
+                    .to_owned(),
+            )
             .await?;
         manager
             .drop_table(Table::drop().table(Folders::Table).to_owned())

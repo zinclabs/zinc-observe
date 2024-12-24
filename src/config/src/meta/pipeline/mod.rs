@@ -79,6 +79,7 @@ impl Pipeline {
     }
 
     /// Verifies the pipeline is valid by:
+    /// 0. non-empty name
     /// 1. non-empty nodes list
     /// 2. non-empty edges list
     /// 3. 1st node in nodes list is either StreamNode or QueryNode
@@ -90,6 +91,10 @@ impl Pipeline {
     ///
     /// If all satisfies, populates the [Pipeline::source] with the first node in nodes list
     pub fn validate(&mut self) -> Result<()> {
+        if self.name.is_empty() {
+            return Err(anyhow!("Please provide non-empty name for the pipeline"));
+        }
+
         // ck 1 & 2
         match (self.nodes.is_empty(), self.edges.is_empty()) {
             (true, true) | (true, false) => {
@@ -302,7 +307,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct PipelineList {
     pub list: Vec<Pipeline>,
 }

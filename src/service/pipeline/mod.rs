@@ -13,34 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
-
-use actix_web::{
-    http::{self, StatusCode},
-    HttpResponse,
-};
 use config::meta::{
     pipeline::{components::PipelineSource, Pipeline, PipelineList},
     search::SearchEventType,
     stream::ListStreamParams,
 };
 
-use super::db;
+use super::db::pipeline::{self, PipelineError};
 use crate::common::{
-    meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
+    meta::authz::Authz,
     utils::auth::{remove_ownership, set_ownership},
 };
 
 pub mod batch_execution;
 
 #[tracing::instrument(skip(pipeline))]
-pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error> {
+pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
+    // check if another realtime pipeline with the same source stream already exists
+    if let PipelineSource::Realtime(stream) = &pipeline.source {
+        if pipeline::list_streams_with_pipeline(&pipeline.org)
+            .await
+            .is_ok_and(|list| list.iter().any(|existing| existing == stream))
+        {
+            return Err(PipelineError::StreamInUse);
+        }
+    }
+
     // validate pipeline
     if let Err(e) = pipeline.validate() {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            format!("Invalid Pipeline: {e}"),
-        )));
+        return Err(PipelineError::InvalidPipeline(e.to_string()));
     }
 
     // Save DerivedStream details if there's any
@@ -55,73 +56,43 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error
         )
         .await
         {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("Failed to save DerivedStream details error: {}", e),
-            )));
+            return Err(PipelineError::InvalidDerivedStream(e.to_string()));
         }
     }
 
-    match db::pipeline::set(&pipeline).await {
-        Err(error) => Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                error.to_string(),
-            )),
-        ),
-        Ok(_) => {
-            set_ownership(&pipeline.org, "pipelines", Authz::new(&pipeline.id)).await;
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "Pipeline saved successfully".to_string(),
-            )))
-        }
-    }
+    pipeline::set(&pipeline).await?;
+    set_ownership(&pipeline.org, "pipelines", Authz::new(&pipeline.id)).await;
+    Ok(())
 }
 
 #[tracing::instrument(skip(pipeline))]
-pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Error> {
-    let Ok(existing_pipeline) = db::pipeline::get_by_id(&pipeline.id).await else {
-        return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            StatusCode::NOT_FOUND.into(),
-            format!("Existing Pipeline with ID {} not found", pipeline.id),
-        )));
+pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
+    let Ok(existing_pipeline) = pipeline::get_by_id(&pipeline.id).await else {
+        return Err(PipelineError::NotFound(pipeline.id));
     };
 
     if existing_pipeline == pipeline {
-        return Ok(HttpResponse::Ok().json("No changes found".to_string()));
+        return Ok(());
     }
 
     // check version
     if existing_pipeline.version != pipeline.version {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            format!(
-                "Pipeline with ID {} modified by someone else. Please refresh",
-                pipeline.id
-            ),
-        )));
+        return Err(PipelineError::Modified(pipeline.id));
     }
 
     // validate pipeline
-    if let Err(e) = pipeline.validate() {
-        return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-            http::StatusCode::BAD_REQUEST.into(),
-            format!("Invalid Pipeline: {e}"),
-        )));
-    }
+    pipeline
+        .validate()
+        .map_err(|e| PipelineError::InvalidPipeline(e.to_string()))?;
 
     // additional checks when the source is changed
     let prev_source_stream = if existing_pipeline.source != pipeline.source {
         // check if the new source exists in another pipeline
-        if let Ok(similar_pl) = db::pipeline::get_with_same_source_stream(&pipeline).await {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!(
-                    "The updated source already exists in another pipeline with name {}, under org {}. Same source can have only one pipeline in an org",
-                    similar_pl.name, similar_pl.org
-                ),
-            )));
+        if pipeline::get_with_same_source_stream(&pipeline)
+            .await
+            .is_ok()
+        {
+            return Err(PipelineError::StreamInUse);
         }
         match existing_pipeline.source {
             // realtime: remove prev. src. stream_params from cache
@@ -135,16 +106,7 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
                 )
                 .await
                 {
-                    let err_msg = format!(
-                        "Failed to update: error deleting DerivedStream associated with previous pipeline version: {}",
-                        error
-                    );
-                    return Ok(HttpResponse::InternalServerError().json(
-                        MetaHttpResponse::message(
-                            http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                            err_msg,
-                        ),
-                    ));
+                    return Err(PipelineError::DeleteDerivedStream(error.to_string()));
                 }
                 None
             }
@@ -166,36 +128,24 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<HttpResponse, Err
         )
         .await
         {
-            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
-                http::StatusCode::BAD_REQUEST.into(),
-                format!("Failed to save DerivedStream details error: {}", e),
-            )));
+            return Err(PipelineError::InvalidDerivedStream(e.to_string()));
         }
     }
 
-    match db::pipeline::update(&pipeline, prev_source_stream).await {
-        Err(error) => Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                error.to_string(),
-            )),
-        ),
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "Pipeline updated successfully".to_string(),
-        ))),
-    }
+    pipeline::update(&pipeline, prev_source_stream).await?;
+    Ok(())
 }
 
 #[tracing::instrument]
 pub async fn list_pipelines(
     org_id: String,
     permitted: Option<Vec<String>>,
-) -> Result<HttpResponse, Error> {
-    if let Ok(pipelines) = db::pipeline::list_by_org(&org_id).await {
-        let mut result = Vec::new();
-        for pipeline in pipelines {
-            if permitted.is_none()
+) -> Result<PipelineList, PipelineError> {
+    let list = pipeline::list_by_org(&org_id)
+        .await?
+        .into_iter()
+        .filter(|pipeline| {
+            permitted.is_none()
                 || permitted
                     .as_ref()
                     .unwrap()
@@ -204,25 +154,15 @@ pub async fn list_pipelines(
                     .as_ref()
                     .unwrap()
                     .contains(&format!("pipeline:_all_{}", org_id))
-            {
-                result.push(pipeline)
-            }
-        }
-
-        Ok(HttpResponse::Ok().json(PipelineList { list: result }))
-    } else {
-        Ok(HttpResponse::Ok().json(PipelineList { list: vec![] }))
-    }
+        })
+        .collect();
+    Ok(PipelineList { list })
 }
 
 #[tracing::instrument]
-pub async fn list_streams_with_pipeline(org: &str) -> Result<HttpResponse, Error> {
-    match db::pipeline::list_streams_with_pipeline(org).await {
-        Ok(stream_params) => Ok(HttpResponse::Ok().json(ListStreamParams {
-            list: stream_params,
-        })),
-        Err(_) => Ok(HttpResponse::Ok().json(PipelineList { list: vec![] })),
-    }
+pub async fn list_streams_with_pipeline(org: &str) -> Result<ListStreamParams, PipelineError> {
+    let list = pipeline::list_streams_with_pipeline(org).await?;
+    Ok(ListStreamParams { list })
 }
 
 #[tracing::instrument]
@@ -230,42 +170,20 @@ pub async fn enable_pipeline(
     org_id: &str,
     pipeline_id: &str,
     value: bool,
-) -> Result<HttpResponse, Error> {
-    let mut pipeline = match db::pipeline::get_by_id(pipeline_id).await {
-        Ok(pipeline) => pipeline,
-        Err(_) => {
-            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                StatusCode::NOT_FOUND.into(),
-                format!("Pipeline with ID {pipeline_id} not found"),
-            )));
-        }
+) -> Result<(), PipelineError> {
+    let Ok(mut pipeline) = pipeline::get_by_id(pipeline_id).await else {
+        return Err(PipelineError::NotFound(pipeline_id.to_string()));
     };
 
     pipeline.enabled = value;
-    match db::pipeline::update(&pipeline, None).await {
-        Err(error) => Ok(
-            HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                error.to_string(),
-            )),
-        ),
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            format!("Pipeline enabled: {value}"),
-        ))),
-    }
+    pipeline::update(&pipeline, None).await?;
+    Ok(())
 }
 
 #[tracing::instrument]
-pub async fn delete_pipeline(pipeline_id: &str) -> Result<HttpResponse, Error> {
-    let existing_pipeline = match db::pipeline::get_by_id(pipeline_id).await {
-        Ok(pipeline) => pipeline,
-        Err(_) => {
-            return Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                StatusCode::NOT_FOUND.into(),
-                format!("Pipeline with ID {pipeline_id} not found"),
-            )));
-        }
+pub async fn delete_pipeline(pipeline_id: &str) -> Result<(), PipelineError> {
+    let Ok(existing_pipeline) = pipeline::get_by_id(pipeline_id).await else {
+        return Err(PipelineError::NotFound(pipeline_id.to_string()));
     };
 
     // delete DerivedStream details if there's any
@@ -277,36 +195,16 @@ pub async fn delete_pipeline(pipeline_id: &str) -> Result<HttpResponse, Error> {
         )
         .await
         {
-            let err_msg = format!(
-                "Failed to delete due to error deleting associated DerivedStream: {}",
-                error
-            );
-            return Ok(
-                HttpResponse::InternalServerError().json(MetaHttpResponse::message(
-                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    err_msg,
-                )),
-            );
+            return Err(PipelineError::InvalidDerivedStream(error.to_string()));
         }
     }
 
-    let result = db::pipeline::delete(pipeline_id).await;
-    match result {
-        Ok(_) => {
-            remove_ownership(
-                &existing_pipeline.org,
-                "pipelines",
-                Authz::new(&existing_pipeline.id),
-            )
-            .await;
-            Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-                http::StatusCode::OK.into(),
-                "Pipeline deleted".to_string(),
-            )))
-        }
-        Err(e) => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-            http::StatusCode::NOT_FOUND.into(),
-            e.to_string(),
-        ))),
-    }
+    pipeline::delete(pipeline_id).await?;
+    remove_ownership(
+        &existing_pipeline.org,
+        "pipelines",
+        Authz::new(&existing_pipeline.id),
+    )
+    .await;
+    Ok(())
 }

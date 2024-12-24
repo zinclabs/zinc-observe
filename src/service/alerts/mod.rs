@@ -22,6 +22,7 @@ use config::{
     meta::{
         alerts::{AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition},
         search::{SearchEventContext, SearchEventType, SqlQuery},
+        sql::resolve_stream_names,
         stream::StreamType,
     },
     utils::{
@@ -200,6 +201,28 @@ impl QueryConditionExt for QueryCondition {
                 };
             }
         };
+
+        let stream_names = match resolve_stream_names(&sql) {
+            Ok(stream_names) => stream_names,
+            Err(e) => {
+                return Err(anyhow::anyhow!(
+                    "Error resolving stream names in SQL query: {e}"
+                ));
+            }
+        };
+
+        // SQL may contain multiple stream names, check for each stream
+        // if the query period is greater than the max query range
+        for stream in stream_names.iter() {
+            if let Some(settings) = infra::schema::get_settings(org_id, stream, stream_type).await {
+                let max_query_range = settings.max_query_range;
+                if max_query_range > 0 && trigger_condition.period > max_query_range * 60 {
+                    return Err(anyhow::anyhow!(
+                        "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
+                    ));
+                }
+            }
+        }
 
         let mut time_diff = Duration::try_minutes(trigger_condition.period)
             .unwrap()

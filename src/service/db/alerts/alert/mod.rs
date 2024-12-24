@@ -34,7 +34,7 @@ pub async fn get(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<Option<Alert>, anyhow::Error> {
+) -> Result<Option<Alert>, infra::errors::Error> {
     if should_use_meta_alerts() {
         old::get(org_id, stream_type, stream_name, name).await
     } else {
@@ -48,7 +48,7 @@ pub async fn set(
     stream_name: &str,
     alert: Alert,
     create: bool,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), infra::errors::Error> {
     if should_use_meta_alerts() {
         old::set(org_id, stream_type, stream_name, &alert, create).await
     } else {
@@ -71,7 +71,7 @@ pub async fn delete(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), infra::errors::Error> {
     if should_use_meta_alerts() {
         old::delete(org_id, stream_type, stream_name, name).await
     } else {
@@ -83,7 +83,7 @@ pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
-) -> Result<Vec<Alert>, anyhow::Error> {
+) -> Result<Vec<Alert>, infra::errors::Error> {
     if should_use_meta_alerts() {
         old::list(org_id, stream_type, stream_name).await
     } else {

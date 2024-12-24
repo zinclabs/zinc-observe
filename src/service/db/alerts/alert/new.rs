@@ -35,7 +35,7 @@ pub async fn get(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<Option<Alert>, anyhow::Error> {
+) -> Result<Option<Alert>, infra::errors::Error> {
     let stream_key = cache_stream_key(org_id, stream_type, stream_name);
     let mut value: Option<Alert> = if let Some(v) = STREAM_ALERTS.read().await.get(&stream_key) {
         v.iter().find(|x| x.name.eq(name)).cloned()
@@ -57,7 +57,7 @@ pub async fn set(
     stream_name: &str,
     alert: Alert,
     create: bool,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), infra::errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match table::put(client, org_id, "default", alert).await {
         Ok(alert) => {
@@ -107,7 +107,7 @@ pub async fn set(
                 }
             }
         }
-        Err(e) => Err(anyhow::anyhow!("Error saving alert: {}", e)),
+        Err(e) => Err(e),
     }
 }
 
@@ -125,11 +125,9 @@ pub async fn delete(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), infra::errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    table::delete_by_name(client, org_id, "default", stream_type, stream_name, name)
-        .await
-        .map_err(|e| anyhow::anyhow!("Error deleting alert: {e}"))?;
+    table::delete_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
     cluster::emit_delete_event(org_id, stream_type, stream_name, name).await?;
     #[cfg(feature = "enterprise")]
     super_cluster::emit_delete_event(org_id, stream_type, stream_name, name).await?;
@@ -147,7 +145,7 @@ pub async fn list(
     org_id: &str,
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
-) -> Result<Vec<Alert>, anyhow::Error> {
+) -> Result<Vec<Alert>, infra::errors::Error> {
     let params = ListAlertsParams::new(org_id).in_folder("default");
     let params = if let Some(stream_name) = stream_name {
         params.for_stream(stream_type.unwrap_or_default(), stream_name)
@@ -379,7 +377,7 @@ mod super_cluster {
 
     /// Sends event to the super cluster queue indicating that all alert have
     /// been deleted from the database.
-    pub async fn emit_delete_all_event() -> Result<(), infra::errors::Error> {
+    pub async fn _emit_delete_all_event() -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
             o2_enterprise::enterprise::super_cluster::queue::delete("/alerts/", true, false, None)
                 .await

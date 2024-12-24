@@ -117,6 +117,16 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .help("the parquet file name"),
                 ),
             clap::Command::new("migrate-schemas").about("migrate from single row to row per schema version"),
+            clap::Command::new("seaorm-rollback").about("rollback SeaORM migration steps")
+                .subcommand(
+                    clap::Command::new("all")
+                    .about("rollback all SeaORM migration steps")
+                )
+                .subcommand(
+                    clap::Command::new("last")
+                    .about("rollback last N SeaORM migration steps")
+                    .arg(clap::Arg::new("N").help("number of migration steps to rollback (default is 1)").value_parser(clap::value_parser!(u32)))
+                ),
         ])
         .get_matches();
 
@@ -274,6 +284,26 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             #[allow(deprecated)]
             migration::schema::run().await?
         }
+        "seaorm-rollback" => match command.subcommand() {
+            Some(("all", _)) => {
+                println!("Rolling back all");
+                infra::table::down(None).await?
+            }
+            Some(("last", sub_matches)) => {
+                let n = sub_matches
+                    .get_one::<u32>("N")
+                    .map(|n| n.to_owned())
+                    .unwrap_or(1);
+                println!("Rolling back {n}");
+                infra::table::down(Some(n)).await?
+            }
+            Some((name, _)) => {
+                return Err(anyhow::anyhow!("unsupported sub command: {name}"));
+            }
+            None => {
+                return Err(anyhow::anyhow!("missing sub command"));
+            }
+        },
         _ => {
             return Err(anyhow::anyhow!("unsupported sub command: {name}"));
         }

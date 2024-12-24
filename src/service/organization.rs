@@ -15,15 +15,20 @@
 
 use std::io::{Error, ErrorKind};
 
-use config::{meta::stream::StreamType, utils::rand::generate_random_string};
+use config::{
+    meta::{
+        dashboards::ListDashboardsParams, pipeline::components::PipelineSource, stream::StreamType,
+    },
+    utils::rand::generate_random_string,
+};
 
 use crate::{
     common::{
         infra::config::USERS_RUM_TOKEN,
         meta::{
             organization::{
-                IngestionPasscode, IngestionTokensContainer, OrgSummary, Organization,
-                RumIngestionToken,
+                AlertSummary, IngestionPasscode, IngestionTokensContainer, OrgSummary,
+                Organization, PipelineSummary, RumIngestionToken, StreamSummary,
             },
             user::{UserOrg, UserRole},
         },
@@ -34,35 +39,48 @@ use crate::{
 
 pub async fn get_summary(org_id: &str) -> OrgSummary {
     let streams = get_streams(org_id, None, false, None).await;
-    let functions = db::functions::list(org_id).await.unwrap();
-    let alerts = db::alerts::alert::list(org_id, None, None).await.unwrap();
-    let mut num_streams = 0;
-    let mut total_records = 0;
-    let mut total_storage_size = 0.0;
-    let mut total_compressed_size = 0.0;
-    let mut total_index_size = 0.0;
+    let mut stream_summary = StreamSummary::default();
     for stream in streams.iter() {
         if !stream.stream_type.eq(&StreamType::Index)
             && !stream.stream_type.eq(&StreamType::Metadata)
         {
-            num_streams += 1;
-            total_records += stream.stats.doc_num;
-            total_storage_size += stream.stats.storage_size;
-            total_compressed_size += stream.stats.compressed_size;
-            total_index_size += stream.stats.index_size;
+            stream_summary.num_streams += 1;
+            stream_summary.total_records += stream.stats.doc_num;
+            stream_summary.total_storage_size += stream.stats.storage_size;
+            stream_summary.total_compressed_size += stream.stats.compressed_size;
+            stream_summary.total_index_size += stream.stats.index_size;
         }
     }
 
+    let pipelines = db::pipeline::list_by_org(org_id).await.unwrap_or_default();
+    let pipeline_summary = PipelineSummary {
+        num_realtime: pipelines
+            .iter()
+            .filter(|p| matches!(p.source, PipelineSource::Realtime(_)))
+            .count() as i64,
+        num_scheduled: pipelines
+            .iter()
+            .filter(|p| matches!(p.source, PipelineSource::Scheduled(_)))
+            .count() as i64,
+    };
+
+    let alerts = db::alerts::alert::list(org_id, None, None).await.unwrap();
+    let alert_summary = AlertSummary {
+        num_realtime: alerts.iter().filter(|a| a.is_real_time).count() as i64,
+        num_scheduled: alerts.iter().filter(|a| !a.is_real_time).count() as i64,
+    };
+
+    let functions = db::functions::list(org_id).await.unwrap_or_default();
+    let dashboards = super::dashboards::list_dashboards(ListDashboardsParams::new(org_id))
+        .await
+        .unwrap_or_default();
+
     OrgSummary {
-        streams: crate::common::meta::organization::StreamSummary {
-            num_streams,
-            total_records,
-            total_storage_size,
-            total_compressed_size,
-            total_index_size,
-        },
-        functions,
-        alerts,
+        streams: stream_summary,
+        pipelines: pipeline_summary,
+        alerts: alert_summary,
+        total_functions: functions.len() as i64,
+        total_dashboards: dashboards.len() as i64,
     }
 }
 

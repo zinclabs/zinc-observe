@@ -15,9 +15,25 @@
 
 use std::io::Error;
 
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
 use ahash::HashMap;
 use config::{ider, meta::pipeline::Pipeline};
+
+use crate::{
+    common::meta::http::HttpResponse as MetaHttpResponse,
+    service::{db::pipeline::PipelineError, pipeline},
+};
+
+impl From<PipelineError> for HttpResponse {
+    fn from(value: PipelineError) -> Self {
+        match value {
+            PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
+            PipelineError::Modified(_) => MetaHttpResponse::conflict(value),
+            error => MetaHttpResponse::bad_request(error),
+        }
+    }
+}
 
 /// CreatePipeline
 #[utoipa::path(
@@ -47,7 +63,13 @@ pub async fn save_pipeline(
     pipeline.name = pipeline.name.trim().to_string();
     pipeline.org = org_id;
     pipeline.id = ider::generate();
-    crate::service::pipeline::save_pipeline(pipeline).await
+    match pipeline::save_pipeline(pipeline).await {
+        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Pipeline created successfully".to_string(),
+        ))),
+        Err(e) => Ok(e.into()),
+    }
 }
 
 /// ListPipelines
@@ -99,7 +121,10 @@ async fn list_pipelines(
         // Get List of allowed objects ends
     }
 
-    crate::service::pipeline::list_pipelines(org_id.into_inner(), _permitted).await
+    match pipeline::list_pipelines(org_id.into_inner(), _permitted).await {
+        Ok(pipeline_list) => Ok(HttpResponse::Ok().json(pipeline_list)),
+        Err(e) => Ok(e.into()),
+    }
 }
 
 /// GetStreamsWithPipeline
@@ -123,7 +148,10 @@ async fn list_streams_with_pipeline(
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-    crate::service::pipeline::list_streams_with_pipeline(&org_id).await
+    match pipeline::list_streams_with_pipeline(&org_id).await {
+        Ok(stream_params) => Ok(HttpResponse::Ok().json(stream_params)),
+        Err(e) => Ok(e.into()),
+    }
 }
 
 /// DeletePipeline
@@ -149,7 +177,13 @@ async fn delete_pipeline(
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let (_org_id, pipeline_id) = path.into_inner();
-    crate::service::pipeline::delete_pipeline(&pipeline_id).await
+    match pipeline::delete_pipeline(&pipeline_id).await {
+        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Pipeline deleted successfully".to_string(),
+        ))),
+        Err(e) => Ok(e.into()),
+    }
 }
 
 /// UpdatePipeline
@@ -175,7 +209,13 @@ pub async fn update_pipeline(
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let pipeline = pipeline.into_inner();
-    crate::service::pipeline::update_pipeline(pipeline).await
+    match pipeline::update_pipeline(pipeline).await {
+        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Pipeline updated successfully".to_string(),
+        ))),
+        Err(e) => Ok(e.into()),
+    }
 }
 
 /// EnablePipeline
@@ -208,5 +248,13 @@ pub async fn enable_pipeline(
         Some(v) => v.parse::<bool>().unwrap_or_default(),
         None => false,
     };
-    crate::service::pipeline::enable_pipeline(&org_id, &pipeline_id, enable).await
+    let resp_msg =
+        "Pipeline successfully ".to_string() + if enable { "enabled" } else { "disabled" };
+    match pipeline::enable_pipeline(&org_id, &pipeline_id, enable).await {
+        Ok(()) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            resp_msg,
+        ))),
+        Err(e) => Ok(e.into()),
+    }
 }

@@ -38,6 +38,7 @@ impl MigrationTrait for Migration {
             .drop_index(
                 Index::drop()
                     .name(DASHBOARDS_FOLDER_ID_DASHBOARD_ID_IDX)
+                    .table(Dashboards::Table)
                     .to_owned(),
             )
             .await?;

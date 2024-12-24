@@ -18,7 +18,7 @@ body:
         - ingestion
         - alerts
         - localization
-        - routing
+        - pipeline
         - metrics
         - traces
         - real user monitoring

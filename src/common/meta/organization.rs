@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::{alerts::alert::Alert, function::Transform};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -56,17 +55,31 @@ pub struct OrganizationResponse {
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct OrgSummary {
     pub streams: StreamSummary,
-    pub functions: Vec<Transform>,
-    pub alerts: Vec<Alert>,
+    pub pipelines: PipelineSummary,
+    pub alerts: AlertSummary,
+    pub total_functions: i64,
+    pub total_dashboards: i64,
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Default, Serialize, Deserialize, ToSchema)]
 pub struct StreamSummary {
     pub num_streams: i64,
     pub total_records: i64,
     pub total_storage_size: f64,
     pub total_compressed_size: f64,
     pub total_index_size: f64,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct PipelineSummary {
+    pub num_realtime: i64,
+    pub num_scheduled: i64,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct AlertSummary {
+    pub num_realtime: i64,
+    pub num_scheduled: i64,
 }
 
 /// A container for passcodes and rumtokens

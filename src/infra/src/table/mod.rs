@@ -41,6 +41,12 @@ pub async fn migrate() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+pub async fn down(steps: Option<u32>) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Migrator::down(client, steps).await?;
+    Ok(())
+}
+
 /// Acquires a lock on the SQLite client if SQLite is configured as the meta store.
 ///
 /// # Returns

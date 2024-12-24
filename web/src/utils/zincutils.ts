@@ -505,6 +505,11 @@ export const formatSizeFromMB = (sizeInMB: string) => {
   return `${size.toFixed(2)} ${units[index]}`;
 };
 
+export const addCommasToNumber = (number: number) => {
+  if (number === null || number === undefined) return '0';
+  return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
+
 /**
  * @param us : Time in microseconds
  */

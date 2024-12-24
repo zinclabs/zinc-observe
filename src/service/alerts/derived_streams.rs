@@ -23,6 +23,7 @@ use config::{
         alerts::{FrequencyType, QueryType},
         pipeline::components::DerivedStream,
         search::{SearchEventContext, SearchEventType},
+        sql::resolve_stream_names,
     },
     utils::json::{Map, Value},
 };
@@ -39,12 +40,38 @@ pub async fn save(
     // checks for query type
     match derived_stream.query_condition.query_type {
         QueryType::SQL => {
-            if derived_stream
-                .query_condition
-                .sql
-                .as_ref()
-                .map_or(false, |sql| sql.is_empty())
-            {
+            if let Some(sql) = &derived_stream.query_condition.sql {
+                if sql.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "DerivedStreams with SQL mode should have a query"
+                    ));
+                }
+
+                // Check the max_query_range of streams in the sql query
+                let stream_names = match resolve_stream_names(sql) {
+                    Ok(stream_names) => stream_names,
+                    Err(e) => {
+                        return Err(anyhow::anyhow!(
+                            "Error resolving stream names in SQL query: {e}"
+                        ));
+                    }
+                };
+                let (org_id, stream_type) = (&derived_stream.org_id, derived_stream.stream_type);
+                for stream in stream_names.iter() {
+                    if let Some(settings) =
+                        infra::schema::get_settings(org_id, stream, stream_type).await
+                    {
+                        let max_query_range = settings.max_query_range;
+                        if max_query_range > 0
+                            && derived_stream.trigger_condition.period > max_query_range * 60
+                        {
+                            return Err(anyhow::anyhow!(
+                                "Query period is greater than max query range of {max_query_range} hours for stream \"{stream}\""
+                            ));
+                        }
+                    }
+                }
+            } else {
                 return Err(anyhow::anyhow!(
                     "DerivedStreams with SQL mode should have a query"
                 ));

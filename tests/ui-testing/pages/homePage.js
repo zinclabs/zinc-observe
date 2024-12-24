@@ -17,8 +17,8 @@ export class HomePage {
     async homePageValidation() {
 
         await expect(this.page.getByRole('main')).toContainText('Streams');
-        await expect(this.page.getByRole('main')).toContainText('Query functions');
-        await expect(this.page.getByRole('main')).toContainText('Scheduled alerts');
+        await expect(this.page.getByRole('main')).toContainText('Function');
+        await expect(this.page.getByRole('main')).toContainText('Scheduled');
 
 
     }

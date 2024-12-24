@@ -17,10 +17,20 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_index(Index::drop().name(SEARCH_QUEUE_WORK_GROUP_IDX).to_owned())
+            .drop_index(
+                Index::drop()
+                    .name(SEARCH_QUEUE_WORK_GROUP_IDX)
+                    .table(SearchQueue::Table)
+                    .to_owned(),
+            )
             .await?;
         manager
-            .drop_index(Index::drop().name(SEARCH_QUEUE_CREATED_AT_IDX).to_owned())
+            .drop_index(
+                Index::drop()
+                    .name(SEARCH_QUEUE_CREATED_AT_IDX)
+                    .table(SearchQueue::Table)
+                    .to_owned(),
+            )
             .await?;
         manager
             .drop_table(Table::drop().table(SearchQueue::Table).to_owned())

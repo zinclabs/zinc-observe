@@ -15,7 +15,7 @@
 
 // use std::sync::Arc;
 
-use anyhow::Result;
+// use anyhow::Result;
 use config::meta::{
     pipeline::{components::PipelineSource, Pipeline},
     stream::StreamParams,
@@ -28,14 +28,33 @@ use crate::{
     service::pipeline::batch_execution::ExecutablePipeline,
 };
 
+#[derive(Debug, thiserror::Error)]
+pub enum PipelineError {
+    // internal
+    #[error("InfraError# {0}")]
+    InfraError(#[from] infra::errors::Error),
+    // not found
+    #[error("Pipeline with ID {0} not found.")]
+    NotFound(String),
+    // conflict
+    #[error("Pipeline with ID {0} modified by someone else. Please refresh.")]
+    Modified(String),
+    // bad request
+    #[error("A realtime pipeline with same source stream already exists")]
+    StreamInUse,
+    #[error("Invalid pipeline {0}")]
+    InvalidPipeline(String),
+    #[error("Invalid DerivedStream config: {0}")]
+    InvalidDerivedStream(String),
+    #[error("Error deleting previous DerivedStream: {0}")]
+    DeleteDerivedStream(String),
+}
+
 /// Stores a new pipeline to database.
 ///
 /// Pipeline validation should be handled by the caller.
-pub async fn set(pipeline: &Pipeline) -> Result<()> {
-    if let Err(e) = infra_pipeline::put(pipeline).await {
-        log::error!("Error saving pipeline: {}", e);
-        return Err(anyhow::anyhow!("Error saving pipeline: {}", e));
-    }
+pub async fn set(pipeline: &Pipeline) -> Result<(), PipelineError> {
+    infra_pipeline::put(pipeline).await?;
 
     // save to cache if realtime pipeline
     if let PipelineSource::Realtime(stream_params) = &pipeline.source {
@@ -50,11 +69,11 @@ pub async fn set(pipeline: &Pipeline) -> Result<()> {
 /// Updates a pipeline entry with the sane values.
 ///
 /// Pipeline validation should be handled by the caller.
-pub async fn update(pipeline: &Pipeline, prev_source_stream: Option<StreamParams>) -> Result<()> {
-    if let Err(e) = infra_pipeline::update(pipeline).await {
-        log::error!("Error updating pipeline: {}", e);
-        return Err(anyhow::anyhow!("Error updating pipeline: {}", e));
-    }
+pub async fn update(
+    pipeline: &Pipeline,
+    prev_source_stream: Option<StreamParams>,
+) -> Result<(), PipelineError> {
+    infra_pipeline::update(pipeline).await?;
 
     if let Some(prev_stream_params) = prev_source_stream {
         update_cache(&prev_stream_params, PipelineTableEvent::Remove).await;
@@ -74,13 +93,8 @@ pub async fn update(pipeline: &Pipeline, prev_source_stream: Option<StreamParams
 }
 
 /// Returns all streams with existing pipelines.
-pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>> {
-    infra_pipeline::list_streams_with_pipeline(org)
-        .await
-        .map_err(|e| {
-            log::error!("Error getting streams with pipeline for org({org}): {}", e);
-            anyhow::anyhow!("Error getting streams with pipeline for org({org}): {}", e)
-        })
+pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>, PipelineError> {
+    Ok(infra_pipeline::list_streams_with_pipeline(org).await?)
 }
 
 /// Transform the initialized and enabled pipeline into ExecutablePipeline struct that's ready for
@@ -121,54 +135,34 @@ pub async fn get_by_stream(stream_params: &StreamParams) -> Option<Pipeline> {
 /// Returns the pipeline by id.
 ///
 /// Used to get the pipeline associated with the ID when scheduled job is ran.
-pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline> {
-    infra_pipeline::get_by_id(pipeline_id).await.map_err(|e| {
-        log::error!("Error getting pipeline with ID({pipeline_id}): {}", e);
-        anyhow::anyhow!("Error getting pipeline with ID({pipeline_id}): {}", e)
-    })
+pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline, PipelineError> {
+    Ok(infra_pipeline::get_by_id(pipeline_id).await?)
 }
 
 /// Finds the pipeline with the same source
 ///
 /// Used to validate if a duplicate pipeline exists.
-pub async fn get_with_same_source_stream(pipeline: &Pipeline) -> Result<Pipeline> {
-    infra_pipeline::get_with_same_source_stream(pipeline)
-        .await
-        .map_err(|_| anyhow::anyhow!("No pipeline with the same source found"))
+pub async fn get_with_same_source_stream(pipeline: &Pipeline) -> Result<Pipeline, PipelineError> {
+    Ok(infra_pipeline::get_with_same_source_stream(pipeline).await?)
 }
 
 /// Lists all pipelines across all orgs.
-pub async fn list() -> Result<Vec<Pipeline>> {
-    infra_pipeline::list().await.map_err(|e| {
-        log::debug!("Error listing pipelines for all orgs: {}", e);
-        anyhow::anyhow!("Error listing pipelines for all orgs: {}", e)
-    })
+pub async fn list() -> Result<Vec<Pipeline>, PipelineError> {
+    Ok(infra_pipeline::list().await?)
 }
 
 /// Lists all pipelines for a given organization.
-pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>> {
-    infra_pipeline::list_by_org(org).await.map_err(|e| {
-        log::debug!("Error listing pipelines for org({org}): {}", e);
-        anyhow::anyhow!("Error listing pipelines for org({org}): {}", e)
-    })
+pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>, PipelineError> {
+    Ok(infra_pipeline::list_by_org(org).await?)
 }
 
 /// Deletes a pipeline by ID.
-pub async fn delete(pipeline_id: &str) -> Result<()> {
-    match infra_pipeline::delete(pipeline_id).await {
-        Err(e) => {
-            log::error!("Error deleting pipeline with ID({pipeline_id}): {}", e);
-            return Err(anyhow::anyhow!(
-                "Error deleting pipeline with ID({pipeline_id}): {}",
-                e
-            ));
-        }
-        Ok(pipeline) => {
-            // remove from cache if realtime pipeline
-            if let PipelineSource::Realtime(stream_params) = &pipeline.source {
-                update_cache(stream_params, PipelineTableEvent::Remove).await;
-            }
-        }
+pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
+    let pipeline = infra_pipeline::delete(pipeline_id).await?;
+
+    // remove from cache if realtime pipeline
+    if let PipelineSource::Realtime(stream_params) = &pipeline.source {
+        update_cache(stream_params, PipelineTableEvent::Remove).await;
     }
 
     Ok(())

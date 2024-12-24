@@ -218,6 +218,8 @@ use crate::{common::meta, handler::http::request};
             meta::user::SignInResponse,
             meta::organization::OrgSummary,
             meta::organization::StreamSummary,
+            meta::organization::PipelineSummary,
+            meta::organization::AlertSummary,
             meta::organization::OrganizationResponse,
             meta::organization::OrgDetails,
             meta::organization::OrgUser,

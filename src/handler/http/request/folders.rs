@@ -159,7 +159,6 @@ pub async fn list_folders(
         return HttpResponse::Forbidden().finish();
     };
 
-    let folder_type = FolderType::Dashboards;
     match folders::list_folders(&org_id, user_id, folder_type.into()).await {
         Ok(folders) => {
             let body: ListFoldersResponseBody = folders.into();

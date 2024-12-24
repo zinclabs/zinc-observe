@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, io::Error};
+use std::collections::HashMap;
 
-use actix_web::{delete, get, http, post, put, web, HttpRequest, HttpResponse};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
 use config::meta::{
     alerts::alert::{Alert, AlertListFilter},
     dashboards::datetime_now,
@@ -26,7 +26,7 @@ use crate::{
         meta::http::HttpResponse as MetaHttpResponse,
         utils::{auth::UserEmail, http::get_stream_type_from_request},
     },
-    service::alerts::alert,
+    service::alerts::alert::{self, AlertError},
 };
 
 /// CreateAlert
@@ -52,7 +52,7 @@ pub async fn save_alert(
     path: web::Path<(String, String)>,
     alert: web::Json<Alert>,
     user_email: UserEmail,
-) -> Result<HttpResponse, Error> {
+) -> HttpResponse {
     let (org_id, stream_name) = path.into_inner();
 
     // Hack for frequency: convert minutes to seconds
@@ -65,8 +65,8 @@ pub async fn save_alert(
     alert.last_satisfied_at = None;
 
     match alert::save(&org_id, &stream_name, "", alert, true).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert saved")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(_) => MetaHttpResponse::ok("Alert saved"),
+        Err(e) => e.into(),
     }
 }
 
@@ -94,7 +94,7 @@ pub async fn update_alert(
     path: web::Path<(String, String, String)>,
     alert: web::Json<Alert>,
     user_email: UserEmail,
-) -> Result<HttpResponse, Error> {
+) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
 
     // Hack for frequency: convert minutes to seconds
@@ -103,8 +103,8 @@ pub async fn update_alert(
     alert.last_edited_by = Some(user_email.user_id);
     alert.updated_at = Some(datetime_now());
     match alert::save(&org_id, &stream_name, &name, alert, false).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert Updated")),
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Ok(_) => MetaHttpResponse::ok("Alert Updated"),
+        Err(e) => e.into(),
     }
 }
 
@@ -126,16 +126,13 @@ pub async fn update_alert(
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts")]
-async fn list_stream_alerts(
-    path: web::Path<(String, String)>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+async fn list_stream_alerts(path: web::Path<(String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
+            return MetaHttpResponse::bad_request(e);
         }
     };
     let user_filter = query.get("owner").map(|v| v.to_string());
@@ -166,9 +163,9 @@ async fn list_stream_alerts(
 
             let mut mapdata = HashMap::new();
             mapdata.insert("list", data);
-            Ok(MetaHttpResponse::json(mapdata))
+            MetaHttpResponse::json(mapdata)
         }
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
 
@@ -188,7 +185,7 @@ async fn list_stream_alerts(
     )
 )]
 #[get("/{org_id}/alerts")]
-async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpResponse, Error> {
+async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse {
     let org_id = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
 
@@ -209,9 +206,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpRe
                 _alert_list_from_rbac = stream_list;
             }
             Err(e) => {
-                return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                    e.to_string(),
-                ));
+                return MetaHttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
@@ -248,9 +243,9 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpRe
 
             let mut mapdata = HashMap::new();
             mapdata.insert("list", data);
-            Ok(MetaHttpResponse::json(mapdata))
+            MetaHttpResponse::json(mapdata)
         }
-        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+        Err(e) => e.into(),
     }
 }
 
@@ -273,27 +268,23 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> Result<HttpRe
     )
 )]
 #[get("/{org_id}/{stream_name}/alerts/{alert_name}")]
-async fn get_alert(
-    path: web::Path<(String, String, String)>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+async fn get_alert(path: web::Path<(String, String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or_default(),
         Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
+            return MetaHttpResponse::bad_request(e);
         }
     };
     match alert::get(&org_id, stream_type, &stream_name, &name).await {
-        Ok(mut data) => {
+        Ok(Some(mut data)) => {
             // Hack for frequency: convert seconds to minutes
-            if let Some(ref mut data) = data {
-                data.trigger_condition.frequency /= 60;
-            }
-            Ok(MetaHttpResponse::json(data))
+            data.trigger_condition.frequency /= 60;
+            MetaHttpResponse::json(data)
         }
-        Err(e) => Ok(MetaHttpResponse::not_found(e)),
+        Ok(None) => AlertError::AlertNotFound.into(),
+        Err(e) => e.into(),
     }
 }
 
@@ -317,24 +308,18 @@ async fn get_alert(
     )
 )]
 #[delete("/{org_id}/{stream_name}/alerts/{alert_name}")]
-async fn delete_alert(
-    path: web::Path<(String, String, String)>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+async fn delete_alert(path: web::Path<(String, String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or_default(),
         Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
+            return MetaHttpResponse::bad_request(e);
         }
     };
     match alert::delete(&org_id, stream_type, &stream_name, &name).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert deleted")),
-        Err(e) => match e {
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
-        },
+        Ok(_) => MetaHttpResponse::ok("Alert deleted"),
+        Err(e) => e.into(),
     }
 }
 
@@ -359,16 +344,13 @@ async fn delete_alert(
     )
 )]
 #[put("/{org_id}/{stream_name}/alerts/{alert_name}/enable")]
-async fn enable_alert(
-    path: web::Path<(String, String, String)>,
-    req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+async fn enable_alert(path: web::Path<(String, String, String)>, req: HttpRequest) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or_default(),
         Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
+            return MetaHttpResponse::bad_request(e);
         }
     };
     let enable = match query.get("value") {
@@ -378,11 +360,8 @@ async fn enable_alert(
     let mut resp = HashMap::new();
     resp.insert("enabled".to_string(), enable);
     match alert::enable(&org_id, stream_type, &stream_name, &name, enable).await {
-        Ok(_) => Ok(MetaHttpResponse::json(resp)),
-        Err(e) => match e {
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
-        },
+        Ok(_) => MetaHttpResponse::json(resp),
+        Err(e) => e.into(),
     }
 }
 
@@ -409,20 +388,17 @@ async fn enable_alert(
 async fn trigger_alert(
     path: web::Path<(String, String, String)>,
     req: HttpRequest,
-) -> Result<HttpResponse, Error> {
+) -> HttpResponse {
     let (org_id, stream_name, name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or_default(),
         Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
+            return MetaHttpResponse::bad_request(e);
         }
     };
     match alert::trigger(&org_id, stream_type, &stream_name, &name).await {
-        Ok(_) => Ok(MetaHttpResponse::ok("Alert triggered")),
-        Err(e) => match e {
-            (http::StatusCode::NOT_FOUND, e) => Ok(MetaHttpResponse::not_found(e)),
-            (_, e) => Ok(MetaHttpResponse::internal_error(e)),
-        },
+        Ok(_) => MetaHttpResponse::ok("Alert triggered"),
+        Err(e) => e.into(),
     }
 }
