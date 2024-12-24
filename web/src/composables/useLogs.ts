@@ -46,6 +46,7 @@ import {
   getWebSocketUrl,
   generateTraceContext,
   arraysMatch,
+  isWebSocketEnabled,
 } from "@/utils/zincutils";
 import {
   convertDateToTimestamp,
@@ -1475,10 +1476,7 @@ const useLogs = () => {
       // window will have more priority
       // if window has use_web_socket property then use that
       // else use organization settings
-      const shouldUseWebSocket =
-        (window as any).use_web_socket ??
-        store?.state?.organizationData?.organizationSettings
-          ?.enable_websocket_search;
+      const shouldUseWebSocket = isWebSocketEnabled();
 
       searchObj.communicationMethod = shouldUseWebSocket ? "ws" : "http";
 
