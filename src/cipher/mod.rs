@@ -13,5 +13,16 @@ pub struct KeyAddRequest {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct KeyGetResponse {
     pub name: String,
-    pub key_type: CipherData,
+    pub data: CipherData,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct KeyInfo {
+    pub name: String,
+    pub data: CipherData,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct KeyListResponse {
+    pub keys: Vec<KeyInfo>,
 }
