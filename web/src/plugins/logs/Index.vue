@@ -333,6 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+// TODO: Remove ts-ignore from the code
 // @ts-nocheck
 import {
   defineComponent,

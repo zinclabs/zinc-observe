@@ -59,44 +59,6 @@ const search = {
     return http({ headers: { traceparent } }).post(url, query);
   },
 
-  ws_search: (
-    {
-      org_identifier,
-      query,
-      page_type = "logs",
-      traceparent,
-      dashboard_id,
-      folder_id,
-      request_id,
-      trace_id,
-    }: {
-      org_identifier: string;
-      query: any;
-      page_type: string;
-      traceparent?: string;
-      dashboard_id?: string;
-      folder_id?: string;
-      request_id: string;
-      trace_id: string;
-    },
-    search_type: string = "UI",
-  ) => {
-    const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
-
-    const payload = {
-      type: "search",
-      content: {
-        trace_id,
-        payload: {
-          query,
-        },
-      },
-    };
-  },
-
   search_around: ({
     org_identifier,
     index,

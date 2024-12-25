@@ -49,13 +49,21 @@ const useSearchWebSocket = () => {
         handlers.error.bind(null, requestId, data),
       );
       return requestId;
-    } catch (e: any) {
-      throw new Error("Error in fetching search data", e);
+    } catch (error: any) {
+      console.error(
+        `Error in fetching search data: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   };
 
   const sendSearchMessageBasedOnRequestId = (requestId: string, data: any) => {
-    webSocket.sendMessage(requestId, JSON.stringify(data));
+    try {
+      webSocket.sendMessage(requestId, JSON.stringify(data));
+    } catch (error: any) {
+      console.error(
+        `Failed to send WebSocket message: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   };
 
   const cancelSearchQueryBasedOnRequestId = (

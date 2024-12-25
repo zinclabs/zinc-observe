@@ -1104,7 +1104,9 @@ export default defineComponent({
           enable_websocket_search:
             orgSettings?.data?.data?.enable_websocket_search ?? false,
         });
-      } catch (error) {}
+      } catch (error) {
+        console.error("Error in getOrganizationSettings:", error);
+      }
       return;
     };
 
