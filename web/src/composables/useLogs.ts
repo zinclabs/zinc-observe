@@ -27,7 +27,12 @@ import {
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, startCase } from "lodash-es";
-import { SearchRequestPayload } from "@/ts/interfaces/query";
+import {
+  SearchRequestPayload,
+  WebSocketSearchResponse,
+  WebSocketSearchPayload,
+  WebSocketErrorResponse,
+} from "@/ts/interfaces/query";
 
 import {
   useLocalLogFilterField,
@@ -292,8 +297,6 @@ const useLogs = () => {
   const fieldValues = ref();
 
   const notificationMsg = ref("");
-
-  const webSocket = useWebSocket();
 
   const {
     fetchQueryDataWithWebSocket,
@@ -4592,7 +4595,6 @@ const useLogs = () => {
       addRequestId(requestId, payload.traceId);
     } catch (e: any) {
       console.error("Error while getting data through web socket", e);
-
       searchObj.loading = false;
       showErrorNotification(
         notificationMsg.value || "Error occurred during the search operation.",
@@ -4637,7 +4639,6 @@ const useLogs = () => {
 
   const sendSearchMessage = (requestId: string, queryReq: any) => {
     try {
-      console.log("Send search message", searchObj.data.isOperationCancelled);
       if (searchObj.data.isOperationCancelled) {
         closeSocketBasedOnRequestId(requestId);
         return;
@@ -4674,8 +4675,8 @@ const useLogs = () => {
   // Limit, aggregation, vrl function, pagination, function error and query error
   const handleSearchResponse = (
     requestId: string,
-    payload: any,
-    response: any,
+    payload: WebSocketSearchPayload,
+    response: WebSocketSearchResponse,
   ) => {
     if (response.type === "search_response") {
       if (payload.type === "search") {
@@ -5004,31 +5005,10 @@ const useLogs = () => {
 
         histogramResults = [];
 
-        const { traceparent, traceId } = generateTraceContext();
-        addTraceId(traceId);
+        const payload = buildWebSocketPayload(queryReq, false, "histogram");
+        const requestId = initializeWebSocketConnection(payload);
 
-        const payload: {
-          queryReq: SearchRequestPayload;
-          type: "search" | "histogram" | "pageCount";
-          isPagination: boolean;
-          traceId: string;
-          org_id: string;
-        } = {
-          queryReq: searchObj.data.histogramQuery,
-          type: "histogram",
-          isPagination: false,
-          traceId,
-          org_id: searchObj.organizationIdentifier,
-        };
-
-        const requestId = fetchQueryDataWithWebSocket(payload, {
-          open: sendSearchMessage,
-          close: handleSearchClose,
-          error: handleSearchError,
-          message: handleSearchResponse,
-        });
-
-        addRequestId(requestId, traceId);
+        addRequestId(requestId, payload.traceId);
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram is not available for limit queries.");
@@ -5112,12 +5092,7 @@ const useLogs = () => {
         if (payload.type === "histogram") searchObj.loadingHistogram = true;
 
         setTimeout(() => {
-          const requestId = fetchQueryDataWithWebSocket(payload, {
-            open: sendSearchMessage,
-            close: handleSearchClose,
-            error: handleSearchError,
-            message: handleSearchResponse,
-          });
+          const requestId = initializeWebSocketConnection(payload);
 
           addRequestId(requestId, payload.traceId);
         }, 1000);
@@ -5155,7 +5130,11 @@ const useLogs = () => {
     searchObj.data.isOperationCancelled = false;
   };
 
-  const handleSearchError = (requestId: string, request: any, err: any) => {
+  const handleSearchError = (
+    requestId: string,
+    request: any,
+    err: WebSocketErrorResponse,
+  ) => {
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
 
@@ -5168,34 +5147,41 @@ const useLogs = () => {
 
     if (trace_id) removeTraceId(trace_id);
 
-    // Default error message
-    let errorMsg =
-      typeof message === "string" && message
-        ? JSON.stringify(message)
-        : "Error while processing histogram request.";
+    const errorMsg = constructErrorMessage({
+      message,
+      code,
+      trace_id,
+      defaultMessage: "Error while processing request",
+    });
 
-    // Handle response errors
     searchObj.data.errorDetail = error_detail || "";
+    searchObj.data.errorMsg = errorMsg;
+    notificationMsg.value = errorMsg;
+  };
 
-    // Custom error message based on code
+  const constructErrorMessage = ({
+    message,
+    code,
+    trace_id,
+    defaultMessage,
+  }: {
+    message?: string;
+    code?: number;
+    trace_id?: string;
+    defaultMessage: string;
+  }): string => {
+    let errorMsg = message || defaultMessage;
+
     const customMessage = logsErrorMessage(code || "");
     if (customMessage) {
       errorMsg = t(customMessage);
     }
 
-    // Add Trace ID if available
-    const finalTraceId = trace_id;
-    if (finalTraceId) {
-      const traceIdMsg = ` <br><span class='text-subtitle1'>TraceID: ${finalTraceId}</span>`;
-      errorMsg += traceIdMsg;
-      notificationMsg.value = `${errorMsg} TraceID: ${finalTraceId}`;
-    } else {
-      notificationMsg.value = errorMsg;
+    if (trace_id) {
+      errorMsg += ` <br><span class='text-subtitle1'>TraceID: ${trace_id}</span>`;
     }
 
-    // Update the error message in the data object
-    searchObj.data.errorMsg = errorMsg;
-    // searchObj.data.errorCode = code || "";
+    return errorMsg;
   };
 
   const refreshPagination = (regenrateFlag: boolean = false) => {
@@ -5248,42 +5234,27 @@ const useLogs = () => {
 
     queryReq.query.track_total_hits = true;
 
-    const { traceparent, traceId } = generateTraceContext();
-    addTraceId(traceId);
+    const payload = buildWebSocketPayload(queryReq, false, "pageCount");
 
-    const payload: {
-      queryReq: SearchRequestPayload;
-      type: "search" | "histogram" | "pageCount";
-      isPagination: boolean;
-      traceId: string;
-      org_id: string;
-    } = {
-      queryReq,
-      type: "pageCount",
-      isPagination: false,
-      traceId,
-      org_id: searchObj.organizationIdentifier,
-    };
+    const requestId = initializeWebSocketConnection(payload);
 
-    const requestId = fetchQueryDataWithWebSocket(payload, {
-      open: sendSearchMessage,
-      close: handleSearchClose,
-      error: handleSearchError,
-      message: handleSearchResponse,
-    });
-
-    addRequestId(requestId, traceId);
+    addRequestId(requestId, payload.traceId);
   };
 
   const sendCancelSearchMessage = () => {
-    searchObj.data.isOperationCancelled = true;
+    try {
+      searchObj.data.isOperationCancelled = true;
 
-    // loop on all requestIds
-    searchObj.data.searchWebSocketRequestIdsAndTraceIds.forEach(
-      ({ requestId, traceId }) => {
-        cancelSearchQueryBasedOnRequestId(requestId, traceId);
-      },
-    );
+      // loop on all requestIds
+      searchObj.data.searchWebSocketRequestIdsAndTraceIds.forEach(
+        ({ requestId, traceId }) => {
+          cancelSearchQueryBasedOnRequestId(requestId, traceId);
+        },
+      );
+    } catch (error: any) {
+      console.error("Failed to cancel WebSocket searches:", error);
+      showErrorNotification("Failed to cancel search operations");
+    }
   };
 
   const handleCancelQuery = () => {

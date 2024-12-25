@@ -38,3 +38,37 @@ export interface QueryPayload {
 export interface HistogramQueryPayload {
   histogram: string;
 }
+
+export interface WebSocketSearchResponse {
+  type: "search_response";
+  content: {
+    results: {
+      hits: any[];
+      total: number;
+      took: number;
+      function_error?: string;
+      new_start_time?: number;
+      new_end_time?: number;
+      scan_size?: number;
+    };
+  };
+}
+
+export interface WebSocketSearchPayload {
+  queryReq: SearchRequestPayload;
+  type: "search" | "histogram" | "pageCount";
+  isPagination: boolean;
+  traceId: string;
+  org_id: string;
+}
+
+export interface ErrorContent {
+  message: string;
+  trace_id?: string;
+  code?: number;
+  error_detail?: string;
+}
+
+interface WebSocketErrorResponse {
+  content: ErrorContent;
+}
