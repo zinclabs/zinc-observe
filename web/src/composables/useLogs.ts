@@ -2180,6 +2180,10 @@ const useLogs = () => {
           // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
           refreshPartitionPagination(regeratePaginationFlag);
 
+          // Scan-size and took time in histogram title
+          // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
+          // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
+
           if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
             if (appendResult) {
               searchObj.data.queryResults.from += res.data.from;
@@ -4781,6 +4785,9 @@ const useLogs = () => {
           delete response.content.total;
         }
 
+        // Scan-size and took time in histogram title
+        // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
+        // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
         if (
           searchObj.data.queryResults.hasOwnProperty("hits") &&
           searchObj.data.queryResults.hits.length > 0
@@ -4788,13 +4795,18 @@ const useLogs = () => {
           searchObj.data.queryResults.hits.push(
             ...response.content.results.hits,
           );
-          searchObj.data.queryResults.total =
-            searchObj.data.queryResults.total + response.content.results.total;
-          searchObj.data.queryResults.took =
-            searchObj.data.queryResults.took + response.content.results.took;
+
+          searchObj.data.queryResults.total += response.content.results.total;
+          searchObj.data.queryResults.took += response.content.results.took;
+          searchObj.data.queryResults.scan_size +=
+            response.content.results.scan_size;
         } else {
           if (isPagination) {
             searchObj.data.queryResults.hits = response.content.results.hits;
+            searchObj.data.queryResults.from = response.content.results.from;
+            searchObj.data.queryResults.scan_size =
+              response.content.results.scan_size;
+            searchObj.data.queryResults.took = response.content.results.took;
           } else {
             searchObj.data.queryResults = response.content.results;
           }
@@ -4945,7 +4957,7 @@ const useLogs = () => {
     //   searchObj.data.queryResults.total = res.data.total;
     // }
 
-    // searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
     searchObjDebug["histogramProcessingEndTime"] = performance.now();
     searchObjDebug["histogramEndTime"] = performance.now();
