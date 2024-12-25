@@ -50,13 +50,12 @@ use sqlparser::{
     parser::Parser,
 };
 
+#[cfg(feature = "enterprise")]
+use super::datafusion::udf::cipher_udf::{DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME};
 use super::{
-    datafusion::udf::{
-        cipher_udf::{DECRYPT_UDF_NAME, ENCRYPT_UDF_NAME},
-        match_all_udf::{
-            FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
-            MATCH_ALL_UDF_NAME,
-        },
+    datafusion::udf::match_all_udf::{
+        FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_RAW_IGNORE_CASE_UDF_NAME, MATCH_ALL_RAW_UDF_NAME,
+        MATCH_ALL_UDF_NAME,
     },
     index::{get_index_condition_from_expr, IndexCondition},
     request::Request,
@@ -1461,11 +1460,13 @@ fn o2_id_is_needed(schemas: &HashMap<TableReference, Arc<SchemaCache>>) -> bool 
     })
 }
 
+#[cfg(feature = "enterprise")]
 struct ExtractKeyNamesVisitor {
     keys: Vec<String>,
     error: Option<Error>,
 }
 
+#[cfg(feature = "enterprise")]
 impl ExtractKeyNamesVisitor {
     fn new() -> Self {
         Self {
@@ -1475,6 +1476,7 @@ impl ExtractKeyNamesVisitor {
     }
 }
 
+#[cfg(feature = "enterprise")]
 impl VisitorMut for ExtractKeyNamesVisitor {
     type Break = ();
 
@@ -1531,6 +1533,7 @@ impl VisitorMut for ExtractKeyNamesVisitor {
     }
 }
 
+#[cfg(feature = "enterprise")]
 pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
     let dialect = &PostgreSqlDialect {};
     let mut statement = Parser::parse_sql(dialect, sql)

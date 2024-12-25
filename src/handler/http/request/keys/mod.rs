@@ -21,8 +21,8 @@ use infra::table::cipher::CipherEntry;
 use o2_enterprise::enterprise::cipher::CipherData;
 
 #[cfg(feature = "enterprise")]
-use crate::cipher::{KeyAddRequest, KeyGetResponse, KeyListResponse};
-use crate::{cipher::KeyInfo, common::meta::http::HttpResponse as MetaHttpResponse};
+use crate::cipher::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Store a key credential in db
 #[utoipa::path(
@@ -55,35 +55,42 @@ pub async fn save(
     in_req: HttpRequest,
     body: web::Bytes,
 ) -> Result<HttpResponse, Error> {
-    let req: KeyAddRequest = match serde_json::from_slice(&body) {
-        Ok(v) => v,
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
-
-    let user_id = match in_req.headers().get("user_id").map(|v| v.to_str().unwrap()) {
-        None => return Ok(MetaHttpResponse::bad_request("invalid user_id in request")),
-        Some(id) => id,
-    };
-
-    // TODO: validate cipher data by actually encrypting here
-
-    match infra::table::cipher::add(CipherEntry {
-        org: org_id.to_string(),
-        created_at: chrono::Utc::now().timestamp_micros(),
-        created_by: user_id.to_string(),
-        name: req.name,
-        data: serde_json::to_string(&req.key).unwrap(),
-        kind: infra::table::cipher::EntryKind::CipherKey,
-    })
-    .await
+    #[cfg(feature = "enterprise")]
     {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "key created successfully".to_string(),
-        ))),
-        Err(e) => Ok(MetaHttpResponse::bad_request(format!(
-            "error in saving : {e}"
-        ))),
+        let req: KeyAddRequest = match serde_json::from_slice(&body) {
+            Ok(v) => v,
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        };
+
+        let user_id = match in_req.headers().get("user_id").map(|v| v.to_str().unwrap()) {
+            None => return Ok(MetaHttpResponse::bad_request("invalid user_id in request")),
+            Some(id) => id,
+        };
+
+        // TODO: validate cipher data by actually encrypting here
+
+        match infra::table::cipher::add(CipherEntry {
+            org: org_id.to_string(),
+            created_at: chrono::Utc::now().timestamp_micros(),
+            created_by: user_id.to_string(),
+            name: req.name,
+            data: serde_json::to_string(&req.key).unwrap(),
+            kind: infra::table::cipher::EntryKind::CipherKey,
+        })
+        .await
+        {
+            Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                "key created successfully".to_string(),
+            ))),
+            Err(e) => Ok(MetaHttpResponse::bad_request(format!(
+                "error in saving : {e}"
+            ))),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        Ok(MetaHttpResponse::forbidden("not supported"))
     }
 }
 
@@ -113,35 +120,40 @@ pub async fn get(
     _req: HttpRequest,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, key_name) = path.into_inner();
-
-    let kdata = match infra::table::cipher::get_data(
-        &org_id,
-        infra::table::cipher::EntryKind::CipherKey,
-        &key_name,
-    )
-    .await
+    #[cfg(feature = "enterprise")]
     {
-        Ok(Some(k)) => k,
-        Ok(None) => {
-            return Ok(MetaHttpResponse::not_found(format!(
-                "key {key_name} not found"
-            )))
-        }
-        Err(e) => {
-            return Ok(MetaHttpResponse::internal_error(format!(
-                "error in getting key {e}"
-            )))
-        }
-    };
+        let (org_id, key_name) = path.into_inner();
 
-    let cd = serde_json::from_str(&kdata).unwrap(); // we can be fairly certain that in db we have proper json
+        let kdata = match infra::table::cipher::get_data(
+            &org_id,
+            infra::table::cipher::EntryKind::CipherKey,
+            &key_name,
+        )
+        .await
+        {
+            Ok(Some(k)) => k,
+            Ok(None) => {
+                return Ok(MetaHttpResponse::not_found(format!(
+                    "key {key_name} not found"
+                )))
+            }
+            Err(e) => {
+                return Ok(MetaHttpResponse::internal_error(format!(
+                    "error in getting key {e}"
+                )))
+            }
+        };
 
-    let res = KeyGetResponse {
-        name: key_name,
-        data: cd,
-    };
-    Ok(HttpResponse::Ok().json(res))
+        let cd = serde_json::from_str(&kdata).unwrap(); // we can be fairly certain that in db we have proper json
+
+        let res = KeyGetResponse {
+            name: key_name,
+            data: cd,
+        };
+        Ok(HttpResponse::Ok().json(res))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    Ok(MetaHttpResponse::forbidden("not supported"))
 }
 
 /// get credentials for given key name
@@ -163,32 +175,37 @@ pub async fn get(
 )]
 #[get("/{org_id}/cipher_keys")]
 pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResponse, Error> {
-    let org_id = path.into_inner();
+    #[cfg(feature = "enterprise")]
+    {
+        let org_id = path.into_inner();
 
-    let filter = infra::table::cipher::ListFilter {
-        org: Some(org_id.into()),
-        kind: Some(infra::table::cipher::EntryKind::CipherKey),
-    };
+        let filter = infra::table::cipher::ListFilter {
+            org: Some(org_id.into()),
+            kind: Some(infra::table::cipher::EntryKind::CipherKey),
+        };
 
-    let kdata = match infra::table::cipher::list_filtered(filter, None).await {
-        Ok(list) => list,
-        Err(e) => {
-            return Ok(MetaHttpResponse::internal_error(format!(
-                "error in listing keys: {e}"
-            )))
-        }
-    };
+        let kdata = match infra::table::cipher::list_filtered(filter, None).await {
+            Ok(list) => list,
+            Err(e) => {
+                return Ok(MetaHttpResponse::internal_error(format!(
+                    "error in listing keys: {e}"
+                )))
+            }
+        };
 
-    let kdata = kdata
-        .into_iter()
-        .map(|d| KeyInfo {
-            name: d.name,
-            data: serde_json::from_str::<CipherData>(&d.data).unwrap(),
-        })
-        .collect::<Vec<_>>();
+        let kdata = kdata
+            .into_iter()
+            .map(|d| KeyInfo {
+                name: d.name,
+                data: serde_json::from_str::<CipherData>(&d.data).unwrap(),
+            })
+            .collect::<Vec<_>>();
 
-    let res = KeyListResponse { keys: kdata };
-    Ok(HttpResponse::Ok().json(res))
+        let res = KeyListResponse { keys: kdata };
+        Ok(HttpResponse::Ok().json(res))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    Ok(MetaHttpResponse::forbidden("not supported"))
 }
 
 /// delete key credentials for given key name
@@ -216,20 +233,25 @@ pub async fn delete(
     _req: HttpRequest,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, key_name) = path.into_inner();
-    match infra::table::cipher::remove(
-        &org_id,
-        infra::table::cipher::EntryKind::CipherKey,
-        &key_name,
-    )
-    .await
+    #[cfg(feature = "enterprise")]
     {
-        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
-            http::StatusCode::OK.into(),
-            "cipher key removed successfully".to_string(),
-        ))),
-        Err(e) => Ok(MetaHttpResponse::internal_error(format!(
-            "error in removing key {e}"
-        ))),
+        let (org_id, key_name) = path.into_inner();
+        match infra::table::cipher::remove(
+            &org_id,
+            infra::table::cipher::EntryKind::CipherKey,
+            &key_name,
+        )
+        .await
+        {
+            Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+                http::StatusCode::OK.into(),
+                "cipher key removed successfully".to_string(),
+            ))),
+            Err(e) => Ok(MetaHttpResponse::internal_error(format!(
+                "error in removing key {e}"
+            ))),
+        }
     }
+    #[cfg(not(feature = "enterprise"))]
+    Ok(MetaHttpResponse::forbidden("not supported"))
 }

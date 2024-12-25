@@ -33,6 +33,8 @@ use config::{
 use infra::errors;
 use tracing::{Instrument, Span};
 
+#[cfg(feature = "enterprise")]
+use crate::service::search::sql::get_cipher_key_names;
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -45,7 +47,7 @@ use crate::{
         },
     },
     service::{
-        search::{self as SearchService, sql::get_cipher_key_names, RESULT_ARRAY},
+        search::{self as SearchService, RESULT_ARRAY},
         self_reporting::report_request_usage_stats,
     },
 };
@@ -225,18 +227,6 @@ pub async fn search_multi(
             }
         }
 
-        let keys_used = match get_cipher_key_names(&req.query.sql) {
-            Ok(v) => v,
-            Err(e) => {
-                return Ok(HttpResponse::InternalServerError().json(
-                    meta::http::HttpResponse::error(
-                        StatusCode::INTERNAL_SERVER_ERROR.into(),
-                        e.to_string(),
-                    ),
-                ));
-            }
-        };
-
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
         {
@@ -276,6 +266,18 @@ pub async fn search_multi(
                     return Ok(MetaHttpResponse::forbidden("Unauthorized Access"));
                 }
             }
+
+            let keys_used = match get_cipher_key_names(&req.query.sql) {
+                Ok(v) => v,
+                Err(e) => {
+                    return Ok(HttpResponse::InternalServerError().json(
+                        meta::http::HttpResponse::error(
+                            StatusCode::INTERNAL_SERVER_ERROR.into(),
+                            e.to_string(),
+                        ),
+                    ));
+                }
+            };
             // Check permissions on stream ends
             // Check permissions on keys
             for key in keys_used {
