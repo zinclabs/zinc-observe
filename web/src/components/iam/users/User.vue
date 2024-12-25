@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-table__title full-width q-mb-md"
           data-test="user-title-text"
         >
-          {{ t("iam.users") }}
+          {{ t("iam.basicUsers") }}
         </div>
         <div class="full-width row q-mb-xs items-start">
           <q-input
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <QTablePagination
           :scope="scope"
-          :pageTitle="t('iam.users')"
+          :pageTitle="t('iam.basicUsers')"
           :resultTotal="resultTotal"
           :perPageOptions="perPageOptions"
           position="top"

@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="iam-service-accounts-selection-table-title"
           class="q-my-sm text-bold"
         >
-          {{ rows.length }} Users
+          {{ rows.length }} {{t('iam.serviceAccounts')}}
         </div>
         <template v-if="rows.length">
           <app-table
