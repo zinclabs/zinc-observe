@@ -373,9 +373,14 @@ async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReaso
         // Attempt to close the session
         if let Err(e) = session.close(close_reason).await {
             log::error!(
-                "[WS_HANDLER]: req_id: {} Failed to close session: {:?}",
+                "[WS_HANDLER]: req_id: {} Failed to close session gracefully. Connection may have been closed prematurely: {:?}",
                 req_id,
                 e
+            );
+        } else {
+            log::info!(
+                "[WS_HANDLER]: req_id: {} Close frame sent successfully. Waiting for acknowledgment...",
+                req_id
             );
         }
     } else {

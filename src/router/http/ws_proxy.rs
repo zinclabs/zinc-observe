@@ -70,6 +70,7 @@ pub async fn ws_proxy(
                 return;
             }
         }
+        log::warn!("[WS_PROXY]: Client connection closed unexpectedly");
     };
 
     let backend_to_client = async move {
@@ -116,6 +117,7 @@ pub async fn ws_proxy(
                 }
             }
         }
+        log::warn!("[WS_PROXY]: Backend connection closed unexpectedly");
     };
 
     // Spawn async tasks for client to backend and backend to client message forwarding
