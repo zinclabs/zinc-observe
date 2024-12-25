@@ -15,13 +15,14 @@
 
 use std::io::Error;
 
-use actix_http::StatusCode;
 use actix_web::{delete, get, http, post, web, HttpRequest, HttpResponse};
+use infra::table::cipher::CipherEntry;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::cipher::CipherData;
 
-use crate::{
-    cipher::{Key, KeyAddRequest, KeyGetResponse},
-    common::meta::{self, http::HttpResponse as MetaHttpResponse},
-};
+#[cfg(feature = "enterprise")]
+use crate::cipher::{KeyAddRequest, KeyGetResponse, KeyListResponse};
+use crate::{cipher::KeyInfo, common::meta::http::HttpResponse as MetaHttpResponse};
 
 /// Store a key credential in db
 #[utoipa::path(
@@ -48,8 +49,8 @@ use crate::{
     ),
     tag = "Key"
 )]
-#[post("/{org_id}/keys")]
-pub async fn store(
+#[post("/{org_id}/cipher_keys")]
+pub async fn save(
     org_id: web::Path<String>,
     in_req: HttpRequest,
     body: web::Bytes,
@@ -59,30 +60,30 @@ pub async fn store(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
-    let user_id = in_req
-        .headers()
-        .get("user_id")
-        .map(|v| v.to_str().unwrap_or("").to_string())
-        .unwrap();
-
-    let key = Key {
-        created_at: chrono::Utc::now().timestamp_micros(),
-        created_by: user_id,
-        name: req.name,
-        credentials: req.credentials,
+    let user_id = match in_req.headers().get("user_id").map(|v| v.to_str().unwrap()) {
+        None => return Ok(MetaHttpResponse::bad_request("invalid user_id in request")),
+        Some(id) => id,
     };
 
-    match infra::table::keys::add(org_id.as_str(), key.into()).await {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(e) => {
-            log::error!("error while storing key : {e}",);
-            Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    e.to_string(),
-                )),
-            )
-        }
+    // TODO: validate cipher data by actually encrypting here
+
+    match infra::table::cipher::add(CipherEntry {
+        org: org_id.to_string(),
+        created_at: chrono::Utc::now().timestamp_micros(),
+        created_by: user_id.to_string(),
+        name: req.name,
+        data: serde_json::to_string(&req.key).unwrap(),
+        kind: infra::table::cipher::EntryKind::CipherKey,
+    })
+    .await
+    {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "key created successfully".to_string(),
+        ))),
+        Err(e) => Ok(MetaHttpResponse::bad_request(format!(
+            "error in saving : {e}"
+        ))),
     }
 }
 
@@ -107,38 +108,87 @@ pub async fn store(
     ),
     tag = "Key"
 )]
-#[get("/{org_id}/keys/{key_name}")]
+#[get("/{org_id}/cipher_keys/{key_name}")]
 pub async fn get(
     _req: HttpRequest,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, key_name) = path.into_inner();
-    match infra::table::keys::get(&org_id, &key_name).await {
-        Ok(v) => match v {
-            Some(model) => {
-                let k: Key = model.into();
-                let res = KeyGetResponse {
-                    name: key_name,
-                    key_type: k.credentials.get_type(),
-                    credentials: k.credentials,
-                };
-                Ok(HttpResponse::Ok().json(res))
-            }
-            None => Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
-                http::StatusCode::NOT_FOUND.into(),
-                format!("Key {key_name} not found"),
-            ))),
-        },
-        Err(e) => {
-            log::error!("error while storing key {e}");
-            Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    e.to_string(),
-                )),
-            )
+
+    let kdata = match infra::table::cipher::get_data(
+        &org_id,
+        infra::table::cipher::EntryKind::CipherKey,
+        &key_name,
+    )
+    .await
+    {
+        Ok(Some(k)) => k,
+        Ok(None) => {
+            return Ok(MetaHttpResponse::not_found(format!(
+                "key {key_name} not found"
+            )))
         }
-    }
+        Err(e) => {
+            return Ok(MetaHttpResponse::internal_error(format!(
+                "error in getting key {e}"
+            )))
+        }
+    };
+
+    let cd = serde_json::from_str(&kdata).unwrap(); // we can be fairly certain that in db we have proper json
+
+    let res = KeyGetResponse {
+        name: key_name,
+        data: cd,
+    };
+    Ok(HttpResponse::Ok().json(res))
+}
+
+/// get credentials for given key name
+#[utoipa::path(
+    get,
+    context_path = "/api",
+    responses(
+        (
+            status = 200,
+            description = "list all keys in the org",
+            body = KeyListResponse,
+            content_type = "application/json",
+            // example = json!({
+            //     "short_url": "http://localhost:5080/short/ddbffcea3ad44292"
+            // })
+        ),
+    ),
+    tag = "Key"
+)]
+#[get("/{org_id}/cipher_keys")]
+pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResponse, Error> {
+    let org_id = path.into_inner();
+
+    let filter = infra::table::cipher::ListFilter {
+        org: Some(org_id.into()),
+        kind: Some(infra::table::cipher::EntryKind::CipherKey),
+    };
+
+    let kdata = match infra::table::cipher::list_filtered(filter, None).await {
+        Ok(list) => list,
+        Err(e) => {
+            return Ok(MetaHttpResponse::internal_error(format!(
+                "error in listing keys: {e}"
+            )))
+        }
+    };
+
+    let kdata = kdata
+        .into_iter()
+        .map(|d| KeyInfo {
+            name: d.name,
+            data: serde_json::from_str::<CipherData>(&d.data).unwrap(),
+        })
+        .collect::<Vec<_>>();
+
+    let res = KeyListResponse { keys: kdata };
+    Ok(HttpResponse::Ok().json(res))
 }
 
 /// delete key credentials for given key name
@@ -161,22 +211,25 @@ pub async fn get(
     ),
     tag = "Keys"
 )]
-#[delete("/{org_id}/keys/{key_name}")]
+#[delete("/{org_id}/cipher_keys/{key_name}")]
 pub async fn delete(
     _req: HttpRequest,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, key_name) = path.into_inner();
-    match infra::table::keys::remove(&org_id, &key_name).await {
-        Ok(_) => Ok(HttpResponse::Ok().finish()),
-        Err(e) => {
-            log::error!("error while deleting key {key_name} : {e}");
-            Ok(
-                HttpResponse::InternalServerError().json(meta::http::HttpResponse::error(
-                    StatusCode::INTERNAL_SERVER_ERROR.into(),
-                    e.to_string(),
-                )),
-            )
-        }
+    match infra::table::cipher::remove(
+        &org_id,
+        infra::table::cipher::EntryKind::CipherKey,
+        &key_name,
+    )
+    .await
+    {
+        Ok(_) => Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "cipher key removed successfully".to_string(),
+        ))),
+        Err(e) => Ok(MetaHttpResponse::internal_error(format!(
+            "error in removing key {e}"
+        ))),
     }
 }
