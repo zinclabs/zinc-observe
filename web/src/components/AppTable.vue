@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-td>
         </q-tr>
       </template>
-      <template v-if="showPagination" #bottom="scope">
+      <template  #bottom="scope">
         <QTablePagination
           :scope="scope"
           :position="'bottom'"

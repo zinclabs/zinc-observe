@@ -139,7 +139,7 @@ const saveRole = () => {
     .catch((err) => {
       if(err.response.status != 403){
         q.notify({
-        message: "Error while creating role",
+        message: err?.response?.data?.message,
         color: "negative",
         position: "bottom",
         timeout: 3000,

@@ -300,7 +300,7 @@
     "groups": "User Groups",
     "roles": "Roles",
     "organizations": "Organizations",
-    "addGroup": "Add Group",
+    "addGroup": "Add User Group",
     "addRole": "Add Role",
     "roleName": "Role Name",
     "groupName": "Group Name",
@@ -347,7 +347,7 @@
   "organization": {
     "header": "Organizations",
     "orgName": "Organization Name",
-    "createOrganization": "Create Organization",
+    "createOrganization": "Add Organization",
     "updateOrganization": "Update Organization",
     "nameHolder": "Type name here",
     "add": "Add Organization",

@@ -105,12 +105,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-tr v-show="props.row.showGroups" :props="props">
           <q-td colspan="100%">
             <div class="flex">
-              <div class="q-px-lg" >
-                <p class="q-mb-sm" v-if="props.row.user_groups "><strong>User Group : </strong> <span> {{props.row.user_groups}}</span></p>
-                <p class="q-mb-sm" v-if="props.row.user_roles"><strong>Custom Roles : </strong><span> {{ props.row.user_roles }}</span></p>
+              <div class="q-px-lg" v-if="props.row.user_groups || props.row.user_roles">
+                <p class="q-mb-sm" v-if="props.row.user_groups">
+                  <strong>User Group: </strong> <span>{{ props.row.user_groups }}</span>
+                </p>
+                <p class="q-mb-sm" v-if="props.row.user_roles">
+                  <strong>Custom Roles: </strong> <span>{{ props.row.user_roles }}</span>
+                </p>
+              </div>
+              <div 
+                class="flex justify-center items-center q-px-lg" 
+                v-else
+                style="width: 100%; text-align: center;"
+              >
+                <p>No Data</p>
               </div>
             </div>
           </q-td>
+
         </q-tr>
       </template>
       <template #top="scope">
