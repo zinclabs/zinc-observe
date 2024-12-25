@@ -966,7 +966,8 @@
     "logDetails": "Log Details",
     "traceIdFieldName": "Trace ID Field Name",
     "spanIdFieldName": "Span ID Field Name",
-    "toggleIngestionLogsLabel": "Toggle Ingestion Logs"
+    "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
+    "cipherKeys": "Cipher Keys"
   },
   "reports": {
     "header": "Reports",
@@ -1014,5 +1015,16 @@
   "traces": {
     "viewLogs": "View Logs",
     "backToLogs": "Back to Logs"
+  },
+  "cipherKey": {
+    "header": "Cipher Keys",
+    "add": "Add Cipher Key",
+    "search": "Search Cipher Key",
+    "update": "Update Cipher Key",
+    "name": "Name",
+    "type": "Type",
+    "step1": "Key Store Details",
+    "step2": "Encryption Mechanism",
+    "secret": "Secret"
   }
 }
