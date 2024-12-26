@@ -236,7 +236,8 @@ pub async fn handle_text_message(
                                     format!("[trace_id: {}, error: {}]", search_req.trace_id, &e);
                                 let close_reason = Some(CloseReason {
                                     code: CloseCode::Error,
-                                    description: Some(err_msg.clone()),
+                                    // sending the original error for audit
+                                    description: Some(err_msg),
                                 });
 
                                 // audit
@@ -261,10 +262,19 @@ pub async fn handle_text_message(
 
                                 let err_res = WsServerEvents::error_response(
                                     e,
-                                    Some(search_req.trace_id),
+                                    Some(search_req.trace_id.clone()),
                                     Some(req_id.to_string()),
                                 );
                                 let _ = send_message(&req_id, err_res.to_json().to_string()).await;
+                                let close_reason = Some(CloseReason {
+                                    code: CloseCode::Error,
+                                    // Need to keep description short
+                                    // `actix_ws` does not support long descriptions
+                                    description: Some(format!(
+                                        "[trace_id {}] Search Error",
+                                        search_req.trace_id.clone()
+                                    )),
+                                });
                                 cleanup_and_close_session(&req_id, close_reason).await;
                             }
                         }
