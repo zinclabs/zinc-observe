@@ -671,7 +671,7 @@ export default defineComponent({
   name: "FieldList",
   props: ["editMode"],
   setup(props, { emit }) {
-    const dashboardPanelDataPageKey = inject(
+    const dashboardPanelDataPageKey: any = inject(
       "dashboardPanelDataPageKey",
       "dashboard",
     );
@@ -827,7 +827,10 @@ export default defineComponent({
             await extractFields();
 
             // if promql mode
-            if (promqlMode.value) {
+            // NOTE: For the metrics page, we added one watch that resets the query on stream change.
+            // Because of that, the default query overrides the original/saved query on the edit panel.
+            // To prevent this, we added the dashboardPanelDataPageKey condition.
+            if (promqlMode.value && dashboardPanelDataPageKey === "metrics") {
               // set the query
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
