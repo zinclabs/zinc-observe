@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               round
               flat
-              @click.stop="exportAlert(props.row)"
+              @click.stop="exportDestination(props.row)"
               data-test="destination-export"
             ></q-btn>
             <q-btn
@@ -459,9 +459,10 @@ export default defineComponent({
       });
     };
 
-    const exportAlert = (row: any) =>{
+    const exportDestination = (row: any) =>{
 
-      const destinationByName: any = getDestinationByName(row.name)
+      const findDestination: any = getDestinationByName(row.name);
+      const destinationByName = {...findDestination}
       if(destinationByName.hasOwnProperty("#")) delete destinationByName["#"];
       const destinationJson = JSON.stringify(destinationByName,null,2);
       const blob = new Blob([destinationJson], { type: 'application/json' });
@@ -514,7 +515,7 @@ export default defineComponent({
       pagination,
       outlinedDelete,
       routeTo,
-      exportAlert,
+      exportDestination,
       showImportDestination,
       importDestination,
     };
