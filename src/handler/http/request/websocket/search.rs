@@ -647,20 +647,10 @@ async fn process_delta(
                 "[WS_SEARCH]: trace_id: {} Remaining query range is less than 0, stopping search",
                 trace_id
             );
-            let (new_start_time, new_end_time) = match search_res.order_by {
-                Some(OrderBy::Desc) => (
-                    original_req_end_time - cache_req_duration,
-                    original_req_end_time,
-                ),
-                Some(OrderBy::Asc) => (
-                    original_req_start_time,
-                    original_req_start_time + cache_req_duration,
-                ),
-                None => (
-                    original_req_end_time - cache_req_duration,
-                    original_req_end_time,
-                ),
-            };
+            let (new_start_time, new_end_time) = (
+                original_req_end_time - cache_req_duration,
+                original_req_end_time,
+            );
             // passs original start_time and end_time partition end time
             let _ = send_partial_search_resp(
                 req_id,
