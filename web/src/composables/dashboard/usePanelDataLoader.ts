@@ -555,16 +555,16 @@ export const usePanelDataLoader = (
     state.errorDetail = "";
 
     // if order by is desc, append new partition response at end
-    if (searchRes?.content?.results?.order_by?.toLowerCase() === "desc") {
-      state.data[payload?.queryReq?.currentQueryIndex] = [
-        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
-        ...(searchRes?.content?.results?.hits ?? {}),
-      ];
-    } else {
+    if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
       // else append new partition response at start
       state.data[payload?.queryReq?.currentQueryIndex] = [
         ...(searchRes?.content?.results?.hits ?? {}),
         ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+      ];
+    } else {
+      state.data[payload?.queryReq?.currentQueryIndex] = [
+        ...(state.data[payload?.queryReq?.currentQueryIndex] ?? []),
+        ...(searchRes?.content?.results?.hits ?? {}),
       ];
     }
 
