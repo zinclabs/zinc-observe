@@ -525,7 +525,7 @@ async fn process_delta(
         delta
     );
     let mut req = req.clone();
-    let original_req_start_time = req.payload.query.start_time;
+    let _original_req_start_time = req.payload.query.start_time;
     let original_req_end_time = req.payload.query.end_time;
     req.payload.query.start_time = delta.delta_start_time;
     req.payload.query.end_time = delta.delta_end_time;
