@@ -36,7 +36,7 @@ use super::{
     entity::{alerts, folders},
     folders::FolderType,
 };
-use crate::errors::{self, FromStrError, PutAlertError};
+use crate::errors::{self, FromStrError};
 
 pub mod intermediate;
 
