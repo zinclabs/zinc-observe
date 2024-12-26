@@ -5005,7 +5005,11 @@ const useLogs = () => {
 
         histogramResults = [];
 
-        const payload = buildWebSocketPayload(queryReq, false, "histogram");
+        const payload = buildWebSocketPayload(
+          searchObj.data.histogramQuery,
+          false,
+          "histogram",
+        );
         const requestId = initializeWebSocketConnection(payload);
 
         addRequestId(requestId, payload.traceId);
