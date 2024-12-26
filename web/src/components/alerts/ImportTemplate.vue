@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
 <div class=" q-mt-md full-width">
-  <div class="fl   q-mx-md items-center no-wrap">
+  <div class="flex q-mx-md items-center no-wrap">
       <div class="col">
         <div class="flex">
           <q-btn
