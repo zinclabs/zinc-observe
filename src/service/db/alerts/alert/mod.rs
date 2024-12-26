@@ -28,8 +28,18 @@ mod new;
 mod old;
 
 use config::meta::{alerts::alert::Alert, stream::StreamType};
+use sea_orm::{ConnectionTrait, TransactionTrait};
+use svix_ksuid::Ksuid;
 
-pub async fn get(
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Option<Alert>, infra::errors::Error> {
+    new::get_by_id(conn, org_id, alert_id).await
+}
+
+pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -38,7 +48,7 @@ pub async fn get(
     if should_use_meta_alerts() {
         old::get(org_id, stream_type, stream_name, name).await
     } else {
-        new::get(org_id, stream_type, stream_name, name).await
+        new::get_by_name(org_id, stream_type, stream_name, name).await
     }
 }
 
@@ -52,8 +62,26 @@ pub async fn set(
     if should_use_meta_alerts() {
         old::set(org_id, stream_type, stream_name, &alert, create).await
     } else {
-        new::set(org_id, stream_type, stream_name, alert, create).await
+        new::set(org_id, stream_type, stream_name, "default", alert, create).await
     }
+}
+
+pub async fn create<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    new::create(conn, org_id, folder_id, alert).await
+}
+
+pub async fn update<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    new::update(conn, org_id, folder_id, alert).await
 }
 
 pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<(), anyhow::Error> {
@@ -66,7 +94,7 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     }
 }
 
-pub async fn delete(
+pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -75,8 +103,16 @@ pub async fn delete(
     if should_use_meta_alerts() {
         old::delete(org_id, stream_type, stream_name, name).await
     } else {
-        new::delete(org_id, stream_type, stream_name, name).await
+        new::delete_by_name(org_id, stream_type, stream_name, name).await
     }
+}
+
+pub async fn delete_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), infra::errors::Error> {
+    new::delete_by_id(conn, org_id, alert_id).await
 }
 
 pub async fn list(

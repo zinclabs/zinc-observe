@@ -136,18 +136,19 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
         return Ok(());
     }
 
-    let alert = match super::alert::get(&org_id, stream_type, stream_name, alert_name).await? {
-        Some(alert) => alert,
-        None => {
-            return Err(anyhow::anyhow!(
-                "alert not found: {}/{}/{}/{}",
-                org_id,
-                stream_name,
-                stream_type,
-                alert_name
-            ));
-        }
-    };
+    let alert =
+        match super::alert::get_by_name(&org_id, stream_type, stream_name, alert_name).await? {
+            Some(alert) => alert,
+            None => {
+                return Err(anyhow::anyhow!(
+                    "alert not found: {}/{}/{}/{}",
+                    org_id,
+                    stream_name,
+                    stream_type,
+                    alert_name
+                ));
+            }
+        };
     let now = Utc::now().timestamp_micros();
 
     let mut new_trigger = db::scheduler::Trigger {
@@ -308,7 +309,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
                 // It has been tried the maximum time, just disable the alert
                 // and show the error.
                 if let Some(mut alert) =
-                    super::alert::get(&org_id, stream_type, stream_name, alert_name).await?
+                    super::alert::get_by_name(&org_id, stream_type, stream_name, alert_name).await?
                 {
                     alert.enabled = false;
                     if let Err(e) =
@@ -349,7 +350,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
             .await?;
         }
         publish_triggers_usage(trigger_data_stream).await;
-        return Err(err);
+        return Err(err.into());
     }
 
     let (ret, end_time) = result.unwrap();
@@ -558,7 +559,7 @@ async fn handle_alert_triggers(trigger: db::scheduler::Trigger) -> Result<(), an
 
     // Check if the alert has been disabled in the mean time
     let mut old_alert =
-        match super::alert::get(&org_id, stream_type, stream_name, alert_name).await? {
+        match super::alert::get_by_name(&org_id, stream_type, stream_name, alert_name).await? {
             Some(alert) => alert,
             None => {
                 return Err(anyhow::anyhow!(

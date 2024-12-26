@@ -45,6 +45,8 @@ use infra::{
     table::{self, folders::FolderType},
 };
 use lettre::{message::MultiPart, AsyncTransport, Message};
+use sea_orm::{ConnectionTrait, TransactionTrait};
+use svix_ksuid::Ksuid;
 
 use crate::{
     common::{
@@ -84,6 +86,16 @@ pub enum AlertError {
 
     #[error("Alert already exists")]
     CreateAlreadyExists,
+
+    /// Error that occurs when trying to create an alert in a folder that cannot
+    /// be found.
+    #[error("Error creating alert in folder that cannot be found")]
+    CreateFolderNotFound,
+
+    /// Error that occurs when trying to move an alert to a destination folder
+    /// that cannot be found.
+    #[error("Error moving alert to folder that cannot be found")]
+    MoveDestinationFolderNotFound,
 
     #[error("Alert not found")]
     AlertNotFound,
@@ -138,16 +150,89 @@ pub async fn save(
     // Currently all alerts are stored in the default folder so create the
     // default folder for the org if it doesn't exist yet.
     if !table::folders::exists(org_id, DEFAULT_FOLDER, FolderType::Alerts).await? {
-        let default_folder = Folder {
-            folder_id: DEFAULT_FOLDER.to_owned(),
-            name: "default".to_owned(),
-            description: "default".to_owned(),
-        };
-        folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
-            .await
-            .map_err(|_| AlertError::CreateDefaultFolderError)?;
+        create_default_alerts_folder(org_id).await?;
     };
 
+    prepare_alert(org_id, stream_name, name, &mut alert, create).await?;
+
+    // save the alert
+    let alert_name = alert.name.clone();
+    match db::alerts::alert::set(org_id, alert.stream_type, stream_name, alert, create).await {
+        Ok(_) => {
+            if name.is_empty() {
+                set_ownership(org_id, "alerts", Authz::new(&alert_name)).await;
+            }
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub async fn create<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    mut alert: Alert,
+) -> Result<Alert, AlertError> {
+    if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
+        if folder_id == DEFAULT_FOLDER {
+            create_default_alerts_folder(org_id).await?;
+        } else {
+            return Err(AlertError::CreateFolderNotFound);
+        }
+    }
+
+    let alert_name = alert.name.clone();
+    let stream_name = alert.stream_name.clone();
+    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, true).await?;
+
+    let alert = db::alerts::alert::create(conn, org_id, folder_id, alert).await?;
+    Ok(alert)
+}
+
+pub async fn update<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    mut alert: Alert,
+) -> Result<Alert, AlertError> {
+    if let Some(folder_id) = folder_id {
+        if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
+            if folder_id == DEFAULT_FOLDER {
+                create_default_alerts_folder(org_id).await?;
+            } else {
+                return Err(AlertError::MoveDestinationFolderNotFound);
+            }
+        }
+    }
+
+    let alert_name = alert.name.clone();
+    let stream_name = alert.stream_name.clone();
+    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, true).await?;
+
+    let alert = db::alerts::alert::update(conn, org_id, folder_id, alert).await?;
+    Ok(alert)
+}
+
+async fn create_default_alerts_folder(org_id: &str) -> Result<(), AlertError> {
+    let default_folder = Folder {
+        folder_id: DEFAULT_FOLDER.to_owned(),
+        name: "default".to_owned(),
+        description: "default".to_owned(),
+    };
+    folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
+        .await
+        .map_err(|_| AlertError::CreateDefaultFolderError)?;
+    Ok(())
+}
+
+async fn prepare_alert(
+    org_id: &str,
+    stream_name: &str,
+    name: &str,
+    alert: &mut Alert,
+    create: bool,
+) -> Result<(), AlertError> {
     if !name.is_empty() {
         alert.name = name.to_string();
     }
@@ -162,7 +247,7 @@ pub async fn save(
     alert.stream_name = stream_name.to_string();
     alert.row_template = alert.row_template.trim().to_string();
 
-    match db::alerts::alert::get(org_id, stream_type, stream_name, &alert.name).await {
+    match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, &alert.name).await {
         Ok(Some(old_alert)) => {
             if create {
                 return Err(AlertError::CreateAlreadyExists);
@@ -343,27 +428,28 @@ pub async fn save(
     //     return Err(anyhow::anyhow!("Alert test failed: {}", e));
     // }
 
-    // save the alert
-    let alert_name = alert.name.clone();
-    match db::alerts::alert::set(org_id, stream_type, stream_name, alert, create).await {
-        Ok(_) => {
-            if name.is_empty() {
-                set_ownership(org_id, "alerts", Authz::new(&alert_name)).await;
-            }
-            Ok(())
-        }
-        Err(e) => Err(e.into()),
-    }
+    Ok(())
 }
 
-pub async fn get(
+pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, AlertError> {
-    let alert = db::alerts::alert::get(org_id, stream_type, stream_name, name).await?;
+    let alert = db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await?;
     Ok(alert)
+}
+
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Alert, AlertError> {
+    match table::alerts::get_by_id(conn, org_id, alert_id).await? {
+        Some((_f, a)) => Ok(a),
+        None => Err(AlertError::AlertNotFound),
+    }
 }
 
 pub async fn list(
@@ -404,19 +490,19 @@ pub async fn list(
     }
 }
 
-pub async fn delete(
+pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
 ) -> Result<(), AlertError> {
-    if db::alerts::alert::get(org_id, stream_type, stream_name, name)
+    if db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name)
         .await
         .is_err()
     {
         return Err(AlertError::AlertNotFound);
     }
-    match db::alerts::alert::delete(org_id, stream_type, stream_name, name).await {
+    match db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, name).await {
         Ok(_) => {
             remove_ownership(org_id, "alerts", Authz::new(name)).await;
             Ok(())
@@ -425,35 +511,82 @@ pub async fn delete(
     }
 }
 
-pub async fn enable(
+pub async fn delete_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), AlertError> {
+    let Some(alert) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+        return Ok(());
+    };
+
+    match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
+        Ok(_) => {
+            remove_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
+            Ok(())
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
+pub async fn enable_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
     value: bool,
 ) -> Result<(), AlertError> {
-    let mut alert = match db::alerts::alert::get(org_id, stream_type, stream_name, name).await {
-        Ok(Some(alert)) => alert,
-        _ => {
-            return Err(AlertError::AlertNotFound);
-        }
-    };
+    let mut alert =
+        match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await {
+            Ok(Some(alert)) => alert,
+            _ => {
+                return Err(AlertError::AlertNotFound);
+            }
+        };
     alert.enabled = value;
     db::alerts::alert::set(org_id, stream_type, stream_name, alert, false).await?;
     Ok(())
 }
 
-pub async fn trigger(
+pub async fn enable_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+    should_enable: bool,
+) -> Result<(), AlertError> {
+    let Some(mut alert) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+        return Err(AlertError::AlertNotFound);
+    };
+    let stream_name = alert.stream_name.clone();
+    alert.enabled = should_enable;
+    db::alerts::alert::set(org_id, alert.stream_type, &stream_name, alert, false).await?;
+    Ok(())
+}
+
+pub async fn trigger_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
 ) -> Result<(String, String), AlertError> {
-    let alert = match db::alerts::alert::get(org_id, stream_type, stream_name, name).await {
+    let alert = match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await {
         Ok(Some(alert)) => alert,
         _ => {
             return Err(AlertError::AlertNotFound);
         }
+    };
+    let now = Utc::now().timestamp_micros();
+    let (success_message, err_message) = alert.send_notification(&[], now, None, now).await?;
+    Ok((success_message, err_message))
+}
+
+pub async fn trigger_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(String, String), AlertError> {
+    let Some(alert) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+        return Err(AlertError::AlertNotFound);
     };
     let now = Utc::now().timestamp_micros();
     let (success_message, err_message) = alert.send_notification(&[], now, None, now).await?;

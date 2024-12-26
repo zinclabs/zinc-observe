@@ -27,10 +27,25 @@ use infra::{
     table::alerts as table,
 };
 use itertools::Itertools;
+use sea_orm::{ConnectionTrait, TransactionTrait};
+use svix_ksuid::Ksuid;
 
 use crate::{common::infra::config::STREAM_ALERTS, service::db};
 
-pub async fn get(
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Option<Alert>, infra::errors::Error> {
+    // We cannot check the cache because the cache stores alerts by stream type
+    // and stream name which are currently unknown.
+    let alert = table::get_by_id(conn, org_id, alert_id)
+        .await?
+        .map(|(_f, a)| a);
+    Ok(alert)
+}
+
+pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
@@ -55,11 +70,12 @@ pub async fn set(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
+    folder_id: &str,
     alert: Alert,
     create: bool,
 ) -> Result<(), infra::errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    match table::put(client, org_id, "default", alert).await {
+    match table::put(client, org_id, folder_id, alert).await {
         Ok(alert) => {
             cluster::emit_put_event(org_id, &alert).await?;
             #[cfg(feature = "enterprise")]
@@ -111,6 +127,73 @@ pub async fn set(
     }
 }
 
+pub async fn create<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    let alert = table::create(conn, org_id, folder_id, alert).await?;
+
+    cluster::emit_put_event(org_id, &alert).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_put_event(org_id, &alert).await?;
+
+    let schedule_key = scheduler_key(alert.stream_type, &alert.stream_name, &alert.name);
+    let trigger = db::scheduler::Trigger {
+        org: org_id.to_string(),
+        module_key: schedule_key.clone(),
+        next_run_at: chrono::Utc::now().timestamp_micros(),
+        is_realtime: alert.is_real_time,
+        is_silenced: false,
+        ..Default::default()
+    };
+
+    let _ = db::scheduler::push(trigger).await.map_err(|e| {
+        log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+        e
+    });
+
+    Ok(alert)
+}
+
+pub async fn update<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    let alert = table::update(conn, org_id, folder_id, alert).await?;
+
+    cluster::emit_put_event(org_id, &alert).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_put_event(org_id, &alert).await?;
+
+    let schedule_key = scheduler_key(alert.stream_type, &alert.stream_name, &alert.name);
+    let trigger = db::scheduler::Trigger {
+        org: org_id.to_string(),
+        module_key: schedule_key.clone(),
+        next_run_at: chrono::Utc::now().timestamp_micros(),
+        is_realtime: alert.is_real_time,
+        is_silenced: false,
+        ..Default::default()
+    };
+
+    if db::scheduler::exists(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await {
+        let _ = db::scheduler::update_trigger(trigger).await.map_err(|e| {
+            log::error!("Failed to update trigger for alert {schedule_key}: {}", e);
+            e
+        });
+    } else {
+        let _ = db::scheduler::push(trigger).await.map_err(|e| {
+            log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
+            e
+        });
+    }
+
+    Ok(alert)
+}
+
 pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let alert = table::put(client, org_id, "default", alert).await?;
@@ -120,7 +203,31 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     Ok(())
 }
 
-pub async fn delete(
+pub async fn delete_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), infra::errors::Error> {
+    let Some((_folder, alert)) = table::get_by_id(conn, org_id, alert_id).await? else {
+        return Ok(());
+    };
+
+    table::delete_by_id(conn, org_id, alert_id).await?;
+    cluster::emit_delete_event(org_id, alert.stream_type, &alert.stream_name, &alert.name).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_delete_event(org_id, alert.stream_type, &alert.stream_name, &alert.name)
+        .await?;
+
+    let schedule_key = scheduler_key(alert.stream_type, &alert.stream_name, &alert.name);
+    if let Err(e) =
+        db::scheduler::delete(org_id, db::scheduler::TriggerModule::Alert, &schedule_key).await
+    {
+        log::error!("Failed to delete trigger: {}", e);
+    };
+    Ok(())
+}
+
+pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
