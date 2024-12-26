@@ -169,6 +169,7 @@ pub async fn handle_text_message(
                     let client_msg = client_msg.clone();
                     #[allow(unused_variables)]
                     let path = path.to_string();
+                    let trace_id = search_req.trace_id.clone();
 
                     let task = tokio::spawn(async move {
                         match search::handle_search_request(
@@ -279,6 +280,9 @@ pub async fn handle_text_message(
                             }
                         }
                     });
+
+                    // Remove the cancellation flag
+                    cancellation_registry_cache_utils::remove_cancellation_flag(&trace_id);
 
                     drop(task);
                 }

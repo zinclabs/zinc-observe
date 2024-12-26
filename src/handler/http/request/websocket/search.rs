@@ -279,9 +279,6 @@ pub async fn handle_search_request(
     };
     send_message(req_id, end_res.to_json().to_string()).await?;
 
-    // Remove the cancellation flag
-    cancellation_registry_cache_utils::remove_cancellation_flag(&trace_id);
-
     Ok(())
 }
 
