@@ -727,7 +727,7 @@ def test_e2e_matchallupperlowercase(create_session, base_url):
     
     json_data = {
         "query": {
-            "sql": "select * from \"stream_pytest_data\" WHERE match_all('E2E_test')",
+            "sql": "select * from \"stream_pytest_data\" WHERE match_all('E2E_test*')",
             "start_time": one_min_ago,
             "end_time": end_time,
             "from": 0,

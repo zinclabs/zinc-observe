@@ -18,6 +18,8 @@
 use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
 
 use config::{get_config, MMDB_CITY_FILE_NAME};
+#[cfg(feature = "enterprise")]
+use maxminddb::geoip2::Enterprise;
 use maxminddb::{
     geoip2::{City, ConnectionType, Isp},
     MaxMindDBError, Reader,
@@ -36,6 +38,8 @@ pub enum DatabaseKind {
     Isp,
     ConnectionType,
     City,
+    #[cfg(feature = "enterprise")]
+    Enterprise,
 }
 
 impl From<&str> for DatabaseKind {
@@ -44,6 +48,8 @@ impl From<&str> for DatabaseKind {
             "GeoLite2-ASN" => Self::Asn,
             "GeoIP2-ISP" => Self::Isp,
             "GeoIP2-Connection-Type" => Self::ConnectionType,
+            #[cfg(feature = "enterprise")]
+            "GeoIP2-Enterprise" => Self::Enterprise,
             _ => Self::City,
         }
     }
@@ -133,6 +139,8 @@ impl Geoip {
             DatabaseKind::Asn | DatabaseKind::Isp => dbreader.lookup::<Isp>(ip).map(|_| ()),
             DatabaseKind::ConnectionType => dbreader.lookup::<ConnectionType>(ip).map(|_| ()),
             DatabaseKind::City => dbreader.lookup::<City>(ip).map(|_| ()),
+            #[cfg(feature = "enterprise")]
+            DatabaseKind::Enterprise => dbreader.lookup::<Enterprise>(ip).map(|_| ()),
         };
 
         match result {
@@ -220,6 +228,86 @@ impl Geoip {
                 let data = self.dbreader.lookup::<ConnectionType>(ip).ok()?;
 
                 add_field!("connection_type", data.connection_type);
+            }
+            #[cfg(feature = "enterprise")]
+            DatabaseKind::Enterprise => {
+                let data = self.dbreader.lookup::<Enterprise>(ip).ok()?;
+
+                add_field!(
+                    "city_name",
+                    self.take_translation(data.city.as_ref().and_then(|c| c.names.as_ref()))
+                );
+
+                add_field!("continent_code", data.continent.and_then(|c| c.code));
+
+                let country = data.country.as_ref();
+                add_field!("country_code", country.and_then(|country| country.iso_code));
+                add_field!(
+                    "country_name",
+                    self.take_translation(country.and_then(|c| c.names.as_ref()))
+                );
+
+                let location = data.location.as_ref();
+                add_field!("timezone", location.and_then(|location| location.time_zone));
+                add_field!("latitude", location.and_then(|location| location.latitude));
+                add_field!(
+                    "longitude",
+                    location.and_then(|location| location.longitude)
+                );
+                add_field!(
+                    "metro_code",
+                    location.and_then(|location| location.metro_code)
+                );
+
+                // last subdivision is most specific per https://github.com/maxmind/GeoIP2-java/blob/39385c6ce645374039450f57208b886cf87ade47/src/main/java/com/maxmind/geoip2/model/AbstractCityResponse.java#L96-L107
+                let subdivision = data.subdivisions.as_ref().and_then(|s| s.last());
+                add_field!(
+                    "region_name",
+                    self.take_translation(subdivision.and_then(|s| s.names.as_ref()))
+                );
+                add_field!(
+                    "region_code",
+                    subdivision.and_then(|subdivision| subdivision.iso_code)
+                );
+                add_field!("postal_code", data.postal.and_then(|p| p.code));
+
+                let registered_country: Option<&maxminddb::geoip2::enterprise::Country<'_>> =
+                    data.registered_country.as_ref();
+                add_field!(
+                    "registered_country_code",
+                    registered_country.and_then(|c| c.iso_code)
+                );
+                add_field!(
+                    "registered_country_name",
+                    self.take_translation(registered_country.and_then(|c| c.names.as_ref()))
+                );
+
+                let represented_country: Option<
+                    &maxminddb::geoip2::enterprise::RepresentedCountry<'_>,
+                > = data.represented_country.as_ref();
+                add_field!(
+                    "represented_country_code",
+                    represented_country.and_then(|c| c.iso_code)
+                );
+                add_field!(
+                    "represented_country_name",
+                    self.take_translation(represented_country.and_then(|c| c.names.as_ref()))
+                );
+
+                if let Some(traits) = data.traits {
+                    add_field!("autonomous_system_number", traits.autonomous_system_number);
+                    add_field!(
+                        "autonomous_system_organization",
+                        traits.autonomous_system_organization
+                    );
+                    add_field!("isp", traits.isp);
+                    add_field!("organization", traits.organization);
+                    add_field!("connection_type", traits.connection_type);
+                    add_field!("user_type", traits.user_type);
+                    add_field!("mobile_country_code", traits.mobile_country_code);
+                    add_field!("mobile_network_code", traits.mobile_network_code);
+                    add_field!("domain", traits.domain);
+                };
             }
         }
 

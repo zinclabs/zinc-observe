@@ -439,6 +439,7 @@ pub enum QuerySearchEventType {
     Other,
     Rum,
     DerivedStream,
+    SearchJob,
 }
 
 impl QuerySearchEventType {
@@ -450,6 +451,7 @@ impl QuerySearchEventType {
     const OTHER: i16 = 5;
     const RUM: i16 = 6;
     const DERIVED_STREAM: i16 = 7;
+    const SEARCH_JOB: i16 = 8;
 }
 
 // Implementation for translating from intermediate representation into DB
@@ -465,6 +467,7 @@ impl From<QuerySearchEventType> for i16 {
             QuerySearchEventType::Other => QuerySearchEventType::OTHER,
             QuerySearchEventType::Rum => QuerySearchEventType::RUM,
             QuerySearchEventType::DerivedStream => QuerySearchEventType::DERIVED_STREAM,
+            QuerySearchEventType::SearchJob => QuerySearchEventType::SEARCH_JOB,
         }
     }
 }
@@ -484,6 +487,7 @@ impl TryFrom<i16> for QuerySearchEventType {
             Self::OTHER => Ok(QuerySearchEventType::Other),
             Self::RUM => Ok(QuerySearchEventType::Rum),
             Self::DERIVED_STREAM => Ok(QuerySearchEventType::DerivedStream),
+            Self::SEARCH_JOB => Ok(QuerySearchEventType::SearchJob),
             _ => Err(FromI16Error {
                 value,
                 ty: "SearchEventType".to_owned(),
@@ -503,6 +507,7 @@ impl From<MetaSearchEventType> for QuerySearchEventType {
             MetaSearchEventType::Other => Self::Other,
             MetaSearchEventType::RUM => Self::Rum,
             MetaSearchEventType::DerivedStream => Self::DerivedStream,
+            MetaSearchEventType::SearchJob => Self::SearchJob,
         }
     }
 }
@@ -518,6 +523,7 @@ impl From<QuerySearchEventType> for MetaSearchEventType {
             QuerySearchEventType::Other => Self::Other,
             QuerySearchEventType::Rum => Self::RUM,
             QuerySearchEventType::DerivedStream => Self::DerivedStream,
+            QuerySearchEventType::SearchJob => Self::SearchJob,
         }
     }
 }

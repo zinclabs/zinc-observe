@@ -285,7 +285,7 @@ impl FromRequest for AuthExtractor {
                 if method.eq("GET") {
                     method = "LIST".to_string();
                 }
-                if method.eq("PUT") || method.eq("DELETE") {
+                if method.eq("PUT") || method.eq("DELETE") || path_columns[1].eq("search_jobs") {
                     format!(
                         "{}:{}",
                         OFGA_MODELS

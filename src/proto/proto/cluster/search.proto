@@ -13,6 +13,22 @@ service Search {
     rpc CancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
     rpc ClusterCancelQuery(CancelQueryRequest) returns (CancelQueryResponse) {}
     rpc Search(SearchRequest) returns (SearchResponse) {}
+    rpc GetResult(GetResultRequest) returns (GetResultResponse) {}
+    rpc DeleteResult(DeleteResultRequest) returns (DeleteResultResponse) {}
+}
+
+message DeleteResultRequest {
+    repeated string paths = 1;
+}
+
+message DeleteResultResponse {}
+
+message GetResultRequest {
+    string           path = 1;
+}
+
+message GetResultResponse {
+    bytes        response = 1;
 }
 
 message SearchRequest {
@@ -44,8 +60,7 @@ message SearchQuery {
     bool          skip_wal = 14;
 }
 
-message QueryStatusRequest {
-}
+message QueryStatusRequest {}
 
 message QueryStatusResponse {
     repeated QueryStatus status = 1;

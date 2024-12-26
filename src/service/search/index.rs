@@ -406,13 +406,18 @@ impl Condition {
                 Ok(Arc::new(InListExpr::new(left, values, false, None)))
             }
             Condition::MatchAll(value) => {
+                let value = value
+                    .trim_start_matches("re:") // regex
+                    .trim_start_matches('*') // contains
+                    .trim_end_matches('*') // prefix or contains
+                    .to_string();
                 let term = Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("%{value}%")))));
                 let mut expr_list: Vec<Arc<dyn PhysicalExpr>> =
                     Vec::with_capacity(fst_fields.len());
                 for field in fst_fields.iter() {
                     let new_expr = Arc::new(LikeExpr::new(
                         false,
-                        false,
+                        true,
                         Arc::new(Column::new(field, schema.index_of(field).unwrap())),
                         term.clone(),
                     ));

@@ -18,10 +18,13 @@ use std::{collections::HashMap, str::FromStr, sync::Arc};
 use config::meta::{
     cluster::{IntoArcVec, RoleGroup},
     search::{ScanStats, SearchEventType},
+    sql::TableReferenceExt,
     stream::FileKey,
 };
 use datafusion::{
-    common::tree_node::TreeNode, physical_plan::ExecutionPlan, prelude::SessionContext,
+    common::{tree_node::TreeNode, TableReference},
+    physical_plan::ExecutionPlan,
+    prelude::SessionContext,
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::{
@@ -106,7 +109,10 @@ pub async fn search(
         .unwrap();
 
     // get stream name
-    let stream_name = empty_exec.name();
+    let stream = TableReference::from(empty_exec.name());
+    let stream_name = stream.stream_name();
+    let stream_type = stream.get_stream_type(req.stream_type);
+
     let schema_latest = empty_exec.schema();
     let mut schema_latest_map = HashMap::with_capacity(schema_latest.fields().len());
     for field in schema_latest.fields() {
@@ -116,8 +122,8 @@ pub async fn search(
     // 1. get file id list
     let file_id_list = crate::service::file_list::query_ids(
         &req.org_id,
-        req.stream_type,
-        stream_name,
+        stream_type,
+        &stream_name,
         req.time_range,
     )
     .await?;
@@ -141,7 +147,7 @@ pub async fn search(
         get_inverted_index_file_lists(
             &trace_id,
             &req,
-            stream_name,
+            &stream_name, // for inverted index search, only have on stream
             &flight_request.index_info.equal_keys,
             &flight_request.index_info.match_all_keys,
         )

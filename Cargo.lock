@@ -2468,6 +2468,7 @@ dependencies = [
  "segment",
  "serde",
  "serde_json",
+ "sha256",
  "sqlparser",
  "sqlx",
  "svix-ksuid",

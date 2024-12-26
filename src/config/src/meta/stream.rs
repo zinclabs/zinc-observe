@@ -83,7 +83,7 @@ impl From<&str> for StreamType {
             "logs" => StreamType::Logs,
             "metrics" => StreamType::Metrics,
             "traces" => StreamType::Traces,
-            "enrichment_tables" => StreamType::EnrichmentTables,
+            "enrichment_tables" | "enrich" => StreamType::EnrichmentTables,
             "file_list" => StreamType::Filelist,
             "metadata" => StreamType::Metadata,
             "index" => StreamType::Index,

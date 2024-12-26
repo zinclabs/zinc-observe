@@ -64,6 +64,7 @@ use tokio::sync::Semaphore;
 
 use crate::service::search::index::IndexCondition;
 
+pub mod catalog;
 pub mod empty_table;
 mod helpers;
 pub mod memtable;

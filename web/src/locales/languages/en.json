@@ -770,7 +770,7 @@
     "rtAlert": "Real time",
     "noData": "No Data Ingested",
     "indexSizeLbl": "Index Size",
-    "docsCountLbl": "Documents",
+    "docsCountLbl": "Records",
     "findIngestion": "Find how to ingest data >>",
     "ingestionMsg": "It appears you have not ingested any data to the selected organization. There are various ways to ingest data, such as using Fluent Bit.",
     "inestedInSearch": "Try Log Search",

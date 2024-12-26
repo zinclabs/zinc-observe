@@ -21,13 +21,13 @@ use config::{
     get_config,
     meta::{
         inverted_index::InvertedIndexOptimizeMode,
-        sql::{resolve_stream_names, OrderBy, Sql as MetaSql},
+        sql::{resolve_stream_names_with_type, OrderBy, Sql as MetaSql, TableReferenceExt},
         stream::StreamType,
     },
     utils::sql::AGGREGATE_UDF_LIST,
     ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
 };
-use datafusion::arrow::datatypes::Schema;
+use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::HashMap;
 use infra::{
     errors::{Error, ErrorCodes},
@@ -72,13 +72,14 @@ pub struct Sql {
     pub sql: String,
     pub org_id: String,
     pub stream_type: StreamType,
-    pub stream_names: Vec<String>,
+    pub stream_names: Vec<TableReference>,
     pub match_items: Option<Vec<String>>, // match_all, only for single stream
-    pub equal_items: HashMap<String, Vec<(String, String)>>, // table_name -> [(field_name, value)]
-    pub prefix_items: HashMap<String, Vec<(String, String)>>, // table_name -> [(field_name, value)]
-    pub columns: HashMap<String, HashSet<String>>, // table_name -> [field_name]
-    pub aliases: Vec<(String, String)>,   // field_name, alias
-    pub schemas: HashMap<String, Arc<SchemaCache>>,
+    pub equal_items: HashMap<TableReference, Vec<(String, String)>>, /* table_name ->
+                                           * [(field_name, value)] */
+    pub prefix_items: HashMap<TableReference, Vec<(String, String)>>, /* table_name -> [(field_name, value)] */
+    pub columns: HashMap<TableReference, HashSet<String>>,            // table_name -> [field_name]
+    pub aliases: Vec<(String, String)>,                               // field_name, alias
+    pub schemas: HashMap<TableReference, Arc<SchemaCache>>,
     pub limit: i64,
     pub offset: i64,
     pub time_range: Option<(i64, i64)>,
@@ -107,13 +108,16 @@ impl Sql {
         let offset = query.from as i64;
 
         // 1. get table name
-        let stream_names = resolve_stream_names(&sql).map_err(|e| Error::Message(e.to_string()))?;
+        let stream_names =
+            resolve_stream_names_with_type(&sql).map_err(|e| Error::Message(e.to_string()))?;
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
-        for stream_name in stream_names.iter() {
-            let schema = infra::schema::get(org_id, stream_name, stream_type)
+        for stream in stream_names.iter() {
+            let stream_name = stream.stream_name();
+            let stream_type = stream.get_stream_type(stream_type);
+            let schema = infra::schema::get(org_id, &stream_name, stream_type)
                 .await
                 .unwrap_or_else(|_| Schema::empty());
-            total_schemas.insert(stream_name.clone(), Arc::new(SchemaCache::new(schema)));
+            total_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(schema)));
         }
 
         let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, &sql)
@@ -182,18 +186,18 @@ impl Sql {
             let has_original_column = has_original_column(&column_visitor.columns);
             used_schemas = generate_select_star_schema(total_schemas, has_original_column);
         } else {
-            for (table_name, schema) in total_schemas.iter() {
-                let columns = match column_visitor.columns.get(table_name) {
+            for (stream, schema) in total_schemas.iter() {
+                let columns = match column_visitor.columns.get(stream) {
                     Some(columns) => columns.clone(),
                     None => {
-                        used_schemas.insert(table_name.to_string(), schema.clone());
+                        used_schemas.insert(stream.clone(), schema.clone());
                         continue;
                     }
                 };
                 let fields =
                     generate_schema_fields(columns, schema, match_visitor.match_items.is_some());
                 let schema = Schema::new(fields).with_metadata(schema.schema().metadata().clone());
-                used_schemas.insert(table_name.to_string(), Arc::new(SchemaCache::new(schema)));
+                used_schemas.insert(stream.clone(), Arc::new(SchemaCache::new(schema)));
             }
         }
 
@@ -310,9 +314,9 @@ impl std::fmt::Display for Sql {
 }
 
 fn generate_select_star_schema(
-    schemas: HashMap<String, Arc<SchemaCache>>,
-    has_original_column: HashMap<String, bool>,
-) -> HashMap<String, Arc<SchemaCache>> {
+    schemas: HashMap<TableReference, Arc<SchemaCache>>,
+    has_original_column: HashMap<TableReference, bool>,
+) -> HashMap<TableReference, Arc<SchemaCache>> {
     let mut used_schemas = HashMap::new();
     for (name, schema) in schemas {
         let stream_settings = unwrap_stream_settings(schema.schema()).unwrap_or_default();
@@ -407,7 +411,9 @@ fn generate_schema_fields(
 }
 
 // check if has original column in sql
-fn has_original_column(columns: &HashMap<String, HashSet<String>>) -> HashMap<String, bool> {
+fn has_original_column(
+    columns: &HashMap<TableReference, HashSet<String>>,
+) -> HashMap<TableReference, bool> {
     let mut has_original_column = HashMap::with_capacity(columns.len());
     for (name, column) in columns.iter() {
         if column.contains(ORIGINAL_DATA_COL_NAME) {
@@ -421,9 +427,9 @@ fn has_original_column(columns: &HashMap<String, HashSet<String>>) -> HashMap<St
 
 /// visit a sql to get all columns
 struct ColumnVisitor<'a> {
-    columns: HashMap<String, HashSet<String>>,
+    columns: HashMap<TableReference, HashSet<String>>,
     columns_alias: HashSet<(String, String)>,
-    schemas: &'a HashMap<String, Arc<SchemaCache>>,
+    schemas: &'a HashMap<TableReference, Arc<SchemaCache>>,
     group_by: Vec<String>,
     order_by: Vec<(String, OrderBy)>, // field_name, order_by
     is_wildcard: bool,
@@ -433,7 +439,7 @@ struct ColumnVisitor<'a> {
 }
 
 impl<'a> ColumnVisitor<'a> {
-    fn new(schemas: &'a HashMap<String, Arc<SchemaCache>>) -> Self {
+    fn new(schemas: &'a HashMap<TableReference, Arc<SchemaCache>>) -> Self {
         Self {
             columns: HashMap::new(),
             columns_alias: HashSet::new(),
@@ -564,7 +570,7 @@ struct IndexVisitor {
 }
 
 impl IndexVisitor {
-    fn new(schemas: &HashMap<String, Arc<SchemaCache>>, is_remove_filter: bool) -> Self {
+    fn new(schemas: &HashMap<TableReference, Arc<SchemaCache>>, is_remove_filter: bool) -> Self {
         let index_fields = if let Some((_, schema)) = schemas.iter().next() {
             let stream_settings = unwrap_stream_settings(schema.schema());
             let index_fields = get_stream_setting_index_fields(&stream_settings);
@@ -614,12 +620,12 @@ impl VisitorMut for IndexVisitor {
 
 /// get all equal items from where clause
 struct PartitionColumnVisitor<'a> {
-    equal_items: HashMap<String, Vec<(String, String)>>, // filed = value
-    schemas: &'a HashMap<String, Arc<SchemaCache>>,
+    equal_items: HashMap<TableReference, Vec<(String, String)>>, // filed = value
+    schemas: &'a HashMap<TableReference, Arc<SchemaCache>>,
 }
 
 impl<'a> PartitionColumnVisitor<'a> {
-    fn new(schemas: &'a HashMap<String, Arc<SchemaCache>>) -> Self {
+    fn new(schemas: &'a HashMap<TableReference, Arc<SchemaCache>>) -> Self {
         Self {
             equal_items: HashMap::new(),
             schemas,
@@ -660,19 +666,17 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                                         }
                                     }
                                     if count == 1 {
-                                        self.equal_items.entry(table_name).or_default().push((
-                                            field_name,
-                                            trim_quotes(right.to_string().as_str()),
-                                        ));
+                                        self.equal_items
+                                            .entry(TableReference::from(table_name))
+                                            .or_default()
+                                            .push((
+                                                field_name,
+                                                trim_quotes(right.to_string().as_str()),
+                                            ));
                                     }
                                 }
                                 Expr::CompoundIdentifier(idents) => {
-                                    let name = idents
-                                        .iter()
-                                        .map(|ident| ident.value.clone())
-                                        .collect::<Vec<_>>();
-                                    let table_name = name[0].clone();
-                                    let field_name = name[1].clone();
+                                    let (table_name, field_name) = generate_table_reference(idents);
                                     // check if table_name is in schemas, otherwise the table_name
                                     // maybe is a alias
                                     if self.schemas.contains_key(&table_name) {
@@ -702,7 +706,10 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                                         }
                                     }
                                     if count == 1 {
-                                        let entry = self.equal_items.entry(table_name).or_default();
+                                        let entry = self
+                                            .equal_items
+                                            .entry(TableReference::from(table_name))
+                                            .or_default();
                                         for val in list.iter() {
                                             entry.push((
                                                 field_name.clone(),
@@ -712,12 +719,7 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
                                     }
                                 }
                                 Expr::CompoundIdentifier(idents) => {
-                                    let name = idents
-                                        .iter()
-                                        .map(|ident| ident.value.clone())
-                                        .collect::<Vec<_>>();
-                                    let table_name = name[0].clone();
-                                    let field_name = name[1].clone();
+                                    let (table_name, field_name) = generate_table_reference(idents);
                                     // check if table_name is in schemas, otherwise the table_name
                                     // maybe is a alias
                                     if self.schemas.contains_key(&table_name) {
@@ -744,12 +746,12 @@ impl VisitorMut for PartitionColumnVisitor<'_> {
 
 /// get all equal items from where clause
 struct PrefixColumnVisitor<'a> {
-    prefix_items: HashMap<String, Vec<(String, String)>>, // filed like 'value%'
-    schemas: &'a HashMap<String, Arc<SchemaCache>>,
+    prefix_items: HashMap<TableReference, Vec<(String, String)>>, // filed like 'value%'
+    schemas: &'a HashMap<TableReference, Arc<SchemaCache>>,
 }
 
 impl<'a> PrefixColumnVisitor<'a> {
-    fn new(schemas: &'a HashMap<String, Arc<SchemaCache>>) -> Self {
+    fn new(schemas: &'a HashMap<TableReference, Arc<SchemaCache>>) -> Self {
         Self {
             prefix_items: HashMap::new(),
             schemas,
@@ -786,20 +788,18 @@ impl VisitorMut for PrefixColumnVisitor<'_> {
                                 if count == 1 {
                                     let pattern = trim_quotes(pattern.to_string().as_str());
                                     if !pattern.starts_with('%') && pattern.ends_with('%') {
-                                        self.prefix_items.entry(table_name).or_default().push((
-                                            field_name,
-                                            pattern.trim_end_matches('%').to_string(),
-                                        ));
+                                        self.prefix_items
+                                            .entry(TableReference::from(table_name))
+                                            .or_default()
+                                            .push((
+                                                field_name,
+                                                pattern.trim_end_matches('%').to_string(),
+                                            ));
                                     }
                                 }
                             }
                             Expr::CompoundIdentifier(idents) => {
-                                let name = idents
-                                    .iter()
-                                    .map(|ident| ident.value.clone())
-                                    .collect::<Vec<_>>();
-                                let table_name = name[0].clone();
-                                let field_name = name[1].clone();
+                                let (table_name, field_name) = generate_table_reference(idents);
                                 // check if table_name is in schemas, otherwise the table_name
                                 // maybe is a alias
                                 if self.schemas.contains_key(&table_name) {
@@ -1314,6 +1314,19 @@ impl VisitorMut for TrackTotalHitsVisitor {
     }
 }
 
+fn generate_table_reference(idents: &[Ident]) -> (TableReference, String) {
+    if idents.len() == 2 {
+        let table_name = idents[0].value.clone();
+        let field_name = idents[1].value.clone();
+        (TableReference::from(table_name), field_name)
+    } else {
+        let stream_type = idents[0].value.clone();
+        let table_name = idents[1].value.clone();
+        let field_name = idents[2].value.clone();
+        (TableReference::partial(stream_type, table_name), field_name)
+    }
+}
+
 fn checking_inverted_index_inner(index_fields: &HashSet<&String>, expr: &Expr) -> bool {
     match expr {
         Expr::Identifier(Ident {
@@ -1438,7 +1451,7 @@ pub fn pickup_where(sql: &str, meta: Option<MetaSql>) -> Result<Option<String>, 
     Ok(Some(where_str))
 }
 
-fn o2_id_is_needed(schemas: &HashMap<String, Arc<SchemaCache>>) -> bool {
+fn o2_id_is_needed(schemas: &HashMap<TableReference, Arc<SchemaCache>>) -> bool {
     schemas.values().any(|schema| {
         let stream_setting = unwrap_stream_settings(schema.schema());
         stream_setting.map_or(false, |setting| setting.store_original_data)

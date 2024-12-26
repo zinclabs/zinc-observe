@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use ::datafusion::arrow::record_batch::RecordBatch;
 use config::{
-    meta::{function::VRLResultResolver, search},
+    meta::{function::VRLResultResolver, search, sql::TableReferenceExt},
     utils::{
         arrow::record_batches_to_json_rows,
         flatten,
@@ -25,6 +25,7 @@ use config::{
     },
 };
 use infra::errors::{Error, ErrorCodes, Result};
+use itertools::Itertools;
 use proto::cluster_rpc::SearchQuery;
 use vector_enrichment::TableRegistry;
 
@@ -124,6 +125,11 @@ pub async fn search(
                         None
                     }
                 };
+            let stream_names = sql
+                .stream_names
+                .iter()
+                .map(|s| s.stream_name())
+                .collect_vec();
             match program {
                 Some(program) => {
                     if apply_over_hits {
@@ -141,7 +147,7 @@ pub async fn search(
                                     .collect(),
                             ),
                             &sql.org_id,
-                            &sql.stream_names,
+                            &stream_names,
                         );
                         ret_val
                             .as_array()
@@ -164,7 +170,7 @@ pub async fn search(
                                     },
                                     json::Value::Object(hit),
                                     &sql.org_id,
-                                    &sql.stream_names,
+                                    &stream_names,
                                 );
                                 (!ret_val.is_null()).then_some(flatten::flatten(ret_val).unwrap())
                             })

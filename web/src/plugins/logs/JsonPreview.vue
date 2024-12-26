@@ -19,27 +19,25 @@
         icon="content_copy"
         @click="copyLogToClipboard"
       />
-
       <div
-        v-if="showViewTraceBtn && filteredTracesStreamOptions.length"
+        v-if="
+          showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
+        "
         class="o2-input flex items-center logs-trace-selector"
       >
         <q-select
           data-test="log-search-index-list-select-stream"
           v-model="searchObj.meta.selectedTraceStream"
-          :label="
-            searchObj.meta.selectedTraceStream ? '' : t('search.selectIndex')
-          "
           :options="filteredTracesStreamOptions"
-          data-cy="stream-selection"
           input-debounce="0"
-          behavior="menu"
           filled
           size="xs"
           borderless
           dense
           fill-input
+          behavior="menu"
           :title="searchObj.meta.selectedTraceStream"
+          :loading="isTracesStreamsLoading"
         >
           <template #no-option>
             <div class="o2-input log-stream-search-input">
@@ -88,13 +86,16 @@
           </template>
         </q-select>
         <q-btn
-          :label="t('common.copyToClipboard')"
-          dense
-          size="sm"
+          data-test="trace-view-logs-btn"
+          v-close-popup="true"
+          class="text-bold traces-view-logs-btn q-px-sm view-trace-btn"
+          :label="t('search.viewTrace')"
+          padding="sm sm"
+          size="xs"
           no-caps
-          class="q-px-sm"
-          icon="content_copy"
-          @click="copyLogToClipboard"
+          dense
+          :icon="outlinedAccountTree"
+          @click="redirectToTraces"
         />
       </div>
     </div>
@@ -239,7 +240,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
-import { useQuasar } from "quasar";
+import { is, useQuasar } from "quasar";
+import { load } from "rudder-sdk-js";
 
 export default {
   name: "JsonPreview",
@@ -282,6 +284,8 @@ export default {
 
     const queryEditorRef = ref<any>();
 
+    const isTracesStreamsLoading = ref(false);
+
     const previewId = ref("");
     const schemaToBeSearch = ref({});
 
@@ -321,6 +325,43 @@ export default {
     const { searchObj, searchAggData } = useLogs();
     let multiStreamFields: any = ref([]);
 
+    const showViewTraceBtn = ref(false);
+
+    const getTracesStreams = async () => {
+      isTracesStreamsLoading.value = true;
+      try {
+        getStreams("traces", false)
+          .then((res: any) => {
+            tracesStreams.value = res.list.map((option: any) => option.name);
+            filteredTracesStreamOptions.value = JSON.parse(
+              JSON.stringify(tracesStreams.value),
+            );
+
+            if (!searchObj.meta.selectedTraceStream.length)
+              searchObj.meta.selectedTraceStream = tracesStreams.value[0];
+          })
+          .catch(() => Promise.reject())
+          .finally(() => {
+            isTracesStreamsLoading.value = false;
+          });
+      } catch (err: any) {
+        isTracesStreamsLoading.value = false;
+        console.error("Failed to get traces streams", err);
+      }
+    };
+
+    const setViewTraceBtn = () => {
+      showViewTraceBtn.value =
+        !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
+        props.value[
+          store.state.organizationData?.organizationSettings
+            ?.trace_id_field_name
+        ];
+
+      if (showViewTraceBtn.value && !filteredTracesStreamOptions.value.length)
+        getTracesStreams();
+    };
+
     onBeforeMount(() => {
       searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
         if (
@@ -329,7 +370,8 @@ export default {
           multiStreamFields.value.push(item.name);
         }
       });
-      if (showViewTraceBtn.value) getTracesStreams();
+      setViewTraceBtn();
+
       previewId.value = getUUID();
     });
 
@@ -338,6 +380,8 @@ export default {
     watch(
       () => props.value,
       async () => {
+        setViewTraceBtn();
+
         if (
           !props.value._o2_id ||
           searchAggData.hasAggregation ||
@@ -387,21 +431,6 @@ export default {
       { immediate: true, deep: true },
     );
 
-    const getTracesStreams = async () => {
-      await getStreams("traces", false)
-        .then((res: any) => {
-          tracesStreams.value = res.list.map((option: any) => option.name);
-          filteredTracesStreamOptions.value = JSON.parse(
-            JSON.stringify(tracesStreams.value),
-          );
-
-          if (!searchObj.meta.selectedTraceStream.length)
-            searchObj.meta.selectedTraceStream = tracesStreams.value[0];
-        })
-        .catch(() => Promise.reject())
-        .finally(() => {});
-    };
-
     const filterStreamFn = (val: any = "") => {
       filteredTracesStreamOptions.value = tracesStreams.value.filter(
         (stream: any) => {
@@ -413,16 +442,6 @@ export default {
     const redirectToTraces = () => {
       emit("view-trace");
     };
-
-    const showViewTraceBtn = computed(() => {
-      return (
-        !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
-        props.value[
-          store.state.organizationData?.organizationSettings
-            ?.trace_id_field_name
-        ] // Check if trace_id_field_name is available in the log fields
-      );
-    });
 
     const handleTabChange = async () => {
       if (activeTab.value === "unflattened") {
@@ -467,6 +486,9 @@ export default {
       schemaToBeSearch,
       filteredTabs,
       handleTabChange,
+      isTracesStreamsLoading,
+      tracesStreams,
+      setViewTraceBtn,
     };
   },
 };
@@ -510,6 +532,7 @@ export default {
           overflow: hidden;
           text-overflow: ellipsis;
           text-align: left;
+          font-weight: 400;
         }
       }
 
@@ -527,6 +550,7 @@ export default {
     .q-btn__content {
       span {
         font-size: 11px;
+        font-weight: 400;
       }
     }
   }

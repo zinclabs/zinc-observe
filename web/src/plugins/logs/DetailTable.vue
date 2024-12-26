@@ -157,7 +157,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <q-item-section>
                           <q-item-label
                             data-test="log-details-include-field-btn"
-                            @click="toggleIncludeSearchTerm(value, key, 'include')"
+                            @click="
+                              toggleIncludeSearchTerm(value, key, 'include')
+                            "
                             ><q-btn
                               title="Add to search query"
                               size="6px"
@@ -205,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <q-item
                         v-if="
                           !searchObj.data.stream.selectedFields.includes(
-                            value.toString()
+                            value.toString(),
                           )
                         "
                         clickable
@@ -434,7 +436,7 @@ export default defineComponent({
     const toggleWrapLogDetails = () => {
       window.localStorage.setItem(
         "wrap-log-details",
-        shouldWrapValues.value ? "true" : "false"
+        shouldWrapValues.value ? "true" : "false",
       );
     };
 
@@ -461,7 +463,7 @@ export default defineComponent({
           type: "positive",
           message: "Content Copied Successfully!",
           timeout: 1000,
-        })
+        }),
       );
     };
 

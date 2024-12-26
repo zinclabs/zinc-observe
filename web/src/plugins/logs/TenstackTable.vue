@@ -275,6 +275,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
+                @view-trace="
+                  viewTrace(formattedRows[virtualRow.index]?.original)
+                "
               />
             </td>
             <template v-else>
@@ -420,6 +423,7 @@ const emits = defineEmits([
   "update:columnSizes",
   "update:columnOrder",
   "expandRow",
+  "view-trace",
 ]);
 
 const sorting = ref<SortingState>([]);
@@ -772,6 +776,10 @@ const handleCellMouseOver = (cell: { id: string; column: { id: string } }) => {
 
 const handleCellMouseLeave = () => {
   activeCellActionId.value = "";
+};
+
+const viewTrace = (row: any) => {
+  emits("view-trace", row);
 };
 
 defineExpose({

@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::DateTime;
-use datafusion::{catalog_common::resolve_table_references, sql::parser::DFParser};
+use datafusion::{
+    catalog_common::resolve_table_references,
+    sql::{parser::DFParser, TableReference},
+};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sqlparser::{
@@ -28,6 +31,7 @@ use sqlparser::{
 };
 use utoipa::ToSchema;
 
+use super::stream::StreamType;
 use crate::get_config;
 
 pub const MAX_LIMIT: i64 = 100000;
@@ -53,6 +57,48 @@ pub fn resolve_stream_names(sql: &str) -> Result<Vec<String>, anyhow::Error> {
         tables.push(table.table().to_string());
     }
     Ok(tables)
+}
+
+pub fn resolve_stream_names_with_type(sql: &str) -> Result<Vec<TableReference>, anyhow::Error> {
+    let dialect = &PostgreSqlDialect {};
+    let statement = DFParser::parse_sql_with_dialect(sql, dialect)?
+        .pop_back()
+        .unwrap();
+    let (table_refs, _) = resolve_table_references(&statement, true)?;
+    let mut tables = Vec::new();
+    for table in table_refs {
+        tables.push(table);
+    }
+    Ok(tables)
+}
+
+pub trait TableReferenceExt {
+    fn stream_type(&self) -> String;
+    fn stream_name(&self) -> String;
+    fn has_stream_type(&self) -> bool;
+    fn get_stream_type(&self, stream_type: StreamType) -> StreamType;
+}
+
+impl TableReferenceExt for TableReference {
+    fn stream_type(&self) -> String {
+        self.schema().unwrap_or("").to_string()
+    }
+
+    fn stream_name(&self) -> String {
+        self.table().to_string()
+    }
+
+    fn has_stream_type(&self) -> bool {
+        self.schema().is_some()
+    }
+
+    fn get_stream_type(&self, stream_type: StreamType) -> StreamType {
+        if self.has_stream_type() {
+            StreamType::from(self.stream_type().as_str())
+        } else {
+            stream_type
+        }
+    }
 }
 
 /// parsed sql
@@ -1175,5 +1221,12 @@ mod tests {
             let actual = Sql::new(sql).unwrap().fields;
             assert_eq!(actual, fields);
         }
+    }
+
+    #[test]
+    fn test_resolve_stream_names_with_type() {
+        let sql = "select * from \"log\".default";
+        let names = resolve_stream_names_with_type(sql).unwrap();
+        println!("{:?}", names);
     }
 }

@@ -227,6 +227,17 @@ pub struct ResponseTook {
     pub nodes: Vec<ResponseNodeTook>,
 }
 
+impl ResponseTook {
+    pub fn add(&mut self, other: &ResponseTook) {
+        self.total += other.total;
+        self.idx_took += other.idx_took;
+        self.wait_queue += other.wait_queue;
+        self.cluster_total += other.cluster_total;
+        self.cluster_wait_queue += other.cluster_wait_queue;
+        self.nodes.extend(other.nodes.clone());
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, Default, ToSchema)]
 pub struct ResponseNodeTook {
     pub node: String,
@@ -377,6 +388,21 @@ impl SearchPartitionRequest {
         }
         self.encoding = RequestEncoding::Empty;
         Ok(())
+    }
+}
+
+impl From<&Request> for SearchPartitionRequest {
+    fn from(req: &Request) -> Self {
+        SearchPartitionRequest {
+            sql: req.query.sql.clone(),
+            start_time: req.query.start_time,
+            end_time: req.query.end_time,
+            encoding: req.encoding,
+            regions: req.regions.clone(),
+            clusters: req.clusters.clone(),
+            query_fn: req.query.query_fn.clone(),
+            streaming_output: req.query.streaming_output,
+        }
     }
 }
 
@@ -697,6 +723,7 @@ pub enum SearchEventType {
     Other,
     RUM,
     DerivedStream,
+    SearchJob,
 }
 
 impl<'de> Deserialize<'de> for SearchEventType {
@@ -736,6 +763,7 @@ impl std::fmt::Display for SearchEventType {
             SearchEventType::Other => write!(f, "other"),
             SearchEventType::RUM => write!(f, "rum"),
             SearchEventType::DerivedStream => write!(f, "derived_stream"),
+            SearchEventType::SearchJob => write!(f, "search_job"),
         }
     }
 }
@@ -753,8 +781,9 @@ impl FromStr for SearchEventType {
             "other" => Ok(SearchEventType::Other),
             "rum" => Ok(SearchEventType::RUM),
             "derived_stream" | "derivedstream" => Ok(SearchEventType::DerivedStream),
+            "search_job" | "searchjob" => Ok(SearchEventType::SearchJob),
             _ => Err(format!(
-                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`"
+                "invalid SearchEventType `{s}`, expected one of `ui`, `dashboards`, `reports`, `alerts`, `values`, `other`, `rum`, `derived_stream`, `search_job`"
             )),
         }
     }

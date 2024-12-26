@@ -748,13 +748,13 @@ pub struct Common {
     pub inverted_index_old_format: bool,
     #[env_config(
         name = "ZO_INVERTED_INDEX_STORE_FORMAT",
-        default = "parquet",
+        default = "tantivy",
         help = "InvertedIndex store format, parquet(default), tantivy, both"
     )]
     pub inverted_index_store_format: String,
     #[env_config(
         name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
-        default = "",
+        default = "tantivy",
         help = "InvertedIndex search format, parquet(default), tantivy."
     )]
     pub inverted_index_search_format: String,
@@ -1010,6 +1010,24 @@ pub struct Limit {
     pub scheduler_clean_interval: i64,
     #[env_config(name = "ZO_SCHEDULER_WATCH_INTERVAL", default = 30)] // seconds
     pub scheduler_watch_interval: i64,
+    #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
+    pub search_job_workers: i64,
+    #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds
+    pub search_job_scheduler_interval: i64,
+    #[env_config(
+        name = "ZO_SEARCH_JOB_RUM_TIMEOUT",
+        default = 600, // seconds
+        help = "Timeout for update check"
+    )]
+    pub search_job_run_timeout: i64,
+    #[env_config(name = "ZO_SEARCH_JOB_DELETE_INTERVAL", default = 600)] // seconds
+    pub search_job_delete_interval: i64,
+    #[env_config(
+        name = "ZO_SEARCH_JOB_TIMEOUT",
+        default = 36000, // seconds
+        help = "Timeout for query"
+    )]
+    pub search_job_timeout: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
     #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]

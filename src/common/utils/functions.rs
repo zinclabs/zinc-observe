@@ -69,6 +69,24 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
             Box::new(GEOIP_ASN_TABLE.read().as_ref().unwrap().clone()),
         );
     }
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .common
+        .enable_enterprise_mmdb
+    {
+        tables.insert(
+            o2_enterprise::enterprise::common::infra::config::GEO_IP_ENTERPRISE_ENRICHMENT_TABLE
+                .to_owned(),
+            Box::new(
+                crate::common::infra::config::GEOIP_ENT_TABLE
+                    .read()
+                    .as_ref()
+                    .unwrap()
+                    .clone(),
+            ),
+        );
+    };
+
     registry.load(tables);
     let mut config = vrl::compiler::CompileConfig::default();
     config.set_custom(registry);

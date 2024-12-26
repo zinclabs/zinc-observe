@@ -58,6 +58,7 @@ rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 segment.workspace = true
+sha256.workspace = true
 sqlparser.workspace = true
 sqlx.workspace = true
 svix-ksuid.workspace = true

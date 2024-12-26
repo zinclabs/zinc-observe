@@ -46,7 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               '-' +
               searchObj.data.resultGrid.currentPage
             "
-            :max="Math.max(1, getPaginations.length || 0)"
+            :max="
+              Math.max(
+                1,
+                searchObj.data.queryResults?.partitionDetail?.paginations
+                  ?.length || 0,
+              )
+            "
             :input="false"
             direction-links
             :boundary-numbers="false"
@@ -150,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close-column="closeColumn"
         @click:data-row="openLogDetails"
         @expand-row="expandLog"
+        @view-trace="redirectToTraces"
       />
 
       <q-dialog
@@ -163,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @before-hide="reDrawChart"
       >
         <DetailTable
+          v-if="searchObj.data.queryResults?.hits?.length"
           :key="
             'dialog_' + searchObj.meta.resultGrid.navigation.currentRowIndex
           "
@@ -306,7 +314,12 @@ export default defineComponent({
         this.$emit("update:recordsPerPage");
         this.scrollTableToTop(0);
       } else if (actionType == "pageChange") {
-        if (this.pageNumberInput > Math.ceil(this.getPaginations.length)) {
+        if (
+          this.pageNumberInput >
+          Math.ceil(
+            this.searchObj.data.queryResults.partitionDetail.paginations.length,
+          )
+        ) {
           this.$q.notify({
             type: "negative",
             message:

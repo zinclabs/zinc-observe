@@ -1,11 +1,11 @@
 use config::{
     get_config,
-    meta::{cluster::get_internal_grpc_token, search, stream::StreamType},
+    meta::{cluster::NodeInfo, search, stream::StreamType},
     utils::json,
 };
 use infra::errors::{Error, ErrorCodes};
 use proto::cluster_rpc;
-use rand::{seq::SliceRandom, thread_rng};
+use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
 use tracing::{info_span, Instrument};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -36,7 +36,7 @@ pub async fn grpc_search(
     };
     // sort nodes by node_id this will improve hit cache ratio
     nodes.dedup_by(|a, b| a.grpc_addr == b.grpc_addr);
-    let mut rng = thread_rng();
+    let mut rng = StdRng::from_entropy();
     let node = nodes.choose(&mut rng).unwrap().clone();
 
     // make cluster request
@@ -70,7 +70,8 @@ pub async fn grpc_search(
                 )
             });
 
-            let token: MetadataValue<_> = get_internal_grpc_token()
+            let token: MetadataValue<_> = node
+                .get_auth_token()
                 .parse()
                 .map_err(|_| Error::Message("invalid token".to_string()))?;
             let channel = get_cached_channel(&node_addr).await.map_err(|err| {

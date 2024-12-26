@@ -4,6 +4,7 @@ use config::{
     meta::{cluster::NodeInfo, inverted_index::InvertedIndexOptimizeMode, stream::FileKey},
     utils::json,
 };
+use datafusion::common::TableReference;
 use hashbrown::HashMap;
 use proto::cluster_rpc::{
     IdxFileName, IndexInfo, KvItem, QueryIdentifier, SearchInfo, SuperClusterInfo,
@@ -17,9 +18,9 @@ use crate::service::search::{
 pub struct RemoteScanNodes {
     pub req: Request,
     pub nodes: Vec<Arc<dyn NodeInfo>>,
-    pub file_id_lists: HashMap<String, Vec<Vec<i64>>>,
+    pub file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
     pub idx_file_list: Vec<FileKey>,
-    pub equal_keys: HashMap<String, Vec<KvItem>>,
+    pub equal_keys: HashMap<TableReference, Vec<KvItem>>,
     pub match_all_keys: Vec<String>,
     pub index_condition: Option<IndexCondition>,
     pub index_optimize_mode: Option<InvertedIndexOptimizeMode>,
@@ -32,9 +33,9 @@ impl RemoteScanNodes {
     pub fn new(
         req: Request,
         nodes: Vec<Arc<dyn NodeInfo>>,
-        file_id_lists: HashMap<String, Vec<Vec<i64>>>,
+        file_id_lists: HashMap<TableReference, Vec<Vec<i64>>>,
         idx_file_list: Vec<FileKey>,
-        equal_keys: HashMap<String, Vec<KvItem>>,
+        equal_keys: HashMap<TableReference, Vec<KvItem>>,
         match_all_keys: Vec<String>,
         index_condition: Option<IndexCondition>,
         index_optimize_mode: Option<InvertedIndexOptimizeMode>,
@@ -55,7 +56,7 @@ impl RemoteScanNodes {
         }
     }
 
-    pub fn get_remote_node(&self, table_name: &str) -> RemoteScanNode {
+    pub fn get_remote_node(&self, table_name: &TableReference) -> RemoteScanNode {
         let query_identifier = QueryIdentifier {
             trace_id: self.req.trace_id.clone(),
             org_id: self.req.org_id.clone(),

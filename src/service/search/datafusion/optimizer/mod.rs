@@ -57,10 +57,9 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     let offset = sql.offset as usize;
     let (start_time, end_time) = sql.time_range.unwrap();
 
-    // get full text search fields
-
     let mut rules: Vec<Arc<dyn OptimizerRule + Send + Sync>> = Vec::with_capacity(64);
 
+    // get full text search fields
     if sql.match_items.is_some() && sql.stream_names.len() == 1 {
         let mut fields = Vec::new();
         let stream_name = &sql.stream_names[0];

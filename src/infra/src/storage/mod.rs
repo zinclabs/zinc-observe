@@ -117,7 +117,11 @@ pub async fn del(files: &[&str]) -> object_store::Result<()> {
                     log::debug!("Deleted object: {}", file);
                 }
                 Err(e) => {
-                    if !is_local_disk_storage() {
+                    // TODO: need a better solution for identifying the error
+                    if file.ends_with(".result.json") {
+                        // ignore search job file deletion error
+                        log::debug!("Failed to delete object: {}, error: {:?}", file, e);
+                    } else if !is_local_disk_storage() {
                         log::error!("Failed to delete object: {:?}", e);
                     }
                 }
