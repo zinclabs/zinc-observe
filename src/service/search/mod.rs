@@ -53,12 +53,8 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::grpc::get_cached_channel,
-    config::meta::cluster::get_internal_grpc_token,
-    o2_enterprise::enterprise::search::TaskStatus,
-    o2_enterprise::enterprise::search::WorkGroup,
-    std::collections::HashSet,
-    tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request},
+    crate::service::grpc::make_grpc_search_client, o2_enterprise::enterprise::search::TaskStatus,
+    o2_enterprise::enterprise::search::WorkGroup, std::collections::HashSet, std::str::FromStr,
     tracing::info_span,
 };
 
@@ -775,8 +771,6 @@ pub async fn search_partition(
 #[cfg(feature = "enterprise")]
 pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     // get nodes from cluster
-
-    use std::str::FromStr;
     let mut nodes = match infra_cluster::get_cached_online_query_nodes(None).await {
         Some(nodes) => nodes,
         None => {
@@ -800,46 +794,15 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
 
         let task = tokio::task::spawn(
             async move {
-                let cfg = get_config();
                 let mut request = tonic::Request::new(proto::cluster_rpc::QueryStatusRequest {});
-                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-
-                opentelemetry::global::get_text_map_propagator(|propagator| {
-                    propagator.inject_context(
-                        &tracing::Span::current().context(),
-                        &mut MetadataMap(request.metadata_mut()),
-                    )
-                });
-
-                let token: MetadataValue<_> = get_internal_grpc_token()
-                    .parse()
-                    .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
-                    log::error!(
-                        "search->grpc: node: {}, connect err: {:?}",
-                        &node.grpc_addr,
-                        err
-                    );
-                    server_internal_error("connect search node error")
-                })?;
-                let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
-                    channel,
-                    move |mut req: Request<()>| {
-                        req.metadata_mut().insert("authorization", token.clone());
-                        Ok(req)
-                    },
-                );
-                client = client
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+                let node = Arc::new(node) as _;
+                let mut client = make_grpc_search_client(&mut request, &node).await?;
                 let response = match client.query_status(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
                         log::error!(
                             "search->grpc: node: {}, search err: {:?}",
-                            &node.grpc_addr,
+                            &node.get_grpc_addr(),
                             err
                         );
                         if err.code() == tonic::Code::Internal {
@@ -963,47 +926,17 @@ pub async fn cancel_query(
         let trace_id = trace_id.to_string();
         let task = tokio::task::spawn(
             async move {
-                let cfg = get_config();
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::CancelQueryRequest { trace_id });
-                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-                opentelemetry::global::get_text_map_propagator(|propagator| {
-                    propagator.inject_context(
-                        &tracing::Span::current().context(),
-                        &mut MetadataMap(request.metadata_mut()),
-                    )
-                });
-
-                let token: MetadataValue<_> = get_internal_grpc_token()
-                    .parse()
-                    .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = get_cached_channel(&node_addr).await.map_err(|err| {
-                    log::error!(
-                        "grpc_cancel_query: node: {}, connect err: {:?}",
-                        &node.grpc_addr,
-                        err
-                    );
-                    server_internal_error("connect search node error")
-                })?;
-                let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
-                    channel,
-                    move |mut req: Request<()>| {
-                        req.metadata_mut().insert("authorization", token.clone());
-                        Ok(req)
-                    },
-                );
-                client = client
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+                let node = Arc::new(node) as _;
+                let mut client = make_grpc_search_client(&mut request, &node).await?;
                 let response: cluster_rpc::CancelQueryResponse =
                     match client.cancel_query(request).await {
                         Ok(res) => res.into_inner(),
                         Err(err) => {
                             log::error!(
                                 "grpc_cancel_query: node: {}, search err: {:?}",
-                                &node.grpc_addr,
+                                &node.get_grpc_addr(),
                                 err
                             );
                             if err.code() == tonic::Code::Internal {

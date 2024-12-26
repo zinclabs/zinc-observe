@@ -33,15 +33,12 @@ use o2_enterprise::enterprise::{
         search::{get_cluster_node_by_name, get_cluster_nodes},
     },
 };
-use proto::cluster_rpc;
 use tokio::sync::mpsc;
-use tonic::{codec::CompressionEncoding, metadata::MetadataValue, Request};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+use super::grpc::make_grpc_search_client;
 use crate::service::{
     db::search_job::{search_job_partitions::*, search_job_results::*, search_jobs::*},
-    grpc::get_cached_channel,
-    search::{self as SearchService, grpc_search::grpc_search, MetadataMap},
+    search::grpc_search::{grpc_search, grpc_search_partition},
 };
 
 // 1. get the oldest job from `search_jobs` table
@@ -165,7 +162,7 @@ async fn handle_search_partition(job: &Job) -> Result<(), anyhow::Error> {
     let stream_type = StreamType::from(job.stream_type.as_str());
     let req: search::Request = json::from_str(&job.payload)?;
     let partition_req = SearchPartitionRequest::from(&req);
-    let res = SearchService::search_partition(
+    let res = grpc_search_partition(
         &job.trace_id,
         &job.org_id,
         stream_type,
@@ -430,7 +427,6 @@ async fn merge_response(
 
 // get the response in this cluster or other cluster
 pub async fn get_result(path: &str, cluster: &str) -> Result<Response, anyhow::Error> {
-    let cfg = config::get_config();
     if *cluster == config::get_cluster_name() {
         let buf = storage::get(path).await?;
         let res: Response = json::from_slice::<Response>(&buf)?;
@@ -443,41 +439,7 @@ pub async fn get_result(path: &str, cluster: &str) -> Result<Response, anyhow::E
         let path = path.to_string();
         let task = tokio::task::spawn(async move {
             let mut request = tonic::Request::new(proto::cluster_rpc::GetResultRequest { path });
-            request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-
-            opentelemetry::global::get_text_map_propagator(|propagator| {
-                propagator.inject_context(
-                    &tracing::Span::current().context(),
-                    &mut MetadataMap(request.metadata_mut()),
-                )
-            });
-
-            let token: MetadataValue<_> = node
-                .get_auth_token()
-                .parse()
-                .map_err(|_| Error::Message("invalid token".to_string()))?;
-            let channel = get_cached_channel(&node.get_grpc_addr())
-                .await
-                .map_err(|err| {
-                    log::error!(
-                        "search->grpc: node: {}, connect err: {:?}",
-                        &node.get_grpc_addr(),
-                        err
-                    );
-                    Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string()))
-                })?;
-            let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
-                channel,
-                move |mut req: Request<()>| {
-                    req.metadata_mut().insert("authorization", token.clone());
-                    Ok(req)
-                },
-            );
-            client = client
-                .send_compressed(CompressionEncoding::Gzip)
-                .accept_compressed(CompressionEncoding::Gzip)
-                .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-                .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+            let mut client = make_grpc_search_client(&mut request, &node).await?;
             let response = match client.get_result(request).await {
                 Ok(res) => res.into_inner(),
                 Err(err) => {
@@ -526,44 +488,9 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
             }
             let paths = paths.clone();
             let task = tokio::task::spawn(async move {
-                let cfg = config::get_config();
                 let mut request =
                     tonic::Request::new(proto::cluster_rpc::DeleteResultRequest { paths });
-                request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-
-                opentelemetry::global::get_text_map_propagator(|propagator| {
-                    propagator.inject_context(
-                        &tracing::Span::current().context(),
-                        &mut MetadataMap(request.metadata_mut()),
-                    )
-                });
-
-                let token: MetadataValue<_> = node
-                    .get_auth_token()
-                    .parse()
-                    .map_err(|_| Error::Message("invalid token".to_string()))?;
-                let channel = get_cached_channel(&node.get_grpc_addr())
-                    .await
-                    .map_err(|err| {
-                        log::error!(
-                            "search->grpc: node: {}, connect err: {:?}",
-                            &node.get_grpc_addr(),
-                            err
-                        );
-                        Error::ErrorCode(ErrorCodes::ServerInternalError(err.to_string()))
-                    })?;
-                let mut client = cluster_rpc::search_client::SearchClient::with_interceptor(
-                    channel,
-                    move |mut req: Request<()>| {
-                        req.metadata_mut().insert("authorization", token.clone());
-                        Ok(req)
-                    },
-                );
-                client = client
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip)
-                    .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-                    .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+                let mut client = make_grpc_search_client(&mut request, &node).await?;
                 let response = match client.delete_result(request).await {
                     Ok(res) => res.into_inner(),
                     Err(err) => {
