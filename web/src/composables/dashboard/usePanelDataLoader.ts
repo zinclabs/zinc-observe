@@ -77,6 +77,13 @@ export const usePanelDataLoader = (
 
   const searchRetriesCount = ref<{ [key: string]: number }>({});
 
+  // Add cleanup function
+  const cleanupSearchRetries = (traceId: string) => {
+    if (searchRetriesCount.value[traceId]) {
+      delete searchRetriesCount.value[traceId];
+    }
+  };
+
   const {
     fetchQueryDataWithWebSocket,
     sendSearchMessageBasedOnRequestId,
@@ -607,8 +614,6 @@ export const usePanelDataLoader = (
   };
 
   const sendSearchMessage = async (requestId: string, payload: any) => {
-    console.log("send search message through ws");
-
     // check if query is already canceled, if it is, close the socket
     if (state.isOperationCancelled) {
       closeSocketBasedOnRequestId(requestId);
@@ -666,6 +671,8 @@ export const usePanelDataLoader = (
         addRequestId(requestId, payload.traceId);
         return;
       } else {
+        // remove current traceId
+        cleanupSearchRetries(payload?.traceId);
         handleSearchError(requestId, payload, {
           content: {
             message:
@@ -682,6 +689,9 @@ export const usePanelDataLoader = (
       processApiError(response?.content, "sql");
     }
 
+    // remove current traceId
+    cleanupSearchRetries(payload?.traceId);
+
     // set loading to false
     state.loading = false;
     state.isOperationCancelled = false;
@@ -693,6 +703,8 @@ export const usePanelDataLoader = (
     response: any,
   ) => {
     removeRequestId(requestId);
+
+    cleanupSearchRetries(payload?.traceId);
 
     // set loading to false
     state.loading = false;
@@ -1823,7 +1835,6 @@ export const usePanelDataLoader = (
   };
 
   onMounted(async () => {
-    console.log("report", reportId.value);
     observer = new IntersectionObserver(handleIntersection, {
       root: null,
       rootMargin: "0px",
