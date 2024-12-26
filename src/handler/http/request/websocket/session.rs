@@ -235,6 +235,7 @@ pub async fn handle_text_message(
 
                                 let err_msg =
                                     format!("[trace_id: {}, error: {}]", search_req.trace_id, &e);
+                                #[allow(unused_variables)]
                                 let close_reason = Some(CloseReason {
                                     code: CloseCode::Error,
                                     // sending the original error for audit

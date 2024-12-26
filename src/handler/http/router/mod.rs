@@ -500,7 +500,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(service_accounts::delete)
         .service(service_accounts::update)
         .service(service_accounts::get_api_token)
-            .service(websocket::websocket);
+        .service(websocket::websocket);
 
     #[cfg(feature = "enterprise")]
     let service = service

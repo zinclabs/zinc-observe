@@ -716,6 +716,7 @@ async fn get_partitions(
         org_id,
         req.stream_type,
         &search_partition_req,
+        false,
     )
     .instrument(tracing::info_span!(
         "src::handler::http::request::websocket::search::get_partitions"
