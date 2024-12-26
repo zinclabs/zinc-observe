@@ -813,6 +813,9 @@ async fn do_partitioned_search(
             max_query_range
         );
     }
+    // for new_start_time & new_end_time
+    let modified_start_time = req.payload.query.start_time;
+    let modified_end_time = req.payload.query.end_time;
 
     let partition_resp = get_partitions(req, org_id).await?;
     let mut partitions = partition_resp.partitions;
@@ -875,8 +878,8 @@ async fn do_partitioned_search(
                 } else {
                     format!("{} \n {}", range_error, search_res.function_error)
                 };
-                search_res.new_start_time = Some(req.payload.query.start_time);
-                search_res.new_end_time = Some(req.payload.query.end_time);
+                search_res.new_start_time = Some(modified_start_time);
+                search_res.new_end_time = Some(modified_end_time);
             }
 
             // Accumulate the result
