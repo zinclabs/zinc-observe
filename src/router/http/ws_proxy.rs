@@ -51,7 +51,7 @@ pub async fn ws_proxy(
 
     // Connect to the backend WebSocket service
     let (backend_ws_stream, _) = connect_async(ws_req).await.map_err(|e| {
-        log::info!(
+        log::error!(
             "[WS_PROXY] Node Role: {} Failed to connect to backend WebSocket service, error: {:?}",
             node_role,
             e
@@ -238,7 +238,6 @@ pub fn convert_actix_to_tungstenite_request(
         .uri(uri);
 
     for (key, value) in headers.iter() {
-        println!("{}: {:?}", key, value);
         request_builder = request_builder.header(key, value);
     }
 

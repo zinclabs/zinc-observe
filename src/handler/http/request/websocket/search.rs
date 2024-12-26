@@ -648,9 +648,9 @@ async fn process_delta(
                 trace_id
             );
             let (new_start_time, new_end_time) = (
-                original_req_end_time - cache_req_duration,
-                original_req_end_time,
-            );
+                    original_req_end_time - cache_req_duration,
+                    original_req_end_time,
+                );
             // passs original start_time and end_time partition end time
             let _ = send_partial_search_resp(
                 req_id,

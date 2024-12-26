@@ -39,7 +39,7 @@ use crate::service::self_reporting::audit;
 // Global cancellation registry for search requests by `trace_id`
 pub static CANCELLATION_FLAGS: Lazy<DashMap<String, bool>> = Lazy::new(DashMap::new);
 
-#[derive(Clone)]
+// Do not clone the session, instead use a reference to the session
 pub struct WsSession {
     inner: Option<Session>,
 }
@@ -93,7 +93,7 @@ pub async fn run(
                 match msg {
                     Ok(actix_ws::Message::Ping(bytes)) => {
                         let mut session = if let Some(session) =
-                                    sessions_cache_utils::get_session(&req_id)
+                                    sessions_cache_utils::get_mut_session(&req_id)
                                 {
                                     session
                                 } else {
@@ -344,7 +344,7 @@ pub async fn handle_text_message(
                 code: CloseCode::Error,
                 description: Some(format!("[req_id {}] Request Error", req_id)),
             });
-            let mut session = if let Some(session) = sessions_cache_utils::get_session(req_id) {
+            let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
                 session
             } else {
                 log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
@@ -356,7 +356,7 @@ pub async fn handle_text_message(
 }
 
 pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
-    let mut session = if let Some(session) = sessions_cache_utils::get_session(req_id) {
+    let mut session = if let Some(session) = sessions_cache_utils::get_mut_session(req_id) {
         session
     } else {
         log::error!("[WS_HANDLER]: req_id: {} session not found", req_id);
@@ -372,7 +372,7 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
 }
 
 async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
-    if let Some(mut session) = sessions_cache_utils::get_session(req_id) {
+    if let Some(mut session) = sessions_cache_utils::get_mut_session(req_id) {
         if let Some(reason) = &close_reason {
             log::info!(
                 "[WS_HANDLER]: req_id: {} Closing session with reason: {:?}",

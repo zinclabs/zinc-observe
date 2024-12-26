@@ -103,7 +103,7 @@ pub mod sessions_cache_utils {
     }
 
     // Return a mutable reference to the session
-    pub fn get_session(
+    pub fn get_mut_session(
         session_id: &str,
     ) -> Option<dashmap::mapref::one::RefMut<'_, String, WsSession>> {
         WS_SESSIONS.get_mut(session_id)
