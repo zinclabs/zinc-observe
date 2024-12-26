@@ -75,28 +75,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: calc(95vw - 20px); height: 100%"
         >
           <template #before>
-            <div v-if="activeTab == 'import_json_clipboard'" class="editor-container">
-
-              <q-form class="q-mx-md q-mt-md" @submit="onSubmit"> 
-                    <query-editor
-                          data-test="scheduled-alert-sql-editor"
-                          ref="queryEditorRef"
-                          editor-id="alerts-query-editor"
-                          class="monaco-editor"
-                          :debounceTime="300"
-                          v-model:query="jsonStr"
-                          language="json"
-                          :class="
-                            jsonStr == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
-                          "
-                          @focus="queryEditorPlaceholderFlag = false"
-                          @blur="queryEditorPlaceholderFlag = true"
-                        />
-
-                <div>
-                </div>
-              </q-form>
-            </div>
             <div v-if="activeTab == 'import_json_url'" class="editor-container-url">
               <q-form class="q-mx-md q-mt-md" @submit="onSubmit"> 
                 <div style="width: 100%" class="q-mb-md">
@@ -422,17 +400,13 @@ export default defineComponent({
     const tabs = reactive ([
 
 {
-    label: "File Upload",
+    label: "File Upload / JSON",
     value: "import_json_file",
 },
 {
     label: "URL Import",
     value: "import_json_url",
-},
-{
-    label: "JSON Clipboard",
-    value: "import_json_clipboard",
-},
+}
 
 
     ]);
@@ -500,53 +474,15 @@ export default defineComponent({
     }
 
     const processJsonObject = async (jsonObj: any,index: number) => {
-  // Step 1: Validate Template
-  // await validateTemplateInputs(jsonObj.templatePayload,index);
 
-  // Step 2: Validate All Destinations Sequentially
-  // for (const [destinationIndex, destination] of jsonObj.destinationPayload.entries()) {
-  //   await validateDestinationInputs(destination, destinationIndex, jsonObj.alertPayload.destinations, jsonObj.templatePayload.name,index);
-  // }
-
-  // Step 3: Validate Alert
   const isValidAlert = await validateAlertInputs(jsonObj,index);
   if (!isValidAlert) {
     return;
   }
 
-  // Step 4: Check if there are no errors before proceeding
   if (alertErrorsToDisplay.value.length === 0 ) {
 
-    // Step 5: Create Template
-    // const hasCreatedTemplate = await createTemplate(jsonObj.templatePayload,index);
-    // if (!hasCreatedTemplate) {
-    //   return;
-    // }
-
-    // Step 6: Create Destinations
-    // const results = await Promise.all(
-    //   jsonObj.destinationPayload.map((destination: any) => createDestination(destination,index))
-    // );
-
-    // // Check if all results are successful
-    // const allSuccessful = results.every(result => result === true);
-
-    // if (!allSuccessful && !hasRolledBack) {
-    //   // Step 7: Rollback Destinations if Creation Failed
-    //   for (const [destinationIndex, destination] of jsonObj.destinationPayload.entries()) {
-    //     await rollbackDestination(destination.name,  index, destinationIndex+1);
-    //   }
-
-
-      // Step 8: Rollback Template
-      // await rollbackTemplate(jsonObj.templatePayload.name,index);
-
-    //   hasRolledBack = true;
-    //   return; // Exit after rollback
-    // }
-
-    // Step 9: Create Alert if No Rollback
-    // if (!hasRolledBack) {
+  
       const hasCreatedAlert = await createAlert(jsonObj,index);
 
       if(hasCreatedAlert) {
@@ -563,20 +499,6 @@ export default defineComponent({
             }
           })
       }
-
-      // if (!hasCreatedAlert) {
-      //   // Step 10: Rollback Destinations if Alert Creation Failed
-      //   for (const [destinationIndex, destination] of jsonObj.destinationPayload.entries()) {
-      //   await rollbackDestination(destination.name,  index, destinationIndex+1);
-      // }
-
-      //   // Step 11: Rollback Template
-      //   await rollbackTemplate(jsonObj.templatePayload.name,index);
-
-      //   hasRolledBack = true;
-      //   return; // Exit after rollback
-      // }
-    // }
   }
 };
 
@@ -738,133 +660,11 @@ export default defineComponent({
 
       return true;
     };
-    const validateTemplateInputs = async (input: any, index: any) => {
-      let templateErrors: string[] = [];
-
-      // Validate name: should be a non-empty string
-      if (!input.name || typeof input.name !== 'string' || input.name.trim() === '') {
-        templateErrors.push(`Template - ${index}: The "name" field is required and should be a valid string.`);
-      }
-
-      // Validate body: should be a non-empty string
-      if (!input.body || typeof input.body !== 'string' || input.body.trim() === '') {
-        templateErrors.push(`Template - ${index}: The "body" field is required and should be a valid string.`);
-      }
-
-      // Validate type: should be either "email" or "http"
-      if (!input.type || (input.type !== 'email' && input.type !== 'http')) {
-        templateErrors.push(`Template - ${index}: The "type" field must be either "email" or "http".`);
-      }
-
-      // Validate title based on type
-      if (input.type === 'email') {
-        // For email type, title should be a non-empty string
-        if (!input.title || typeof input.title !== 'string' || input.title.trim() === '') {
-          templateErrors.push(`Template - ${index}: The "title" field is required and should be a non-empty string for "email" type.`);
-        }
-      } else if (input.type === 'http') {
-        // For http type, title should be empty
-        if (input.title && input.title.trim() !== '') {
-          templateErrors.push(`Template - ${index}: The "title" field should be empty for "http" type.`);
-        }
-      }
-
-      if (checkTemplatesInList(props.templates, input.name)) {
-        templateErrors.push(`Template - ${index}: "${input.name}" already exists`);
-      }
-
-      // If there are errors, log them at the end
-      if (templateErrors.length > 0) {
-        alertErrorsToDisplay.value.push(templateErrors);
-        return false;
-      }
-
-      // If all validations pass
-      return true;
-    };
-    const validateDestinationInputs = async (input: any, destinationIndex: number, destinationList: any, templateName: any, index: any) => {  
-        let destinationErrors: string[] = [];
-
-        // Check if 'url' is required for webhook and should not exist for email
-        if (!input.hasOwnProperty('type') && !input.url) {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'url' is required for webhook`);
-        }
-
-        if (input.type === 'email' && input.url) {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'url' should not be provided for email`);
-        }
-
-        // Check type for email and it should be present only for email
-        if (input.type !== 'email' && input.hasOwnProperty('type')) {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'type' should be email for email`);
-        }
-
-        // Check if 'method' is required for both webhook and email
-        if (!input.method || (input.method !== 'post' && input.method !== 'get' && input.method !== 'put')) {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'method' is required and should be either 'post', 'get', or 'put'`);
-        }
-
-        // Check if 'skip_tls_verify' is required for both webhook and email, and it should be a boolean
-        if (input.skip_tls_verify === undefined || typeof input.skip_tls_verify !== 'boolean') {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'skip_tls_verify' is required and should be a boolean value`);
-        }
-
-        // Check if 'headers' is required for webhook but not for email
-        if (!input.hasOwnProperty('type') && Object.keys(input.headers).length === 0) {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'headers' is required for webhook`);
-        }
-
-        if (input.type === 'email' && Object.keys(input.headers).length !== 0) {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'headers' should not be provided for email`);
-        }
-
-        // Check if 'name' is required for both webhook and email
-        if (!input.name || typeof input.name !== 'string') {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'name' is required and should be a string`);
-        }
-
-        // 'emails' should be required for email type and should be an array of strings
-        if (input.type === 'email') {
-          if (!Array.isArray(input.emails) || input.emails.some((email: any) => typeof email !== 'string')) {
-            destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'emails' should be an array of strings for email`);
-          }
-        }
-
-        // Check if 'template' is required for both webhook and email
-        if (!input.template || typeof input.template !== 'string') {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'template' is required and should be a string`);
-        }
-
-        if (!destinationList.includes(input.name)) {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'name' should match one of the destinations provided in the alert`);
-        }
-
-        if (input.template !== templateName) {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: 'template' should match the template name provided in the template`);
-        }
-
-        if (checkDestinationInList(props.destinations, input.name)) {
-          destinationErrors.push(`Destination - ${index} ---> [${destinationIndex + 1}]: "${input.name}" already exists`);
-        }
-
-        // Log all destination errors at the end if any exist
-        if (destinationErrors.length > 0) {
-          alertErrorsToDisplay.value.push(destinationErrors);
-          return false;
-      }
-
-  // If all validations pass
-  return true;
-    };
 
 
     const checkDestinationInList = (destinations, destinationName) =>{
       const destinationsList = destinations.map(destination => destination.name);
       return destinationsList.includes(destinationName);
-    }
-    const checkTemplatesInList = (templates, templateName) =>{
-      const templatesList = templates.map(template => template.name);
-      return templatesList.includes(templateName);
     }
 
     const checkAlertsInList = (alerts, alertName) =>{
@@ -873,65 +673,6 @@ export default defineComponent({
       return alertsList.includes(alertName);
     }
 
-
-    const createTemplate = async (input: any,index: any) => {
-      try {
-        // Await the template creation service call
-        await templateService.create({
-          org_identifier: store.state.selectedOrganization.identifier,
-          template_name: input.name,
-          data: {
-            name: input.name.trim(),
-            body: input.body,
-            type: input.type,
-            title: input.title,
-          },
-        });
-
-    // Success block
-    alertCreators.value.push({
-      message: `Template - ${index}: "${input.name}" created successfully`,
-      success: true,
-    });
-    emit("update:templates");
-    return true; // Return true for success
-  } catch (error) {
-    // Error block
-    alertCreators.value.push({
-      message: `Template - ${index}: "${input.name}" creation failed`,
-      success: false,
-    });
-    return false; // Return false for failure
-  }
-}
-
-
-    const createDestination = async (input: any,index: any) => {
-      try {
-        // Await the destination creation service call
-        await destinationService.create({
-          org_identifier: store.state.selectedOrganization.identifier,
-          destination_name: input.name,
-          data: input,
-        });
-
-        // Success block
-        alertCreators.value.push({
-          message: `Destination - ${index}: "${input.name}" created successfully`,
-          success: true,
-        });
-        emit("update:destinations");
-        return true; // Return true for success
-      } catch (error) {
-        // Error block
-        console.log(error, "error");
-        alertCreators.value.push({
-          message: `Destination - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
-          success: false,
-        });
-        return false; // Return false for failure
-      }
-    }
 
 
     const createAlert = async (input: any,index: any) => {
@@ -960,61 +701,6 @@ export default defineComponent({
       }
     }
 
-
-    const rollbackTemplate = async (templateName: any,index: any) => {
-  try {
-    // Await the delete service call for template
-    await templateService.delete({
-      org_identifier: store.state.selectedOrganization.identifier,
-      template_name: templateName,
-    });
-
-    // Success block
-    alertCreators.value.push({
-      message: `Template - ${index}: "${templateName}" rolled back successfully`,
-      success: true,
-      rollback:true,
-    });
-    emit("update:templates");
-    return true; // Return true for success
-  } catch (error) {
-    // Error block
-    alertCreators.value.push({
-      message: `Template - ${index}: "${templateName}" roll back failed`,
-      success: false,
-      rollback:false,
-    });
-    return false; // Return false for failure
-  }
-}
-
-    const rollbackDestination = async (destinationName: any,index: any, destinationIndex: any) => {
-      try {
-        // Await the delete service call for destination
-        // if(checkDestinationInList(props.destinations,destinationName)){
-          await destinationService.delete({
-            org_identifier: store.state.selectedOrganization.identifier,
-            destination_name: destinationName,
-          });
-          alertCreators.value.push({
-          message: `Destination - ${index}: ---> [${destinationIndex}] "${destinationName}" rolled back successfully`,
-          success: true,
-          rollback:true
-        });
-        emit("update:destinations");
-        // }
-        // Success block
-        return true; // Return true for success
-      } catch (error) {
-        // Error block
-        alertCreators.value.push({
-          message: `Destination - ${index}: ---> [${destinationIndex}] "${destinationName}" roll back failed`,
-          success: false,
-          rollback:false,
-        });
-        return false; // Return false for failure
-      }
-    }
 
 
 
