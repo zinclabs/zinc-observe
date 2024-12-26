@@ -4628,13 +4628,13 @@ const useLogs = () => {
     return payload;
   };
 
-  const initializeWebSocketConnection = (payload: any) => {
+  const initializeWebSocketConnection = (payload: any): string => {
     return fetchQueryDataWithWebSocket(payload, {
       open: sendSearchMessage,
       close: handleSearchClose,
       error: handleSearchError,
       message: handleSearchResponse,
-    });
+    }) as string;
   };
 
   const sendSearchMessage = (requestId: string, queryReq: any) => {
@@ -4676,7 +4676,7 @@ const useLogs = () => {
   const handleSearchResponse = (
     requestId: string,
     payload: WebSocketSearchPayload,
-    response: WebSocketSearchResponse,
+    response: WebSocketSearchResponse | WebSocketErrorResponse,
   ) => {
     if (response.type === "search_response") {
       if (payload.type === "search") {
@@ -4695,16 +4695,16 @@ const useLogs = () => {
       if (payload.type === "pageCount") {
         handlePageCountResponse(payload.queryReq, payload.traceId, response);
       }
+    }
 
-      if (payload.type === "error") {
-        handleSearchError(requestId, payload.traceId, response);
-      }
+    if (response.type === "error") {
+      handleSearchError(requestId, payload.traceId, response);
+    }
 
-      if (payload.type === "cancel_response") {
-        searchObj.loading = false;
-        searchObj.loadingHistogram = false;
-        handleCancelQuery();
-      }
+    if (response.type === "cancel_response") {
+      searchObj.loading = false;
+      searchObj.loadingHistogram = false;
+      handleCancelQuery();
     }
   };
 
@@ -5107,6 +5107,7 @@ const useLogs = () => {
             code: response.code,
             error_detail: "",
           },
+          type: "error",
         });
       }
     }
@@ -5172,7 +5173,7 @@ const useLogs = () => {
   }): string => {
     let errorMsg = message || defaultMessage;
 
-    const customMessage = logsErrorMessage(code || "");
+    const customMessage = logsErrorMessage(code || 0);
     if (customMessage) {
       errorMsg = t(customMessage);
     }

@@ -40,7 +40,7 @@ export interface HistogramQueryPayload {
 }
 
 export interface WebSocketSearchResponse {
-  type: "search_response";
+  type: "search_response" | "cancel_response";
   content: {
     results: {
       hits: any[];
@@ -69,6 +69,7 @@ export interface ErrorContent {
   error_detail?: string;
 }
 
-interface WebSocketErrorResponse {
+export interface WebSocketErrorResponse {
   content: ErrorContent;
+  type: "error";
 }

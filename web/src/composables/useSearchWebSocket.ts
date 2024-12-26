@@ -53,6 +53,7 @@ const useSearchWebSocket = () => {
       console.error(
         `Error in fetching search data: ${error instanceof Error ? error.message : String(error)}`,
       );
+      return "";
     }
   };
 

@@ -661,7 +661,7 @@ export const usePanelDataLoader = (
           close: handleSearchClose,
           error: handleSearchError,
           message: handleSearchResponse,
-        });
+        }) as string;
 
         addRequestId(requestId, payload.traceId);
         return;
@@ -741,7 +741,7 @@ export const usePanelDataLoader = (
         close: handleSearchClose,
         error: handleSearchError,
         message: handleSearchResponse,
-      });
+      }) as string;
 
       addRequestId(requestId, traceId);
     } catch (e: any) {
