@@ -135,7 +135,6 @@ const removeHandler = (
 
 const closeSocket = (socketId: string) => {
   const socket = sockets[socketId];
-  console.log("close socket", socketId, socket.readyState);
   if (socket && socket.readyState === WebSocket.OPEN) {
     setTimeout(() => {
       sendMessage(socketId, JSON.stringify({ type: "close" }));

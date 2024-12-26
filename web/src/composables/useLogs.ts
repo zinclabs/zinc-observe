@@ -5214,6 +5214,8 @@ const useLogs = () => {
 
       totalPages = Math.ceil(total / rowsPerPage);
 
+      console.log("Total Pages", searchObj.data.queryResults.total, totalPages);
+
       for (let i = 0; i < totalPages; i++) {
         if (i + 1 > currentPage + 10) {
           break;

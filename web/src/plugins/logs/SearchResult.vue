@@ -49,8 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :max="
               Math.max(
                 1,
-                searchObj.data.queryResults?.partitionDetail?.paginations
-                  ?.length || 0,
+                (searchObj.communicationMethod === 'ws'
+                  ? searchObj.data.queryResults?.pagination?.length
+                  : searchObj.data.queryResults?.partitionDetail?.paginations
+                      ?.length) || 0,
               )
             "
             :input="false"
@@ -314,12 +316,13 @@ export default defineComponent({
         this.$emit("update:recordsPerPage");
         this.scrollTableToTop(0);
       } else if (actionType == "pageChange") {
-        if (
-          this.pageNumberInput >
-          Math.ceil(
-            this.searchObj.data.queryResults.partitionDetail.paginations.length,
-          )
-        ) {
+        const maxPages =
+          this.searchObj.communicationMethod === "ws"
+            ? this.searchObj.data.queryResults.pagination.length
+            : this.searchObj.data.queryResults.partitionDetail.paginations
+                .length;
+
+        if (this.pageNumberInput > Math.ceil(maxPages)) {
           this.$q.notify({
             type: "negative",
             message:
