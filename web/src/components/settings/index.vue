@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template v-slot:after>
         <div
-      style="position: absolute;  top: 10px; left: 0%; transform: translate(-50%, -50%); z-index: 90;"
+      style="position: absolute;  top: -5px; left: -16px; z-index: 90; "
     >
       <!-- Place the content you want in the middle here -->
       <q-btn
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dense
         size="20px"
         round
-        class="field-list-collapse-btn"
+        class="field-list-collapse-btn "
         :style="{
                       right: showManagementTabs ? '0px' : '-4px',
                     }"
