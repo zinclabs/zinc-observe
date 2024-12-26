@@ -553,21 +553,6 @@ export const usePanelDataLoader = (
   const handleHistogramResponse = async (payload: any, searchRes: any) => {
     // remove past error detail
     state.errorDetail = "";
-    // if there is an function error and which not related to stream range, throw error
-    // if (searchRes.data.function_error && searchRes.data.is_partial != true) {
-    //   // abort on unmount
-    //   if (abortControllerRef) {
-    //     // this will stop partition api call
-    //     abortControllerRef?.abort();
-    //   }
-    //   // throw error
-    //   throw new Error(`Function error: ${searchRes.data.function_error}`);
-    // }
-
-    // if the query is aborted or the response is partial, break the loop
-    // if (payload.abortControllerRef?.signal?.aborted) {
-    //   return;
-    // }
 
     // if order by is desc, append new partition response at end
     if (searchRes?.content?.results?.order_by?.toLowerCase() === "desc") {
