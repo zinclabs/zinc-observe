@@ -175,6 +175,7 @@ export default defineComponent({
     const settingsTab = ref("general");
     const { isMetaOrg } = useIsMetaOrg();
     const splitterModel = ref(250);
+    const storePreviousStoreModel  = ref(250);
 
     const handleSettingsRouting = () => {
       if (router.currentRoute.value.name === "settings") {
@@ -223,11 +224,14 @@ export default defineComponent({
     const showManagementTabs = ref(true);
     const controlManagementTabs = () => {
       if(showManagementTabs.value){
-      splitterModel.value = 0;
+        const prevVal = splitterModel.value;
+        storePreviousStoreModel.value = prevVal;
+        splitterModel.value = 0;
         showManagementTabs.value = false;
       }
       else{
-        splitterModel.value = 250;
+        splitterModel.value = storePreviousStoreModel.value || 250;
+        
         showManagementTabs.value = true;
       }
     }
