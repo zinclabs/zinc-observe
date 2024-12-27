@@ -23,12 +23,7 @@ const errorHandlers: Record<string, ErrorHandler[]> = {};
 
 const pingIntervals: Record<string, any> = {};
 
-const connect = (
-  socketId: string,
-  url: string,
-  interval: number = 5000,
-  maxAttempts: number = 10,
-) => {
+const connect = (socketId: string, url: string) => {
   if (!socketId?.trim()) {
     throw new Error("Invalid socketId");
   }
@@ -46,9 +41,7 @@ const connect = (
 
       socket.addEventListener("open", (event) => onOpen(socketId, event));
       socket.addEventListener("message", (event) => onMessage(socketId, event));
-      socket.addEventListener("close", (event) =>
-        onClose(socketId, event, interval, maxAttempts, createSocket),
-      );
+      socket.addEventListener("close", (event) => onClose(socketId, event));
     } catch (error) {
       console.error("Error in creating WebSocket", error);
     }
@@ -72,13 +65,7 @@ const onMessage = (socketId: string, event: MessageEvent) => {
   messageHandlers[socketId]?.forEach((handler) => handler(data));
 };
 
-const onClose = (
-  socketId: string,
-  event: CloseEvent,
-  interval: number,
-  maxAttempts: number,
-  reconnect: () => void,
-) => {
+const onClose = (socketId: string, event: CloseEvent) => {
   console.log("onClose", socketId, event.code, event.reason);
   clearInterval(pingIntervals[socketId]);
   delete pingIntervals[socketId];

@@ -87,7 +87,11 @@ const useSearchWebSocket = () => {
   };
 
   const closeSocketBasedOnRequestId = (requestId: string) => {
-    webSocket.closeSocket(requestId);
+    try {
+      webSocket.closeSocket(requestId);
+    } catch (error: any) {
+      console.error(`Failed to close socket ${requestId}:`, error);
+    }
   };
 
   return {

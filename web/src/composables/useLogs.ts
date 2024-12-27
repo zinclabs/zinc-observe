@@ -237,6 +237,9 @@ const defaultObject = {
   },
 };
 
+const maxSearchRetries = 2;
+const searchReconnectDelay = 1000; // 1 second
+
 // TODO OK:
 // useStreamManagement for stream-related functions
 // useQueryProcessing for query-related functions
@@ -5091,7 +5094,10 @@ const useLogs = () => {
         searchObj.data.searchRetriesCount[payload.traceId] += 1;
       }
 
-      if (searchObj.data.searchRetriesCount[payload.traceId] <= 2) {
+      if (
+        searchObj.data.searchRetriesCount[payload.traceId] <=
+        searchReconnectDelay
+      ) {
         if (payload.type === "search") searchObj.loading = true;
         if (payload.type === "histogram") searchObj.loadingHistogram = true;
 
@@ -5099,7 +5105,7 @@ const useLogs = () => {
           const requestId = initializeWebSocketConnection(payload);
 
           addRequestId(requestId, payload.traceId);
-        }, 1000);
+        }, maxSearchRetries);
 
         return;
       } else {
