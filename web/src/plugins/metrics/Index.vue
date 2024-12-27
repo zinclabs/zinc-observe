@@ -468,6 +468,8 @@ export default defineComponent({
       // need to remove the xy filters
       removeXYFilters();
 
+      // set default chart type as line
+      dashboardPanelData.data.type = "line";
       // set the default query type as promql for metrics
       dashboardPanelData.data.queryType = "promql";
       dashboardPanelData.data.queries[0].customQuery = true;

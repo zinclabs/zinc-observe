@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import {
+  calculateOptimalFontSize,
   formatDate,
   formatUnitValue,
   getUnitValue,
@@ -620,12 +621,14 @@ export const convertPromQLData = async (
 
         switch (it?.resultType) {
           case "matrix": {
-            const series = it?.result?.map((metric: any) => {
+            // take first result
+            const series = [it?.result[0]]?.map((metric: any) => {
               const values = metric.values.sort(
                 (a: any, b: any) => a[0] - b[0],
               );
+              // first value
               const unitValue = getUnitValue(
-                values[values.length - 1][1],
+                values?.[0]?.[1],
                 panelSchema.config?.unit,
                 panelSchema.config?.unit_custom,
                 panelSchema.config?.decimals,
@@ -637,7 +640,10 @@ export const convertPromQLData = async (
                     type: "text",
                     style: {
                       text: formatUnitValue(unitValue),
-                      fontSize: Math.min(params.coordSys.cx / 2, 90), //coordSys is relative. so that we can use it to calculate the dynamic size
+                      fontSize: calculateOptimalFontSize(
+                        formatUnitValue(unitValue),
+                        params.coordSys.cx * 2,
+                      ), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
                       align: "center",
                       verticalAlign: "middle",
