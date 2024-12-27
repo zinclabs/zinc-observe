@@ -520,7 +520,12 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(search::search_job::retry_job)
         .service(search::job::cancel_multiple_query)
         .service(search::job::cancel_query)
-        .service(search::job::query_status);
+        .service(search::job::query_status)
+        .service(keys::get)
+        .service(keys::delete)
+        .service(keys::save)
+        .service(keys::list)
+        .service(keys::update);
 
     cfg.service(service);
 }
