@@ -107,6 +107,39 @@ def test_job_cancel(create_session, base_url):
         resp_post_job_cancel.status_code == 200
     ), f"Post the job cancel 200, but got {resp_post_job_cancel.status_code} {resp_post_job_cancel.content}"  
 
+def test_job_retry(create_session, base_url):
+    """Running an E2E test for post the job retry."""
+
+    session = create_session
+    url = base_url
+    org_id = "default"
+    resp_get_job = session.get(f"{url}api/{org_id}/search_jobs")
+
+   # Ensure the response is successful and contains data
+    assert resp_get_job.status_code == 200, f"Request failed: {resp_get_job.text}"
+    response_json = resp_get_job.json()
+    
+     # Access the first job in the list
+    assert isinstance(response_json, list), "Response is not a list"
+    assert len(response_json) > 0, "No jobs returned in response"
+    
+    job_id = response_json[0]["id"]  # Access the first job's 'id'
+    job_status = response_json[0]["status"]  # Check the job's status
+    print(f"Job ID: {job_id}, Status: {job_status}")
+    
+    # Ensure the job is in a retryable state
+    retryable_statuses = [2, 3]  # Finished or canceled
+    if job_status not in retryable_statuses:
+        raise AssertionError(f"Job is not in a retryable state. Current status: {job_status}")
+    
+    headers = {"Content-Type": "application/json"}
+    resp_post_job_retry = session.post(f"{url}api/{org_id}/search_jobs/{job_id}/retry", headers=headers)
+    
+    print(resp_post_job_retry.content)
+    assert (
+        resp_post_job_retry.status_code == 200
+    ), f"Post the job retry 200, but got {resp_post_job_retry.status_code} {resp_post_job_retry.content}"
+    
 def test_get_job_id(create_session, base_url):
     """Running an E2E test for Get the job id."""
 
@@ -185,35 +218,3 @@ def test_delete_job(create_session, base_url):
         resp_delete_job.status_code == 200
     ), f"Delete the job 200, but got {resp_delete_job.status_code} {resp_delete_job.content}"
 
-def test_job_retry(create_session, base_url):
-    """Running an E2E test for post the job retry."""
-
-    session = create_session
-    url = base_url
-    org_id = "default"
-    resp_get_job = session.get(f"{url}api/{org_id}/search_jobs")
-
-   # Ensure the response is successful and contains data
-    assert resp_get_job.status_code == 200, f"Request failed: {resp_get_job.text}"
-    response_json = resp_get_job.json()
-    
-     # Access the first job in the list
-    assert isinstance(response_json, list), "Response is not a list"
-    assert len(response_json) > 0, "No jobs returned in response"
-    
-    job_id = response_json[0]["id"]  # Access the first job's 'id'
-    job_status = response_json[0]["status"]  # Check the job's status
-    print(f"Job ID: {job_id}, Status: {job_status}")
-    
-    # Ensure the job is in a retryable state
-    retryable_statuses = [2, 3]  # Finished or canceled
-    if job_status not in retryable_statuses:
-        raise AssertionError(f"Job is not in a retryable state. Current status: {job_status}")
-    
-    headers = {"Content-Type": "application/json"}
-    resp_post_job_retry = session.post(f"{url}api/{org_id}/search_jobs/{job_id}/retry", headers=headers)
-    
-    print(resp_post_job_retry.content)
-    assert (
-        resp_post_job_retry.status_code == 200
-    ), f"Post the job retry 200, but got {resp_post_job_retry.status_code} {resp_post_job_retry.content}"
