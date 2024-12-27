@@ -980,7 +980,7 @@ export default defineComponent({
         },
       });
     }
-    const exportAlert = (row) => {
+    const exportAlert = (row: any) => {
   // Find the alert based on uuid
   const alertToBeExported = alerts.value.find(
     (alert) => alert.uuid === row.uuid
