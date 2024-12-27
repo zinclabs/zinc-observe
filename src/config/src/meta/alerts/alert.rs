@@ -16,6 +16,7 @@
 use chrono::{DateTime, FixedOffset};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
+use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
 use crate::meta::{
@@ -25,6 +26,8 @@ use crate::meta::{
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
+    #[serde(default)]
+    pub id: Option<Ksuid>,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
@@ -76,6 +79,7 @@ impl PartialEq for Alert {
 impl Default for Alert {
     fn default() -> Self {
         Self {
+            id: None,
             name: "".to_string(),
             org_id: "".to_string(),
             stream_type: StreamType::default(),

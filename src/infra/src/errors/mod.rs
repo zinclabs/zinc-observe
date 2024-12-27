@@ -136,6 +136,12 @@ pub enum PutDashboardError {
 
 #[derive(ThisError, Debug)]
 pub enum PutAlertError {
+    #[error("cannot provide alert ID when creating an alert")]
+    CreateAlertSetID,
+    #[error("must provide alert ID when updating an alert")]
+    UpdateAlertMissingID,
+    #[error("alert to update not found")]
+    UpdateAlertNotFound,
     #[error("error putting alert with folder that does not exist")]
     FolderDoesNotExist,
     #[error("cannot convert {0} into a trigger threshold operator")]
