@@ -144,7 +144,8 @@ pub async fn get(
             }
         };
 
-        let cd = serde_json::from_str(&kdata).unwrap(); // we can be fairly certain that in db we have proper json
+        // we can be fairly certain that in db we have proper json
+        let cd = serde_json::from_str(&kdata).unwrap();
 
         let res = KeyGetResponse {
             name: key_name,
