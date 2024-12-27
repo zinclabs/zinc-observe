@@ -30,13 +30,13 @@ use config::{
     utils::{base64, json},
     DISTINCT_FIELDS,
 };
-#[cfg(feature = "enterprise")]
-use crate::service::search::sql::get_cipher_key_names;
 use infra::{cache::stats, errors};
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::check_stream_permissions;
 
+#[cfg(feature = "enterprise")]
+use crate::service::search::sql::get_cipher_key_names;
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},

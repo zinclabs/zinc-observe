@@ -207,6 +207,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { cipher::run().await });
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(async move { db::keys::watch().await });
 
     // RBAC model
     #[cfg(feature = "enterprise")]
