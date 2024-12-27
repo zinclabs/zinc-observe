@@ -160,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               use-input
               @filter="filterFn"
+              :disable="filterdOption.length === 0"
             />
           <div v-if="beingUpdated">
             <q-toggle
