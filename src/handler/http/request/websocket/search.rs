@@ -253,7 +253,16 @@ pub async fn handle_search_request(
         // Step 3: Write to results cache
         // cache only if from is 0 and is not an aggregate_query
         if req.payload.query.from == 0 {
-            write_results_to_cache(c_resp, start_time, end_time, accumulated_results).await?;
+            write_results_to_cache(c_resp, start_time, end_time, accumulated_results)
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[WS_SEARCH] trace_id: {}, Error writing results to cache: {:?}",
+                        trace_id,
+                        e
+                    );
+                    Error::Message(e.to_string())
+                })?;
         }
     } else {
         // Step 4: Search without cache for req with from > 0
@@ -630,7 +639,7 @@ async fn process_delta(
                 trace_id,
                 search_res.hits
             );
-            log::info!(
+            log::debug!(
                 "[WS_SEARCH]: Sending search response for trace_id: {}, delta: {:?}, hits len: {}, result_cache_ratio: {}, accumulated_results len: {}",
                 trace_id,
                 delta,
@@ -648,9 +657,9 @@ async fn process_delta(
                 trace_id
             );
             let (new_start_time, new_end_time) = (
-                    original_req_end_time - cache_req_duration,
-                    original_req_end_time,
-                );
+                original_req_end_time - cache_req_duration,
+                original_req_end_time,
+            );
             // passs original start_time and end_time partition end time
             let _ = send_partial_search_resp(
                 req_id,

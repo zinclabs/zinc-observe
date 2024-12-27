@@ -217,9 +217,13 @@ pub fn convert_actix_to_tungstenite_request(
     let method = reqwest::Method::from_str(actix_req.method().as_str()).unwrap();
     let mut headers = tokio_tungstenite::tungstenite::http::HeaderMap::new();
     for (key, value) in actix_req.headers().iter() {
-        let key = HeaderName::from_str(key.as_str()).unwrap();
-        let value = HeaderValue::from_str(value.to_str().unwrap()).unwrap();
-        headers.insert(key, value);
+        if let Ok(header_str) = value.to_str() {
+            if let Ok(header_name) = HeaderName::from_str(key.as_str()) {
+                if let Ok(header_value) = HeaderValue::from_str(header_str) {
+                    headers.insert(header_name, header_value);
+                }
+            }
+        }
     }
 
     // insert headers for websockets, connection upgrade and upgrade to websocket
