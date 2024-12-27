@@ -365,14 +365,11 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     alert_id: Ksuid,
 ) -> Result<(), errors::Error> {
     let _lock = super::get_lock().await;
-    let model = get_model_by_id(conn, org_id, alert_id)
-        .await?
-        .map(|(_folder, alert)| alert);
-
-    if let Some(model) = model {
-        let _ = model.delete(conn).await?;
-    }
-
+    alerts::Entity::delete_many()
+        .filter(alerts::Column::Org.eq(org_id))
+        .filter(alerts::Column::Id.eq(alert_id.to_string()))
+        .exec(conn)
+        .await?;
     Ok(())
 }
 

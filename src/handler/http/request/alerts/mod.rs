@@ -84,7 +84,7 @@ impl From<AlertError> for HttpResponse {
         (status = 400, description = "Error",   content_type = "application/json", body = HttpResponse),
     )
 )]
-#[post("v2/{org_id}/alerts")]
+#[post("/v2/{org_id}/alerts")]
 pub async fn create_alert(
     path: web::Path<String>,
     req_body: web::Json<CreateAlertRequestBody>,
@@ -125,7 +125,7 @@ pub async fn create_alert(
         (status = 404, description = "NotFound", content_type = "application/json", body = HttpResponse),
     )
 )]
-#[get("v2/{org_id}/alerts/{alert_id}")]
+#[get("/v2/{org_id}/alerts/{alert_id}")]
 async fn get_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     let (org_id, alert_id) = path.into_inner();
 
@@ -194,7 +194,7 @@ pub async fn update_alert(
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[delete("v2/{org_id}/alerts/{alert_id}")]
+#[delete("/v2/{org_id}/alerts/{alert_id}")]
 async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
     let (org_id, alert_id) = path.into_inner();
 
@@ -266,7 +266,7 @@ async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse 
         (status = 500, description = "Failure",  content_type = "application/json", body = HttpResponse),
     )
 )]
-#[put("v2/{org_id}/alerts/{alert_id}/enable")]
+#[put("/v2/{org_id}/alerts/{alert_id}/enable")]
 async fn enable_alert(path: web::Path<(String, Ksuid)>, req: HttpRequest) -> HttpResponse {
     let (org_id, alert_id) = path.into_inner();
     let Ok(query) = web::Query::<EnableAlertQuery>::from_query(req.query_string()) else {
