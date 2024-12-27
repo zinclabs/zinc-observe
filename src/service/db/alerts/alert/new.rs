@@ -27,7 +27,6 @@ use infra::{
     db::{connect_to_orm, ORM_CLIENT},
     table::alerts as table,
 };
-use itertools::Itertools;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
