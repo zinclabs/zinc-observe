@@ -69,12 +69,17 @@ pub async fn save(
 
         // TODO: validate cipher data by actually encrypting here
 
+        let cd: CipherData = match req.key.try_into() {
+            Ok(v) => v,
+            Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
+        };
+
         match infra::table::cipher::add(CipherEntry {
             org: org_id.to_string(),
             created_at: chrono::Utc::now().timestamp_micros(),
             created_by: user_id.to_string(),
             name: req.name,
-            data: serde_json::to_string(&req.key).unwrap(),
+            data: serde_json::to_string(&cd).unwrap(),
             kind: infra::table::cipher::EntryKind::CipherKey,
         })
         .await
@@ -145,11 +150,11 @@ pub async fn get(
         };
 
         // we can be fairly certain that in db we have proper json
-        let cd = serde_json::from_str(&kdata).unwrap();
+        let cd: CipherData = serde_json::from_str(&kdata).unwrap();
 
         let res = KeyGetResponse {
             name: key_name,
-            data: cd,
+            key: cd.into(),
         };
         Ok(HttpResponse::Ok().json(res))
     }
@@ -196,9 +201,12 @@ pub async fn list(_req: HttpRequest, path: web::Path<String>) -> Result<HttpResp
 
         let kdata = kdata
             .into_iter()
-            .map(|d| KeyInfo {
-                name: d.name,
-                data: serde_json::from_str::<CipherData>(&d.data).unwrap(),
+            .map(|d| {
+                let cd = serde_json::from_str::<CipherData>(&d.data).unwrap();
+                KeyInfo {
+                    name: d.name,
+                    key: cd.into(),
+                }
             })
             .collect::<Vec<_>>();
 
