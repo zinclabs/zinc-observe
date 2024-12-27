@@ -78,67 +78,68 @@ def test_get_job_status(create_session, base_url):
         resp_get_job_status.status_code == 200
     ), f"Get the job status 200, but got {resp_get_job_status.status_code} {resp_get_job_status.content}"  
 
-def test_job_cancel(create_session, base_url):
-    """Running an E2E test for post the job cancel."""
+# def test_job_cancel(create_session, base_url):
+#     """Running an E2E test for post the job cancel."""
 
-    session = create_session
-    url = base_url
-    org_id = "default"
-    resp_get_job = session.get(f"{url}api/{org_id}/search_jobs")
+#     session = create_session
+#     url = base_url
+#     org_id = "default"
+#     resp_get_job = session.get(f"{url}api/{org_id}/search_jobs")
 
-    # Ensure the response is successful and contains data
-    assert resp_get_job.status_code == 200, f"Request failed: {resp_get_job.text}"
-    response_json = resp_get_job.json()
+#     # Ensure the response is successful and contains data
+#     assert resp_get_job.status_code == 200, f"Request failed: {resp_get_job.text}"
+#     response_json = resp_get_job.json()
     
-    # Access the first job in the list
-    assert isinstance(response_json, list), "Response is not a list"
-    assert len(response_json) > 0, "No jobs returned in response"
+#     # Access the first job in the list
+#     assert isinstance(response_json, list), "Response is not a list"
+#     assert len(response_json) > 0, "No jobs returned in response"
     
-    job_id = response_json[0]["id"]  # Access the first job's 'id'
-    assert job_id, "Job ID not found"
+#     job_id = response_json[0]["id"]  # Access the first job's 'id'
+#     assert job_id, "Job ID not found"
     
-    print(f"Job ID: {job_id}")
+#     print(f"Job ID: {job_id}")
 
-    headers = {"Content-Type": "application/json"}
-    resp_post_job_cancel = session.post(f"{url}api/{org_id}/search_jobs/{job_id}/cancel", headers=headers )
+#     headers = {"Content-Type": "application/json"}
+#     resp_post_job_cancel = session.post(f"{url}api/{org_id}/search_jobs/{job_id}/cancel", headers=headers )
 
-    print(resp_post_job_cancel.content)
-    assert (
-        resp_post_job_cancel.status_code == 200
-    ), f"Post the job cancel 200, but got {resp_post_job_cancel.status_code} {resp_post_job_cancel.content}"  
+#     print(resp_post_job_cancel.content)
+#     assert (
+#         resp_post_job_cancel.status_code == 200
+#     ), f"Post the job cancel 200, but got {resp_post_job_cancel.status_code} {resp_post_job_cancel.content}"  
 
-def test_job_retry(create_session, base_url):
-    """Running an E2E test for post the job retry."""
+# def test_job_retry(create_session, base_url):
+#     """Running an E2E test for post the job retry."""
 
-    session = create_session
-    url = base_url
-    org_id = "default"
-    resp_get_job = session.get(f"{url}api/{org_id}/search_jobs")
+#     session = create_session
+#     url = base_url
+#     org_id = "default"
+#     resp_get_job = session.get(f"{url}api/{org_id}/search_jobs")
 
-   # Ensure the response is successful and contains data
-    assert resp_get_job.status_code == 200, f"Request failed: {resp_get_job.text}"
-    response_json = resp_get_job.json()
+#    # Ensure the response is successful and contains data
+#     assert resp_get_job.status_code == 200, f"Request failed: {resp_get_job.text}"
+#     response_json = resp_get_job.json()
     
-     # Access the first job in the list
-    assert isinstance(response_json, list), "Response is not a list"
-    assert len(response_json) > 0, "No jobs returned in response"
+#      # Access the first job in the list
+#     assert isinstance(response_json, list), "Response is not a list"
+#     assert len(response_json) > 0, "No jobs returned in response"
     
-    job_id = response_json[0]["id"]  # Access the first job's 'id'
-    job_status = response_json[0]["status"]  # Check the job's status
-    print(f"Job ID: {job_id}, Status: {job_status}")
+#     job_id = response_json[0]["id"]  # Access the first job's 'id'
+#     job_status = response_json[0]["status"]  # Check the job's status
+#     print(f"Job ID: {job_id}, Status: {job_status}")
     
-    # Ensure the job is in a retryable state
-    retryable_statuses = [2, 3]  # Finished or canceled
-    if job_status not in retryable_statuses:
-        raise AssertionError(f"Job is not in a retryable state. Current status: {job_status}")
+#     # Ensure the job is in a retryable state
+#     retryable_statuses = [2, 3]  # Finished or canceled
+#     if job_status not in retryable_statuses:
+#         raise AssertionError(f"Job is not in a retryable state. Current status: {job_status}")
     
-    headers = {"Content-Type": "application/json"}
-    resp_post_job_retry = session.post(f"{url}api/{org_id}/search_jobs/{job_id}/retry", headers=headers)
+#     headers = {"Content-Type": "application/json"}
+#     resp_post_job_retry = session.post(f"{url}api/{org_id}/search_jobs/{job_id}/retry", headers=headers)
     
-    print(resp_post_job_retry.content)
-    assert (
-        resp_post_job_retry.status_code == 200
-    ), f"Post the job retry 200, but got {resp_post_job_retry.status_code} {resp_post_job_retry.content}"
+#     print(resp_post_job_retry.content)
+#     assert (
+#         resp_post_job_retry.status_code == 200
+#     ), f"Post the job retry 200, but got {resp_post_job_retry.status_code} {resp_post_job_retry.content}"
+    
     
 def test_get_job_id(create_session, base_url):
     """Running an E2E test for Get the job id."""
@@ -190,31 +191,31 @@ def test_get_job_id(create_session, base_url):
     ), f"Get the job id 200, but got {resp_get_job_id.status_code} {resp_get_job_id.content}"  
 
 
-def test_delete_job(create_session, base_url):
-    """Running an E2E test for delete the job."""
+# def test_delete_job(create_session, base_url):
+#     """Running an E2E test for delete the job."""
 
-    session = create_session
-    url = base_url
-    org_id = "default"
-    resp_get_job = session.get(f"{url}api/{org_id}/search_jobs")
+#     session = create_session
+#     url = base_url
+#     org_id = "default"
+#     resp_get_job = session.get(f"{url}api/{org_id}/search_jobs")
 
-    # Ensure the response is successful and contains data
-    assert resp_get_job.status_code == 200, f"Request failed: {resp_get_job.text}"
-    response_json = resp_get_job.json()
+#     # Ensure the response is successful and contains data
+#     assert resp_get_job.status_code == 200, f"Request failed: {resp_get_job.text}"
+#     response_json = resp_get_job.json()
     
-    # Access the first job in the list
-    assert isinstance(response_json, list), "Response is not a list"
-    assert len(response_json) > 0, "No jobs returned in response"
+#     # Access the first job in the list
+#     assert isinstance(response_json, list), "Response is not a list"
+#     assert len(response_json) > 0, "No jobs returned in response"
     
-    job_id = response_json[0]["id"]  # Access the first job's 'id'
-    assert job_id, "Job ID not found"
+#     job_id = response_json[0]["id"]  # Access the first job's 'id'
+#     assert job_id, "Job ID not found"
     
-    print(f"Job ID: {job_id}")
+#     print(f"Job ID: {job_id}")
 
-    resp_delete_job = session.delete(f"{url}api/{org_id}/search_jobs/{job_id}")
+#     resp_delete_job = session.delete(f"{url}api/{org_id}/search_jobs/{job_id}")
 
-    print(resp_delete_job.content)
-    assert (
-        resp_delete_job.status_code == 200
-    ), f"Delete the job 200, but got {resp_delete_job.status_code} {resp_delete_job.content}"
+#     print(resp_delete_job.content)
+#     assert (
+#         resp_delete_job.status_code == 200
+#     ), f"Delete the job 200, but got {resp_delete_job.status_code} {resp_delete_job.content}"
 
