@@ -1440,7 +1440,7 @@ async fn permitted_alerts(
         org_id, user_id, "GET", "alert",
     )
     .await
-    .map_err(|err| FolderError::PermittedAlertsValidator(err.to_string()))?;
+    .map_err(|err| AlertError::PermittedAlertsValidator(err.to_string()))?;
     Ok(stream_list)
 }
 
