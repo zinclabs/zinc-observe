@@ -473,6 +473,11 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
     ) -> Result<()> {
+        let mut data_loaded = self.ctx.data_loading.lock().await;
+        if *data_loaded {
+            return Ok(()); // data is already loading
+        }
+
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
 
         let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
@@ -493,6 +498,12 @@ impl Engine {
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
+        log::info!(
+            "[PromQL] Loading data for stream: {}, filter: {:?}",
+            table_name,
+            selector
+        );
+
         let mut filters = selector
             .matchers
             .matchers
@@ -569,6 +580,7 @@ impl Engine {
             .write()
             .await
             .insert(table_name.to_string(), values);
+        *data_loaded = true;
         Ok(())
     }
 
