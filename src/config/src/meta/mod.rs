@@ -22,6 +22,7 @@ pub mod function;
 pub mod inverted_index;
 pub mod logger;
 pub mod meta_store;
+pub mod otlp;
 pub mod pipeline;
 pub mod search;
 pub mod self_reporting;

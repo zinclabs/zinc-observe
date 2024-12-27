@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::metrics;
+use config::{meta::otlp::OtlpRequestType, metrics};
 use opentelemetry_proto::tonic::collector::metrics::v1::{
     metrics_service_server::MetricsService, ExportMetricsServiceRequest,
     ExportMetricsServiceResponse,
@@ -47,10 +47,10 @@ impl MetricsService for MetricsIngester {
             return Err(Status::invalid_argument(msg));
         }
 
-        let resp = crate::service::metrics::otlp_grpc::handle_grpc_request(
+        let resp = crate::service::metrics::otlp::handle_otlp_request(
             org_id.unwrap().to_str().unwrap(),
             in_req,
-            true,
+            OtlpRequestType::Grpc,
         )
         .await;
         if resp.is_ok() {

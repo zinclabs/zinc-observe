@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::metrics;
+use config::{meta::otlp::OtlpRequestType, metrics};
 use opentelemetry_proto::tonic::collector::trace::v1::{
     trace_service_server::TraceService, ExportTraceServiceRequest, ExportTraceServiceResponse,
 };
 use tonic::{Response, Status};
 
-use crate::service::traces::{handle_trace_request, RequestType};
+use crate::service::traces::handle_otlp_request;
 
 #[derive(Default)]
 pub struct TraceServer;
@@ -54,10 +54,10 @@ impl TraceService for TraceServer {
             in_stream_name = Some(stream_name.to_str().unwrap());
         };
 
-        let resp = handle_trace_request(
+        let resp = handle_otlp_request(
             org_id.unwrap().to_str().unwrap(),
             in_req,
-            RequestType::Grpc,
+            OtlpRequestType::Grpc,
             in_stream_name,
         )
         .await;

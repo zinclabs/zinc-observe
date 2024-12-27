@@ -20,8 +20,7 @@ use regex::Regex;
 use crate::common::meta::prom::{Metadata, HASH_LABEL, METADATA_LABEL, VALUE_LABEL};
 
 pub mod json;
-pub mod otlp_grpc;
-pub mod otlp_http;
+pub mod otlp;
 pub mod prom;
 
 const EXCLUDE_LABELS: [&str; 5] = [

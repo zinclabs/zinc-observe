@@ -23,6 +23,7 @@ use config::{
     get_config,
     meta::{
         alerts::alert::Alert,
+        otlp::OtlpRequestType,
         self_reporting::usage::{RequestStats, UsageType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
@@ -77,13 +78,7 @@ const TRACE_ID_BYTES_COUNT: usize = 16;
 const ATTR_STATUS_CODE: &str = "status_code";
 const ATTR_STATUS_MESSAGE: &str = "status_message";
 
-pub enum RequestType {
-    Grpc,
-    HttpJson,
-    HttpProtobuf,
-}
-
-pub async fn traces_proto(
+pub async fn otlp_proto(
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
@@ -91,23 +86,33 @@ pub async fn traces_proto(
     let request = match ExportTraceServiceRequest::decode(body) {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[TRACE] Invalid proto: {}", e);
+            log::error!("[TRACES:OTLP] Invalid proto: {}", e);
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("Invalid proto: {}", e),
             )));
         }
     };
-    match handle_trace_request(org_id, request, RequestType::HttpProtobuf, in_stream_name).await {
+    match handle_otlp_request(
+        org_id,
+        request,
+        OtlpRequestType::HttpProtobuf,
+        in_stream_name,
+    )
+    .await
+    {
         Ok(v) => Ok(v),
         Err(e) => {
-            log::error!("[TRACE] Error while handling grpc trace request: {}", e);
+            log::error!(
+                "[TRACES:OTLP] Error while handling grpc trace request: {}",
+                e
+            );
             Err(e)
         }
     }
 }
 
-pub async fn traces_json(
+pub async fn otlp_json(
     org_id: &str,
     body: web::Bytes,
     in_stream_name: Option<&str>,
@@ -115,26 +120,29 @@ pub async fn traces_json(
     let request = match serde_json::from_slice::<ExportTraceServiceRequest>(body.as_ref()) {
         Ok(req) => req,
         Err(e) => {
-            log::error!("[TRACE] Invalid json: {}", e);
+            log::error!("[TRACES:OTLP] Invalid json: {}", e);
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("Invalid json: {}", e),
             )));
         }
     };
-    match handle_trace_request(org_id, request, RequestType::HttpJson, in_stream_name).await {
+    match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson, in_stream_name).await {
         Ok(v) => Ok(v),
         Err(e) => {
-            log::error!("[TRACE] Error while handling http trace request: {}", e);
+            log::error!(
+                "[TRACES:OTLP] Error while handling http trace request: {}",
+                e
+            );
             Err(e)
         }
     }
 }
 
-pub async fn handle_trace_request(
+pub async fn handle_otlp_request(
     org_id: &str,
     request: ExportTraceServiceRequest,
-    req_type: RequestType,
+    req_type: OtlpRequestType,
     in_stream_name: Option<&str>,
 ) -> Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
@@ -161,7 +169,7 @@ pub async fn handle_trace_request(
     // check memtable
     if let Err(e) = ingester::check_memtable_size() {
         log::error!(
-            "[TRACE] ingestion error while checking memtable size: {}",
+            "[TRACES:OTLP] ingestion error while checking memtable size: {}",
             e
         );
         return Ok(
@@ -220,7 +228,7 @@ pub async fn handle_trace_request(
             let spans = inst_span.spans;
             for span in spans {
                 if span.trace_id.len() != TRACE_ID_BYTES_COUNT {
-                    log::error!("[TRACE] skipping span with invalid trace id");
+                    log::error!("[TRACES:OTLP] skipping span with invalid trace id");
                     partial_success.rejected_spans += 1;
                     continue;
                 }
@@ -228,7 +236,7 @@ pub async fn handle_trace_request(
                     TraceId::from_bytes(span.trace_id.try_into().unwrap()).to_string();
                 if span.span_id.len() != SPAN_ID_BYTES_COUNT {
                     log::error!(
-                        "[TRACE] skipping span with invalid span id, trace_id: {}",
+                        "[TRACES:OTLP] skipping span with invalid span id, trace_id: {}",
                         trace_id
                     );
                     partial_success.rejected_spans += 1;
@@ -288,7 +296,7 @@ pub async fn handle_trace_request(
                     }
                     if link.span_id.len() != SPAN_ID_BYTES_COUNT {
                         log::error!(
-                            "[TRACE] skipping link with invalid span id, trace_id: {}",
+                            "[TRACES:OTLP] skipping link with invalid span id, trace_id: {}",
                             trace_id
                         );
                         continue;
@@ -297,7 +305,7 @@ pub async fn handle_trace_request(
                         SpanId::from_bytes(link.span_id.try_into().unwrap()).to_string();
                     if link.trace_id.len() != TRACE_ID_BYTES_COUNT {
                         log::error!(
-                            "[TRACE] skipping link with invalid trace id, trace_id: {}",
+                            "[TRACES:OTLP] skipping link with invalid trace id, trace_id: {}",
                             trace_id
                         );
                         continue;
@@ -319,7 +327,7 @@ pub async fn handle_trace_request(
                 let timestamp = (start_time / 1000) as i64;
                 if timestamp < min_ts {
                     log::error!(
-                        "[TRACE] skipping span with timestamp older than allowed retention period, trace_id: {}",
+                        "[TRACES:OTLP] skipping span with timestamp older than allowed retention period, trace_id: {}",
                         trace_id
                     );
                     partial_success.rejected_spans += 1;
@@ -386,7 +394,7 @@ pub async fn handle_trace_request(
                         }
                         _ => {
                             log::error!(
-                                "[TRACE] stream did not receive a valid json object, trace_id: {}",
+                                "[TRACES:OTLP] stream did not receive a valid json object, trace_id: {}",
                                 trace_id
                             );
                             return Ok(HttpResponse::InternalServerError().json(
@@ -427,7 +435,7 @@ pub async fn handle_trace_request(
         match exec_pl.process_batch(org_id, records).await {
             Err(e) => {
                 log::error!(
-                    "[Trace] pipeline({}/{}) batch execution error: {}.",
+                    "[TRACES:OTLP] pipeline({}/{}) batch execution error: {}.",
                     org_id,
                     traces_stream_name,
                     e
@@ -464,7 +472,9 @@ pub async fn handle_trace_request(
                                 v
                             }
                             _ => {
-                                log::error!("[TRACE] stream did not receive a valid json object");
+                                log::error!(
+                                    "[TRACES:OTLP] stream did not receive a valid json object"
+                                );
                                 return Ok(HttpResponse::InternalServerError().json(
                                     MetaHttpResponse::error(
                                         http::StatusCode::INTERNAL_SERVER_ERROR.into(),
@@ -508,7 +518,7 @@ pub async fn handle_trace_request(
 
     let time = start.elapsed().as_secs_f64();
     let ep = match req_type {
-        RequestType::Grpc => "/grpc/otlp/traces",
+        OtlpRequestType::Grpc => "/grpc/otlp/traces",
         _ => "/api/otlp/v1/traces",
     };
 
@@ -558,7 +568,7 @@ fn get_span_status(status: Option<Status>) -> String {
 
 fn format_response(
     mut partial_success: ExportTracePartialSuccess,
-    req_type: RequestType,
+    req_type: OtlpRequestType,
 ) -> Result<HttpResponse, Error> {
     let partial = partial_success.rejected_spans > 0;
 
@@ -573,7 +583,7 @@ fn format_response(
     };
 
     match req_type {
-        RequestType::HttpJson => Ok(if partial {
+        OtlpRequestType::HttpJson => Ok(if partial {
             HttpResponse::PartialContent().json(res)
         } else {
             HttpResponse::Ok().json(res)

@@ -72,6 +72,14 @@ async fn search_in_cluster(
     let op_start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
 
+    log::info!(
+        "promql->search->start: org_id: {}, start: {}, end: {}, query: {}",
+        &req.org_id,
+        req.query.as_ref().unwrap().start,
+        req.query.as_ref().unwrap().end,
+        req.query.as_ref().unwrap().query,
+    );
+
     // get querier nodes from cluster
     let mut nodes = cluster::get_cached_online_querier_nodes(Some(RoleGroup::Interactive))
         .await
