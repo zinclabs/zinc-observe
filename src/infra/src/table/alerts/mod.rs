@@ -422,6 +422,17 @@ pub async fn list<C: ConnectionTrait>(
     Ok(alerts)
 }
 
+/// Lists all alerts.
+pub async fn list_all<C: ConnectionTrait>(conn: &C) -> Result<Vec<MetaAlert>, errors::Error> {
+    let _lock = super::get_lock().await;
+    let alerts = list_all_models(conn)
+        .await?
+        .into_iter()
+        .map(MetaAlert::try_from)
+        .collect::<Result<_, errors::Error>>()?;
+    Ok(alerts)
+}
+
 /// Tries to get an alert ORM entity and its parent folder ORM entity.
 async fn get_model_by_id<C: ConnectionTrait>(
     conn: &C,
@@ -475,14 +486,8 @@ async fn list_models<C: ConnectionTrait>(
 ) -> Result<Vec<(folders::Model, alerts::Model)>, sea_orm::DbErr> {
     let query = alerts::Entity::find()
         .find_also_related(folders::Entity)
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Alerts.into()));
-
-    // Apply the optional org_id filter.
-    let query = if let Some(org_id) = &params.org_id {
-        query.filter(folders::Column::Org.eq(org_id))
-    } else {
-        query
-    };
+        .filter(folders::Column::Type.eq::<i16>(FolderType::Alerts.into()))
+        .filter(folders::Column::Org.eq(params.org_id));
 
     // Apply the optional folder_id filter.
     let query = if let Some(folder_id) = &params.folder_id {
@@ -492,11 +497,16 @@ async fn list_models<C: ConnectionTrait>(
     };
 
     // Apply the optional stream filter.
-    let query = if let Some((stream_type, stream_name)) = &params.stream_type_and_name {
+    let query = if let Some((stream_type, maybe_stream_name)) = &params.stream_type_and_name {
         let stream_type_str = intermediate::StreamType::from(*stream_type).to_string();
-        query
-            .filter(alerts::Column::StreamType.eq(stream_type_str))
-            .filter(alerts::Column::StreamName.eq(stream_name))
+
+        if let Some(stream_name) = maybe_stream_name {
+            query
+                .filter(alerts::Column::StreamType.eq(stream_type_str))
+                .filter(alerts::Column::StreamName.eq(stream_name))
+        } else {
+            query.filter(alerts::Column::StreamType.eq(stream_type_str))
+        }
     } else {
         query
     };
@@ -527,6 +537,18 @@ async fn list_models<C: ConnectionTrait>(
         .filter_map(|(d, maybe_f)| maybe_f.map(|f| (f, d)))
         .collect();
     Ok(folders_and_dashboards)
+}
+
+/// Lists all alert ORM models.
+async fn list_all_models<C: ConnectionTrait>(
+    conn: &C,
+) -> Result<Vec<alerts::Model>, sea_orm::DbErr> {
+    let alerts = alerts::Entity::find()
+        .all(conn)
+        .await?
+        .into_iter()
+        .collect();
+    Ok(alerts)
 }
 
 /// Updates all mutable fields on the [alerts::ActiveModel].

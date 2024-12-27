@@ -51,12 +51,9 @@ pub struct ListAlertsQuery {
     /// Optional enabled filter parameter.
     pub enabled: Option<bool>,
 
-    /// The optional number of alerts to retrieve. If not set then all alerts
-    /// that match the query parameters will be returned.
-    pub page_size: Option<u64>,
-
-    /// The optional page index. If not set then defaults to `0`.
-    pub page_idx: Option<u64>,
+    /// The optional page size and page index of results to retrieve.
+    #[serde(flatten)]
+    pub page: Option<ListAlertsQueryPageParams>,
 }
 
 /// Parameters for filtering by stream in the HTTP URL query component for
@@ -73,6 +70,23 @@ pub struct ListAlertsQueryStreamParams {
 
     /// Optional stream name filter parameter.
     pub stream_name: Option<String>,
+}
+
+/// Parameters for requesting a specific page of results in the HTTP URL query
+/// component for listing alerts.
+///
+/// This structure is flattened inside [ListAlertsQuery] and is used to enforce
+/// the constraint that `page_idx` can only be provided when `page_size` is
+/// also provided.
+#[derive(Debug, Deserialize, utoipa::IntoParams)]
+#[serde(rename_all = "snake_case")]
+pub struct ListAlertsQueryPageParams {
+    /// The optional number of alerts to retrieve. If not set then all alerts
+    /// that match the query parameters will be returned.
+    pub page_size: u64,
+
+    /// The optional page index. If not set then defaults to `0`.
+    pub page_idx: Option<u64>,
 }
 
 /// HTTP URL query component that contains parameters for enabling alerts.
@@ -93,5 +107,28 @@ impl From<CreateAlertRequestBody> for meta_alerts::Alert {
 impl From<UpdateAlertRequestBody> for meta_alerts::Alert {
     fn from(value: UpdateAlertRequestBody) -> Self {
         value.0.into()
+    }
+}
+
+impl ListAlertsQuery {
+    pub fn into(self, org_id: &str) -> meta_alerts::ListAlertsParams {
+        meta_alerts::ListAlertsParams {
+            org_id: org_id.to_string(),
+            folder_id: self.folder,
+            stream_type_and_name: self.stream.map(
+                |ListAlertsQueryStreamParams {
+                     stream_type,
+                     stream_name,
+                 }| { (stream_type.into(), stream_name) },
+            ),
+            enabled: self.enabled,
+            owner: self.owner,
+            page_size_and_idx: self.page.map(
+                |ListAlertsQueryPageParams {
+                     page_size,
+                     page_idx,
+                 }| { (page_size, page_idx.unwrap_or(0)) },
+            ),
+        }
     }
 }

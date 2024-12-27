@@ -21,8 +21,10 @@ use svix_ksuid::Ksuid;
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
     handler::http::models::alerts::{
-        requests::{CreateAlertRequestBody, EnableAlertQuery, UpdateAlertRequestBody},
-        responses::{EnableAlertResponseBody, GetAlertResponseBody},
+        requests::{
+            CreateAlertRequestBody, EnableAlertQuery, ListAlertsQuery, UpdateAlertRequestBody,
+        },
+        responses::{EnableAlertResponseBody, GetAlertResponseBody, ListAlertsResponseBody},
     },
     service::alerts::alert::{self, AlertError},
 };
@@ -54,11 +56,13 @@ impl From<AlertError> for HttpResponse {
             AlertError::SqlContainsSelectStar => MetaHttpResponse::bad_request(value),
             AlertError::PromqlMissingQuery => MetaHttpResponse::bad_request(value),
             AlertError::SendNotificationError { .. } => MetaHttpResponse::internal_error(value),
-            AlertError::GetDestinationWithTemplateError(error) => {
-                MetaHttpResponse::internal_error(error)
+            AlertError::GetDestinationWithTemplateError(err) => {
+                MetaHttpResponse::internal_error(err)
             }
             AlertError::PeriodExceedsMaxQueryRange { .. } => MetaHttpResponse::bad_request(value),
             AlertError::ResolveStreamNameError(_) => MetaHttpResponse::internal_error(value),
+            AlertError::PermittedAlertsMissingUser => MetaHttpResponse::forbidden(""),
+            AlertError::PermittedAlertsValidator(err) => MetaHttpResponse::forbidden(err),
         }
     }
 }
@@ -199,6 +203,48 @@ async fn delete_alert(path: web::Path<(String, Ksuid)>) -> HttpResponse {
         Ok(_) => MetaHttpResponse::ok("Alert deleted"),
         Err(e) => e.into(),
     }
+}
+
+/// ListAlerts
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "ListAlerts",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ListAlertsQuery,
+      ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = ListAlertsResponseBody),
+    )
+)]
+#[get("/v2/{org_id}/alerts")]
+async fn list_alerts(path: web::Path<String>, req: HttpRequest) -> HttpResponse {
+    let org_id = path.into_inner();
+    let Ok(query) = web::Query::<ListAlertsQuery>::from_query(req.query_string()) else {
+        return MetaHttpResponse::bad_request("Error parsing query parameters");
+    };
+    let query = query.0;
+
+    #[cfg(not(feature = "enterprise"))]
+    let user_id = None;
+    #[cfg(feature = "enterprise")]
+    let Ok(user_id) = req.headers().get("user_id").map(|v| v.to_str()).transpose() else {
+        return MetaHttpResponse::forbidden("");
+    };
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let folders_and_alerts = match alert::list_v2(client, user_id, query.into(&org_id)).await {
+        Ok(f_a) => f_a,
+        Err(e) => return e.into(),
+    };
+    let Ok(resp_body) = ListAlertsResponseBody::try_from(folders_and_alerts) else {
+        return MetaHttpResponse::internal_error("");
+    };
+    MetaHttpResponse::json(resp_body)
 }
 
 /// EnableAlert

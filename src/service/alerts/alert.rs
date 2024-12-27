@@ -24,7 +24,7 @@ use config::{
     get_config,
     meta::{
         alerts::{
-            alert::{Alert, AlertListFilter},
+            alert::{Alert, AlertListFilter, ListAlertsParams},
             destinations::{DestinationType, DestinationWithTemplate, HTTPType},
             FrequencyType, Operator, QueryType,
         },
@@ -44,6 +44,7 @@ use infra::{
     schema::unwrap_stream_settings,
     table::{self, folders::FolderType},
 };
+use itertools::Itertools;
 use lettre::{message::MultiPart, AsyncTransport, Message};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
@@ -138,6 +139,16 @@ pub enum AlertError {
 
     #[error("Error resolving stream names in SQL query: {0}")]
     ResolveStreamNameError(#[source] anyhow::Error),
+
+    /// An error occured trying to get the list of permitted alerts in
+    /// enterprise mode because no user_id was provided.
+    #[error("user_id required to get permitted alerts in enterprise mode")]
+    PermittedAlertsMissingUser,
+
+    /// An error occured trying to get the list of permitted alerts in
+    /// enterprise mode using the validator.
+    #[error("PermittedAlertsValidator# {0}")]
+    PermittedAlertsValidator(String),
 }
 
 pub async fn save(
@@ -488,6 +499,27 @@ pub async fn list(
         }
         Err(e) => Err(e.into()),
     }
+}
+
+pub async fn list_v2<C: ConnectionTrait>(
+    conn: &C,
+    user_id: Option<&str>,
+    params: ListAlertsParams,
+) -> Result<Vec<(Folder, Alert)>, AlertError> {
+    let (permissions, is_all_permitted) = match permitted_alerts(&params.org_id, user_id).await? {
+        Some(ps) => {
+            let org_all_permitted = ps.contains(&format!("alert:_all_{}", params.org_id));
+            (ps, org_all_permitted)
+        }
+        None => (vec![], true),
+    };
+
+    let alerts = db::alerts::alert::list_with_folders(conn, params)
+        .await?
+        .into_iter()
+        .filter(|(_f, a)| is_all_permitted || permissions.contains(&format!("alert:{}", a.name)))
+        .collect_vec();
+    Ok(alerts)
 }
 
 pub async fn delete_by_id<C: ConnectionTrait>(
@@ -1386,6 +1418,30 @@ impl VarValue<'_> {
             VarValue::Vector(v) => v[0..n].join(if is_email { "" } else { "\\n" }),
         }
     }
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn permitted_alerts(
+    _org_id: &str,
+    _user_id: Option<&str>,
+) -> Result<Option<Vec<String>>, AlertError> {
+    Ok(None)
+}
+
+#[cfg(feature = "enterprise")]
+async fn permitted_alerts(
+    org_id: &str,
+    user_id: Option<&str>,
+) -> Result<Option<Vec<String>>, AlertError> {
+    let Some(user_id) = user_id else {
+        return Err(AlertError::PermittedAlertsMissingUser);
+    };
+    let stream_list = crate::handler::http::auth::validator::list_objects_for_user(
+        org_id, user_id, "GET", "alert",
+    )
+    .await
+    .map_err(|err| FolderError::PermittedAlertsValidator(err.to_string()))?;
+    Ok(stream_list)
 }
 
 #[cfg(test)]

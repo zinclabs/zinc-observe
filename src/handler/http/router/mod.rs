@@ -439,6 +439,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(alerts::get_alert)
         .service(alerts::update_alert)
         .service(alerts::delete_alert)
+        .service(alerts::list_alerts)
         .service(alerts::enable_alert)
         .service(alerts::trigger_alert)
         .service(alerts::templates::save_template)

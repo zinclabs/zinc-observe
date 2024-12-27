@@ -18,6 +18,7 @@ use std::sync::Arc;
 use config::{
     meta::{
         alerts::alert::{Alert, ListAlertsParams},
+        folder::Folder,
         stream::StreamType,
     },
     utils::json,
@@ -247,24 +248,11 @@ pub async fn delete_by_name(
     Ok(())
 }
 
-pub async fn list(
-    org_id: &str,
-    stream_type: Option<StreamType>,
-    stream_name: Option<&str>,
-) -> Result<Vec<Alert>, infra::errors::Error> {
-    let params = ListAlertsParams::new(org_id).in_folder("default");
-    let params = if let Some(stream_name) = stream_name {
-        params.for_stream(stream_type.unwrap_or_default(), stream_name)
-    } else {
-        params
-    };
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let items = table::list(client, params)
-        .await?
-        .into_iter()
-        .map(|(_f, a)| a)
-        .collect();
+pub async fn list<C: ConnectionTrait>(
+    conn: &C,
+    params: ListAlertsParams,
+) -> Result<Vec<(Folder, Alert)>, infra::errors::Error> {
+    let items = table::list(conn, params).await?.into_iter().collect();
     Ok(items)
 }
 
@@ -353,11 +341,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 
 pub async fn cache() -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let alerts = table::list(client, ListAlertsParams::all())
-        .await?
-        .into_iter()
-        .map(|(_f, a)| a)
-        .collect_vec();
+    let alerts = table::list_all(client).await?;
 
     for alert in alerts {
         let mut cacher = STREAM_ALERTS.write().await;
