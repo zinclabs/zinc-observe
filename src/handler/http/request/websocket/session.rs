@@ -281,11 +281,9 @@ pub async fn handle_text_message(
                             }
                         }
                     });
-
+                    drop(task);
                     // Remove the cancellation flag
                     cancellation_registry_cache_utils::remove_cancellation_flag(&trace_id);
-
-                    drop(task);
                 }
                 #[cfg(feature = "enterprise")]
                 WsClientEvents::Cancel { trace_id } => {
