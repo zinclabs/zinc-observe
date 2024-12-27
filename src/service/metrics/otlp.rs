@@ -13,9 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    io::{Error, ErrorKind},
+    sync::Arc,
+};
 
-use actix_web::{http, HttpResponse};
+use actix_web::{http, web, HttpResponse};
 use bytes::BytesMut;
 use chrono::Utc;
 use config::{
@@ -23,6 +27,7 @@ use config::{
     get_config,
     meta::{
         alerts::alert,
+        otlp::OtlpRequestType,
         self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
@@ -57,10 +62,56 @@ use crate::{
     },
 };
 
-pub async fn handle_grpc_request(
+pub async fn otlp_proto(org_id: &str, body: web::Bytes) -> Result<HttpResponse, std::io::Error> {
+    let request = match ExportMetricsServiceRequest::decode(body) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("[METRICS:OTLP] Invalid proto: {}", e);
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("Invalid proto: {}", e),
+            )));
+        }
+    };
+    match handle_otlp_request(org_id, request, OtlpRequestType::HttpProtobuf).await {
+        Ok(v) => Ok(v),
+        Err(e) => {
+            log::error!(
+                "[METRICS:OTLP] Error while handling grpc trace request: {}",
+                e
+            );
+            Err(Error::new(ErrorKind::Other, e))
+        }
+    }
+}
+
+pub async fn otlp_json(org_id: &str, body: web::Bytes) -> Result<HttpResponse, std::io::Error> {
+    let request = match serde_json::from_slice::<ExportMetricsServiceRequest>(body.as_ref()) {
+        Ok(req) => req,
+        Err(e) => {
+            log::error!("[METRICS:OTLP] Invalid json: {}", e);
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::BAD_REQUEST.into(),
+                format!("Invalid json: {}", e),
+            )));
+        }
+    };
+    match handle_otlp_request(org_id, request, OtlpRequestType::HttpJson).await {
+        Ok(v) => Ok(v),
+        Err(e) => {
+            log::error!(
+                "[METRICS:OTLP] Error while handling http trace request: {}",
+                e
+            );
+            Err(Error::new(ErrorKind::Other, e))
+        }
+    }
+}
+
+pub async fn handle_otlp_request(
     org_id: &str,
     request: ExportMetricsServiceRequest,
-    is_grpc: bool,
+    req_type: OtlpRequestType,
 ) -> Result<HttpResponse, anyhow::Error> {
     if !LOCAL_NODE.is_ingester() {
         return Ok(
@@ -108,14 +159,15 @@ pub async fn handle_grpc_request(
     let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
 
     let cfg = get_config();
-    let mut response = ExportMetricsServiceResponse {
-        partial_success: None,
-    };
+    let mut partial_success = ExportMetricsPartialSuccess::default();
 
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<json::Value>> = HashMap::new();
 
     for resource_metric in &request.resource_metrics {
+        if resource_metric.scope_metrics.is_empty() {
+            continue;
+        }
         for scope_metric in &resource_metric.scope_metrics {
             for metric in &scope_metric.metrics {
                 let metric_name = &format_stream_name(&metric.name);
@@ -307,14 +359,7 @@ pub async fn handle_grpc_request(
                     stream_name
                 );
                 log::error!("{err_msg}");
-                let partial_resp =
-                    response
-                        .partial_success
-                        .get_or_insert(ExportMetricsPartialSuccess {
-                            rejected_data_points: 0,
-                            error_message: String::new(),
-                        });
-                partial_resp.error_message = err_msg;
+                partial_success.error_message = err_msg;
                 continue;
             };
             let count = pipeline_inputs.len();
@@ -326,15 +371,8 @@ pub async fn handle_grpc_request(
                     );
                     log::error!("{err_msg}");
                     // update status
-                    let partial_resp =
-                        response
-                            .partial_success
-                            .get_or_insert(ExportMetricsPartialSuccess {
-                                rejected_data_points: 0,
-                                error_message: String::new(),
-                            });
-                    partial_resp.rejected_data_points += count as i64;
-                    partial_resp.error_message = err_msg;
+                    partial_success.rejected_data_points += count as i64;
+                    partial_success.error_message = err_msg;
                     continue;
                 }
                 Ok(pl_results) => {
@@ -526,11 +564,12 @@ pub async fn handle_grpc_request(
         .await;
     }
 
-    let ep = if is_grpc {
+    let ep = if OtlpRequestType::Grpc == req_type {
         "/grpc/otlp/metrics"
     } else {
         "/api/otlp/v1/metrics"
     };
+
     let time_took = start.elapsed().as_secs_f64();
     metrics::HTTP_RESPONSE_TIME
         .with_label_values(&[
@@ -558,16 +597,7 @@ pub async fn handle_grpc_request(
         }
     }
 
-    let res = ExportMetricsServiceResponse {
-        partial_success: None,
-    };
-    let mut out = BytesMut::with_capacity(res.encoded_len());
-    res.encode(&mut out).expect("Out of memory");
-
-    Ok(HttpResponse::Ok()
-        .status(http::StatusCode::OK)
-        .content_type("application/x-protobuf")
-        .body(out))
+    format_response(partial_success, req_type)
 }
 
 fn process_gauge(
@@ -761,17 +791,18 @@ fn process_hist_data_point(
 
     // add bucket records
     let len = data_point.bucket_counts.len();
+    let mut accumulated_count = 0;
     for i in 0..len {
         let mut bucket_rec = rec.clone();
         bucket_rec[NAME_LABEL] = format!("{}_bucket", rec[NAME_LABEL].as_str().unwrap()).into();
-        if let Some(val) = data_point.bucket_counts.get(i) {
-            bucket_rec[VALUE_LABEL] = (*val as f64).into()
-        }
         if let Some(val) = data_point.explicit_bounds.get(i) {
             bucket_rec["le"] = (*val.to_string()).into()
-        }
-        if i == len - 1 {
+        } else {
             bucket_rec["le"] = f64::INFINITY.to_string().into();
+        }
+        if let Some(val) = data_point.bucket_counts.get(i) {
+            accumulated_count += val;
+            bucket_rec[VALUE_LABEL] = (accumulated_count as f64).into()
         }
         bucket_recs.push(bucket_rec);
     }
@@ -918,4 +949,43 @@ fn process_aggregation_temporality(rec: &mut json::Value, val: i32) {
         _ => AggregationTemporality::Unspecified.as_str_name(),
     }
     .into();
+}
+
+fn format_response(
+    mut partial_success: ExportMetricsPartialSuccess,
+    req_type: OtlpRequestType,
+) -> Result<HttpResponse, anyhow::Error> {
+    let partial = partial_success.rejected_data_points > 0;
+
+    let res = if partial {
+        log::error!(
+            "[METRICS:OTLP] Partial success: {}, error: {}",
+            partial_success.rejected_data_points,
+            partial_success.error_message
+        );
+        partial_success.error_message =
+            "Some data points were rejected due to exceeding the allowed retention period"
+                .to_string();
+        ExportMetricsServiceResponse {
+            partial_success: Some(partial_success),
+        }
+    } else {
+        ExportMetricsServiceResponse::default()
+    };
+
+    match req_type {
+        OtlpRequestType::HttpJson => Ok(if partial {
+            HttpResponse::PartialContent().json(res)
+        } else {
+            HttpResponse::Ok().json(res)
+        }),
+        _ => {
+            let mut out = BytesMut::with_capacity(res.encoded_len());
+            res.encode(&mut out).expect("Out of memory");
+            Ok(HttpResponse::Ok()
+                .status(http::StatusCode::OK)
+                .content_type("application/x-protobuf")
+                .body(out))
+        }
+    }
 }

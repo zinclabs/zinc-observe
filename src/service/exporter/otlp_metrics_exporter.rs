@@ -17,6 +17,7 @@ use core::fmt;
 use std::fmt::{Debug, Formatter};
 
 use async_trait::async_trait;
+use config::meta::otlp::OtlpRequestType;
 use opentelemetry::metrics::Result;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use opentelemetry_sdk::metrics::{
@@ -26,7 +27,7 @@ use opentelemetry_sdk::metrics::{
     Aggregation, InstrumentKind,
 };
 
-use crate::service::metrics::otlp_grpc::handle_grpc_request;
+use crate::service::metrics::otlp::handle_otlp_request;
 
 /// An interface for OTLP metrics clients
 #[async_trait]
@@ -108,10 +109,10 @@ impl O2MetricsClient {
 #[async_trait]
 impl MetricsClient for O2MetricsClient {
     async fn export(&self, metrics: &mut ResourceMetrics) -> Result<()> {
-        if let Err(e) = handle_grpc_request(
+        if let Err(e) = handle_otlp_request(
             "default",
             ExportMetricsServiceRequest::from(&*metrics),
-            true,
+            OtlpRequestType::Grpc,
         )
         .await
         {

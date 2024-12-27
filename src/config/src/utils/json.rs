@@ -20,6 +20,7 @@ pub use serde_json::{
 pub fn get_float_value(val: &Value) -> f64 {
     match val {
         Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
+        // f64, i64, u64 both can be converted to f64
         Value::Number(v) => v.as_f64().unwrap_or(0.0),
         Value::Bool(v) => {
             if *v {
@@ -35,7 +36,11 @@ pub fn get_float_value(val: &Value) -> f64 {
 pub fn get_int_value(val: &Value) -> i64 {
     match val {
         Value::String(v) => v.parse::<i64>().unwrap_or(0),
-        Value::Number(v) => v.as_i64().unwrap_or(0),
+        // i64, u64 both can be converted to i64, f64 needs to be converted to i64
+        Value::Number(v) => match v.as_i64() {
+            Some(v) => v,
+            None => v.as_f64().unwrap_or(0.0) as i64,
+        },
         Value::Bool(v) => {
             if *v {
                 1
@@ -50,7 +55,11 @@ pub fn get_int_value(val: &Value) -> i64 {
 pub fn get_uint_value(val: &Value) -> u64 {
     match val {
         Value::String(v) => v.parse::<u64>().unwrap_or(0),
-        Value::Number(v) => v.as_u64().unwrap_or(0),
+        // i64 is negative, u64 is positive, f64 needs to be converted to u64
+        Value::Number(v) => match v.as_u64() {
+            Some(v) => v,
+            None => v.as_f64().unwrap_or(0.0) as u64,
+        },
         Value::Bool(v) => {
             if *v {
                 1

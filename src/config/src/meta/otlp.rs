@@ -13,20 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod alerts;
-pub mod bitvec;
-pub mod cluster;
-pub mod dashboards;
-pub mod folder;
-pub mod function;
-pub mod inverted_index;
-pub mod logger;
-pub mod meta_store;
-pub mod otlp;
-pub mod pipeline;
-pub mod search;
-pub mod self_reporting;
-pub mod short_url;
-pub mod sql;
-pub mod stream;
-pub mod websocket;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OtlpRequestType {
+    Grpc,
+    HttpJson,
+    HttpProtobuf,
+}
