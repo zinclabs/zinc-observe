@@ -306,12 +306,19 @@ export const usePanelDataLoader = (
     state.isOperationCancelled = true;
 
     if (isWebSocketEnabled() && state.searchWebSocketRequestIdsAndTraceIds) {
-      // loop on state.searchWebSocketRequestIdsAndTraceIds
-      state.searchWebSocketRequestIdsAndTraceIds.forEach((it) => {
-        cancelSearchQueryBasedOnRequestId(it.requestId, it.traceId);
-      });
+      try {
+        // loop on state.searchWebSocketRequestIdsAndTraceIds
+        state.searchWebSocketRequestIdsAndTraceIds.forEach((it) => {
+          if (it?.requestId && it?.traceId) {
+            cancelSearchQueryBasedOnRequestId(it?.requestId, it?.traceId);
+          }
+        });
+      } catch (error) {
+        console.error("Error during WebSocket cleanup:", error);
+      } finally {
+        state.searchWebSocketRequestIdsAndTraceIds = [];
+      }
     }
-
     if (abortController) {
       abortController?.abort();
     }
@@ -579,22 +586,29 @@ export const usePanelDataLoader = (
     payload: any,
     response: any,
   ) => {
-    if (response.type === "search_response") {
-      handleHistogramResponse(payload, response);
-    }
+    try {
+      if (response.type === "search_response") {
+        handleHistogramResponse(payload, response);
+      }
 
-    if (response.type === "error") {
+      if (response.type === "error") {
+        // set loading to false
+        state.loading = false;
+        state.isOperationCancelled = false;
+
+        processApiError(response?.content, "sql");
+      }
+
+      if (response.type === "end") {
+        // set loading to false
+        state.loading = false;
+        state.isOperationCancelled = false;
+      }
+    } catch (error: any) {
       // set loading to false
       state.loading = false;
       state.isOperationCancelled = false;
-
-      processApiError(response?.content, "sql");
-    }
-
-    if (response.type === "end") {
-      // set loading to false
-      state.loading = false;
-      state.isOperationCancelled = false;
+      state.errorDetail = error?.message || "Unknown error in search response";
     }
   };
 
@@ -633,27 +647,43 @@ export const usePanelDataLoader = (
     payload: any,
     response: any,
   ) => {
+    const MAX_RETRIES = 2;
+    const RECONNECT_DELAY = 1000; // 1 second
+
     removeRequestId(requestId);
 
     if (response.code === 1001 || response.code === 1006) {
-      if (!searchRetriesCount.value[payload.traceId]) {
-        searchRetriesCount.value[payload.traceId] = 1;
-      } else {
-        searchRetriesCount.value[payload.traceId] += 1;
-      }
+      const retryCount = searchRetriesCount.value[payload.traceId] || 0;
+      searchRetriesCount.value[payload.traceId] = retryCount + 1;
 
-      if (searchRetriesCount.value[payload.traceId] <= 2) {
+      if (retryCount < MAX_RETRIES) {
         state.loading = true;
         state.isOperationCancelled = false;
 
-        const requestId = fetchQueryDataWithWebSocket(payload, {
-          open: sendSearchMessage,
-          close: handleSearchClose,
-          error: handleSearchError,
-          message: handleSearchResponse,
-        }) as string;
+        setTimeout(() => {
+          try {
+            const newRequestId = fetchQueryDataWithWebSocket(payload, {
+              open: sendSearchMessage,
+              close: handleSearchClose,
+              error: handleSearchError,
+              message: handleSearchResponse,
+            }) as string;
 
-        addRequestId(requestId, payload.traceId);
+            addRequestId(newRequestId, payload.traceId);
+          } catch (error: any) {
+            console.error("Error reconnecting WebSocket:", error);
+            cleanupSearchRetries(payload?.traceId);
+            handleSearchError(requestId, payload, {
+              content: {
+                message: "Failed to reconnect WebSocket",
+                trace_id: payload.traceId,
+                code: response.code,
+                error_detail: error?.message,
+              },
+            });
+          }
+        }, RECONNECT_DELAY);
+
         return;
       } else {
         // remove current traceId
