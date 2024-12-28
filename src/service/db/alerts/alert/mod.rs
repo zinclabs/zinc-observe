@@ -27,18 +27,33 @@
 mod new;
 mod old;
 
-use config::meta::{alerts::alert::Alert, stream::StreamType};
+use config::meta::{
+    alerts::alert::{Alert, ListAlertsParams},
+    folder::Folder,
+    stream::StreamType,
+};
+use infra::db::{connect_to_orm, ORM_CLIENT};
+use sea_orm::{ConnectionTrait, TransactionTrait};
+use svix_ksuid::Ksuid;
 
-pub async fn get(
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Option<Alert>, infra::errors::Error> {
+    new::get_by_id(conn, org_id, alert_id).await
+}
+
+pub async fn get_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, infra::errors::Error> {
     if should_use_meta_alerts() {
-        old::get(org_id, stream_type, stream_name, name).await
+        old::get_by_name(org_id, stream_type, stream_name, name).await
     } else {
-        new::get(org_id, stream_type, stream_name, name).await
+        new::get_by_name(org_id, stream_type, stream_name, name).await
     }
 }
 
@@ -66,16 +81,42 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     }
 }
 
-pub async fn delete(
+pub async fn create<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    new::create(conn, org_id, folder_id, alert).await
+}
+
+pub async fn update<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: Alert,
+) -> Result<Alert, infra::errors::Error> {
+    new::update(conn, org_id, folder_id, alert).await
+}
+
+pub async fn delete_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), infra::errors::Error> {
+    new::delete_by_id(conn, org_id, alert_id).await
+}
+
+pub async fn delete_by_name(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
 ) -> Result<(), infra::errors::Error> {
     if should_use_meta_alerts() {
-        old::delete(org_id, stream_type, stream_name, name).await
+        old::delete_by_name(org_id, stream_type, stream_name, name).await
     } else {
-        new::delete(org_id, stream_type, stream_name, name).await
+        new::delete_by_name(org_id, stream_type, stream_name, name).await
     }
 }
 
@@ -87,8 +128,28 @@ pub async fn list(
     if should_use_meta_alerts() {
         old::list(org_id, stream_type, stream_name).await
     } else {
-        new::list(org_id, stream_type, stream_name).await
+        let params = ListAlertsParams::new(org_id).in_folder("default");
+        let params = if let Some(stream_name) = stream_name {
+            params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
+        } else {
+            params
+        };
+
+        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let alerts = new::list(client, params)
+            .await?
+            .into_iter()
+            .map(|(_f, a)| a)
+            .collect();
+        Ok(alerts)
     }
+}
+
+pub async fn list_with_folders<C: ConnectionTrait>(
+    conn: &C,
+    params: ListAlertsParams,
+) -> Result<Vec<(Folder, Alert)>, infra::errors::Error> {
+    new::list(conn, params).await
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {

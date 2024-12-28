@@ -16,5 +16,6 @@
 //! This module contains models that can be serialized and deserialized as JSON
 //! for HTTP responses and requests.
 
+pub mod alerts;
 pub mod dashboards;
 pub mod folders;

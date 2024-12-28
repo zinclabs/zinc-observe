@@ -16,6 +16,7 @@
 use chrono::{DateTime, FixedOffset};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
+use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
 use crate::meta::{
@@ -25,6 +26,8 @@ use crate::meta::{
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
+    #[serde(default)]
+    pub id: Option<Ksuid>,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
@@ -76,6 +79,7 @@ impl PartialEq for Alert {
 impl Default for Alert {
     fn default() -> Self {
         Self {
+            id: None,
             name: "".to_string(),
             org_id: "".to_string(),
             stream_type: StreamType::default(),
@@ -108,13 +112,15 @@ pub struct AlertListFilter {
 #[derive(Debug, Clone)]
 pub struct ListAlertsParams {
     /// The optional org ID surrogate key with which to filter alerts.
-    pub org_id: Option<String>,
+    pub org_id: String,
 
     /// The optional folder ID surrogate key with which to filter alerts.
     pub folder_id: Option<String>,
 
-    /// The optional stream type and name with which to filter alerts.
-    pub stream_type_and_name: Option<(StreamType, String)>,
+    /// The optional stream type and stream name with which to filter alerts.
+    ///
+    /// The stream name can only be provided if the stream type is also provide.
+    pub stream_type_and_name: Option<(StreamType, Option<String>)>,
 
     /// The optional filter on the enabled field. `Some(true)` indicates that
     /// only enabled alerts should be returned, while `Some(false)` indicates
@@ -133,19 +139,7 @@ impl ListAlertsParams {
     /// key.
     pub fn new(org_id: &str) -> Self {
         Self {
-            org_id: Some(org_id.to_owned()),
-            folder_id: None,
-            stream_type_and_name: None,
-            enabled: None,
-            owner: None,
-            page_size_and_idx: None,
-        }
-    }
-
-    /// Returns new parameters to list all dashboards.
-    pub fn all() -> Self {
-        Self {
-            org_id: None,
+            org_id: org_id.to_owned(),
             folder_id: None,
             stream_type_and_name: None,
             enabled: None,
@@ -160,9 +154,9 @@ impl ListAlertsParams {
         self
     }
 
-    /// Filter alerts by the given stream type and name.
-    pub fn for_stream(mut self, stream_type: StreamType, stream_name: &str) -> Self {
-        self.stream_type_and_name = Some((stream_type, stream_name.to_string()));
+    /// Filter alerts by the given stream type and optional stream name.
+    pub fn for_stream(mut self, stream_type: StreamType, stream_name: Option<&str>) -> Self {
+        self.stream_type_and_name = Some((stream_type, stream_name.map(|n| n.to_string())));
         self
     }
 
