@@ -1,6 +1,3 @@
-import json
-import requests
-import pytest
 from datetime import datetime, timezone, timedelta
 import time
 
@@ -128,6 +125,14 @@ def test_job_cancel(create_session, base_url):
     assert (
         resp_post_job_cancel.status_code == 200
     ), f"Post the job cancel 200, but got {resp_post_job_cancel.status_code} {resp_post_job_cancel.content}"  
+
+    # Verify job status after cancellation
+    time.sleep(1)  # Brief wait for status update
+    resp_status = session.get(f"{url}api/{org_id}/search_jobs/{job_id}/status")
+    status_json = resp_status.json()
+    assert status_json["status"] == 3, f"Expected job status to be 'canceled' (3), got {status_json['status']}"
+
+
 
 def test_job_retry(create_session, base_url):
     """Running an E2E test for post the job retry."""
@@ -262,4 +267,9 @@ def test_delete_job(create_session, base_url):
     assert (
         resp_delete_job.status_code == 200
     ), f"Delete the job 200, but got {resp_delete_job.status_code} {resp_delete_job.content}"
+
+    # Verify job is deleted
+    resp_verify = session.get(f"{url}api/{org_id}/search_jobs/{job_id}")
+    assert resp_verify.status_code == 404, f"Expected 404 for deleted job, got {resp_verify.status_code}"
+
 
