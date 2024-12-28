@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use config::meta::{
     alerts::{
@@ -28,13 +30,13 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, PaginatorTrait,
     QueryFilter, QueryOrder, Set, TransactionTrait, TryIntoModel,
 };
-use svix_ksuid::KsuidLike;
+use svix_ksuid::{Ksuid, KsuidLike};
 
 use super::{
     entity::{alerts, folders},
     folders::FolderType,
 };
-use crate::errors;
+use crate::errors::{self, FromStrError, PutAlertError};
 
 pub mod intermediate;
 
@@ -42,6 +44,11 @@ impl TryFrom<alerts::Model> for MetaAlert {
     type Error = errors::Error;
 
     fn try_from(value: alerts::Model) -> Result<Self, Self::Error> {
+        let id: Ksuid = Ksuid::from_str(&value.id).map_err(|_| FromStrError {
+            value: value.id,
+            ty: "svix_ksuid::Ksuid".to_owned(),
+        })?;
+
         // Transform database string values into intermediate types which can be
         // directly translated into service layer types.
         let stream_type: intermediate::StreamType = value.stream_type.parse()?;
@@ -90,6 +97,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .map(|dt| dt.into());
 
         let alert = Self {
+            id: Some(id),
             name: value.name,
             org_id: value.org,
             stream_type: stream_type.into(),
@@ -133,6 +141,24 @@ impl TryFrom<alerts::Model> for MetaAlert {
             },
         };
         Ok(alert)
+    }
+}
+
+/// Gets an alert by its ID.
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Option<(MetaFolder, MetaAlert)>, errors::Error> {
+    let _lock = super::get_lock().await;
+    let models = get_model_by_id(conn, org_id, alert_id).await?;
+
+    if let Some((folder_model, alert_model)) = models {
+        let folder = folder_model.into();
+        let alert = alert_model.try_into()?;
+        Ok(Some((folder, alert)))
+    } else {
+        Ok(None)
     }
 }
 
@@ -193,11 +219,11 @@ pub async fn put<C: TransactionTrait>(
                 errors::DbError::PutAlert(errors::PutAlertError::FolderDoesNotExist).into(),
             );
         }
-        Some((folder_m, Some(alert_m))) => {
+        Some((_folder_m, Some(alert_m))) => {
             // Destination folder exists and alert already exists, so convert
             // the alert model to an active model and update it.
             let mut alert_am: alerts::ActiveModel = alert_m.into();
-            update_mutable_fields(&mut alert_am, folder_m, alert)?;
+            update_mutable_fields(&mut alert_am, alert)?;
             let model: alerts::Model = alert_am.update(&txn).await?.try_into_model()?;
             Ok(model)
         }
@@ -212,6 +238,7 @@ pub async fn put<C: TransactionTrait>(
                 // The following fields can only be set on creation.
                 id: Set(id),
                 org: Set(org_id.to_owned()),
+                folder_id: Set(folder_m.id),
                 stream_type: Set(stream_type),
                 stream_name: Set(stream_name),
                 name: Set(alert_name),
@@ -219,7 +246,13 @@ pub async fn put<C: TransactionTrait>(
                 // they are set below.
                 ..Default::default()
             };
-            update_mutable_fields(&mut alert_am, folder_m, alert)?;
+            update_mutable_fields(&mut alert_am, alert)?;
+
+            // Triggered and satisfied timestamps should always be initialized
+            // to None.
+            alert_am.last_triggered_at = Set(None);
+            alert_am.last_satisfied_at = Set(None);
+
             let model: alerts::Model = alert_am.insert(&txn).await?.try_into_model()?;
             Ok(model)
         }
@@ -227,6 +260,117 @@ pub async fn put<C: TransactionTrait>(
     let alert = rslt?.try_into()?;
     txn.commit().await?;
     Ok(alert)
+}
+
+/// Creates a new alert in the database. Returns the new alert.
+pub async fn create<C: TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: &str,
+    alert: MetaAlert,
+) -> Result<MetaAlert, errors::Error> {
+    // Ensure that no ID is provided.
+    if alert.id.is_some() {
+        return Err(errors::DbError::PutAlert(PutAlertError::CreateAlertSetID).into());
+    };
+
+    let _lock = super::get_lock().await;
+    let txn = conn.begin().await?;
+
+    // Get the destination folder.
+    let Some(folder_m) =
+        super::folders::get_model(&txn, org_id, folder_id, FolderType::Alerts).await?
+    else {
+        return Err(errors::DbError::PutAlert(PutAlertError::FolderDoesNotExist).into());
+    };
+
+    let id = svix_ksuid::Ksuid::new(None, None).to_string();
+    let stream_type = intermediate::StreamType::from(alert.stream_type).to_string();
+    let mut alert_am = alerts::ActiveModel {
+        id: Set(id),
+        org: Set(org_id.to_owned()),
+        folder_id: Set(folder_m.id),
+        stream_type: Set(stream_type),
+        stream_name: Set(alert.stream_name.clone()),
+        name: Set(alert.name.clone()),
+        // All remaining fields can be set on creation or updated so
+        // they are set below.
+        ..Default::default()
+    };
+    update_mutable_fields(&mut alert_am, alert)?;
+
+    // Triggered and satisfied timestamps should always be initialized
+    // to None so overwrite any value that might have been set already.
+    alert_am.last_triggered_at = Set(None);
+    alert_am.last_satisfied_at = Set(None);
+
+    let alert_m: alerts::Model = alert_am.insert(&txn).await?.try_into_model()?;
+    let alert = alert_m.try_into()?;
+    txn.commit().await?;
+    Ok(alert)
+}
+
+/// Creates a new alert in the database. Returns the new alert.
+pub async fn update<C: TransactionTrait + ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_id: Option<&str>,
+    alert: MetaAlert,
+) -> Result<MetaAlert, errors::Error> {
+    // Ensure that ID is provided.
+    let Some(alert_id) = alert.id else {
+        return Err(errors::DbError::PutAlert(PutAlertError::CreateAlertSetID).into());
+    };
+
+    let _lock = super::get_lock().await;
+    let txn = conn.begin().await?;
+
+    // Try to get the new parent folder if a folder ID is provided.
+    let maybe_folder_m = match folder_id {
+        Some(f_id) => {
+            let Some(folder_m) =
+                super::folders::get_model(&txn, org_id, f_id, FolderType::Alerts).await?
+            else {
+                return Err(errors::DbError::PutAlert(PutAlertError::FolderDoesNotExist).into());
+            };
+            Some(folder_m)
+        }
+        None => None,
+    };
+
+    // Try to get the alert to update.
+    let Some((_, alert_m)) = get_model_by_id(conn, org_id, alert_id).await? else {
+        return Err(errors::DbError::PutAlert(PutAlertError::UpdateAlertNotFound).into());
+    };
+
+    // Update fields using values from the given alert.
+    let mut alert_am: alerts::ActiveModel = alert_m.into();
+    update_mutable_fields(&mut alert_am, alert)?;
+
+    // Update the folder if a new parent folder was provided.
+    if let Some(folder_m) = maybe_folder_m {
+        alert_am.folder_id = Set(folder_m.id);
+    }
+
+    let alert_m: alerts::Model = alert_am.update(&txn).await?.try_into_model()?;
+    let alert = alert_m.try_into()?;
+    txn.commit().await?;
+    Ok(alert)
+}
+
+/// Deletes an alert by its ID.
+pub async fn delete_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<(), errors::Error> {
+    let _lock = super::get_lock().await;
+    alerts::Entity::delete_many()
+        .filter(alerts::Column::Org.eq(org_id))
+        .filter(alerts::Column::Id.eq(alert_id.to_string()))
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 /// Deletes an alert by its name.
@@ -275,6 +419,32 @@ pub async fn list<C: ConnectionTrait>(
     Ok(alerts)
 }
 
+/// Lists all alerts.
+pub async fn list_all<C: ConnectionTrait>(conn: &C) -> Result<Vec<MetaAlert>, errors::Error> {
+    let _lock = super::get_lock().await;
+    let alerts = list_all_models(conn)
+        .await?
+        .into_iter()
+        .map(MetaAlert::try_from)
+        .collect::<Result<_, errors::Error>>()?;
+    Ok(alerts)
+}
+
+/// Tries to get an alert ORM entity and its parent folder ORM entity.
+async fn get_model_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: Ksuid,
+) -> Result<Option<(folders::Model, alerts::Model)>, sea_orm::DbErr> {
+    let maybe_f_a = alerts::Entity::find_by_id(alert_id.to_string())
+        .filter(alerts::Column::Org.eq(org_id))
+        .find_also_related(folders::Entity)
+        .one(conn)
+        .await?
+        .and_then(|(a, maybe_f)| maybe_f.map(|f| (f, a)));
+    Ok(maybe_f_a)
+}
+
 /// Tries to get an alert ORM entity and its parent folder ORM entity.
 async fn get_model_by_name<C: ConnectionTrait>(
     conn: &C,
@@ -313,14 +483,8 @@ async fn list_models<C: ConnectionTrait>(
 ) -> Result<Vec<(folders::Model, alerts::Model)>, sea_orm::DbErr> {
     let query = alerts::Entity::find()
         .find_also_related(folders::Entity)
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Alerts.into()));
-
-    // Apply the optional org_id filter.
-    let query = if let Some(org_id) = &params.org_id {
-        query.filter(folders::Column::Org.eq(org_id))
-    } else {
-        query
-    };
+        .filter(folders::Column::Type.eq::<i16>(FolderType::Alerts.into()))
+        .filter(folders::Column::Org.eq(params.org_id));
 
     // Apply the optional folder_id filter.
     let query = if let Some(folder_id) = &params.folder_id {
@@ -330,11 +494,16 @@ async fn list_models<C: ConnectionTrait>(
     };
 
     // Apply the optional stream filter.
-    let query = if let Some((stream_type, stream_name)) = &params.stream_type_and_name {
+    let query = if let Some((stream_type, maybe_stream_name)) = &params.stream_type_and_name {
         let stream_type_str = intermediate::StreamType::from(*stream_type).to_string();
-        query
-            .filter(alerts::Column::StreamType.eq(stream_type_str))
-            .filter(alerts::Column::StreamName.eq(stream_name))
+
+        if let Some(stream_name) = maybe_stream_name {
+            query
+                .filter(alerts::Column::StreamType.eq(stream_type_str))
+                .filter(alerts::Column::StreamName.eq(stream_name))
+        } else {
+            query.filter(alerts::Column::StreamType.eq(stream_type_str))
+        }
     } else {
         query
     };
@@ -367,6 +536,18 @@ async fn list_models<C: ConnectionTrait>(
     Ok(folders_and_dashboards)
 }
 
+/// Lists all alert ORM models.
+async fn list_all_models<C: ConnectionTrait>(
+    conn: &C,
+) -> Result<Vec<alerts::Model>, sea_orm::DbErr> {
+    let alerts = alerts::Entity::find()
+        .all(conn)
+        .await?
+        .into_iter()
+        .collect();
+    Ok(alerts)
+}
+
 /// Updates all mutable fields on the [alerts::ActiveModel].
 ///
 /// For some fields the values will be extracted from and transformed from the
@@ -377,7 +558,6 @@ async fn list_models<C: ConnectionTrait>(
 /// should be treated as immutable will not be updated.
 fn update_mutable_fields(
     alert_am: &mut alerts::ActiveModel,
-    folder_m: folders::Model,
     alert: MetaAlert,
 ) -> Result<(), errors::Error> {
     let is_real_time = alert.is_real_time;
@@ -455,7 +635,6 @@ fn update_mutable_fields(
     let last_edited_by = alert.last_edited_by.filter(|s| !s.is_empty());
     let updated_at: i64 = chrono::Utc::now().timestamp();
 
-    alert_am.folder_id = Set(folder_m.id);
     alert_am.is_real_time = Set(is_real_time);
     alert_am.destinations = Set(destinations);
     alert_am.context_attributes = Set(context_attributes);
