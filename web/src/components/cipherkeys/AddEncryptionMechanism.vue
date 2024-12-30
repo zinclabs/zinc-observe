@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="cipher-keys-add-encryption-mechanism">
     <q-select
       data-test="add-cipher-key-auth-method-input"
-      v-model="formData.key.mechanism.type"
+      v-model="frmData.key.mechanism.type"
       :label="t('cipherKey.providerType') + ' *'"
       color="input-border q-w-lg"
       bg-color="input-bg"
@@ -36,9 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <q-select
-      v-if="formData.key.mechanism.type === 'simple'"
+      v-if="frmData.key.mechanism.type === 'simple'"
       data-test="add-cipher-algorithm-input"
-      v-model="formData.key.mechanism.simple_algorithm"
+      v-model="frmData.key.mechanism.simple_algorithm"
       :label="t('cipherKey.algorithm') + ' *'"
       color="input-border q-w-lg"
       bg-color="input-bg"
@@ -59,22 +59,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 
-<script lang="ts" setup>
-import { ref } from "vue";
+<script lang="ts">
+import { ref, defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 
-const { t } = useI18n();
+export default defineComponent({
+  name: "PageAddEncryptionMechanism",
+  props: {
+    formData: Object,
+  },
+  setup(props: any) {
+    const { t } = useI18n();
+    const frmData = ref(props.formData || {});
 
-const providerTypeOptions = ref([
-  { value: "simple", label: "Simple" },
-  { value: "tink_keyset", label: "Tink KeySet" },
-]);
+    const providerTypeOptions = ref([
+      { value: "simple", label: "Simple" },
+      { value: "tink_keyset", label: "Tink KeySet" },
+    ]);
 
-const plainAlgorithmOptions = ref([
-  { value: "aes-256-siv", label: "AES 256 SIV" },
-]);
-const props = defineProps({
-  formData: Object,
+    const plainAlgorithmOptions = ref([
+      { value: "aes-256-siv", label: "AES 256 SIV" },
+    ]);
+
+    return {
+      t,
+      frmData,
+      providerTypeOptions,
+      plainAlgorithmOptions,
+    };
+  },
 });
 </script>
 

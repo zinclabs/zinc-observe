@@ -246,7 +246,7 @@ export interface FormData {
   provider: Object;
 }
 export default defineComponent({
-  name: "PageOrganization",
+  name: "PageAddAkeylessType",
   props: {
     formData: Object,
   },
