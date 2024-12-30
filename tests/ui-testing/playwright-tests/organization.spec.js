@@ -1,16 +1,25 @@
 import { test, expect } from "./baseFixtures.js";
 import { LoginPage } from '../pages/loginPage.js';
-import { IamPage } from "../pages/iamPage.js";
+import { IamOrgPage } from "../pages/iamOrgPage.js";
+import { IamUserPage } from "../pages/iamUserPage.js";
+
 
 
 
 test.describe("Organizations Redesign", () => {
-    let loginPage, iamPage;
+    let loginPage, iamOrgPage, iamUserPage;
+    const orgName = `org${Date.now()}`;
     const emailName = `email${Date.now()}@gmail.com`;
+    const password = "password123";
+    const username = "username123";
+
 
     test.beforeEach(async ({ page }) => {
+        // Login
         loginPage = new LoginPage(page);
-        iamPage = new IamPage(page);
+        iamOrgPage = new IamOrgPage(page);
+        iamUserPage = new IamUserPage(page);
+
         await loginPage.gotoLoginPage();
         await loginPage.loginAsInternalUser(); // Login as root user
         await loginPage.login();
@@ -18,149 +27,70 @@ test.describe("Organizations Redesign", () => {
     });
 
 
-    test("Error Message displayed if Email Blank", async ({ page }) => {
+    test("Add an organization successfully", async ({ page }) => {
 
-        await iamPage.gotoIamPage();
-        await iamPage.iamURLValidation();
-        await iamPage.iamPageServiceAccountsTab();
-        await iamPage.iamPageAddServiceAccount();
-        await iamPage.iamPageAddServiceAccountEmailValidation();
+        // Navigate to Organizations
+        await iamOrgPage.navigateToOrganizations();
 
+        // Add Organization
+        await iamOrgPage.addOrganization(orgName);
+
+        // Verify success message
+        await iamOrgPage.verifySuccessMessage('Organization added successfully.');
+        //await expect(iamOrgPage.alert).toContainText('Organization added successfully.');
     });
 
-    test("Service Account created", async ({ page }) => {
 
-        await iamPage.gotoIamPage();
-        await iamPage.iamPageServiceAccountsTab();
-        await iamPage.iamPageAddServiceAccount();
-        await iamPage.enterEmailServiceAccount(emailName);
-        await iamPage.clickSaveServiceAccount();
-        await iamPage.verifySuccessMessage('Service Account created successfully.');
+    test("Error when Add organization without name", async ({ page }) => {
 
-    });
+        // Navigate to Organizations
+        await iamOrgPage.navigateToOrganizations();
 
-    test("Service Account not created if Email already exists", async ({ page }) => {
+        // Attempt to add organization without a name
+        await iamOrgPage.addOrgButton.click({ force: true });
+        //await iamOrgPage.verifyError('Name is required');
+        await iamOrgPage.orgNameInput.fill('');
 
-        await iamPage.gotoIamPage();
-        await iamPage.iamPageServiceAccountsTab();
-        await iamPage.iamPageAddServiceAccount();
-        await iamPage.enterSameEmailServiceAccount();
-        await iamPage.clickSaveServiceAccount();
-        await iamPage.verifySuccessMessage('User already exists');
+        await iamOrgPage.checkSaveButton();
 
-    });
 
-    test("Service Account not created if Cancel clicked", async ({ page }) => {
-
-        await iamPage.gotoIamPage();
-        await iamPage.iamPageServiceAccountsTab();
-        await iamPage.iamPageAddServiceAccount();
-        await iamPage.enterEmailServiceAccount(emailName);
-        await iamPage.enterFirstLastNameServiceAccount();
-        await iamPage.clickCancelServiceAccount();
-
-    });
-
-    test("Service Account Token copied", async ({ page }) => {
-
-        await iamPage.gotoIamPage();
-        await iamPage.iamPageServiceAccountsTab();
-        await iamPage.iamPageAddServiceAccount();
-        await iamPage.enterEmailServiceAccount(emailName);
-        await iamPage.clickSaveServiceAccount();
-        await iamPage.verifySuccessMessage('Service Account created successfully.');
-        await iamPage.clickCopyToken();
 
 
     });
 
-    test("Service Account Download Token", async ({ page }) => {
+    test("Cancel when Add organization with name", async ({ page }) => {
 
-        await iamPage.gotoIamPage();
-        await iamPage.iamPageServiceAccountsTab();
-        await iamPage.iamPageAddServiceAccount();
-        await iamPage.enterEmailServiceAccount(emailName);
-        await iamPage.clickSaveServiceAccount();
-        await iamPage.verifySuccessMessage('Service Account created successfully.');
-        await iamPage.clickDownloadToken();
+        // Navigate to Organizations
+        await iamOrgPage.navigateToOrganizations();
 
+        // Attempt to add organization without a name
+        await iamOrgPage.addOrgButton.click({ force: true });
+        await iamOrgPage.orgNameInput.fill('Org');
 
-    });
-    test("Service Account Token Pop Up Closed", async ({ page }) => {
-
-        await iamPage.gotoIamPage();
-        await iamPage.iamPageServiceAccountsTab();
-        await iamPage.iamPageAddServiceAccount();
-        await iamPage.enterEmailServiceAccount(emailName);
-        await iamPage.clickSaveServiceAccount();
-        await iamPage.verifySuccessMessage('Service Account created successfully.');
-        await iamPage.clickServiceAccountPopUpClosed();
+        // Cancel the operation
+        await iamOrgPage.cancelAddOrganization();
 
     });
 
-    test("Service Account Created and deleted", async ({ page }) => {
+   test('Add a user successfully', async ({ page }) => {
 
-        await iamPage.gotoIamPage();
-        await iamPage.iamPageServiceAccountsTab();
-        await iamPage.iamPageAddServiceAccount();
-        await iamPage.enterEmailServiceAccount(emailName);
-        await iamPage.clickSaveServiceAccount();
-        await iamPage.verifySuccessMessage('Service Account created successfully.');
-        await iamPage.clickServiceAccountPopUpClosed();
-        await iamPage.reloadServiceAccountPage();
-        await iamPage.deletedServiceAccount(emailName);
-        await iamPage.requestServiceAccountOk();
-        await iamPage.verifySuccessMessage('Service Account deleted successfully.');
+    await iamUserPage.goToUsersTab();
 
-    });
+    await iamUserPage.addBasicUser();
 
-    test("Service Account Created and not deleted if cancel clicked", async ({ page }) => {
+    await iamUserPage.enterEmailBasicUser(emailName);
+    
 
-        await iamPage.gotoIamPage();
-        await iamPage.iamPageServiceAccountsTab();
-        await iamPage.iamPageAddServiceAccount();
-        await iamPage.enterEmailServiceAccount(emailName);
-        await iamPage.clickSaveServiceAccount();
-        await iamPage.verifySuccessMessage('Service Account created successfully.');
-        await iamPage.clickServiceAccountPopUpClosed();
-        await iamPage.reloadServiceAccountPage();
-        await iamPage.deletedServiceAccount(emailName);
-        await iamPage.requestServiceAccountCancel();
+    await iamUserPage.addBasicUser();
 
-    });
+    await iamUserPage.addBasicUser();
 
-    test("Service Account Created and updated details", async ({ page }) => {
+    await iamUserPage.validateAlertMessage('User added successfully.');
 
-        await iamPage.gotoIamPage();
-        await iamPage.iamPageServiceAccountsTab();
-        await iamPage.iamPageAddServiceAccount();
-        await iamPage.enterEmailServiceAccount(emailName);
-        await iamPage.clickSaveServiceAccount();
-        await iamPage.verifySuccessMessage('Service Account created successfully.');
-        await iamPage.clickServiceAccountPopUpClosed();
-        await iamPage.reloadServiceAccountPage();
-        await iamPage.updatedServiceAccount(emailName);
-        await iamPage.enterFirstLastNameServiceAccount();
-        await iamPage.clickSaveServiceAccount();
-        await iamPage.verifySuccessMessage('Service Account updated successfully.');
+  });
 
-    });
 
-    test("Service Account Created and refresh token", async ({ page }) => {
 
-        await iamPage.gotoIamPage();
-        await iamPage.iamPageServiceAccountsTab();
-        await iamPage.iamPageAddServiceAccount();
-        await iamPage.enterEmailServiceAccount(emailName);
-        await iamPage.clickSaveServiceAccount();
-        await iamPage.verifySuccessMessage('Service Account created successfully.');
-        await iamPage.clickServiceAccountPopUpClosed();
-        await iamPage.reloadServiceAccountPage();
-        await iamPage.refreshServiceAccount(emailName);
-        await iamPage.requestServiceAccountOk();
-        await iamPage.verifySuccessMessage('Service token refreshed successfully.');
-
-    });
 
 
 
