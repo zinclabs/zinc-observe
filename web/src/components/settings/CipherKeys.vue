@@ -106,6 +106,7 @@ import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
+import cipherKeysService from "@/services/cipher_keys";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -165,6 +166,8 @@ export default defineComponent({
       if (router.currentRoute.value.query.action == "add") {
         showAddDialog.value = true;
       }
+
+      getCipherKeysData();
     });
 
     onUpdated(() => {
@@ -172,6 +175,21 @@ export default defineComponent({
         showAddDialog.value = true;
       }
     });
+
+    const getCipherKeysData = () => {
+      cipherKeysService
+        .list(store.state.selectedOrganization.identifier)
+        .then((response) => {
+          tabledata.value = response.data;
+          resultTotal.value = response.data.length;
+        })
+        .catch((error) => {
+          $q.notify({
+            type: "negative",
+            message: error.response.data.message,
+          });
+        });
+    };
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
