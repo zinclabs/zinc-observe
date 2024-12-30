@@ -6,5 +6,4 @@ pub use super::{
     search_job_results::Entity as SearchJobResults, search_jobs::Entity as SearchJobs,
     search_queue::Entity as SearchQueue,
     alerts::Entity as Alerts, cipher_keys::Entity as CipherKeys, dashboards::Entity as Dashboards,
-    folders::Entity as Folders,
 };
