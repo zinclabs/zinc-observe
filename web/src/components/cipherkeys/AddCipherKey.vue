@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? isValidResourceName(val) ||
                     `Characters like :, ?, /, #, and spaces are not allowed.`
                   : 'Name is required',
+              (val: any) => maxLengthCharValidation(val, 50),
             ]"
             tabindex="0"
           />
@@ -116,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div>
             <add-openobserve-type
-              v-if="formData.key.store.type == 'openobserve'"
+              v-if="formData.key.store.type == 'local'"
               v-model:formData="formData"
             />
             <add-akeyless-type
@@ -173,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           color="secondary"
           padding="sm xl"
           no-caps
-          @click="onSubmit"
+          type="submit"
         />
       </div>
     </q-form>
@@ -191,15 +192,21 @@ import { ref, onBeforeMount, onActivated, defineEmits, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { isValidResourceName } from "@/utils/zincutils";
+import { useQuasar } from "quasar";
+import {
+  isValidResourceName,
+  maxLengthCharValidation,
+} from "@/utils/zincutils";
 import AddOpenobserveType from "@/components/cipherkeys/AddOpenobserveType.vue";
 import AddAkeylessType from "@/components/cipherkeys/AddAkeylessType.vue";
 import AddEncryptionMechanism from "@/components/cipherkeys/AddEncryptionMechanism.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import CipherKeysService from "@/services/cipher_keys";
 
 const emit = defineEmits(["cancel:hideform"]);
 const { t } = useI18n();
 const router = useRouter();
+const $q = useQuasar();
 const store = useStore();
 const addCipherKeyFormRef: any = ref();
 const isUpdatingCipherKey: any = ref(false);
@@ -208,7 +215,7 @@ const formData: any = ref({
   name: "",
   key: {
     store: {
-      type: "openobserve",
+      type: "local",
       akeyless: {
         base_url: "",
         access_id: "",
@@ -239,7 +246,7 @@ const formData: any = ref({
   },
 });
 const cipherKeyTypes = computed(() => [
-  { label: "OpenObserve", value: "openobserve" },
+  { label: "OpenObserve", value: "local" },
   { label: "Akeyless", value: "akeyless" },
 ]);
 
@@ -262,26 +269,95 @@ const getTypeLabel = (type: string) => {
 };
 
 const setupTemplateData = () => {
-  // Format the data for the template editor
-  // const params = router.currentRoute.value.query;
-  // if (props.template) {
-  //   isUpdatingCipherKey.value = true;
-  //   formData.value.name = props.template.name;
-  //   formData.value.body = props.template.body;
-  //   formData.value.type = props.template.type;
-  //   formData.value.title = props.template.title;
-  // }
-  // if (params.type) {
-  //   formData.value.type = params.type as "email" | "http";
-  // }
+  if (router.currentRoute.value.query.action === "edit") {
+    isUpdatingCipherKey.value = true;
+    if (router.currentRoute.value.query.name) {
+      CipherKeysService.get_by_name(
+        store.state.selectedOrganization.identifier,
+        router.currentRoute.value.query.name,
+      )
+        .then((response) => {
+          formData.value = response.data;
+          originalData.value = JSON.stringify(formData.value);
+        })
+        .catch((error) => {
+          $q.notify({
+            type: "negative",
+            message: error.response.data.message,
+          });
+        });
+    }
+  }
 };
 
 const onSubmit = () => {
-  // if (isUpdatingCipherKey.value) {
-  //   updateTemplate();
-  // } else {
-  //   addTemplate();
-  // }
+  addCipherKeyFormRef.value
+    .validate()
+    .then((valid: any) => {
+      if (isUpdatingCipherKey.value) {
+        updateCipherKey();
+      } else {
+        createCipherKey();
+      }
+    })
+    .catch((error: any) => {
+      $q.notify({
+        type: "negative",
+        message: "Please fill all the required fields",
+      });
+    });
+};
+
+const createCipherKey = () => {
+  const dismiss = $q.notify({
+    spinner: true,
+    message: "Please wait while processing your request...",
+  });
+  CipherKeysService.create(
+    store.state.selectedOrganization.identifier,
+    formData.value,
+  )
+    .then((response) => {
+      dismiss();
+      $q.notify({
+        type: "positive",
+        message: "Cipher key created successfully",
+      });
+      emit("cancel:hideform");
+    })
+    .catch((error) => {
+      dismiss();
+      $q.notify({
+        type: "negative",
+        message: error.response.data.message,
+      });
+    });
+};
+
+const updateCipherKey = () => {
+  const dismiss = $q.notify({
+    spinner: true,
+    message: "Please wait while processing your request...",
+  });
+  CipherKeysService.update(
+    store.state.selectedOrganization.identifier,
+    formData.value,
+  )
+    .then((response) => {
+      dismiss();
+      $q.notify({
+        type: "positive",
+        message: "Cipher key updated successfully",
+      });
+      emit("cancel:hideform");
+    })
+    .catch((error) => {
+      dismiss();
+      $q.notify({
+        type: "negative",
+        message: error.response.data.message,
+      });
+    });
 };
 
 const openCancelDialog = () => {

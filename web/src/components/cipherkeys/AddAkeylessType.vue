@@ -27,7 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       outlined
       filled
       dense
-      :rules="[(val: any) => !!val || 'Base URL is required']"
+      :rules="[
+        (val: any) => !!val || 'Base URL is required',
+        (val: any) => validateUrl(val) || 'Please provide correct URL.'
+      ]"
     />
     <!-- Add input filed for access id with URL validation from q-input-->
     <q-input
@@ -213,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { validateUrl } from "@/utils/zincutils";
 
 const { t } = useI18n();
 const authenticationTypeOptions = ref([

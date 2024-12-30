@@ -29,6 +29,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="loading"
       >
         <template #no-data><NoData /></template>
+        <template v-slot:body-cell-actions="props">
+          <q-td :props="props">
+            <q-btn
+              :data-test="`cipherkey-list-${props.row.name}-update`"
+              icon="edit"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('common.edit')"
+              @click="editCipherKey(props.row)"
+            ></q-btn>
+            <q-btn
+              :data-test="`cipherkey-list-${props.row.name}-delete`"
+              :icon="outlinedDelete"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('common.delete')"
+              @click="confirmDeleteCipherKey(props.row)"
+            ></q-btn>
+          </q-td>
+        </template>
         <template #top="scope">
           <div class="row full-width">
             <div
@@ -45,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="q-ml-none q-mb-xs"
                 style="width: 400px"
                 :placeholder="t('cipherKey.search')"
+                clearable
               >
                 <template #prepend>
                   <q-icon name="search" />
@@ -78,7 +107,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :scope="scope"
             :resultTotal="resultTotal"
             :perPageOptions="perPageOptions"
-            :maxRecordToReturn="maxRecordToReturn"
             position="bottom"
             @update:changeRecordPerPage="changePagination"
             @update:maxRecordToReturn="changeMaxRecordToReturn"
@@ -90,6 +118,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <add-cipher-key @cancel:hideform="hideAddDialog" />
     </div>
   </q-page>
+  <ConfirmDialog
+    title="Delete Cipher Key"
+    message="Are you sure you want to delete Cipher Key?"
+    @update:ok="deleteCipherKey"
+    @update:cancel="cancelDeleteCipherKey"
+    v-model="confirmDelete.visible"
+  />
 </template>
 
 <script lang="ts">
@@ -106,7 +141,9 @@ import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
-import cipherKeysService from "@/services/cipher_keys";
+import CipherKeysService from "@/services/cipher_keys";
+import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 export default defineComponent({
   name: "PageOrganization",
@@ -114,6 +151,7 @@ export default defineComponent({
     QTablePagination,
     NoData,
     AddCipherKey,
+    ConfirmDialog,
   },
   setup() {
     const store = useStore();
@@ -133,17 +171,38 @@ export default defineComponent({
       {
         name: "name",
         field: "name",
-        label: t("organization.name"),
+        label: t("cipherKey.name"),
         align: "left",
         sortable: true,
       },
+      {
+        name: "store_type",
+        field: "store_type",
+        label: t("cipherKey.storeType"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "mechanism_type",
+        field: "mechanism_type",
+        label: t("cipherKey.mechanismType"),
+        align: "left",
+        sortable: true,
+      },
+      {
+        name: "actions",
+        field: "actions",
+        label: t("cipherKey.actions"),
+        align: "left",
+        sortable: false,
+      },
     ]);
     const perPageOptions = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
       { label: "20", value: 20 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
+      { label: "250", value: 250 },
+      { label: "500", value: 500 },
       { label: "All", value: 0 },
     ];
     const resultTotal = ref<number>(0);
@@ -153,43 +212,37 @@ export default defineComponent({
       rowsPerPage: 20,
     });
 
+    const confirmDelete: Ref<{
+      visible: boolean;
+      data: any;
+    }> = ref({ visible: false, data: null });
+
     watch(
       () => router.currentRoute.value.query?.action,
       (action) => {
-        if (action == "add") {
+        if (action == "add" || action == "edit") {
           showAddDialog.value = true;
         }
       },
     );
 
     onMounted(() => {
-      if (router.currentRoute.value.query.action == "add") {
+      if (
+        router.currentRoute.value.query.action == "add" ||
+        router.currentRoute.value.query.action == "edit"
+      ) {
         showAddDialog.value = true;
       }
-
-      getCipherKeysData();
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.query.action == "add") {
+      if (
+        router.currentRoute.value.query.action == "add" ||
+        router.currentRoute.value.query.action == "edit"
+      ) {
         showAddDialog.value = true;
       }
     });
-
-    const getCipherKeysData = () => {
-      cipherKeysService
-        .list(store.state.selectedOrganization.identifier)
-        .then((response) => {
-          tabledata.value = response.data;
-          resultTotal.value = response.data.length;
-        })
-        .catch((error) => {
-          $q.notify({
-            type: "negative",
-            message: error.response.data.message,
-          });
-        });
-    };
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -208,16 +261,16 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+    };
 
-      if (evt) {
-        let button_txt = evt.target.innerText;
-        segment.track("Button Click", {
-          button: button_txt,
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          page: "Organizations",
-        });
-      }
+    const editCipherKey = (data: any) => {
+      router.push({
+        query: {
+          action: "edit",
+          org_identifier: store.state.selectedOrganization.identifier,
+          name: data.name,
+        },
+      });
     };
 
     const getData = () => {
@@ -225,18 +278,92 @@ export default defineComponent({
         spinner: true,
         message: "Please wait while loading data...",
       });
+
+      CipherKeysService.list(store.state.selectedOrganization.identifier)
+        .then((response) => {
+          const data = [];
+          const responseData = response.data.keys;
+          for (let i = 0; i < responseData.length; i++) {
+            data.push({
+              "#": i + 1,
+              name: responseData[i].name,
+              store_type: responseData[i].key.store.type,
+              mechanism_type: responseData[i].key.mechanism.type,
+            });
+          }
+
+          tabledata.value = data;
+          resultTotal.value = responseData.length;
+          dismiss();
+        })
+        .catch((error) => {
+          dismiss();
+          $q.notify({
+            type: "negative",
+            message: error.response.data.message,
+          });
+        });
     };
 
     getData();
 
-    const hideAddDialog = () => {
+    const hideAddDialog = async () => {
       showAddDialog.value = !showAddDialog.value;
+      await getData();
       router.push({
         name: "cipherKeys",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+    };
+
+    const deleteCipherKey = () => {
+      if (confirmDelete.value?.data?.name) {
+        const dismiss = $q.notify({
+          spinner: true,
+          message: "Please wait while processing delete request...",
+          type: "warning",
+        });
+        CipherKeysService.delete(
+          store.state.selectedOrganization.identifier,
+          confirmDelete.value.data.name,
+        )
+          .then(() => {
+            dismiss();
+            $q.notify({
+              type: "positive",
+              message: `Cipher Key ${confirmDelete.value.data.name} deleted successfully`,
+              timeout: 2000,
+            });
+
+            getData();
+          })
+          .catch((err) => {
+            dismiss();
+            if (err.response.data.code === 409) {
+              $q.notify({
+                type: "negative",
+                message: err.response.data.message,
+                timeout: 2000,
+              });
+            } else {
+              $q.notify({
+                type: "negative",
+                message: err.response.data.message,
+                timeout: 2000,
+              });
+            }
+          });
+      }
+    };
+    const confirmDeleteCipherKey = (destination: any) => {
+      confirmDelete.value.visible = true;
+      confirmDelete.value.data = destination;
+    };
+    const cancelDeleteCipherKey = () => {
+      confirmDelete.value.visible = false;
+      confirmDelete.value.data = null;
     };
 
     return {
@@ -269,6 +396,12 @@ export default defineComponent({
         return filtered;
       },
       hideAddDialog,
+      cancelDeleteCipherKey,
+      confirmDeleteCipherKey,
+      confirmDelete,
+      outlinedDelete,
+      editCipherKey,
+      deleteCipherKey,
     };
   },
 });

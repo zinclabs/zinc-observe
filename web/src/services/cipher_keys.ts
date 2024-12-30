@@ -16,34 +16,21 @@
 import http from "./http";
 
 const cipherKeys = {
-  // create: ({ org_identifier, template_name, data }: any) => {
-  //   return http().post(`/api/${org_identifier}/alerts/templates`, data);
-  // },
-  // update: ({ org_identifier, template_name, data }: any) => {
-  //   return http().put(
-  //     `/api/${org_identifier}/alerts/templates/${encodeURIComponent(
-  //       template_name
-  //     )}`,
-  //     data
-  //   );
-  // },
-  list: (org_identifier: string) => {
-    return http().get(`/api/${org_identifier}/cipher_keys/`);
+  create: (org_identifier: string, data: any) => {
+    return http().post(`/api/${org_identifier}/cipher_keys`, data);
   },
-  // get_by_name: ({ org_identifier, template_name }: any) => {
-  //   return http().get(
-  //     `/api/${org_identifier}/alerts/templates/${encodeURIComponent(
-  //       template_name
-  //     )}`
-  //   );
-  // },
-  // delete: ({ org_identifier, template_name }: any) => {
-  //   return http().delete(
-  //     `/api/${org_identifier}/alerts/templates/${encodeURIComponent(
-  //       template_name
-  //     )}`
-  //   );
-  // },
+  update: (org_identifier: string, data: any) => {
+    return http().put(`/api/${org_identifier}/cipher_keys`, data);
+  },
+  list: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/cipher_keys`);
+  },
+  get_by_name: (org_identifier: string, name: string) => {
+    return http().get(`/api/${org_identifier}/cipher_keys/${name}`);
+  },
+  delete: (org_identifier: string, name: string) => {
+    return http().delete(`/api/${org_identifier}/cipher_keys/${name}`);
+  },
 };
 
 export default cipherKeys;
