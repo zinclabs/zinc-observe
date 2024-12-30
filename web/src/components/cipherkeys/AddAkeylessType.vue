@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Add input filed for base URL, access id with URL validation from q-input-->
     <q-input
       data-test="add-cipher-key-akeyless-baseurl-input"
-      v-model="formData.key.store.akeyless.base_url"
+      v-model="frmData.key.store.akeyless.base_url"
       :label="t('cipherKey.baseURL') + ' *'"
       color="input-border"
       bg-color="input-bg"
@@ -29,13 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense
       :rules="[
         (val: any) => !!val || 'Base URL is required',
-        (val: any) => validateUrl(val) || 'Please provide correct URL.'
+        (val: any) => validateUrl(val) || 'Please provide correct URL.',
       ]"
     />
-    <!-- Add input filed for access id with URL validation from q-input-->
+    <!-- Add input filed for access id with URL validation from q-input -->
     <q-input
       data-test="add-cipher-key-akeyless-access-id-input"
-      v-model="formData.key.store.akeyless.access_id"
+      v-model="frmData.key.store.akeyless.access_id"
       :label="t('cipherKey.accessId') + ' *'"
       color="input-border"
       bg-color="input-bg"
@@ -45,14 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       filled
       dense
       :rules="[
-        (val: any) => !!val || t('validation.required'),
+        (val: any) => !!val || 'Access ID is required',
         (val: string) =>
           /^[a-zA-Z0-9-]*$/.test(val) || 'Access ID should be alphanumeric',
       ]"
     />
     <q-select
       data-test="add-cipher-key-auth-method-input"
-      v-model="formData.key.store.akeyless.auth.type"
+      v-model="frmData.key.store.akeyless.auth.type"
       :label="t('cipherKey.authenticationType') + ' *'"
       color="input-border q-w-lg"
       bg-color="input-bg"
@@ -71,20 +71,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <fieldset
       class="q-fieldset q-pa-md q-w-lg"
-      v-if="formData.key.store.akeyless.auth.type != ''"
+      v-if="frmData.key.store.akeyless.auth.type != ''"
     >
       <legend class="q-caption bg-white q-px-sm">
-        {{
-          getAuthenticationTypeLabel(
-            formData.key.store.akeyless.auth.type,
-          )
-        }}
+        {{ getAuthenticationTypeLabel(frmData.key.store.akeyless.auth.type) }}
         Configuration
       </legend>
-      <div v-if="formData.key.store.akeyless.auth.type === 'access_key'">
+      <div v-if="frmData.key.store.akeyless.auth.type === 'access_key'">
         <q-input
           data-test="add-cipher-key-akeyless-access-key-input"
-          v-model="formData.key.store.akeyless.auth.access_key"
+          v-model="frmData.key.store.akeyless.auth.access_key"
           :label="t('cipherKey.accessKey') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -93,13 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           outlined
           filled
           dense
-          :rules="[(val: any) => !!val || t('validation.required')]"
+          :rules="[(val: any) => !!val || 'Access Key is required']"
         />
       </div>
-      <div v-if="formData.key.store.akeyless.auth.type === 'ldap'">
+      <div v-if="frmData.key.store.akeyless.auth.type === 'ldap'">
         <q-input
           data-test="add-cipher-key-akeyless-ldap-username-input"
-          v-model="formData.key.store.akeyless.auth.ldap.username"
+          v-model="frmData.key.store.akeyless.auth.ldap.username"
           :label="t('cipherKey.ldapUsername') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -112,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-input
           data-test="add-cipher-key-akeyless-ldap-password-input"
-          v-model="formData.key.store.akeyless.auth.ldap.password"
+          v-model="frmData.key.store.akeyless.auth.ldap.password"
           :label="t('cipherKey.ldapPassword') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -127,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </fieldset>
     <q-select
       data-test="add-cipher-key-secret-type-input"
-      v-model="formData.key.store.akeyless.store.type"
+      v-model="frmData.key.store.akeyless.store.type"
       :label="t('cipherKey.secretType') + ' *'"
       color="input-border q-w-lg"
       bg-color="input-bg"
@@ -146,16 +142,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <fieldset
       class="q-fieldset q-pa-md q-w-lg"
-      v-if="formData.key.store.akeyless.store.type != ''"
+      v-if="frmData.key.store.akeyless.store.type != ''"
     >
       <legend class="q-caption bg-white q-px-sm">
-        {{ getSecretOptionLabel(formData.key.store.akeyless.store.type) }}
+        {{ getSecretOptionLabel(frmData.key.store.akeyless.store.type) }}
         Configuration
       </legend>
-      <div v-if="formData.key.store.akeyless.store.type === 'static_secret'">
+      <div v-if="frmData.key.store.akeyless.store.type === 'static_secret'">
         <q-input
           data-test="add-cipher-key-akeyless-static-secret-name-input"
-          v-model="formData.key.store.akeyless.store.static_secret"
+          v-model="frmData.key.store.akeyless.store.static_secret"
           :label="t('cipherKey.staticSecretName') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -167,10 +163,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rules="[(val: any) => !!val || 'Static Secret Name is required']"
         />
       </div>
-      <div v-if="formData.key.store.akeyless.store.type === 'dfc'">
+      <div v-if="frmData.key.store.akeyless.store.type === 'dfc'">
         <q-input
           data-test="add-cipher-key-akeyless-dfc-name-input"
-          v-model="formData.key.store.akeyless.store.dfc.name"
+          v-model="frmData.key.store.akeyless.store.dfc.name"
           :label="t('cipherKey.dfcName') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -183,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-input
           data-test="add-cipher-key-akeyless-dfc-iv-input"
-          v-model="formData.key.store.akeyless.store.dfc.iv"
+          v-model="frmData.key.store.akeyless.store.dfc.iv"
           :label="t('cipherKey.dfcIV') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -196,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-input
           data-test="add-cipher-key-akeyless-dfc-encrypted-data-input"
-          v-model="formData.key.store.akeyless.store.dfc.encrypted_data"
+          v-model="frmData.key.store.akeyless.store.dfc.encrypted_data"
           :label="t('cipherKey.dfcEncryptedData') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -213,53 +209,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 
-<script lang="ts" setup>
-import { ref } from "vue";
+<script lang="ts">
+import { defineComponent, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { validateUrl } from "@/utils/zincutils";
 
-const { t } = useI18n();
-const authenticationTypeOptions = ref([
-  { label: "Access Key", value: "access_key" },
-  { label: "LDAP", value: "ldap" },
-]);
-const secretTypeOptions = ref([
-  { label: "Static Secret", value: "static_secret" },
-  { label: "DFC", value: "dfc" },
-]);
-
-const getSecretOptionLabel = (value: string) => {
-  const option = secretTypeOptions.value.find(
-    (option) => option.value === value,
-  );
-  return option ? option.label : "";
-};
-
-const getAuthenticationTypeLabel = (value: string) => {
-  const option = authenticationTypeOptions.value.find(
-    (option) => option.value === value,
-  );
-  return option ? option.label : "";
-};
-
 export interface AkeylessStore {
-  key: {
-    store?: {
-      akeyless?: {
-        access_id: string;
-        base_url: string;
-        auth: {
-          type: string;
-          access_key: string;
+  store: {
+    akeyless: {
+      access_id: string;
+      base_url: string;
+      auth: {
+        type: string;
+        access_key: string;
+        ldap: {
+          username: string;
+          password: string;
         };
-        store: {
-          type: string;
-          static_secret: string;
-          dfc: {
-            name: string;
-            iv: string;
-            encrypted_data: string;
-          };
+      };
+      store: {
+        type: string;
+        static_secret: string;
+        dfc: {
+          name: string;
+          iv: string;
+          encrypted_data: string;
         };
       };
     };
@@ -271,9 +245,48 @@ export interface FormData {
   key: AkeylessStore;
   provider: Object;
 }
+export default defineComponent({
+  name: "PageOrganization",
+  props: {
+    formData: Object,
+  },
+  setup(props: any, { emit }) {
+    const { t } = useI18n();
+    const frmData = ref(props.formData || {});
 
-const props = defineProps({
-  formData: FormData,
+    const authenticationTypeOptions = ref([
+      { label: "Access Key", value: "access_key" },
+      { label: "LDAP", value: "ldap" },
+    ]);
+    const secretTypeOptions = ref([
+      { label: "Static Secret", value: "static_secret" },
+      { label: "DFC", value: "dfc" },
+    ]);
+
+    const getSecretOptionLabel = (value: string) => {
+      const option = secretTypeOptions.value.find(
+        (option) => option.value === value,
+      );
+      return option ? option.label : "";
+    };
+
+    const getAuthenticationTypeLabel = (value: string) => {
+      const option = authenticationTypeOptions.value.find(
+        (option) => option.value === value,
+      );
+      return option ? option.label : "";
+    };
+
+    return {
+      t,
+      frmData,
+      authenticationTypeOptions,
+      secretTypeOptions,
+      getSecretOptionLabel,
+      getAuthenticationTypeLabel,
+      validateUrl,
+    };
+  },
 });
 </script>
 
