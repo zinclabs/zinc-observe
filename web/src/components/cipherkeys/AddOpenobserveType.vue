@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <q-input
       data-test="add-cipher-key-openobserve-secret-input"
-      v-model="formData.key.store.local"
+      v-model="frmData.key.store.local"
       :label="t('cipherKey.secret') + ' *'"
       color="input-border"
       bg-color="input-bg"
@@ -32,13 +32,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 
-<script lang="ts" setup>
-import { ref } from "vue";
+<script lang="ts">
+import { ref, defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
-import { defineAsyncComponent } from "vue";
 
-const { t } = useI18n();
-const props = defineProps({
-  formData: Object,
+export default defineComponent({
+  name: "AddOpenobserveType",
+  props: {
+    formData: Object,
+  },
+  setup(props) {
+    const { t } = useI18n();
+    const frmData = ref(props.formData || {});
+    return {
+      t,
+      frmData,
+    };
+  },
 });
 </script>

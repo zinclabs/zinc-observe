@@ -998,7 +998,7 @@ export const maxLengthCharValidation = (
   );
 };
 
-export const validateUrl = (val) => {
+export const validateUrl = (val: string) => {
   try {
     const url = new URL(val); // Built-in URL constructor
     return url.protocol === "http:" || url.protocol === "https:";
