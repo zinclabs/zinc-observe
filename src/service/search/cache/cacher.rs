@@ -124,9 +124,9 @@ pub async fn check_cache(
         req.query.sql = origin_sql.clone();
         discard_interval = interval * 1000 * 1000; // in microseconds
     }
-    if req.query.size >= 0 {
-        *file_path = format!("{}_{}_{}", file_path, req.query.from, req.query.size);
-    }
+    // if req.query.size >= 0 {
+    //     *file_path = format!("{}", file_path, req.query.from, req.query.size);
+    // }
     let query_key = file_path.replace('/', "_");
 
     let mut is_descending = true;
@@ -193,7 +193,7 @@ pub async fn check_cache(
         for res in cached_responses {
             if res.has_cached_data {
                 multi_resp.has_cached_data = true;
-                multi_resp.cached_response.push(res.cached_response);
+                multi_resp.cached_response.push(res);
             }
         }
 
@@ -215,7 +215,7 @@ pub async fn check_cache(
         multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
         multi_resp.took = start.elapsed().as_millis() as usize;
-
+        multi_resp.file_path = file_path.to_string();
         multi_resp
     } else {
         let c_resp = match crate::service::search::cluster::cacher::get_cached_results(
@@ -278,14 +278,15 @@ pub async fn check_cache(
                 }
             }
         };
+        multi_resp.deltas = c_resp.deltas.clone();
         multi_resp.has_cached_data = c_resp.has_cached_data;
         multi_resp.is_descending = is_descending;
-        multi_resp.cached_response.push(c_resp.cached_response);
+        multi_resp.cached_response.push(c_resp);
         multi_resp.took = start.elapsed().as_millis() as usize;
-        multi_resp.deltas = c_resp.deltas;
         multi_resp.cache_query_response = true;
         multi_resp.limit = sql.limit as i64;
         multi_resp.ts_column = result_ts_col;
+        multi_resp.file_path = file_path.to_string();
         multi_resp
     }
 }
@@ -658,6 +659,9 @@ fn calculate_deltas_multi(
             let mut end_time = meta.response_start_time;
             if end_time % histogram_interval != 0 {
                 end_time = end_time - (end_time % histogram_interval);
+                if end_time < start_time {
+                    end_time = start_time;
+                }
             }
             end_time
         } else {

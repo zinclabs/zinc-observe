@@ -183,6 +183,10 @@ impl Sample {
     pub(crate) fn new(timestamp: i64, value: f64) -> Self {
         Self { timestamp, value }
     }
+
+    pub(crate) fn is_nan(&self) -> bool {
+        self.value.is_nan()
+    }
 }
 
 #[derive(Debug, Clone)]

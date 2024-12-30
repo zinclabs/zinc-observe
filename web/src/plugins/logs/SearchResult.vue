@@ -49,8 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :max="
               Math.max(
                 1,
-                searchObj.data.queryResults?.partitionDetail?.paginations
-                  ?.length || 0,
+                (searchObj.communicationMethod === 'ws'
+                  ? searchObj.data.queryResults?.pagination?.length
+                  : searchObj.data.queryResults?.partitionDetail?.paginations
+                      ?.length) || 0,
               )
             "
             :input="false"
@@ -83,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></q-select>
         </div>
       </div>
-      <div v-if="searchObj.data.histogram.errorMsg == ''">
+      <div v-if="searchObj.data?.histogram?.errorMsg == ''">
         <ChartRenderer
           v-if="searchObj.meta.showHistogram"
           data-test="logs-search-result-bar-chart"
@@ -105,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-else-if="
-          searchObj.data.histogram.errorMsg != '' &&
+          searchObj.data.histogram?.errorMsg != '' &&
           searchObj.meta.showHistogram
         "
       >
@@ -123,11 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("search.histogramErrorBtnLabel") }}</q-btn
           ><br />
           <span v-if="disableMoreErrorDetails">
-            {{ searchObj.data.histogram.errorMsg }}
+            {{ searchObj.data.histogram?.errorMsg }}
           </span>
         </h6>
         <h6 class="text-center" v-else>
-          {{ searchObj.data.histogram.errorMsg }}
+          {{ searchObj.data.histogram?.errorMsg }}
         </h6>
       </div>
       <tenstack-table
@@ -210,6 +212,7 @@ import {
   onMounted,
   onUpdated,
   defineAsyncComponent,
+  watch,
 } from "vue";
 import { copyToClipboard, useQuasar } from "quasar";
 import { useStore } from "vuex";
@@ -307,16 +310,19 @@ export default defineComponent({
       } else if (actionType == "recordsPerPage") {
         this.searchObj.data.resultGrid.currentPage = 1;
         this.pageNumberInput = this.searchObj.data.resultGrid.currentPage;
-        this.refreshPartitionPagination(true);
+        this.searchObj.communicationMethod === "ws"
+          ? this.refreshPagination()
+          : this.refreshPartitionPagination(true);
         this.$emit("update:recordsPerPage");
         this.scrollTableToTop(0);
       } else if (actionType == "pageChange") {
-        if (
-          this.pageNumberInput >
-          Math.ceil(
-            this.searchObj.data.queryResults.partitionDetail.paginations.length,
-          )
-        ) {
+        const maxPages =
+          this.searchObj.communicationMethod === "ws"
+            ? this.searchObj.data.queryResults.pagination.length
+            : this.searchObj.data.queryResults.partitionDetail.paginations
+                .length;
+
+        if (this.pageNumberInput > Math.ceil(maxPages)) {
           this.$q.notify({
             type: "negative",
             message:
@@ -384,6 +390,7 @@ export default defineComponent({
       filterHitsColumns,
       reorderSelectedFields,
       getFilterExpressionByFieldType,
+      refreshPagination,
     } = useLogs();
     const pageNumberInput = ref(1);
     const totalHeight = ref(0);
@@ -545,6 +552,26 @@ export default defineComponent({
       );
     });
 
+    const getPartitionPaginations = computed(() => {
+      return searchObj.data.queryResults?.partitionDetail?.paginations || [];
+    });
+
+    const getSocketPaginations = computed(() => {
+      return searchObj.data.queryResults.pagination || [];
+    });
+
+    const getPaginations = computed(() => {
+      try {
+        if (searchObj.communicationMethod === "http") {
+          return getPartitionPaginations.value || [];
+        } else {
+          return getSocketPaginations.value || [];
+        }
+      } catch (e) {
+        return [];
+      }
+    });
+
     return {
       t,
       store,
@@ -580,6 +607,8 @@ export default defineComponent({
       scrollTableToTop,
       getColumns,
       reorderSelectedFields,
+      getPaginations,
+      refreshPagination,
     };
   },
   computed: {

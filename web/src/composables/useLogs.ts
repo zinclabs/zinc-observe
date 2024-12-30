@@ -15,10 +15,24 @@
 
 import { date, useQuasar } from "quasar";
 import { useI18n } from "vue-i18n";
-import { reactive, ref, type Ref, toRaw, nextTick, onBeforeMount } from "vue";
+import {
+  reactive,
+  ref,
+  type Ref,
+  toRaw,
+  nextTick,
+  onBeforeMount,
+  watch,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { cloneDeep } from "lodash-es";
+import { cloneDeep, startCase } from "lodash-es";
+import {
+  SearchRequestPayload,
+  WebSocketSearchResponse,
+  WebSocketSearchPayload,
+  WebSocketErrorResponse,
+} from "@/ts/interfaces/query";
 
 import {
   useLocalLogFilterField,
@@ -34,8 +48,10 @@ import {
   convertToCamelCase,
   getFunctionErrorMessage,
   getUUID,
+  getWebSocketUrl,
   generateTraceContext,
   arraysMatch,
+  isWebSocketEnabled,
 } from "@/utils/zincutils";
 import {
   convertDateToTimestamp,
@@ -53,11 +69,12 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import useFunctions from "@/composables/useFunctions";
 import useNotifications from "@/composables/useNotifications";
 import useStreams from "@/composables/useStreams";
+import useWebSocket from "@/composables/useWebSocket";
 
 import searchService from "@/services/search";
-import type { LogsQueryPayload } from "@/ts/interfaces/query";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
+import useSearchWebSocket from "./useSearchWebSocket";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -67,6 +84,7 @@ const defaultObject = {
   loadingStream: false,
   loadingSavedView: false,
   shouldIgnoreWatcher: false,
+  communicationMethod: "http",
   config: {
     splitterModel: 20,
     lastSplitterPosition: 0,
@@ -116,9 +134,9 @@ const defaultObject = {
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
     resultGrid: {
+      rowsPerPage: 100,
       wrapCells: false,
       manualRemoveFields: false,
-      rowsPerPage: 100,
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
@@ -211,9 +229,16 @@ const defaultObject = {
     customDownloadQueryObj: <any>{},
     functionError: "",
     searchRequestTraceIds: <string[]>[],
+    searchWebSocketRequestIdsAndTraceIds: <
+      { requestId: string; traceId: string }[]
+    >[],
     isOperationCancelled: false,
+    searchRetriesCount: <{ [key: string]: number }>{},
   },
 };
+
+const maxSearchRetries = 2;
+const searchReconnectDelay = 1000; // 1 second
 
 // TODO OK:
 // useStreamManagement for stream-related functions
@@ -248,6 +273,8 @@ const searchAggData = reactive({
   hasAggregation: false,
 });
 
+const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
+
 let histogramResults: any = [];
 let histogramMappedData: any = [];
 const intervalMap: any = {
@@ -271,8 +298,15 @@ const useLogs = () => {
   const router = useRouter();
   let parser: any;
   const fieldValues = ref();
-  const initialQueryPayload: Ref<LogsQueryPayload | null> = ref(null);
+
   const notificationMsg = ref("");
+
+  const {
+    fetchQueryDataWithWebSocket,
+    sendSearchMessageBasedOnRequestId,
+    cancelSearchQueryBasedOnRequestId,
+    closeSocketBasedOnRequestId,
+  } = useSearchWebSocket();
 
   const { updateFieldKeywords } = useSqlSuggestions();
 
@@ -1035,8 +1069,12 @@ const useLogs = () => {
     }
   }
 
-  const isNonAggregatedQuery = (parsedSQL: any = null) => {
-    return !parsedSQL?.limit || parsedSQL?.limit.value?.length == 0;
+  const isLimitQuery = (parsedSQL: any = null) => {
+    return parsedSQL?.limit && parsedSQL?.limit.value?.length > 0;
+  };
+
+  const isDistinctQuery = (parsedSQL: any = null) => {
+    return parsedSQL?.distinct?.type === "DISTINCT";
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -1064,9 +1102,10 @@ const useLogs = () => {
         return;
       }
 
+      // In Limit we don't need to get partitions, as we directly hit search request with query limit
       if (
         !searchObj.meta.sqlMode ||
-        (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL))
+        (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL))
       ) {
         const partitionQueryReq: any = {
           sql: queryReq.query.sql,
@@ -1307,7 +1346,7 @@ const useLogs = () => {
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
-              (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
+              (searchObj.meta.sqlMode && !isLimitQuery(parsedSQL)))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
@@ -1439,6 +1478,19 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
+      // get websocket enable config from store
+      // window will have more priority
+      // if window has use_web_socket property then use that
+      // else use organization settings
+      const shouldUseWebSocket = isWebSocketEnabled();
+
+      searchObj.communicationMethod = shouldUseWebSocket ? "ws" : "http";
+
+      if (searchObj.communicationMethod === "ws") {
+        getDataThroughWebSocket(isPagination);
+        return;
+      }
+
       // searchObj.data.histogram.chartParams.title = "";
       searchObjDebug["queryDataStartTime"] = performance.now();
       searchObj.meta.showDetailTab = false;
@@ -1456,11 +1508,9 @@ const useLogs = () => {
         isNaN(searchObj.data.datetime.endTime) ||
         isNaN(searchObj.data.datetime.startTime)
       ) {
-        const queryParams: any = router.currentRoute.value.query;
-        const currentPeriod: string = queryParams?.period || "15m";
-        const extractedDate: any = extractTimestamps(currentPeriod);
-        searchObj.data.datetime.startTime = extractedDate.from;
-        searchObj.data.datetime.endTime = extractedDate.to;
+        setDateTime(
+          (router.currentRoute.value?.query?.period as string) || "15m",
+        );
       }
 
       searchObjDebug["buildSearchStartTime"] = performance.now();
@@ -1492,9 +1542,8 @@ const useLogs = () => {
           searchObj.data.tempFunctionContent != "" &&
           searchObj.meta.toggleFunction
         ) {
-          queryReq.query["query_fn"] = b64EncodeUnicode(
-            searchObj.data.tempFunctionContent,
-          );
+          queryReq.query["query_fn"] =
+            b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
         }
 
         // in case of relative time, set start_time and end_time to query
@@ -1543,6 +1592,7 @@ const useLogs = () => {
         searchObj.data.customDownloadQueryObj = JSON.parse(
           JSON.stringify(queryReq),
         );
+
         // get the current page detail and set it into query request
         queryReq.query.start_time =
           searchObj.data.queryResults.partitionDetail.paginations[
@@ -1603,7 +1653,7 @@ const useLogs = () => {
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
             (!searchObj.meta.sqlMode ||
-              (searchObj.meta.sqlMode && isNonAggregatedQuery(parsedSQL)))) ||
+              isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&
@@ -1678,9 +1728,29 @@ const useLogs = () => {
           }
           await generateHistogramData();
           refreshPartitionPagination(true);
-        } else if (searchObj.meta.sqlMode && !isNonAggregatedQuery(parsedSQL)) {
+        } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
           resetHistogramWithError(
             "Histogram is not available for limit queries.",
+          );
+        } else if (searchObj.meta.sqlMode && isDistinctQuery(parsedSQL)) {
+          let aggFlag = false;
+          if (parsedSQL) {
+            aggFlag = hasAggregation(parsedSQL?.columns);
+          }
+          if (
+            queryReq.query.from == 0 &&
+            searchObj.data.queryResults.hits.length > 0 &&
+            !aggFlag
+          ) {
+            setTimeout(async () => {
+              searchObjDebug["pagecountStartTime"] = performance.now();
+              // TODO : check the page count request
+              getPageCount(queryReq);
+              searchObjDebug["pagecountEndTime"] = performance.now();
+            }, 0);
+          }
+          resetHistogramWithError(
+            "Histogram is not available for DISTINCT queries.",
           );
         } else {
           let aggFlag = false;
@@ -1821,6 +1891,7 @@ const useLogs = () => {
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
+
       return parser.astify(filteredQuery);
 
       // return convertPostgreToMySql(parser.astify(filteredQuery));
@@ -1889,7 +1960,7 @@ const useLogs = () => {
           // check for total records update for the partition and update pagination accordingly
           // searchObj.data.queryResults.partitionDetail.partitions.forEach(
           //   (item: any, index: number) => {
-          searchObj.data.queryResults.scan_size = res.data.scan_size;
+          searchObj.data.queryResults.scan_size += res.data.scan_size;
           searchObj.data.queryResults.took += res.data.took;
           for (const [
             index,
@@ -1992,6 +2063,7 @@ const useLogs = () => {
 
       if (searchObj.data.isOperationCancelled) {
         notificationMsg.value = "Search operation is cancelled.";
+
         searchObj.loading = false;
         searchObj.data.isOperationCancelled = false;
         return;
@@ -2000,7 +2072,7 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
-        if (parsedSQL.limit != null && parsedSQL.limit.value.length != 0) {
+        if (isLimitQuery(parsedSQL)) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
           //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
@@ -2008,6 +2080,11 @@ const useLogs = () => {
           if (parsedSQL.limit.separator == "offset") {
             queryReq.query.from = parsedSQL.limit.value[1].value || 0;
           }
+          delete queryReq.query.track_total_hits;
+        }
+
+        if (isDistinctQuery(parsedSQL)) {
+          searchObj.meta.resultGrid.showPagination = false;
           delete queryReq.query.track_total_hits;
         }
 
@@ -2108,6 +2185,10 @@ const useLogs = () => {
           // if total records in partition is greater than recordsPerPage then we need to update pagination
           // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
           refreshPartitionPagination(regeratePaginationFlag);
+
+          // Scan-size and took time in histogram title
+          // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
+          // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
 
           if (res.data.from > 0 || searchObj.data.queryResults.subpage > 1) {
             if (appendResult) {
@@ -2324,6 +2405,7 @@ const useLogs = () => {
           .then(async (res: any) => {
             removeTraceId(traceId);
             searchObjDebug["histogramProcessingStartTime"] = performance.now();
+
             searchObj.loading = false;
             if (searchObj.data.queryResults.aggs == null) {
               searchObj.data.queryResults.aggs = [];
@@ -3221,13 +3303,19 @@ const useLogs = () => {
         searchObj.data.queryResults.hits.length,
         searchObj.data.queryResults.total,
       );
-      if (searchObj.meta.resultGrid.showPagination == false) {
+
+      if (!searchObj.meta.resultGrid.showPagination) {
         endCount = searchObj.data.queryResults.hits.length;
         totalCount = searchObj.data.queryResults.hits.length;
       } else {
+        endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
         if (
           currentPage >=
-          searchObj.data.queryResults.partitionDetail.paginations.length - 1
+          (searchObj.communicationMethod === "ws"
+            ? searchObj.data.queryResults?.pagination?.length
+            : searchObj.data.queryResults.partitionDetail?.paginations
+                ?.length || 0) -
+            1
         ) {
           endCount = Math.min(
             startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
@@ -3252,7 +3340,7 @@ const useLogs = () => {
 
       let plusSign: string = "";
       if (
-        searchObj.data.queryResults.partitionDetail.partitions.length > 1 &&
+        searchObj.data.queryResults?.partitionDetail?.partitions?.length > 1 &&
         searchObj.meta.showHistogram == false
       ) {
         plusSign = "+";
@@ -3550,6 +3638,7 @@ const useLogs = () => {
         })
         .finally(() => {
           removeTraceId(traceId);
+
           searchObj.loading = false;
         });
     } catch (e: any) {
@@ -4007,9 +4096,29 @@ const useLogs = () => {
       );
   };
 
+  const addRequestId = (requestId: string, traceId: string) => {
+    searchObj.data.searchWebSocketRequestIdsAndTraceIds.push({
+      requestId,
+      traceId,
+    });
+  };
+
+  const removeRequestId = (requestId: string) => {
+    searchObj.data.searchWebSocketRequestIdsAndTraceIds =
+      searchObj.data.searchWebSocketRequestIdsAndTraceIds.filter(
+        (id) => id.requestId !== requestId,
+      );
+  };
+
   const cancelQuery = () => {
+    if (searchObj.communicationMethod === "ws") {
+      sendCancelSearchMessage();
+      return;
+    }
+
     const tracesIds = [...searchObj.data.searchRequestTraceIds];
     searchObj.data.isOperationCancelled = true;
+
     searchService
       .delete_running_queries(
         store.state.selectedOrganization.identifier,
@@ -4355,6 +4464,852 @@ const useLogs = () => {
     return node && node.type === "column_ref";
   }
 
+  const getDataThroughWebSocket = (isPagination: boolean) => {
+    try {
+      if (isPagination) {
+        searchObj.data.queryResults.hits = [];
+      } else {
+        resetQueryData();
+        searchObj.data.queryResults = {};
+      }
+
+      // reset searchAggData
+      searchAggData.total = 0;
+      searchAggData.hasAggregation = false;
+
+      searchObj.meta.showDetailTab = false;
+      searchObj.meta.searchApplied = true;
+      searchObj.data.functionError = "";
+      if (
+        !searchObj.data.stream.streamLists?.length ||
+        searchObj.data.stream.selectedStream.length == 0
+      ) {
+        searchObj.loading = false;
+        return;
+      }
+
+      if (
+        Number.isNaN(searchObj.data.datetime.endTime) ||
+        Number.isNaN(searchObj.data.datetime.startTime)
+      ) {
+        setDateTime(
+          (router.currentRoute.value?.query?.period as string) || "15m",
+        );
+      }
+
+      const queryReq: SearchRequestPayload = buildSearch();
+
+      if (queryReq === null) {
+        searchObj.loading = false;
+        if (!notificationMsg.value) {
+          notificationMsg.value = "Search query is empty or invalid.";
+        }
+        return;
+      }
+
+      if (!queryReq) {
+        searchObj.loading = false;
+        throw new Error(
+          notificationMsg.value ||
+            "Something went wrong while creating Search Request.",
+        );
+      }
+
+      // get function definition
+      if (
+        searchObj.data.tempFunctionContent != "" &&
+        searchObj.meta.toggleFunction
+      ) {
+        queryReq.query["query_fn"] =
+          b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+      }
+
+      if (searchObj.data.datetime.type === "relative") {
+        if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
+        else {
+          if (
+            searchObj.meta.refreshInterval == 0 &&
+            router.currentRoute.value.name == "logs" &&
+            searchObj.data.queryResults.hasOwnProperty("hits")
+          ) {
+            const start_time: number =
+              initialQueryPayload.value?.query?.start_time || 0;
+            const end_time: number =
+              initialQueryPayload.value?.query?.end_time || 0;
+            queryReq.query.start_time = start_time;
+            queryReq.query.end_time = end_time;
+          }
+        }
+      }
+
+      // copy query request for histogram query and same for customDownload
+      searchObj.data.histogramQuery = JSON.parse(JSON.stringify(queryReq));
+
+      // reset errorCode
+      searchObj.data.errorCode = 0;
+
+      searchObj.data.histogramQuery.query.sql =
+        searchObj.data.histogramQuery.aggs.histogram;
+      searchObj.data.histogramQuery.query.sql_mode = "full";
+      searchObj.data.histogramQuery.query.size = -1;
+      delete searchObj.data.histogramQuery.query.quick_mode;
+      delete searchObj.data.histogramQuery.query.from;
+      delete searchObj.data.histogramQuery.aggs;
+      delete queryReq.aggs;
+
+      searchObj.data.customDownloadQueryObj = JSON.parse(
+        JSON.stringify(queryReq),
+      );
+
+      queryReq.query.from =
+        (searchObj.data.resultGrid.currentPage - 1) *
+        searchObj.meta.resultGrid.rowsPerPage;
+      queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
+
+      const parsedSQL: any = fnParsedSQL();
+
+      searchObj.meta.resultGrid.showPagination = true;
+
+      if (searchObj.meta.sqlMode == true) {
+        if (isLimitQuery(parsedSQL)) {
+          queryReq.query.size = parsedSQL.limit.value[0].value;
+          searchObj.meta.resultGrid.showPagination = false;
+          //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
+
+          if (parsedSQL.limit.separator == "offset") {
+            queryReq.query.from = parsedSQL.limit.value[1].value || 0;
+          }
+          delete queryReq.query.track_total_hits;
+        }
+
+        if (isDistinctQuery(parsedSQL)) {
+          searchObj.meta.resultGrid.showPagination = false;
+          delete queryReq.query.track_total_hits;
+        }
+      }
+
+      const payload = buildWebSocketPayload(queryReq, isPagination, "search");
+      const requestId = initializeWebSocketConnection(payload);
+
+      if (!requestId) {
+        throw new Error("Failed to initialize WebSocket connection");
+      }
+
+      addRequestId(requestId, payload.traceId);
+    } catch (e: any) {
+      console.error("Error while getting data through web socket", e);
+      searchObj.loading = false;
+      showErrorNotification(
+        notificationMsg.value || "Error occurred during the search operation.",
+      );
+      notificationMsg.value = "";
+    }
+  };
+
+  const buildWebSocketPayload = (
+    queryReq: SearchRequestPayload,
+    isPagination: boolean,
+    type: "search" | "histogram" | "pageCount",
+  ) => {
+    const { traceId } = generateTraceContext();
+    addTraceId(traceId);
+
+    const payload: {
+      queryReq: SearchRequestPayload;
+      type: "search" | "histogram" | "pageCount";
+      isPagination: boolean;
+      traceId: string;
+      org_id: string;
+    } = {
+      queryReq,
+      type,
+      isPagination,
+      traceId,
+      org_id: searchObj.organizationIdentifier,
+    };
+
+    return payload;
+  };
+
+  const initializeWebSocketConnection = (payload: any): string => {
+    return fetchQueryDataWithWebSocket(payload, {
+      open: sendSearchMessage,
+      close: handleSearchClose,
+      error: handleSearchError,
+      message: handleSearchResponse,
+    }) as string;
+  };
+
+  const sendSearchMessage = (requestId: string, queryReq: any) => {
+    try {
+      if (searchObj.data.isOperationCancelled) {
+        closeSocketBasedOnRequestId(requestId);
+        return;
+      }
+
+      sendSearchMessageBasedOnRequestId(requestId, {
+        type: "search",
+        content: {
+          trace_id: queryReq.traceId,
+          payload: {
+            query: queryReq.queryReq.query,
+          },
+          stream_type: searchObj.data.stream.streamType,
+          search_type: "ui",
+          use_cache: (window as any).use_cache ?? true,
+        },
+      });
+      // cancelQuery();
+    } catch (e: any) {
+      searchObj.loading = false;
+      showErrorNotification(
+        notificationMsg.value || "Error occurred while sending socket message.",
+      );
+      notificationMsg.value = "";
+    }
+  };
+
+  const setDateTime = (period: string = "15m") => {
+    const extractedDate: any = extractTimestamps(period);
+    searchObj.data.datetime.startTime = extractedDate.from;
+    searchObj.data.datetime.endTime = extractedDate.to;
+  };
+
+  // Limit, aggregation, vrl function, pagination, function error and query error
+  const handleSearchResponse = (
+    requestId: string,
+    payload: WebSocketSearchPayload,
+    response: WebSocketSearchResponse | WebSocketErrorResponse,
+  ) => {
+    if (response.type === "search_response") {
+      if (payload.type === "search") {
+        handleLogsResponse(
+          payload.queryReq,
+          payload.isPagination,
+          payload.traceId,
+          response,
+        );
+      }
+
+      if (payload.type === "histogram") {
+        handleHistogramResponse(payload.queryReq, payload.traceId, response);
+      }
+
+      if (payload.type === "pageCount") {
+        handlePageCountResponse(payload.queryReq, payload.traceId, response);
+      }
+    }
+
+    if (response.type === "error") {
+      handleSearchError(requestId, payload.traceId, response);
+    }
+
+    if (response.type === "cancel_response") {
+      searchObj.loading = false;
+      searchObj.loadingHistogram = false;
+      handleCancelQuery();
+    }
+  };
+
+  const handleLogsResponse = async (
+    queryReq: SearchRequestPayload,
+    isPagination: boolean,
+    traceId: string,
+    response: any,
+  ) => {
+    try {
+      const parsedSQL = fnParsedSQL();
+
+      if (
+        response.content.results.hasOwnProperty("function_error") &&
+        response.content.results.function_error != ""
+      ) {
+        searchObj.data.functionError = response.content.results.function_error;
+      }
+
+      if (
+        response.content.results.hasOwnProperty("function_error") &&
+        response.content.results.function_error != "" &&
+        response.content.results.hasOwnProperty("new_start_time") &&
+        response.content.results.hasOwnProperty("new_end_time")
+      ) {
+        response.content.results.function_error = getFunctionErrorMessage(
+          response.content.results.function_error,
+          response.content.results.new_start_time,
+          response.content.results.new_end_time,
+          store.state.timezone,
+        );
+        searchObj.data.datetime.startTime =
+          response.content.results.new_start_time;
+        searchObj.data.datetime.endTime = response.content.results.new_end_time;
+        searchObj.data.datetime.type = "absolute";
+        queryReq.query.start_time = response.content.results.new_start_time;
+        queryReq.query.end_time = response.content.results.new_end_time;
+        searchObj.data.histogramQuery.query.start_time =
+          response.content.results.new_start_time;
+        searchObj.data.histogramQuery.query.end_time =
+          response.content.results.new_end_time;
+
+        updateUrlQueryParams();
+      }
+
+      if (searchObj.meta.sqlMode) {
+        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+          searchAggData.total =
+            searchAggData.total + response.content?.results?.total;
+          searchAggData.hasAggregation = true;
+          searchObj.meta.resultGrid.showPagination = false;
+        }
+      }
+
+      resetFieldValues();
+
+      // Refresh Interval
+      if (
+        searchObj.meta.refreshInterval > 0 &&
+        router.currentRoute.value.name == "logs" &&
+        searchObj.data.queryResults.hasOwnProperty("hits") &&
+        searchObj.data.queryResults.hits.length > 0
+      ) {
+        searchObj.data.queryResults.from = response.content.from;
+        searchObj.data.queryResults.scan_size = response.content.scan_size;
+        searchObj.data.queryResults.took = response.content.took;
+        searchObj.data.queryResults.aggs = response.content.aggs;
+        const lastRecordTimeStamp = parseInt(
+          searchObj.data.queryResults.hits[0][
+            store.state.zoConfig.timestamp_column
+          ],
+        );
+        searchObj.data.queryResults.hits = response.content.hits;
+      }
+
+      if (!searchObj.meta.refreshInterval) {
+        // In page count we set track_total_hits
+        if (!queryReq.query.hasOwnProperty("track_total_hits")) {
+          delete response.content.total;
+        }
+
+        // Scan-size and took time in histogram title
+        // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
+        // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
+        if (
+          searchObj.data.queryResults.hasOwnProperty("hits") &&
+          searchObj.data.queryResults.hits.length > 0
+        ) {
+          searchObj.data.queryResults.hits.push(
+            ...response.content.results.hits,
+          );
+
+          searchObj.data.queryResults.total += response.content.results.total;
+          searchObj.data.queryResults.took += response.content.results.took;
+          searchObj.data.queryResults.scan_size +=
+            response.content.results.scan_size;
+        } else {
+          if (isPagination) {
+            searchObj.data.queryResults.hits = response.content.results.hits;
+            searchObj.data.queryResults.from = response.content.results.from;
+            searchObj.data.queryResults.scan_size =
+              response.content.results.scan_size;
+            searchObj.data.queryResults.took = response.content.results.took;
+          } else {
+            searchObj.data.queryResults = response.content.results;
+          }
+        }
+      }
+
+      // If its a pagination request, then append
+      if (!isPagination) {
+        searchObj.data.queryResults.pagination = [];
+      }
+
+      if (isPagination) refreshPagination(true);
+
+      processPostPaginationData();
+
+      searchObj.loading = false;
+
+      searchObjDebug["paginatedDataReceivedEndTime"] = performance.now();
+    } catch (e: any) {
+      searchObj.loading = false;
+      console.log(e);
+      showErrorNotification(
+        notificationMsg.value || "Error occurred while handling logs response.",
+      );
+      notificationMsg.value = "";
+    }
+  };
+
+  const handlePageCountResponse = (
+    queryReq: SearchRequestPayload,
+    traceId: string,
+    response: any,
+  ) => {
+    removeTraceId(traceId);
+
+    if (searchObj.data.queryResults.aggs == null) {
+      searchObj.data.queryResults.aggs = [];
+    }
+
+    let regeratePaginationFlag = false;
+    if (
+      response.content.results.hits.length !=
+      searchObj.meta.resultGrid.rowsPerPage
+    ) {
+      regeratePaginationFlag = true;
+    }
+
+    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    searchObj.data.queryResults.scan_size += response.content.results.scan_size;
+    searchObj.data.queryResults.took += response.content.results.took;
+
+    // if total records in partition is greater than recordsPerPage then we need to update pagination
+    // setting up forceFlag to true to update pagination as we have check for pagination already created more than currentPage + 3 pages.
+    refreshPagination(regeratePaginationFlag);
+
+    searchObj.data.histogram.chartParams.title = getHistogramTitle();
+  };
+
+  const handleHistogramResponse = (
+    queryReq: SearchRequestPayload,
+    traceId: string,
+    response: any,
+  ) => {
+    searchObjDebug["histogramProcessingStartTime"] = performance.now();
+
+    searchObj.loading = false;
+
+    if (searchObj.data.queryResults.aggs == null) {
+      searchObj.data.queryResults.aggs = [];
+    }
+
+    if (
+      searchObj.data.queryResults.aggs.length == 0 &&
+      response.content.results.hits.length > 0
+    ) {
+      let date = new Date();
+
+      const startDateTime =
+        searchObj.data.customDownloadQueryObj.query.start_time / 1000;
+
+      const endDateTime =
+        searchObj.data.customDownloadQueryObj.query.end_time / 1000;
+
+      const nowString = response.content.results.hits[0].zo_sql_key;
+      const now = new Date(nowString);
+
+      const day = String(now.getDate()).padStart(2, "0");
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const year = now.getFullYear();
+
+      const dateToBePassed = `${day}-${month}-${year}`;
+      const hours = String(now.getHours()).padStart(2, "0");
+      let minutes = String(now.getMinutes()).padStart(2, "0");
+      if (searchObj.data.histogramInterval / 1000 <= 9999) {
+        minutes = String(now.getMinutes() + 1).padStart(2, "0");
+      }
+
+      const time = `${hours}:${minutes}`;
+
+      const currentTimeToBePassed = convertDateToTimestamp(
+        dateToBePassed,
+        time,
+        "UTC",
+      );
+      for (
+        let currentTime: any = currentTimeToBePassed.timestamp / 1000;
+        currentTime < endDateTime;
+        currentTime += searchObj.data.histogramInterval / 1000
+      ) {
+        date = new Date(currentTime);
+        histogramResults.push({
+          zo_sql_key: date.toISOString().slice(0, 19),
+          zo_sql_num: 0,
+        });
+      }
+      for (
+        let currentTime: any = currentTimeToBePassed.timestamp / 1000;
+        currentTime > startDateTime;
+        currentTime -= searchObj.data.histogramInterval / 1000
+      ) {
+        date = new Date(currentTime);
+        histogramResults.push({
+          zo_sql_key: date.toISOString().slice(0, 19),
+          zo_sql_num: 0,
+        });
+      }
+    }
+
+    searchObj.data.queryResults.aggs.push(...response.content.results.hits);
+    searchObj.data.queryResults.scan_size += response.content.results.scan_size;
+    searchObj.data.queryResults.took += response.content.results.took;
+    searchObj.data.queryResults.result_cache_ratio +=
+      response.content.results.result_cache_ratio;
+
+    generateHistogramData();
+    refreshPagination(true); // check whats this
+
+    // queryReq.query.start_time =
+    //   searchObj.data.queryResults.partitionDetail.paginations[
+    //     searchObj.data.resultGrid.currentPage - 1
+    //   ][0].startTime;
+    // queryReq.query.end_time =
+    //   searchObj.data.queryResults.partitionDetail.paginations[
+    //     searchObj.data.resultGrid.currentPage - 1
+    //   ][0].endTime;
+
+    // if (hasAggregationFlag) {
+    //   searchObj.data.queryResults.total = res.data.total;
+    // }
+
+    searchObj.data.histogram.chartParams.title = getHistogramTitle();
+
+    searchObjDebug["histogramProcessingEndTime"] = performance.now();
+    searchObjDebug["histogramEndTime"] = performance.now();
+  };
+
+  const resetHistogramError = () => {
+    searchObj.data.histogram.errorMsg = "";
+    searchObj.data.histogram.errorCode = 0;
+    searchObj.data.histogram.errorDetail = "";
+  };
+
+  const processHistogramRequest = async (queryReq: SearchRequestPayload) => {
+    const parsedSQL: any = fnParsedSQL();
+
+    const shouldShowHistogram =
+      (isHistogramDataMissing(searchObj) &&
+        isHistogramEnabled(searchObj) &&
+        isSingleStreamSelected(searchObj) &&
+        (!searchObj.meta.sqlMode ||
+          isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
+      (isHistogramEnabled(searchObj) &&
+        isSingleStreamSelected(searchObj) &&
+        !searchObj.meta.sqlMode);
+
+    if (searchObj.data.stream.selectedStream.length > 1) {
+      const errMsg = "Histogram is not available for multi stream search.";
+      resetHistogramWithError(errMsg, 0);
+    }
+
+    if (!searchObj.data.queryResults?.hits?.length) {
+      return;
+    }
+
+    searchObj.data.queryResults.aggs = [];
+    if (shouldShowHistogram) {
+      searchObj.meta.refreshHistogram = false;
+      if (searchObj.data.queryResults.hits.length > 0) {
+        searchObjDebug["histogramStartTime"] = performance.now();
+        resetHistogramError();
+
+        searchObj.loadingHistogram = true;
+
+        await generateHistogramSkeleton();
+
+        histogramResults = [];
+
+        const payload = buildWebSocketPayload(
+          searchObj.data.histogramQuery,
+          false,
+          "histogram",
+        );
+        const requestId = initializeWebSocketConnection(payload);
+
+        addRequestId(requestId, payload.traceId);
+      }
+    } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
+      resetHistogramWithError("Histogram is not available for limit queries.");
+    } else if (searchObj.meta.sqlMode && isDistinctQuery(parsedSQL)) {
+      resetHistogramWithError(
+        "Histogram is not available for DISTINCT queries.",
+      );
+    } else {
+      let aggFlag = false;
+      if (parsedSQL) {
+        aggFlag = hasAggregation(parsedSQL?.columns);
+      }
+      if (
+        queryReq.query.from == 0 &&
+        searchObj.data.queryResults.hits.length > 0 &&
+        !aggFlag
+      ) {
+        setTimeout(async () => {
+          searchObjDebug["pagecountStartTime"] = performance.now();
+          // TODO : check the page count request
+          getPageCountThroughSocket(queryReq);
+          searchObjDebug["pagecountEndTime"] = performance.now();
+        }, 0);
+      }
+    }
+  };
+
+  function isHistogramEnabled(searchObj: any) {
+    return (
+      searchObj.meta.refreshHistogram &&
+      !searchObj.loadingHistogram &&
+      searchObj.meta.showHistogram
+    );
+  }
+
+  function isSingleStreamSelected(searchObj: any) {
+    return searchObj.data.stream.selectedStream.length <= 1;
+  }
+
+  function isNonAggregatedSQLMode(searchObj: any, parsedSQL: any) {
+    return !(
+      searchObj.meta.sqlMode &&
+      (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL))
+    );
+  }
+
+  function isHistogramDataMissing(searchObj: any) {
+    return searchObj.data.queryResults.aggs === undefined;
+  }
+
+  const handleSearchClose = (
+    requestId: string,
+    payload: any,
+    response: any,
+  ) => {
+    if (requestId) removeRequestId(requestId);
+
+    // Any case where below logic may end in recursion
+    console.log(
+      "handleSearchClose",
+      requestId,
+      searchObj.data.isOperationCancelled,
+    );
+
+    if (searchObj.data.isOperationCancelled) {
+      searchObj.loading = false;
+      searchObj.loadingHistogram = false;
+      searchObj.data.isOperationCancelled = false;
+      return;
+    }
+
+    if (response.code === 1001 || response.code === 1006) {
+      if (!searchObj.data.searchRetriesCount[payload.traceId]) {
+        searchObj.data.searchRetriesCount[payload.traceId] = 1;
+      } else {
+        searchObj.data.searchRetriesCount[payload.traceId] += 1;
+      }
+
+      if (
+        searchObj.data.searchRetriesCount[payload.traceId] <=
+        searchReconnectDelay
+      ) {
+        if (payload.type === "search") searchObj.loading = true;
+        if (payload.type === "histogram") searchObj.loadingHistogram = true;
+
+        setTimeout(() => {
+          const requestId = initializeWebSocketConnection(payload);
+
+          addRequestId(requestId, payload.traceId);
+        }, maxSearchRetries);
+
+        return;
+      } else {
+        handleSearchError(requestId, payload, {
+          content: {
+            message:
+              "WebSocket connection terminated unexpectedly. Please check your network and try again",
+            trace_id: payload.traceId,
+            code: response.code,
+            error_detail: "",
+          },
+          type: "error",
+        });
+      }
+    }
+
+    if (searchObj.data.searchRetriesCount[payload.traceId]) {
+      delete searchObj.data.searchRetriesCount[payload.traceId];
+    }
+
+    if (payload.traceId) removeTraceId(payload.traceId);
+
+    if (
+      payload.type === "search" &&
+      !payload.isPagination &&
+      !searchObj.data.isOperationCancelled
+    ) {
+      processHistogramRequest(payload.queryReq);
+    }
+
+    if (payload.type === "search") searchObj.loading = false;
+    if (payload.type === "histogram") searchObj.loadingHistogram = false;
+    searchObj.data.isOperationCancelled = false;
+  };
+
+  const handleSearchError = (
+    requestId: string,
+    request: any,
+    err: WebSocketErrorResponse,
+  ) => {
+    searchObj.loading = false;
+    searchObj.loadingHistogram = false;
+
+    const { message, trace_id, code, error_detail } = err.content;
+
+    // 20009 is the code for query cancelled
+    if (code === 20009) {
+      handleCancelQuery();
+    }
+
+    if (trace_id) removeTraceId(trace_id);
+
+    const errorMsg = constructErrorMessage({
+      message,
+      code,
+      trace_id,
+      defaultMessage: "Error while processing request",
+    });
+
+    searchObj.data.errorDetail = error_detail || "";
+    searchObj.data.errorMsg = errorMsg;
+    notificationMsg.value = errorMsg;
+  };
+
+  const constructErrorMessage = ({
+    message,
+    code,
+    trace_id,
+    defaultMessage,
+  }: {
+    message?: string;
+    code?: number;
+    trace_id?: string;
+    defaultMessage: string;
+  }): string => {
+    let errorMsg = message || defaultMessage;
+
+    const customMessage = logsErrorMessage(code || 0);
+    if (customMessage) {
+      errorMsg = t(customMessage);
+    }
+
+    if (trace_id) {
+      errorMsg += ` <br><span class='text-subtitle1'>TraceID: ${trace_id}</span>`;
+    }
+
+    return errorMsg;
+  };
+
+  const refreshPagination = (regenrateFlag: boolean = false) => {
+    try {
+      const { rowsPerPage } = searchObj.meta.resultGrid;
+      const { currentPage } = searchObj.data.resultGrid;
+
+      let total = 0;
+      let totalPages = 0;
+
+      total = (searchObj.data.queryResults.aggs || []).reduce(
+        (
+          acc: number,
+          item: {
+            zo_sql_num: number;
+          },
+        ) => {
+          return acc + item.zo_sql_num;
+        },
+        0,
+      );
+
+      searchObj.data.queryResults.total = total;
+      searchObj.data.queryResults.pagination = [];
+
+      totalPages = Math.ceil(total / rowsPerPage);
+
+      console.log("Total Pages", searchObj.data.queryResults.total, totalPages);
+
+      for (let i = 0; i < totalPages; i++) {
+        if (i + 1 > currentPage + 10) {
+          break;
+        }
+        searchObj.data.queryResults.pagination.push({
+          from: i * rowsPerPage + 1,
+          size: rowsPerPage,
+        });
+      }
+    } catch (e: any) {
+      console.log("Error while refreshing partition pagination", e);
+      notificationMsg.value = "Error while refreshing partition pagination.";
+      return false;
+    }
+  };
+
+  const getPageCountThroughSocket = async (queryReq: any) => {
+    searchObj.data.countErrorMsg = "";
+    queryReq.query.size = 0;
+    delete queryReq.query.from;
+    delete queryReq.query.quick_mode;
+    queryReq.query["sql_mode"] = "full";
+
+    queryReq.query.track_total_hits = true;
+
+    const payload = buildWebSocketPayload(queryReq, false, "pageCount");
+
+    const requestId = initializeWebSocketConnection(payload);
+
+    addRequestId(requestId, payload.traceId);
+  };
+
+  const sendCancelSearchMessage = () => {
+    try {
+      searchObj.data.isOperationCancelled = true;
+
+      // loop on all requestIds
+      searchObj.data.searchWebSocketRequestIdsAndTraceIds.forEach(
+        ({ requestId, traceId }) => {
+          cancelSearchQueryBasedOnRequestId(requestId, traceId);
+        },
+      );
+    } catch (error: any) {
+      console.error("Failed to cancel WebSocket searches:", error);
+      showErrorNotification("Failed to cancel search operations");
+    }
+  };
+
+  const handleCancelQuery = () => {
+    $q.notify({
+      message: "Running query cancelled successfully",
+      color: "positive",
+      position: "bottom",
+      timeout: 4000,
+    });
+  };
+
+  const handlePageCountError = (err: any) => {
+    searchObj.loading = false;
+    let trace_id = "";
+    searchObj.data.countErrorMsg = "Error while retrieving total events: ";
+    if (err.response != undefined) {
+      if (err.response.data.hasOwnProperty("trace_id")) {
+        trace_id = err.response.data?.trace_id;
+      }
+    } else {
+      if (err.hasOwnProperty("trace_id")) {
+        trace_id = err?.trace_id;
+      }
+    }
+
+    const customMessage = logsErrorMessage(err?.response?.data.code);
+    searchObj.data.errorCode = err?.response?.data.code;
+
+    notificationMsg.value = searchObj.data.countErrorMsg;
+
+    if (err?.request?.status >= 429) {
+      notificationMsg.value = err?.response?.data?.message;
+      searchObj.data.countErrorMsg += err?.response?.data?.message;
+    }
+
+    if (trace_id) {
+      searchObj.data.countErrorMsg += " TraceID:" + trace_id;
+      notificationMsg.value += " TraceID:" + trace_id;
+      trace_id = "";
+    }
+  };
+
   return {
     searchObj,
     searchAggData,
@@ -4394,11 +5349,13 @@ const useLogs = () => {
     cancelQuery,
     reorderSelectedFields,
     resetHistogramWithError,
-    isNonAggregatedQuery,
+    isLimitQuery,
     extractTimestamps,
     getFilterExpressionByFieldType,
     setSelectedStreams,
     extractValueQuery,
+    initialQueryPayload,
+    refreshPagination,
   };
 };
 

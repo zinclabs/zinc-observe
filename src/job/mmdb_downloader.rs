@@ -50,13 +50,14 @@ pub async fn run() -> Result<(), anyhow::Error> {
 async fn run_download_files() {
     let cfg = config::get_config();
 
+    log::info!("Checking mmdb files");
+
     // send request and await response
     let client = reqwest::Client::new();
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().common.enable_enterprise_mmdb {
         o2_enterprise::enterprise::mmdb::mmdb_downloader::run_download_files().await;
-        let client = Lazy::get(&CLIENT_INITIALIZED);
 
         let fname = format!(
             "{}{}",
@@ -64,7 +65,7 @@ async fn run_download_files() {
             get_o2_config().common.mmdb_enterprise_file_name
         );
 
-        if client.is_none() {
+        if Lazy::get(&CLIENT_INITIALIZED).is_none() {
             update_global_maxmind_client(&fname).await;
             log::info!("Maxmind client initialized");
             Lazy::force(&MMDB_INIT_NOTIFIER).notify_one();
@@ -110,9 +111,7 @@ async fn run_download_files() {
         }
     }
 
-    let client = Lazy::get(&CLIENT_INITIALIZED);
-
-    if client.is_none() {
+    if Lazy::get(&CLIENT_INITIALIZED).is_none() {
         update_global_maxmind_client(&asn_fname).await;
         update_global_maxmind_client(&city_fname).await;
         log::info!("Maxmind client initialized");
@@ -128,6 +127,8 @@ async fn run_download_files() {
             update_global_maxmind_client(&city_fname).await;
         }
     }
+
+    log::info!("Maxmind client initialized");
 
     Lazy::force(&CLIENT_INITIALIZED);
 }

@@ -19,7 +19,7 @@ use std::{
 };
 
 use config::{
-    ider,
+    get_config, ider,
     meta::{
         cluster::{get_internal_grpc_token, RoleGroup},
         search::ScanStats,
@@ -43,7 +43,10 @@ use crate::{
     common::infra::cluster,
     service::{
         grpc::get_cached_channel,
-        promql::{micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK},
+        promql::{
+            adjust_start_end, micros, value::*, MetricsQueryRequest, DEFAULT_LOOKBACK,
+            DEFAULT_MAX_POINTS_PER_SERIES,
+        },
         search::{server_internal_error, MetadataMap},
         self_reporting::report_request_usage_stats,
     },
@@ -55,8 +58,8 @@ pub mod grpc;
 pub async fn search(
     org_id: &str,
     req: &MetricsQueryRequest,
-    timeout: i64,
     user_email: &str,
+    timeout: i64,
 ) -> Result<Value> {
     let mut req: cluster_rpc::MetricsQueryRequest = req.to_owned().into();
     req.org_id = org_id.to_string();
@@ -71,10 +74,12 @@ async fn search_in_cluster(
 ) -> Result<Value> {
     let op_start = std::time::Instant::now();
     let started_at = chrono::Utc::now().timestamp_micros();
+    let cfg = get_config();
 
     log::info!(
-        "promql->search->start: org_id: {}, start: {}, end: {}, query: {}",
-        &req.org_id,
+        "promql->search->start: org_id: {}, no_cache: {}, start: {}, end: {}, query: {}",
+        req.org_id,
+        req.no_cache,
         req.query.as_ref().unwrap().start,
         req.query.as_ref().unwrap().end,
         req.query.as_ref().unwrap().query,
@@ -105,16 +110,32 @@ async fn search_in_cluster(
 
     // The number of resolution steps; see the diagram at
     // https://promlabs.com/blog/2020/06/18/the-anatomy-of-a-promql-query/#range-queries
-    let step = max(micros(DEFAULT_LOOKBACK), step);
-    let nr_steps = match (end - start) / step {
+    let partition_step = max(micros(DEFAULT_LOOKBACK), step);
+    let nr_steps = match (end - start) / partition_step {
         0 => 1,
         n => n,
     };
+
+    // adjust start and end time
+    let cache_disabled = req.no_cache || !cfg.common.result_cache_enabled;
+    let (start, end) = adjust_start_end(start, end, step, cache_disabled);
+
+    let max_points = if cfg.limit.metrics_max_points_per_series > 0 {
+        cfg.limit.metrics_max_points_per_series
+    } else {
+        DEFAULT_MAX_POINTS_PER_SERIES
+    };
+    if (end - start) / step > max_points as i64 {
+        return Err(Error::ErrorCode(ErrorCodes::InvalidParams(
+            "too many points per series must be returned on the given, you can change the limit by ZO_METRICS_MAX_POINTS_PER_SERIES".to_string(),
+        )));
+    }
+
     // A span of time covered by an individual querier (worker).
     let worker_dt = if nr_steps > nr_queriers {
-        step * ((nr_steps / nr_queriers) + 1)
+        partition_step * ((nr_steps / nr_queriers) + 1)
     } else {
-        step
+        partition_step
     };
 
     // partition request, here plus 1 second, because division is integer, maybe

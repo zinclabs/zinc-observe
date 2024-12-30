@@ -133,6 +133,8 @@ pub struct RequestRangeQuery {
     pub step: Option<String>,
     /// Evaluation timeout.
     pub timeout: Option<String>,
+    /// Do not use cache.
+    pub no_cache: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

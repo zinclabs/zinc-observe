@@ -97,6 +97,8 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
         .unwrap()
 });
 
+// Please note: `query_fn` which is the vrl needs to be base64::decoded
+// when using this search
 #[tracing::instrument(name = "service:search:enter", skip_all)]
 pub async fn search(
     trace_id: &str,

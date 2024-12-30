@@ -449,6 +449,8 @@ pub struct MetricsQueryRequest {
     pub query: ::core::option::Option<MetricsQueryStmt>,
     #[prost(int64, tag = "8")]
     pub timeout: i64,
+    #[prost(bool, tag = "9")]
+    pub no_cache: bool,
 }
 #[derive(serde::Serialize)]
 #[allow(clippy::derive_partial_eq_without_eq)]

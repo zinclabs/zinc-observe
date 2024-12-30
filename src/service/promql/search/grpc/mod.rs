@@ -157,11 +157,18 @@ pub async fn search(
         }
         value::Value::Matrix(v) => {
             v.iter().for_each(|v| {
-                resp.result.push(cluster_rpc::Series {
-                    metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
-                    samples: v.samples.iter().map(|x| x.into()).collect(),
-                    ..Default::default()
-                });
+                let samples = v
+                    .samples
+                    .iter()
+                    .filter_map(|x| if x.is_nan() { None } else { Some(x.into()) })
+                    .collect::<Vec<_>>();
+                if !samples.is_empty() {
+                    resp.result.push(cluster_rpc::Series {
+                        metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
+                        samples,
+                        ..Default::default()
+                    });
+                }
             });
         }
         value::Value::Sample(v) => {

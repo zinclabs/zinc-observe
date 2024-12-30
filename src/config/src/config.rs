@@ -876,6 +876,8 @@ pub struct Common {
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
+    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
+    pub websocket_enabled: bool,
 }
 
 #[derive(EnvConfig)]
@@ -954,6 +956,10 @@ pub struct Limit {
     pub metrics_leader_push_interval: u64,
     #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
     pub metrics_leader_election_interval: i64,
+    #[env_config(name = "ZO_METRICS_MAX_SERIES_PER_QUERY", default = 30000)]
+    pub metrics_max_series_per_query: usize,
+    #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
+    pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds

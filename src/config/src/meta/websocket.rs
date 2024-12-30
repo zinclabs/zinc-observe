@@ -13,30 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod alerts;
-pub mod authz;
-pub mod clusters;
-pub mod dashboards;
-pub mod enrichment_table;
-#[allow(deprecated)]
-pub mod folders;
-pub mod functions;
-pub mod kv;
-pub mod logs;
-pub mod metrics;
-pub mod organization;
-pub mod pipeline;
-pub mod prom;
-pub mod rum;
-pub mod search;
-pub mod service_accounts;
-pub mod short_url;
-pub mod status;
-pub mod stream;
-pub mod syslog;
-pub mod traces;
-pub mod users;
-pub mod websocket;
+use serde::{Deserialize, Serialize};
 
-pub const CONTENT_TYPE_JSON: &str = "application/json";
-pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+use crate::meta::search::{Response, SearchEventContext};
+
+pub const MAX_QUERY_RANGE_LIMIT_ERROR_MESSAGE: &str = "Reached Max query range limit.";
+
+pub enum SearchResultType {
+    Cached(Response),
+    Search(Response),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SearchEventReq {
+    pub trace_id: String,
+    pub payload: crate::meta::search::Request,
+    pub time_offset: Option<i64>,
+    pub stream_type: crate::meta::stream::StreamType,
+    pub use_cache: bool,
+    pub search_type: crate::meta::search::SearchEventType,
+    #[serde(flatten)]
+    pub search_event_context: Option<SearchEventContext>,
+}

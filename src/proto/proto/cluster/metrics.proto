@@ -14,11 +14,12 @@ service Metrics {
 }
 
 message MetricsQueryRequest {
-    Job                         job = 1;
-    string                   org_id = 2;
-    bool                   need_wal = 4;
-    MetricsQueryStmt          query = 5;
-    int64                   timeout = 8;
+    Job                 job = 1;
+    string           org_id = 2;
+    bool           need_wal = 4;
+    MetricsQueryStmt  query = 5;
+    int64           timeout = 8;
+    bool           no_cache = 9;
 }
 
 message MetricsQueryStmt {
@@ -29,11 +30,11 @@ message MetricsQueryStmt {
 }
 
 message MetricsQueryResponse {
-    Job                         job = 1;
-    int32                      took = 2;
-    string              result_type = 3; // vector, matrix, scalar
-    repeated Series          result = 4;
-    ScanStats            scan_stats = 5;
+    Job                 job = 1;
+    int32              took = 2;
+    string      result_type = 3; // vector, matrix, scalar
+    repeated Series  result = 4;
+    ScanStats    scan_stats = 5;
 }
 
 message Series {

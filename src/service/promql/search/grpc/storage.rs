@@ -39,7 +39,7 @@ use crate::service::{
     search::{datafusion::exec::register_table, match_source},
 };
 
-#[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip_all, fields(org_id = org_id, stream_name = stream_name))]
+#[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
     trace_id: &str,
     org_id: &str,
@@ -166,11 +166,7 @@ pub(crate) async fn create_context(
     Ok((ctx, schema, scan_stats))
 }
 
-#[tracing::instrument(
-    name = "promql:search:grpc:storage:get_file_list",
-    skip_all,
-    fields(org_id, stream_name)
-)]
+#[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip(trace_id))]
 async fn get_file_list(
     trace_id: &str,
     org_id: &str,

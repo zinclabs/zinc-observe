@@ -407,6 +407,7 @@ impl FromRequest for AuthExtractor {
                 || path.contains("clusters")
                 || path.contains("query_manager")
                 || path.contains("/short")
+                || path.contains("/ws")
             {
                 return ready(Ok(AuthExtractor {
                     auth: auth_str.to_owned(),

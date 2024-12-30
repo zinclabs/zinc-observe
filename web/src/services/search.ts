@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { generateTraceContext } from "@/utils/zincutils";
+import { generateTraceContext, getWebSocketUrl } from "@/utils/zincutils";
 import http from "./http";
 import stream from "./stream";
 
@@ -34,7 +34,7 @@ const search = {
       dashboard_id?: string;
       folder_id?: string;
     },
-    search_type: string = "UI"
+    search_type: string = "UI",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
@@ -116,7 +116,7 @@ const search = {
     end_time: number;
   }) => {
     const url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&step=0&query=${encodeURIComponent(
-      query
+      query,
     )}`;
     return http().get(url);
   },
@@ -220,7 +220,7 @@ const search = {
 
     return http().post(
       `/api/${org_identifier}/_search_history`,
-      payload // Send the payload as the request body
+      payload, // Send the payload as the request body
     );
   },
 };

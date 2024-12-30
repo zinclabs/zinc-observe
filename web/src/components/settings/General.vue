@@ -40,6 +40,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rules="[(val: any) => !!val || 'Scrape interval is required']"
           :lazy-rules="true"
         />
+
+        <q-toggle
+          v-if="store.state.zoConfig.websocket_enabled"
+          v-model="enableWebsocketSearch"
+          :label="t('settings.enableWebsocketSearch')"
+          data-test="general-settings-enable-websocket"
+          class="q-py-md showLabelOnTop"
+        />
         <span>&nbsp;</span>
 
         <div class="flex justify-start">
@@ -217,8 +225,7 @@ import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
 import configService from "@/services/config";
-import DOMPurify from 'dompurify';
-
+import DOMPurify from "dompurify";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -240,8 +247,15 @@ export default defineComponent({
     const store = useStore();
     const router: any = useRouter();
     const scrapeIntereval = ref(
-      store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15
+      store.state?.organizationData?.organizationSettings?.scrape_interval ??
+        15,
     );
+
+    const enableWebsocketSearch = ref(
+      store.state?.organizationData?.organizationSettings
+        ?.enable_websocket_search ?? false,
+    );
+
     const loadingState = ref(false);
     const customText = ref("");
     const editingText = ref(false);
@@ -253,6 +267,10 @@ export default defineComponent({
       scrapeIntereval.value =
         store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15;
+
+      enableWebsocketSearch.value =
+        store.state?.organizationData?.organizationSettings
+          ?.enable_websocket_search ?? false;
     });
 
     watch(
@@ -261,9 +279,8 @@ export default defineComponent({
         if (!value) {
           customText.value = store.state.zoConfig.custom_logo_text;
         }
-      }
-
-    )
+      },
+    );
 
     const onSubmit = useLoading(async () => {
       try {
@@ -272,12 +289,13 @@ export default defineComponent({
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
           scrape_interval: scrapeIntereval.value,
+          enable_websocket_search: enableWebsocketSearch.value,
         });
 
         //update settings in backend
         await organizations.post_organization_settings(
           store.state?.selectedOrganization?.identifier,
-          store.state?.organizationData?.organizationSettings
+          store.state?.organizationData?.organizationSettings,
         );
 
         q.notify({
@@ -308,7 +326,7 @@ export default defineComponent({
         settingsService
           .createLogo(
             store.state.selectedOrganization?.identifier || orgIdentifier,
-            formData
+            formData,
           )
           .then(async (res) => {
             if (res.status == 200) {
@@ -360,7 +378,7 @@ export default defineComponent({
       }
       settingsService
         .deleteLogo(
-          store.state.selectedOrganization?.identifier || orgIdentifier
+          store.state.selectedOrganization?.identifier || orgIdentifier,
         )
         .then(async (res: any) => {
           if (res.status == 200) {
@@ -393,14 +411,12 @@ export default defineComponent({
         });
     };
 
-
     const sanitizeInput = (text: string): string => {
       // Limit input to 100 characters
-        
+
       // Used DOMPurify for thorough sanitization
       return DOMPurify.sanitize(text);
     };
-
 
     const updateCustomText = () => {
       loadingState.value = true;
@@ -412,7 +428,7 @@ export default defineComponent({
       }
 
       customText.value = sanitizeInput(customText.value);
-      if(customText.value.length > 100) {
+      if (customText.value.length > 100) {
         q.notify({
           type: "negative",
           message: "Text should be less than 100 characters.",
@@ -426,7 +442,7 @@ export default defineComponent({
         .updateCustomText(
           store.state.selectedOrganization?.identifier || orgIdentifier,
           "custom_logo_text",
-          customText.value
+          customText.value,
         )
         .then(async (res: any) => {
           if (res.status == 200) {
@@ -472,6 +488,7 @@ export default defineComponent({
       config,
       router,
       scrapeIntereval,
+      enableWebsocketSearch,
       onSubmit,
       files,
       counterLabelFn(CounterLabelParams: { filesNumber: any; totalSize: any }) {

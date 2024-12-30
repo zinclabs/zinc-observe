@@ -16,6 +16,7 @@
 use std::io::Error as StdErr;
 
 use actix_web::{delete, get, post, web, HttpResponse};
+use config::get_config;
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
@@ -90,6 +91,14 @@ async fn create(
     if let Some(toggle_ingestion_logs) = settings.toggle_ingestion_logs {
         field_found = true;
         data.toggle_ingestion_logs = toggle_ingestion_logs;
+    }
+
+    if let Some(enable_websocket_search) = settings.enable_websocket_search {
+        // allow only if websocket is enabled
+        if get_config().common.websocket_enabled {
+            field_found = true;
+            data.enable_websocket_search = enable_websocket_search;
+        }
     }
 
     if !field_found {

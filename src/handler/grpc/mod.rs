@@ -66,6 +66,7 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
             need_wal: false,
             query: Some(req_query),
             timeout: 0,
+            no_cache: req.no_cache.unwrap_or_default(),
         }
     }
 }

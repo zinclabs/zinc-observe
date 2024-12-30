@@ -19,4 +19,5 @@ pub mod http;
 pub mod jwt;
 pub mod redirect_response;
 pub mod stream;
+pub mod websocket;
 pub mod zo_logger;

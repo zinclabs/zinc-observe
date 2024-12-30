@@ -32,7 +32,8 @@ use strum::IntoEnumIterator;
 use {
     crate::service::self_reporting::audit,
     o2_enterprise::enterprise::common::{
-        auditor::AuditMessage, infra::config::get_config as get_o2_config,
+        auditor::{AuditMessage, HttpMeta, Protocol},
+        infra::config::get_config as get_o2_config,
     },
 };
 
@@ -265,12 +266,14 @@ pub async fn authentication(
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        method: "POST".to_string(),
-        path: "/auth/login".to_string(),
-        body: "".to_string(),
-        query_params: _req.query_string().to_string(),
-        response_code: 200,
         _timestamp: chrono::Utc::now().timestamp_micros(),
+        protocol: Protocol::Http(HttpMeta {
+            method: "POST".to_string(),
+            path: "/auth/login".to_string(),
+            body: "".to_string(),
+            query_params: _req.query_string().to_string(),
+            response_code: 200,
+        }),
     };
 
     let mut resp = SignInResponse::default();
@@ -404,12 +407,14 @@ pub async fn get_presigned_url(
         let audit_message = AuditMessage {
             user_email: basic_auth.user_id().to_string(),
             org_id: "".to_string(),
-            method: "GET".to_string(),
-            path: "/auth/presigned-url".to_string(),
-            body: "".to_string(),
-            query_params: _req.query_string().to_string(),
-            response_code: 200,
             _timestamp: chrono::Utc::now().timestamp_micros(),
+            protocol: Protocol::Http(HttpMeta {
+                method: "GET".to_string(),
+                path: "/auth/presigned-url".to_string(),
+                body: "".to_string(),
+                query_params: _req.query_string().to_string(),
+                response_code: 200,
+            }),
         };
         audit(audit_message).await;
     }
@@ -441,13 +446,15 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
         let mut audit_message = AuditMessage {
             user_email: "".to_string(),
             org_id: "".to_string(),
-            method: "GET".to_string(),
-            path: "/auth/login".to_string(),
-            body: "".to_string(),
-            // Don't include query string as it may contain the auth token
-            query_params: "".to_string(),
-            response_code: 302,
             _timestamp: chrono::Utc::now().timestamp_micros(),
+            protocol: Protocol::Http(HttpMeta {
+                method: "GET".to_string(),
+                path: "/auth/login".to_string(),
+                body: "".to_string(),
+                // Don't include query string as it may contain the auth token
+                query_params: "".to_string(),
+                response_code: 302,
+            }),
         };
 
         let (name, password) = {
@@ -653,7 +660,9 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
     use chrono::Utc;
 
     audit_message._timestamp = Utc::now().timestamp_micros();
-    audit_message.response_code = 401;
+    if let Protocol::Http(http_meta) = &mut audit_message.protocol {
+        http_meta.response_code = 401;
+    }
     // Even if the user_email of audit_message is not set, still the event should be audited
     audit(audit_message).await;
 }

@@ -127,6 +127,10 @@ fn default_toggle_ingestion_logs() -> bool {
     false
 }
 
+fn default_enable_websocket_search() -> bool {
+    false
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -139,6 +143,8 @@ pub struct OrganizationSettingPayload {
     pub span_id_field_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub toggle_ingestion_logs: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_websocket_search: Option<bool>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -153,6 +159,8 @@ pub struct OrganizationSetting {
     pub span_id_field_name: String,
     #[serde(default = "default_toggle_ingestion_logs")]
     pub toggle_ingestion_logs: bool,
+    #[serde(default = "default_enable_websocket_search")]
+    pub enable_websocket_search: bool,
 }
 
 impl Default for OrganizationSetting {
@@ -162,6 +170,7 @@ impl Default for OrganizationSetting {
             trace_id_field_name: default_trace_id_field_name(),
             span_id_field_name: default_span_id_field_name(),
             toggle_ingestion_logs: default_toggle_ingestion_logs(),
+            enable_websocket_search: default_enable_websocket_search(),
         }
     }
 }

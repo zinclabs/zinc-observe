@@ -25,7 +25,10 @@ use config::{
         self_reporting::error::{ErrorData, ErrorSource, PipelineError},
         stream::{StreamParams, StreamType},
     },
-    utils::{flatten, json::Value},
+    utils::{
+        flatten,
+        json::{get_string_value, Value},
+    },
 };
 use futures::future::try_join_all;
 use once_cell::sync::Lazy;
@@ -765,10 +768,7 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
     if haystack.starts_with("{") && haystack.ends_with("}") {
         let field_name = &haystack[1..haystack.len() - 1];
         return match record.get(field_name) {
-            Some(stream_name) => stream_name
-                .as_str()
-                .map(|s| s.to_string())
-                .ok_or_else(|| anyhow!("Matched stream name {stream_name} is not a string")),
+            Some(stream_name) => Ok(get_string_value(stream_name)),
             None => Err(anyhow!("Field name {field_name} not found in record")),
         };
     }
@@ -785,10 +785,7 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
 
         // Get and validate the field value
         match record.get(field_name) {
-            Some(stream_name) => match stream_name.as_str() {
-                Some(s) => result.push_str(s),
-                None => return Err(anyhow!("Matched stream name {stream_name} is not a string")),
-            },
+            Some(value) => result.push_str(&get_string_value(value)),
             None => return Err(anyhow!("Field name {field_name} not found in record")),
         }
 
@@ -816,6 +813,8 @@ mod tests {
             ("{container_name}", "compactor"),
             ("abc-{container_name}", "abc-compactor"),
             ("abc-{container_name}-xyz", "abc-compactor-xyz"),
+            ("abc-{value}-xyz", "abc-123-xyz"),
+            ("{value}", "123"),
         ];
         for (test, expected) in ok_cases {
             let result = resolve_stream_name(test, &record);
