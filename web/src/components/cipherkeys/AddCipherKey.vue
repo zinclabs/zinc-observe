@@ -250,7 +250,7 @@ const cipherKeyTypes = computed(() => [
   { label: "Akeyless", value: "akeyless" },
 ]);
 
-const originalData: Ref<string> = ref("");
+const originalData: any = ref("");
 
 const dialog = ref({
   show: false,
@@ -272,9 +272,18 @@ const setupTemplateData = () => {
   if (router.currentRoute.value.query.action === "edit") {
     isUpdatingCipherKey.value = true;
     if (router.currentRoute.value.query.name) {
+      const name = router.currentRoute.value.query.name || "";
+      if (name === "") {
+        $q.notify({
+          type: "negative",
+          message: "Invalid cipher key name",
+        });
+        emit("cancel:hideform");
+        return;
+      }
       CipherKeysService.get_by_name(
         store.state.selectedOrganization.identifier,
-        router.currentRoute.value.query.name,
+        name,
       )
         .then((response) => {
           formData.value = response.data;
