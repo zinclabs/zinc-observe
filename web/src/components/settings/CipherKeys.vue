@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-table>
     </div>
     <div v-else>
-      <add-cipher-key />
+      <add-cipher-key @cancel:hideform="hideAddDialog" />
     </div>
   </q-page>
 </template>
@@ -212,7 +212,9 @@ export default defineComponent({
     getData();
 
     const hideAddDialog = () => {
+      showAddDialog.value = !showAddDialog.value;
       router.push({
+        name: "cipherKeys",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
