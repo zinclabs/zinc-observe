@@ -731,7 +731,8 @@
     "searchMsg": "Search for Dashboards across Folders",
     "trellisLayout": "Trellis Layout",
     "numOfColumns": "Columns per Row",
-    "trellisTooltip": "This is only applicable when breakdown field is available. Add Breakdown Field to enable Trellis Layout"
+    "trellisTooltip": "This is only applicable when breakdown field is available. Add Breakdown Field to enable Trellis Layout",
+    "communityDashboard": "Community Dashboards"
   },
   "panel": {
     "header": "Panel",
