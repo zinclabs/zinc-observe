@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "rootDir": "./snapshots-management",
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true // For JSON imports
+  },
+  "include": ["snapshots-management/**/*.ts", "snapshots-management/config.json"]
+}

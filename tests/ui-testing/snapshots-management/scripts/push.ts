@@ -1,10 +1,10 @@
 import { readFileSync } from 'fs';
 import path from 'path';
-import { RemoteSnapshotLocation } from './snapshot/RemoteSnapshotLocation';
-import config from './snapshots/config.json';
+import { RemoteSnapshotLocation } from '../snapshot-locations/RemoteSnapshotLocation';
+import config from '../config.json';
 import inquirer from 'inquirer';
 import { readdirSync, lstatSync } from 'fs';
-import { ENABLED_LOGGING } from './constant/const';
+import { ENABLED_LOGGING } from '../constant/const';
 
 const originalLog = console.log;
 

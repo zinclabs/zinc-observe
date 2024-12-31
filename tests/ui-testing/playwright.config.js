@@ -14,6 +14,7 @@ dotenv.config();
  */
 module.exports = defineConfig({
   testDir: './playwright-tests',
+  snapshotPathTemplate: '{testDir}/__snapshots__/{testFilePath}/{arg}{ext}',
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

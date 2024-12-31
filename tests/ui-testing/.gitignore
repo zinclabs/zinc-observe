@@ -15,3 +15,5 @@ cypress/screenshots
 /playwright/.cache/
 coverage/
 .nyc_output/
+
+dist/

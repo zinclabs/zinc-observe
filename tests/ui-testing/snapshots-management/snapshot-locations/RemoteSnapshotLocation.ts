@@ -1,6 +1,7 @@
 import { ENABLED_LOGGING , process } from '../constant/const';
 import { SnapshotLocation } from './SnapshotLocation';
 import { S3Client, GetObjectCommand, PutObjectCommand, ListObjectsCommand, CopyObjectCommand, HeadObjectCommand, ListBucketsCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+const { fromNodeProviderChain } = require("@aws-sdk/credential-providers");
 
 const originalLog = console.log;
 
@@ -21,10 +22,11 @@ export class RemoteSnapshotLocation implements SnapshotLocation {
   constructor(bucket: string, basePath: string, region: string, version: string) {
     this.s3 = new S3Client({
       region: region,
-      credentials: {
-        accessKeyId: process.env.ACCESS_KEY_ID,
-        secretAccessKey: process.env.SECRET_ACCESS_KEY,
-      },
+      // credentials: {
+      //   accessKeyId: process.env.ACCESS_KEY_ID,
+      //   secretAccessKey: process.env.SECRET_ACCESS_KEY,
+      // },
+      credentials: fromNodeProviderChain(),
       endpoint: basePath,
     });
 

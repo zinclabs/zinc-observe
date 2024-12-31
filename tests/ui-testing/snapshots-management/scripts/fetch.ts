@@ -1,9 +1,9 @@
 import path from 'path';
 import fs from 'fs/promises';
-import { SnapshotLocation } from './snapshot/SnapshotLocation';
-import { RemoteSnapshotLocation } from './snapshot/RemoteSnapshotLocation';
-import config from './snapshots/config.json';
-import { ENABLED_LOGGING } from './constant/const';
+import { SnapshotLocation } from '../snapshot-locations/SnapshotLocation';
+import { RemoteSnapshotLocation } from '../snapshot-locations/RemoteSnapshotLocation';
+import config from '../config.json';
+import { ENABLED_LOGGING } from '../constant/const';
 
 const originalLog = console.log;
 
