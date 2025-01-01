@@ -42,6 +42,7 @@ export class LogsPage {
     this.streamDropdown = '[data-test="log-search-index-list-select-stream"]';
     this.queryButton = "[data-test='logs-search-bar-refresh-btn']";
     this.queryEditor = '[data-test="logs-search-bar-query-editor"]';
+    this.quickModeToggle = '[data-test="logs-search-bar-quick-mode-toggle-btn"]';
 
     this.profileButton = page.locator('[data-test="header-my-account-profile-icon"]');
     this.signOutButton = page.getByText('Sign Out');
@@ -59,7 +60,7 @@ export class LogsPage {
     await this.page.locator(this.homeButton).hover();
     await this.logsMenuItem.click();
     await this.page.waitForTimeout(3000);
-   // await expect(this.page.locator('[data-test="logs-search-no-stream-selected-text"]')).toContainText('info Select a stream and press \'Run query\' to continue. Additionally, you can apply additional filters and adjust the date range to enhance search.');
+    // await expect(this.page.locator('[data-test="logs-search-no-stream-selected-text"]')).toContainText('info Select a stream and press \'Run query\' to continue. Additionally, you can apply additional filters and adjust the date range to enhance search.');
   }
 
   async validateLogsPage() {
@@ -71,16 +72,16 @@ export class LogsPage {
     await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();
     await this.page.waitForTimeout(2000);
     await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
-  
 
 
-}
 
-async logsPageURLValidation() {
+  }
+
+  async logsPageURLValidation() {
 
     await expect(this.page).toHaveURL(/defaulttestmulti/);
 
-}
+  }
 
   async selectIndexAndStream() {
     // Select index and stream
@@ -91,10 +92,6 @@ async logsPageURLValidation() {
   }
 
   async selectIndexAndStreamJoin() {
-    // Select index and stream
-    //await this.page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
-    //await this.page.locator('[data-test="logs-search-field-list-collapse-btn"]').click();
-
     await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
     await this.page.waitForTimeout(3000);
     await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
@@ -214,7 +211,19 @@ async logsPageURLValidation() {
     const search = this.page.waitForResponse("**/api/default/_search**");
     await this.page.waitForTimeout(3000);
     await this.page.locator(this.queryButton).click({ force: true });
-    await expect.poll(async () => (await search).status()).toBe(200);
+    try {
+      const response = await search;
+      await expect.poll(async () => response.status()).toBe(200);
+    } catch (error) {
+      throw new Error(`Failed to get response: ${error.message}`);
+       }
+  }
+
+  async applyQueryButton(expectedUrl) {
+    const searchResponse = this.page.waitForResponse(expectedUrl);
+    await this.page.waitForTimeout(3000);
+    await this.page.locator(this.queryButton).click({ force: true });
+    await expect.poll(async () => (await searchResponse).status()).toBe(200);
   }
 
   async clearAndRunQuery() {
@@ -235,60 +244,132 @@ async logsPageURLValidation() {
     await this.page.locator('[data-test="logs-search-subfield-add-kubernetes_container_name-ziox"] [data-test="log-search-subfield-list-equal-kubernetes_container_name-field-btn"]').click();
 
   }
-  
+
   async kubernetesContainerNameJoin() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameJoinLimit() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
     await this.page.waitForTimeout(5000);
   }
 
 
   async kubernetesContainerNameJoinLike() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE "%ziox%"');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameLeftJoin() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameRightJoin() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
 
   async kubernetesContainerNameFullJoin() {
     await this.page
-    .locator('[data-test="logs-search-bar-query-editor"]')
-    .getByLabel("Editor content;Press Alt+F1")
-    .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+      .locator('[data-test="logs-search-bar-query-editor"]')
+      .getByLabel("Editor content;Press Alt+F1")
+      .fill('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
     await this.page.waitForTimeout(5000);
   }
+
+  async displayCountQuery() {
+    await this.page.waitForTimeout(4000);
+    await expect(this.page.getByRole('heading', { name: 'Error while fetching' })).not.toBeVisible();
+  }
+
+  async validateResult() {
+    await this.page.waitForTimeout(10000);
+    await expect(this.page.locator('[data-test="logs-search-search-result"]')).toBeVisible();
+    await this.page.locator('td[data-test="log-table-column-0-source"]').nth(0).click();
+    await expect(this.page.locator('[data-test="log-expand-detail-key-kubernetes_container_name-text"]')).toBeVisible();
+
+  }
+
+
 
 
   async signOut() {
     await this.profileButton.click();
     await this.signOutButton.click();
   }
+
+  async displayTwoStreams() {
+    await expect(this.page.locator('[data-test="logs-search-index-list"]')).toContainText('default, e2e_automate');
+  }
+
+  async verifyQuickModeToggle() {
+    await expect(this.page.locator(this.quickModeToggle)).toBeVisible();
+  }
+
+  async clickQuickModeToggle() {
+
+    await this.page.waitForSelector('[data-test="logs-search-bar-quick-mode-toggle-btn"]');
+    // Get the toggle button element
+    const toggleButton = await this.page.$('[data-test="logs-search-bar-quick-mode-toggle-btn"] > .q-toggle__inner');
+    // Evaluate the class attribute to determine if the toggle is in the off state
+    const isSwitchedOff = await toggleButton.evaluate(node => node.classList.contains('q-toggle__inner--falsy'));
+    // If the toggle is switched off, click on it to switch it on
+    if (isSwitchedOff) {
+      await toggleButton.click();
+
+    }
+
+  }
+
+  async clickInterestingFields() {
+
+    await this.page.locator('[data-cy="index-field-search-input"]').fill("kubernetes_container_name");
+    await this.page.waitForTimeout(2000);
+    await this.page.locator('[data-test="log-search-index-list-interesting-kubernetes_container_name-field-btn"]').first().click();
+    await this.page.waitForTimeout(2000);
+     }
+
+   async validateInterestingFields() {
+   await expect(this.page.locator('[data-test="logs-search-bar-query-editor"]').getByText(/kubernetes_container_name/).first()).toBeVisible();
+   }
+
+   async validateInterestingFieldsQuery() {
+    await this.page.waitForSelector('[data-test="logs-search-bar-query-editor"]');
+    await expect(this.page.locator('[data-test="logs-search-bar-query-editor"]').locator('text=kubernetes_container_name FROM "default"')
+    ).toBeVisible();
+  }
+
+  async addRemoveInteresting() {
+
+    await this.page.locator('[data-cy="index-field-search-input"]').clear();
+    await this.page.locator('[data-cy="index-field-search-input"]').fill("job");
+    await this.page.waitForTimeout(2000);
+    await this.page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]').last().click({force: true,});
+    await this.page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content').click({force: true,});
+    await this.page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]').last().click({force: true, });
+    await expect(this.page.locator('[data-test="logs-search-bar-query-editor"]')).not.toHaveText(/job/);
+   
+  }
+
+
+    
+  
 
 }

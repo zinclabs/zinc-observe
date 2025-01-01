@@ -3,6 +3,7 @@ import { LoginPage } from '../pages/loginPage';
 import { LogsPage } from '../pages/logsPage.js';
 import { IngestionPage } from '../pages/ingestionPage';
 
+test.describe.configure({ mode: 'parallel' });
 
 test.describe("Join for logs", () => {
     let loginPage, logsPage, ingestionPage;
@@ -12,6 +13,7 @@ test.describe("Join for logs", () => {
         ingestionPage = new IngestionPage(page);
         logsPage = new LogsPage(page);
         await loginPage.gotoLoginPage();
+       // await loginPage.loginAsInternalUser();
         await loginPage.login(); // Login as root user
         await ingestionPage.ingestion();
         await ingestionPage.ingestionJoin();
@@ -21,8 +23,9 @@ test.describe("Join for logs", () => {
 
         await logsPage.navigateToLogs();
         await logsPage.selectIndexAndStreamJoin();
+        await logsPage.displayTwoStreams();
         await logsPage.selectRunQuery();
-        await logsPage.signOut();
+     
 
     });
 
@@ -32,7 +35,8 @@ test.describe("Join for logs", () => {
         await logsPage.selectIndexAndStreamJoin();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
-        await logsPage.signOut();
+        await logsPage.displayTwoStreams();
+       
 
     });
 
@@ -43,7 +47,8 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerName();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
-        await logsPage.signOut();
+        await logsPage.validateResult();
+    
 
     });
 
@@ -54,7 +59,9 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameJoin();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
-        await logsPage.signOut();
+        await logsPage.displayCountQuery();
+        await logsPage.validateResult();
+       
 
     });
 
@@ -65,7 +72,8 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameJoinLimit();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
-        await logsPage.signOut();
+        await logsPage.validateResult();
+      
 
     });
 
@@ -76,7 +84,8 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameJoinLike();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
-        await logsPage.signOut();
+       
+      
 
     });
 
@@ -87,7 +96,8 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameLeftJoin();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
-        await logsPage.signOut();
+        await logsPage.validateResult();
+    
 
     });
 
@@ -98,7 +108,8 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameRightJoin();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
-        await logsPage.signOut();
+        await logsPage.validateResult();
+     
 
     });
 
@@ -109,7 +120,42 @@ test.describe("Join for logs", () => {
         await logsPage.kubernetesContainerNameFullJoin();
         await logsPage.enableSQLMode();
         await logsPage.selectRunQuery();
-        await logsPage.signOut();
+        await logsPage.validateResult();
+    
 
     });
+
+    test("Click on interesting field icon and display field in editor", async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexAndStreamJoin();
+        await logsPage.enableSQLMode();
+        await logsPage.clickQuickModeToggle();
+        await logsPage.selectRunQuery();
+        await logsPage.clickInterestingFields();
+        await logsPage.validateInterestingFields();
+    });
+
+    test("Click on interesting field icon and display query in editor", async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexAndStreamJoin();
+        await logsPage.enableSQLMode();
+        await logsPage.clickQuickModeToggle();
+        await logsPage.selectRunQuery();
+        await logsPage.clickInterestingFields();
+        await logsPage.validateInterestingFieldsQuery();
+    });
+
+    test("Add/remove interesting field removes it from editor and results too", async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexAndStreamJoin();
+        await logsPage.enableSQLMode();
+        await logsPage.clickQuickModeToggle();
+        await logsPage.selectRunQuery();
+        await logsPage.clickInterestingFields();
+        await logsPage.addRemoveInteresting();
+    });
+
 });

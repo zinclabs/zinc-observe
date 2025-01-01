@@ -66,7 +66,7 @@ export default createStore({
     theme: "",
     printMode: false,
     organizationData: JSON.parse(JSON.stringify(organizationObj)),
-    zoConfig: {},
+    zoConfig: <{ [key: string]: any }>{},
     timezone: useLocalTimezone()
       ? useLocalTimezone()
       : Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -76,6 +76,8 @@ export default createStore({
     savedFunctionDialog: false,
     regionInfo: [],
     hiddenMenus: [],
+    sessionId: "",
+    webSocketUrl: "",
   },
   mutations: {
     login(state, payload) {

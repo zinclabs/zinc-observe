@@ -1,7 +1,10 @@
 use actix_web::{post, web, Error, HttpRequest, HttpResponse};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
-    common::{auditor::AuditMessage, infra::config::get_config as get_o2_config},
+    common::{
+        auditor::{AuditMessage, HttpMeta, Protocol},
+        infra::config::get_config as get_o2_config,
+    },
     dex::service::auth::get_dex_jwks,
 };
 
@@ -23,12 +26,14 @@ pub async fn exchange_token(
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
         org_id: "".to_string(),
-        method: req.method().to_string(),
-        path: req.path().to_string(),
-        body: "".to_string(),
-        query_params: req.query_string().to_string(),
-        response_code: 200,
         _timestamp: chrono::Utc::now().timestamp_micros(),
+        protocol: Protocol::Http(HttpMeta {
+            method: req.method().to_string(),
+            path: req.path().to_string(),
+            body: "".to_string(),
+            query_params: req.query_string().to_string(),
+            response_code: 200,
+        }),
     };
     match result {
         Ok(response) => {
@@ -47,7 +52,9 @@ pub async fn exchange_token(
                     process_token(res).await
                 }
                 Err(e) => {
-                    audit_message.response_code = 401;
+                    if let Protocol::Http(http_meta) = &mut audit_message.protocol {
+                        http_meta.response_code = 401;
+                    }
                     audit_message._timestamp = chrono::Utc::now().timestamp_micros();
                     audit(audit_message).await;
                     return Ok(HttpResponse::Unauthorized().json(e.to_string()));
@@ -59,7 +66,9 @@ pub async fn exchange_token(
         }
         Err(e) => {
             log::error!("Error: {}", e);
-            audit_message.response_code = 401;
+            if let Protocol::Http(http_meta) = &mut audit_message.protocol {
+                http_meta.response_code = 401;
+            }
             audit_message._timestamp = chrono::Utc::now().timestamp_micros();
             audit(audit_message).await;
             Ok(HttpResponse::Unauthorized().json(e.to_string()))

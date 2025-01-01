@@ -876,6 +876,8 @@ pub struct Common {
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
+    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
+    pub websocket_enabled: bool,
 }
 
 #[derive(EnvConfig)]

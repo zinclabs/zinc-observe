@@ -241,7 +241,18 @@ impl Pipeline {
         match &self.source {
             PipelineSource::Realtime(stream_params) => stream_params.clone(),
             PipelineSource::Scheduled(ds) => {
-                StreamParams::new(&ds.org_id, "DerivedStream", ds.stream_type)
+                let stream_name = match ds
+                    .query_condition
+                    .sql
+                    .as_ref()
+                    .map(|sql| super::sql::resolve_stream_names(sql))
+                {
+                    Some(Ok(stream_names)) if stream_names.len() == 1 => {
+                        stream_names.into_iter().next().unwrap()
+                    }
+                    _ => "DerivedStream".to_string(),
+                };
+                StreamParams::new(&ds.org_id, stream_name.as_str(), ds.stream_type)
             }
         }
     }

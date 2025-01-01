@@ -25,26 +25,28 @@ export class ReportsPage {
     this.relative30SecondsButton = page.locator(relative30SecondsButtonLocator);
     this.absoluteTab = absoluteTabLocator;
     this.profileButton = page.locator('button').filter({ hasText: (process.env["ZO_ROOT_USER_EMAIL"]) });
+    this.zoneInput = page.locator('[data-test="add-report-schedule-send-later-section"]').getByText('arrow_drop_down');
+    this.timeZoneOption = (zone) => `role=option[name="${zone}"]`;
     this.signOutButton = page.getByText('Sign Out');
   }
   
   async navigateToReports() {
     await this.homeMenu.hover();
-    await this.reportsMenu.click();
+    await this.reportsMenu.click({ force: true });
     await expect(this.page.locator('[data-test="report-list-title"]')).toContainText('Reports');
-    await this.scheduledTab.click();
+    await this.scheduledTab.click({ force: true });
   }
 
   async goToReports() {
    
-    await this.reportsMenu.click();
+    await this.reportsMenu.click({ force: true });
     await expect(this.page.locator('[data-test="report-list-title"]')).toContainText('Reports');
  
   }
 
   async reportsPageDefaultMultiOrg() {
-    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click();    
-    await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click();
+    await this.page.locator('[data-test="navbar-organizations-select"]').getByText('arrow_drop_down').click({ force: true });    
+    await this.page.getByRole('option', { name: 'defaulttestmulti' }).locator('div').nth(2).click({ force: true });
 }
 
 async reportsPageURLValidation() {
@@ -59,29 +61,147 @@ async reportsURLValidation() {
 
 
 
-  async createReport(dashboardName) {
+  async createReportAddReportButton() {
     await this.page.waitForSelector('[data-test="report-list-add-report-btn"]');
-    await this.addReportButton.click();
+    await this.addReportButton.click({ force: true });  
+  }
+
+  async createReportReportNameInput() {
     await this.page.waitForSelector("[aria-label='Name *']");
     await this.reportNameInput.fill("rreport1");
     await this.page.waitForTimeout(5000);
-    await this.folderInput.dblclick();
+  }
+
+  async createReportFolderInput() {
+    await this.folderInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle");
     await this.folderInput.pressSequentially('de', { delay: 100 });
-    await this.page.getByRole('option', { name: 'default' }).click();
-    await this.dashboardInput.dblclick();
+    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
+  }
+
+  async createReportDashboardInput(dashboardName) {
+    await this.dashboardInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle");
     await this.dashboardInput.pressSequentially(dashboardName, { delay: 100 });
-    await this.page.getByRole('option', { name: dashboardName }).click();
-    await this.dashboardTabInput.dblclick();
+    await this.page.getByRole('option', { name: dashboardName }).click({ force: true });
+  }
+
+  async createReportDashboardTabInput() {
+    await this.dashboardTabInput.dblclick({ force: true });
     await this.page.waitForLoadState("networkidle");
     await this.dashboardTabInput.pressSequentially('de', { delay: 100 });
-    await this.page.getByRole('option', { name: 'default' }).click();
-    await this.continueButtonStep1.click();
-    await this.continueButtonStep2.click();
+    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
+  }
+
+  async createReportContinueButtonStep1() {
+    await this.continueButtonStep1.click({ force: true });
+    await this.page.waitForTimeout(3000);
+  }
+
+  async createReportOnce() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-once-btn"]').click({ force: true });
+
+  }
+
+  async createReportHours() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-hours-btn"]').click({ force: true });
+
+  }
+
+  async createReportDays() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-days-btn"]').click({ force: true });
+
+  }
+
+  async createReportWeeks() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-weeks-btn"]').click({ force: true });
+
+  }
+
+  async createReportMonths() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-months-btn"]').click({ force: true });
+
+  }
+
+  async createReportCustom() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-custom-btn"]').click({ force: true });
+
+  }
+
+  async createReportCron() {
+    await this.page.locator('[data-test="add-report-schedule-frequency-cron-btn"]').click({ force: true });
+
+  }
+
+  async createReportDateTime() {
+
+    await this.page.getByLabel('Start Date *').fill('29-12-2025');
+    await this.page.getByLabel('Start Time *').fill('11:55');
+  }
+
+  async createReportZone() {
+
+    await this.zoneInput.dblclick({ force: true });
+    await this.page.waitForLoadState("networkidle");
+    await this.zoneInput.pressSequentially('UTC', { delay: 1000 });
+    await this.page.getByRole('option', { name: 'UTC', exact: true }).waitFor({ state: 'visible' });
+    await this.page.getByRole('option', { name: 'UTC', exact: true }).click();
+    await this.page.waitForTimeout(5000);
+  }
+
+  async setTimeZone(zone) {
+    await this.zoneInput.click({ force: true });
+    await this.page.getByRole(this.timeZoneOption(zone)).click({ force: true });
+  }
+
+  async setTimeIST() {
+    await this.zoneInput.fill("Asia/c");
+    await page.getByText("Asia/Calcutta", { exact: true }).click({ force: true });
+
+  }
+
+  async createReportScheduleLater() {
+
+    await this.page.locator('[data-test="add-report-schedule-scheduleLater-btn"]').click({ force: true });
+    
+  }
+
+  async createReportContinueButtonStep2() {
+    await this.continueButtonStep2.click({ force: true });
+  }
+
+  async createReportFillDetail() {
     await this.titleInput.fill("reporterTest");
     await this.recipientsInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
-    await this.saveButton.click();
+  }
+
+  async createReportSaveButton() {
+    await this.saveButton.click({ force: true });
+  }
+
+  async createReport(dashboardName) {
+    await this.page.waitForSelector('[data-test="report-list-add-report-btn"]');
+    await this.addReportButton.click({ force: true });
+    await this.page.waitForSelector("[aria-label='Name *']");
+    await this.reportNameInput.fill("rreport1");
+    await this.page.waitForTimeout(5000);
+    await this.folderInput.dblclick({ force: true });
+    await this.page.waitForLoadState("networkidle");
+    await this.folderInput.pressSequentially('de', { delay: 100 });
+    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
+    await this.dashboardInput.dblclick({ force: true });
+    await this.page.waitForLoadState("networkidle");
+    await this.dashboardInput.pressSequentially(dashboardName, { delay: 100 });
+    await this.page.getByRole('option', { name: dashboardName }).click({ force: true });
+    await this.dashboardTabInput.dblclick({ force: true });
+    await this.page.waitForLoadState("networkidle");
+    await this.dashboardTabInput.pressSequentially('de', { delay: 100 });
+    await this.page.getByRole('option', { name: 'default' }).click({ force: true });
+    await this.continueButtonStep1.click({ force: true });
+    await this.continueButtonStep2.click({ force: true });
+    await this.titleInput.fill("reporterTest");
+    await this.recipientsInput.fill(process.env["ZO_ROOT_USER_EMAIL"]);
+    await this.saveButton.click({ force: true });
   }
   async verifyReportSaved() {
     await expect(this.successAlert).toContainText('Report saved successfully.');
@@ -90,13 +210,13 @@ async reportsURLValidation() {
     await this.page.locator('[data-test="report-list-search-input"]').fill(reportName);
     await this.page
       .locator(`[data-test="report-list-${reportName}-delete-report"]`)
-      .click();
+      .click({ force: true });
     await this.page.locator('[data-test="confirm-button"]','visible').click();
   }
   async setTimeToPast30Seconds() {
     // Set the time filter to the last 30 seconds
-    await this.page.locator(this.dateTimeButton).click();
-    await this.relative30SecondsButton.click();
+    await this.page.locator(this.dateTimeButton).click({ force: true });
+    await this.relative30SecondsButton.click({ force: true });
   }
   async verifyTimeSetTo30Seconds() {
     // Verify that the time filter displays "Past 30 Seconds"
@@ -104,16 +224,16 @@ async reportsURLValidation() {
   }
   async setDateTime() {
     await expect(this.page.locator(this.dateTimeButton)).toBeVisible();
-    await this.page.locator(this.dateTimeButton).click();
-    await this.page.locator(this.absoluteTab).click();
+    await this.page.locator(this.dateTimeButton).click({ force: true });
+    await this.page.locator(this.absoluteTab).click({ force: true });
     await this.page.waitForTimeout(1000);
 
   }
 
   async fillTimeRange(startTime, endTime) {
-    await this.page.getByRole('button', { name: '1', exact: true }).click();
+    await this.page.getByRole('button', { name: '1', exact: true }).click({ force: true });
     await this.page.getByLabel('access_time').first().fill(startTime);
-    await this.page.getByRole('button', { name: '1', exact: true }).click();
+    await this.page.getByRole('button', { name: '1', exact: true }).click({ force: true });
     await this.page.getByLabel('access_time').nth(1).fill(endTime);
 
   }
@@ -123,8 +243,8 @@ async reportsURLValidation() {
   }
 
   async signOut() {
-    await this.profileButton.click();
-    await this.signOutButton.click();
+    await this.profileButton.click({ force: true });
+    await this.signOutButton.click({ force: true });
   }
 }
 

@@ -36,7 +36,8 @@ use {
     base64::{engine::general_purpose, Engine as _},
     futures::StreamExt,
     o2_enterprise::enterprise::common::{
-        auditor::AuditMessage, infra::config::get_config as get_o2_config,
+        auditor::{AuditMessage, HttpMeta, Protocol},
+        infra::config::get_config as get_o2_config,
     },
 };
 
@@ -75,6 +76,7 @@ async fn audit_middleware(
     let path_columns = path.split('/').collect::<Vec<&str>>();
     let path_len = path_columns.len();
     if get_o2_config().common.audit_enabled
+        && !path_columns.get(1).unwrap_or(&"").to_string().eq("ws")
         && !(method.eq("POST") && INGESTION_EP.contains(&path_columns[path_len - 1]))
     {
         let query_params = req.query_string().to_string();
@@ -118,12 +120,14 @@ async fn audit_middleware(
             audit(AuditMessage {
                 user_email,
                 org_id,
-                method,
-                path,
-                body,
-                query_params,
-                response_code: res.response().status().as_u16(),
                 _timestamp: chrono::Utc::now().timestamp_micros(),
+                protocol: Protocol::Http(HttpMeta {
+                    method,
+                    path,
+                    body,
+                    query_params,
+                    response_code: res.response().status().as_u16(),
+                }),
             })
             .await;
         }
@@ -502,7 +506,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(service_accounts::save)
         .service(service_accounts::delete)
         .service(service_accounts::update)
-        .service(service_accounts::get_api_token);
+        .service(service_accounts::get_api_token)
+        .service(websocket::websocket);
 
     #[cfg(feature = "enterprise")]
     let service = service

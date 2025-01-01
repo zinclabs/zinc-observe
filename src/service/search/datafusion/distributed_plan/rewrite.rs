@@ -21,7 +21,9 @@ use datafusion::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
         Result, TableReference,
     },
-    physical_plan::{repartition::RepartitionExec, ExecutionPlan, Partitioning},
+    physical_plan::{
+        repartition::RepartitionExec, ExecutionPlan, ExecutionPlanProperties, Partitioning,
+    },
 };
 use hashbrown::HashMap;
 use proto::cluster_rpc::KvItem;
@@ -80,13 +82,14 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             if visitor.is_remote_scan {
                 let table_name = visitor.table_name.clone().unwrap();
                 let input = node.children()[0];
-                let node_len = self.remote_scan_nodes.nodes.len();
                 let remote_scan = Arc::new(RemoteScanExec::new(
                     input.clone(),
                     self.remote_scan_nodes.get_remote_node(&table_name),
                 )?);
-                let partitioning = Partitioning::RoundRobinBatch(node_len);
-                let repartition = Arc::new(RepartitionExec::try_new(remote_scan, partitioning)?);
+                let output_partitioning =
+                    Partitioning::RoundRobinBatch(input.output_partitioning().partition_count());
+                let repartition =
+                    Arc::new(RepartitionExec::try_new(remote_scan, output_partitioning)?);
                 let new_node = node.with_new_children(vec![repartition])?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));

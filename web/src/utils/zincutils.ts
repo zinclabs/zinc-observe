@@ -22,6 +22,7 @@ import { useStore } from "vuex";
 import useStreams from "@/composables/useStreams";
 import userService from "@/services/users";
 import { DateTime as _DateTime } from "luxon";
+import store from "../stores";
 
 let moment: any;
 let momentInitialized = false;
@@ -968,4 +969,22 @@ export const arraysMatch = (arr1: Array<any>, arr2: Array<any>) => {
 
 export const deepCopy = (value: any) => {
   return JSON.parse(JSON.stringify(value));
+};
+
+export const getWebSocketUrl = (request_id: string, org_identifier: string) => {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${store.state.API_ENDPOINT.split("//")[1]}/api/${org_identifier}/ws/${request_id}`;
+};
+
+export const isWebSocketEnabled = () => {
+  if (!store.state.zoConfig?.websocket_enabled) {
+    return false;
+  }
+
+  if ((window as any).use_web_socket === undefined) {
+    return store?.state?.organizationData?.organizationSettings
+      ?.enable_websocket_search;
+  } else {
+    return (window as any).use_web_socket;
+  }
 };

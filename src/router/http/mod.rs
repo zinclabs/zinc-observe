@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod ws_proxy;
+
 use std::collections::HashMap;
 
 use ::config::{
@@ -22,9 +24,12 @@ use ::config::{
 };
 use actix_web::{http::Error, route, web, HttpRequest, HttpResponse};
 
-use crate::common::{infra::cluster, utils::http::get_search_type_from_request};
+use crate::{
+    common::{infra::cluster, utils::http::get_search_type_from_request},
+    router::http::ws_proxy::{convert_to_websocket_url, ws_proxy},
+};
 
-const QUERIER_ROUTES: [&str; 18] = [
+const QUERIER_ROUTES: [&str; 19] = [
     "/config",
     "/summary",
     "/organizations",
@@ -33,6 +38,7 @@ const QUERIER_ROUTES: [&str; 18] = [
     "/streams",
     "/clusters",
     "/query_manager",
+    "/ws",
     "/_search",
     "/_around",
     "/_values",
@@ -151,6 +157,7 @@ async fn dispatch(
     client: web::Data<awc::Client>,
 ) -> actix_web::Result<HttpResponse, Error> {
     let start = std::time::Instant::now();
+    let cfg = get_config();
 
     // get online nodes
     let path = req.uri().path_and_query().map(|x| x.as_str()).unwrap_or("");
@@ -159,8 +166,43 @@ async fn dispatch(
         return Ok(HttpResponse::ServiceUnavailable().body(new_url.value));
     }
 
+    // check if the request is a websocket request
+    let path_columns: Vec<&str> = path.split('/').collect();
+    if *path_columns.get(3).unwrap_or(&"") == "ws" {
+        if cfg.common.websocket_enabled {
+            // Convert the HTTP/HTTPS URL to a WebSocket URL (WS/WSS)
+            let ws_url = match convert_to_websocket_url(&new_url.value) {
+                Ok(url) => url,
+                Err(e) => {
+                    log::error!("Error converting URL to WebSocket: {}", e);
+                    return Ok(HttpResponse::BadRequest().body("Invalid WebSocket URL"));
+                }
+            };
+
+            return match ws_proxy(req, payload, ws_url.clone()).await {
+                Ok(res) => {
+                    log::info!(
+                    "[WS_ROUTER] Successfully proxied WebSocket connection to backend: {}, took: {} ms",
+                    ws_url,
+                    start.elapsed().as_millis()
+                );
+                    Ok(res)
+                }
+                Err(e) => {
+                    log::error!("[WS_ROUTER] failed: {}", e);
+                    Ok(HttpResponse::InternalServerError().body("WebSocket proxy error"))
+                }
+            };
+        } else {
+            log::info!(
+                "[WS_ROUTER]: Node Role: {} Websocket is disabled",
+                cfg.common.node_role
+            );
+            return Ok(HttpResponse::NotFound().body("WebSocket is disabled"));
+        }
+    }
+
     // send query
-    let cfg = get_config();
     let resp = if cfg.route.connection_pool_disabled {
         let client = awc::Client::builder()
             .timeout(std::time::Duration::from_secs(cfg.route.timeout))

@@ -953,6 +953,7 @@
     "apikeyLabel": "API Keys",
     "generalPageTitle": "General Settings",
     "scrapintervalLabel": "Scrape Interval (In Seconds) *",
+    "enableWebsocketSearch": "Enable Websocket Search",
     "enterpriseTitle": "Enterprise Settings",
     "logoLabel": "Drag & Drop Logo Image",
     "customLogoTitle": "Custom Logo",

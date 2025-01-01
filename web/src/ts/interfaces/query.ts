@@ -18,6 +18,12 @@ export interface Query {
   size: number;
   sql: string;
   sql_mode: string;
+  track_total_hits?: boolean;
+}
+
+export interface SearchRequestPayload {
+  query: QueryPayload;
+  aggs?: HistogramQueryPayload;
 }
 
 export interface QueryPayload {
@@ -26,13 +32,44 @@ export interface QueryPayload {
   end_time: number;
   from: number;
   size: number;
+  query_fn?: string;
+  track_total_hits?: boolean;
 }
-
-export interface histogramQueryPayload {
+export interface HistogramQueryPayload {
   histogram: string;
 }
 
-export interface LogsQueryPayload {
-  query: QueryPayload;
-  aggs?: histogramQueryPayload;
+export interface WebSocketSearchResponse {
+  type: "search_response" | "cancel_response";
+  content: {
+    results: {
+      hits: any[];
+      total: number;
+      took: number;
+      function_error?: string;
+      new_start_time?: number;
+      new_end_time?: number;
+      scan_size?: number;
+    };
+  };
+}
+
+export interface WebSocketSearchPayload {
+  queryReq: SearchRequestPayload;
+  type: "search" | "histogram" | "pageCount";
+  isPagination: boolean;
+  traceId: string;
+  org_id: string;
+}
+
+export interface ErrorContent {
+  message: string;
+  trace_id?: string;
+  code?: number;
+  error_detail?: string;
+}
+
+export interface WebSocketErrorResponse {
+  content: ErrorContent;
+  type: "error";
 }
