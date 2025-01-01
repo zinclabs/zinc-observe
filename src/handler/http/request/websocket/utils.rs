@@ -45,7 +45,7 @@ pub mod enterprise_utils {
         }
 
         // Get user details from the USERS cache
-        let user: config::meta::user::User = get_user(Some(&org_id), user_id)
+        let user: config::meta::user::User = get_user(Some(org_id), user_id)
             .await
             .ok_or_else(|| "User not found".to_string())?;
 
