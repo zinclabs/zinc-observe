@@ -46,8 +46,8 @@ codegen-units = 4
 
 [dependencies]
 actix-cors = "0.7"
-actix-http = "3.8"
-actix-multipart = { version = "0.6", features = ["derive"] }
+actix-http = "3.9"
+actix-multipart = { version = "0.7", features = ["derive"] }
 actix-web.workspace = true
 actix-web-httpauth = "0.8"
 actix-web-lab = "0.20"
@@ -60,12 +60,13 @@ actix-web-rust-embed-responder = { version = "2.2", default-features = false, fe
 actix-ws = "0.2.5"
 actix = "0.13.5"
 actix-web-actors = "4.3.0"
+actix-tls.workspace = true
 ahash.workspace = true
 anyhow.workspace = true
 argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
-awc = "3.5"
+awc = { version = "3.5", features = ["rustls-0_23"] }
 aws-sdk-sns.workspace = true
 base64.workspace = true
 bitflags = "2.6.0"
@@ -145,6 +146,8 @@ regex.workspace = true
 regex-syntax.workspace = true
 reqwest.workspace = true
 rust-embed-for-web = "11.2.1"
+rustls.workspace = true
+rustls-pemfile.workspace = true
 sea-orm.workspace = true
 segment.workspace = true
 serde.workspace = true
@@ -216,8 +219,9 @@ wal = { path = "src/wal" }
 proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 ahash = { version = "0.8", features = ["serde"] }
-actix-web = "4.8"
+actix-web = { version = "4.9", features = ["rustls-0_23"] }
 actix-web-prometheus = { version = "0.1", features = ["process"] }
+actix-tls = { version = "3.4", features = ["connect", "uri", "rustls-0_23-native-roots", "rustls-0_23-webpki-roots"] }
 anyhow = "1.0"
 arc-swap = "1.7.1"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
@@ -291,6 +295,8 @@ reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-native-roots",
     "stream",
 ] }
+rustls-pemfile = "2"
+rustls = { version = "0.23.20", default-features = false, features = ["std", "tls12"]}
 sea-orm = { version = "1.1.0", features = [
     "sqlx-all",
     "runtime-tokio-rustls",

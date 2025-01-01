@@ -288,42 +288,46 @@ pub async fn extract_multipart(
 ) -> Result<Vec<json::Map<String, json::Value>>, Error> {
     let mut records = Vec::new();
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_disposition = field.content_disposition();
-        let filename = content_disposition.get_filename();
+        let Some(content_disposition) = field.content_disposition() else {
+            continue;
+        };
+
+        if content_disposition.get_filename().is_none() {
+            continue;
+        };
+
         let mut data = bytes::Bytes::new();
 
-        if filename.is_some() {
-            while let Some(chunk) = field.next().await {
-                let chunked_data = chunk.unwrap();
-                // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
-                data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
+        while let Some(chunk) = field.next().await {
+            let chunked_data = chunk.unwrap();
+            // Reconstruct entire CSV data bytes here to prevent fragmentation of values.
+            data = Bytes::from([data.as_ref(), chunked_data.as_ref()].concat());
+        }
+        let mut rdr = csv::Reader::from_reader(data.as_ref());
+        let headers: csv::StringRecord = rdr
+            .headers()?
+            .iter()
+            .map(|x| {
+                let mut x = x.trim().to_string();
+                format_key(&mut x);
+                x
+            })
+            .collect::<Vec<_>>()
+            .into();
+
+        for result in rdr.records() {
+            // The iterator yields Result<StringRecord, Error>, so we check the
+            // error here.
+            let record = result?;
+            // Transform the record to a JSON value
+            let mut json_record = json::Map::new();
+
+            for (header, field) in headers.iter().zip(record.iter()) {
+                json_record.insert(header.into(), json::Value::String(field.into()));
             }
-            let mut rdr = csv::Reader::from_reader(data.as_ref());
-            let headers: csv::StringRecord = rdr
-                .headers()?
-                .iter()
-                .map(|x| {
-                    let mut x = x.trim().to_string();
-                    format_key(&mut x);
-                    x
-                })
-                .collect::<Vec<_>>()
-                .into();
 
-            for result in rdr.records() {
-                // The iterator yields Result<StringRecord, Error>, so we check the
-                // error here.
-                let record = result?;
-                // Transform the record to a JSON value
-                let mut json_record = json::Map::new();
-
-                for (header, field) in headers.iter().zip(record.iter()) {
-                    json_record.insert(header.into(), json::Value::String(field.into()));
-                }
-
-                if !json_record.is_empty() {
-                    records.push(json_record);
-                }
+            if !json_record.is_empty() {
+                records.push(json_record);
             }
         }
     }

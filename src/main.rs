@@ -89,6 +89,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+use openobserve::service::tls::{aws_client_tls_config, http_tls_config};
 use tracing_subscriber::{
     filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*, EnvFilter,
 };
@@ -548,11 +549,16 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         );
         let mut app = App::new().wrap(prometheus.clone());
         if config::cluster::LOCAL_NODE.is_router() {
-            let client = awc::Client::builder()
+            let mut client_builder = awc::Client::builder()
                 .connector(awc::Connector::new().limit(cfg.route.max_connections))
                 .timeout(Duration::from_secs(cfg.route.timeout))
-                .disable_redirects()
-                .finish();
+                .disable_redirects();
+            if cfg.http.tls_enabled {
+                let config = aws_client_tls_config().unwrap();
+                client_builder =
+                    client_builder.connector(awc::Connector::new().rustls_0_23(config));
+            }
+            let client = client_builder.finish();
             app = app
                 .service(
                     // if `cfg.common.base_uri` is empty, scope("") still works as expected.
@@ -591,8 +597,14 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
         cfg.limit.keep_alive,
     ))))
     .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
-    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout))
-    .bind(haddr)?;
+    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
+    let server = match cfg.http.tls_enabled {
+        true => {
+            let sc = http_tls_config()?;
+            server.bind_rustls_0_23(haddr, sc)?
+        }
+        false => server.bind(haddr)?,
+    };
 
     let server = server
         .workers(cfg.limit.http_worker_num)
@@ -679,8 +691,15 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
         cfg.limit.keep_alive,
     ))))
     .client_request_timeout(Duration::from_secs(max(5, cfg.limit.request_timeout)))
-    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout))
-    .bind(haddr)?;
+    .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
+
+    let server = match cfg.http.tls_enabled {
+        true => {
+            let sc = http_tls_config()?;
+            server.bind_rustls_0_23(haddr, sc)?
+        }
+        false => server.bind(haddr)?,
+    };
 
     let server = server
         .workers(cfg.limit.http_worker_num)

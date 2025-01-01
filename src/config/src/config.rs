@@ -463,6 +463,20 @@ pub struct Http {
     pub addr: String,
     #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
+    #[env_config(name = "ZO_HTTP_TLS_ENABLED", default = false)]
+    pub tls_enabled: bool,
+    #[env_config(name = "ZO_HTTP_TLS_CERT_PATH", default = "")]
+    pub tls_cert_path: String,
+    #[env_config(name = "ZO_HTTP_TLS_KEY_PATH", default = "")]
+    pub tls_key_path: String,
+    #[env_config(name = "ZO_HTTP_TLS_MIN_VERSION", default = "", help = "Supported values: "1.2" or "1.3", default is all_version")]
+    pub tls_min_version: String,
+    #[env_config(
+        name = "ZO_HTTP_TLS_ROOT_CERTIFICATES",
+        default = "native",
+        help = "this value must use webpki or native. it means use standard root certificates from webpki-roots or native-roots as a rustls certificate store"
+    )]
+    pub tls_root_certificates: String,
 }
 
 #[derive(EnvConfig)]
