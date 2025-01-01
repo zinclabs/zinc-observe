@@ -30,7 +30,7 @@ pub struct Organization {
     pub org_type: String,
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema, Clone, Debug)]
 pub struct OrganizationInvites {
     #[serde(default)]

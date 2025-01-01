@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use config::meta::user::{DBUser, User, UserOrg, UserRole};
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 use infra::table::org_invites::InvitationRecord;
 #[cfg(feature = "enterprise")]
 use infra::table::users::UserUpdate;
@@ -25,8 +25,8 @@ use infra::{
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     table::users,
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::org_invites;
+#[cfg(feature = "cloud")]
+use o2_enterprise::enterprise::cloud::org_invites;
 
 use super::org_users::{self, get_cached_user_org};
 use crate::{
@@ -220,7 +220,7 @@ pub async fn delete(name: &str) -> Result<(), anyhow::Error> {
     }
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 pub async fn list_user_invites(user_id: &str) -> Result<Vec<InvitationRecord>, anyhow::Error> {
     let user_id = user_id.to_lowercase();
     org_invites::list_by_user(&user_id).await

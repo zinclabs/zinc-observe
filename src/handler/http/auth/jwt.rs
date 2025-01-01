@@ -77,6 +77,7 @@ pub async fn process_token(
         None => res.0.user_email.to_owned(),
         Some(name) => name.as_str().unwrap().to_string(),
     };
+    // TODO(org_revamp): a different process to add new users for cloud
     let mut source_orgs: Vec<UserOrg> = vec![];
     let mut custom_roles: Vec<String> = vec![];
     let mut tuples_to_add = HashMap::new();
@@ -122,6 +123,8 @@ pub async fn process_token(
 
     if db_user.is_none() {
         log::info!("User does not exist in the database");
+
+        // TODO(org_revamp): a different process to add new users for cloud
 
         if o2cfg.openfga.enabled {
             for (index, org) in source_orgs.iter().enumerate() {

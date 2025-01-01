@@ -1058,7 +1058,7 @@ pub fn is_user_from_org(orgs: Vec<UserOrg>, org_id: &str) -> (bool, UserOrg) {
     }
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 pub async fn list_user_invites(user_id: &str) -> Result<HttpResponse, Error> {
     let result = db::user::list_user_invites(user_id).await;
     match result {

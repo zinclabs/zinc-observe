@@ -715,7 +715,7 @@ async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
 }
 
 /// ListUserInvitations
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 #[utoipa::path(
     context_path = "/api",
     tag = "Users",
@@ -736,7 +736,7 @@ pub async fn list_invitations(user_email: UserEmail) -> Result<HttpResponse, Err
     users::list_user_invites(user_id).await
 }
 
-#[cfg(not(feature = "enterprise"))]
+#[cfg(not(feature = "cloud"))]
 #[get("/invites")]
 pub async fn list_invitations(_user_email: UserEmail) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))

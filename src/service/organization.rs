@@ -29,11 +29,13 @@ use config::{
 };
 #[cfg(feature = "enterprise")]
 use lettre::{message::SinglePart, AsyncTransport, Message};
+#[cfg(feature = "cloud")]
+use o2_enterprise::enterprise::cloud::org_invites;
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::common::{infra::config::get_config as get_o2_config, org_invites};
+use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
 use super::{db::org_users, users::add_admin_to_org};
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 use crate::common::meta::organization::OrganizationInvites;
 use crate::{
     common::{
@@ -360,15 +362,13 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
     }
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 pub async fn generate_invitation(
     org_id: &str,
     user_email: &str,
     invites: OrganizationInvites,
 ) -> Result<String, anyhow::Error> {
-    use o2_enterprise::enterprise::common::org_invites::{
-        get_invite_email_body, get_invite_email_subject,
-    };
+    use org_invites::{get_invite_email_body, get_invite_email_subject};
 
     use super::users::get_user;
 
@@ -431,7 +431,7 @@ pub async fn generate_invitation(
     }
 }
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 pub async fn accept_invitation(
     org_id: &str,
     user_email: &str,

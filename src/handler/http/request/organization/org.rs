@@ -20,7 +20,7 @@ use std::{
 
 use actix_web::{get, http, post, put, web, HttpRequest, HttpResponse, Result};
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 use crate::common::meta::organization::OrganizationInvites;
 use crate::{
     common::{
@@ -382,7 +382,7 @@ async fn rename_org(
 }
 
 /// InviteOrganizationMembers
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -416,7 +416,7 @@ pub async fn generate_org_invite(
     }
 }
 
-#[cfg(not(feature = "enterprise"))]
+#[cfg(not(feature = "cloud"))]
 #[put("/{org_id}/generate_invite")]
 pub async fn generate_org_invite() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
@@ -426,7 +426,7 @@ pub async fn generate_org_invite() -> Result<HttpResponse, Error> {
 }
 
 /// AcceptOrganizationInvite
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 #[utoipa::path(
     context_path = "/api",
     tag = "Organizations",
@@ -459,7 +459,7 @@ async fn accept_org_invite(
     }
 }
 
-#[cfg(not(feature = "enterprise"))]
+#[cfg(not(feature = "cloud"))]
 #[put("/{org_id}/accept_invite/{invite_token}")]
 async fn accept_org_invite() -> Result<HttpResponse, Error> {
     Ok(HttpResponse::NotFound().json(MetaHttpResponse::error(
