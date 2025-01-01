@@ -16,4 +16,6 @@ cypress/screenshots
 coverage/
 .nyc_output/
 
+# for snapshots
 dist/
+playwright-tests/__snapshots__

@@ -28,7 +28,7 @@ async function fetchSnapshots(): Promise<void> {
         );
 
         // Local folder path targeting `__screenshots__` within the given localFolderPath
-        const screenshotsFolder = path.join(process.cwd(), "tests", "__snapshots__");
+        const screenshotsFolder = path.join(process.cwd(), "playwright-tests", "__snapshots__");
 
         console.log(`fetch-snapshots : Screenshots folder: ${screenshotsFolder}`);
         // console.log(`fetch-snapshots : BaseLocalFolder folder: ${baseLocalFolder}`);

@@ -22,7 +22,7 @@ async function pushSnapshots(): Promise<void> {
   try {
     const snapshotLocation = new RemoteSnapshotLocation(config.bucket, config.basePath, config.region, config.currentVersion); 
     const version = config.currentVersion;
-    const localFolderPath = path.join(process.cwd(), "tests", '__snapshots__')// Path of the folder to push
+    const localFolderPath = path.join(process.cwd(), "playwright-tests", '__snapshots__')// Path of the folder to push
 
     console.log(`push-snapshots : Checking if the local folder exists: ${localFolderPath}...`);
     if (!lstatSync(localFolderPath).isDirectory()) {
