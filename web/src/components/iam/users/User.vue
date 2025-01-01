@@ -698,8 +698,14 @@ export default defineComponent({
     const addMember = async (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
       if (res.code == 200) {
+        router.push({
+          name: "users",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
         await getOrgMembers();
-            updateUserActions();
+        updateUserActions();
         if (operationType == "created") {
           $q.notify({
             color: "positive",
