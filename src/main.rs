@@ -235,6 +235,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("infra sea_orm migrate failed: {}", e);
             }
 
+            // cloud-related migrations
+            #[cfg(feature = "cloud")]
+            if let Err(e) = o2_enterprise::enterprise::cloud::migrate().await {
+                job_init_tx.send(false).ok();
+                panic!("cloud sea_orm migrate failed: {}", e);
+            }
+
             // migrate dashboards
             if let Err(e) = migration::dashboards::run().await {
                 job_init_tx.send(false).ok();
