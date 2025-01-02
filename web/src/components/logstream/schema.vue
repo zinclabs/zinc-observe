@@ -519,26 +519,11 @@ class="indexDetailsContainer" style="height: 100vh">
                   <!-- Body Slot for Selection -->
                   <template v-slot:body-selection="scope">
                     <q-td class="text-center q-td--no-hover">
-                      <template
-                        v-if="
-                          scope.row.hasOwnProperty('isCreated') &&
-                          scope.row.isCreated == false
-                        "
-                      >
-                        <q-icon
-                          name="close"
-                          color="negative"
-                          @click="handleNotCreatedRow(scope.row)"
-                          size="md"
-                        />
-                      </template>
-                      <template v-else>
-                        <q-checkbox
-                          :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
-                          v-model="scope.selected"
-                          size="sm"
-                        />
-                      </template>
+                      <q-checkbox
+                        :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
+                        v-model="scope.selected"
+                        size="sm"
+                      />
                     </q-td>
                   </template>
 
@@ -1108,7 +1093,6 @@ export default defineComponent({
           field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
         ),
       );
-      
       // Push unique and normalized field names to settings.defined_schema_fields
       settings.defined_schema_fields.push(...newSchemaFieldsSet);
 
@@ -1120,12 +1104,13 @@ export default defineComponent({
       });
       if (selectedDateFields.value.length > 0) {
         selectedDateFields.value.forEach((field) => {
-          // Filter out the items that match the condition
+          // Filter out the items only if both start and end match
           settings.extended_retention_days = settings.extended_retention_days.filter((item) => {
-            return item.start !== field.start && item.end !== field.end;
-          });
+            return !(item.start === field.start && item.end === field.end);
+            });
         });
-      }
+      };
+
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
@@ -1573,22 +1558,6 @@ export default defineComponent({
       onSubmit();
       };
 
-    const handleNotCreatedRow = (row) => {
-      // Re-assign filtered rows to redBtnRows.value to update the array
-      redBtnRows.value = redBtnRows.value.filter(
-          (field) =>
-            field.isCreated !== undefined ? ( // Check if `isCreated` exists
-              field.isCreated === false && // Only check for `isCreated === false`
-              (field.original_start !== row.original_start || field.original_end !== row.original_end) // Check `original_start` and `original_end`
-            ) : true // If `isCreated` does not exist, keep the row
-        );
-
-      redDaysList.value = redDaysList.value.filter(
-        (field) =>
-          field.start !== row.original_start || field.end !== row.original_end,
-      );
-    };
-
     return {
       t,
       q,
@@ -1657,8 +1626,6 @@ export default defineComponent({
       redDaysList,
       deleteDates,
       IsdeleteBtnVisible,
-      handleNotCreatedRow
-
     };
   },
   created() {
