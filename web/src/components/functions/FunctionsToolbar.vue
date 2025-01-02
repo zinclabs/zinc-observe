@@ -21,25 +21,45 @@
       </div>
       <div class="tw-text-lg tw-w-full">Add Function</div>
       <q-form ref="addFunctionForm" class="o2-input">
-        <q-input
-          v-model="functionName"
-          :label="t('function.name')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-pa-none tw-w-full q-ml-md"
-          stack-label
-          outlined
-          filled
-          dense
-          v-bind:readonly="disableName"
-          v-bind:disable="disableName"
-          :rules="[
-            (val: any) => !!val || 'Field is required!',
-            isValidMethodName,
-          ]"
-          tabindex="0"
-          style="min-width: 300px"
-        />
+        <div class="tw-flex tw-items-center">
+          <q-input
+            v-model="functionName"
+            :label="t('function.name') + '*'"
+            color="input-border"
+            bg-color="input-bg"
+            class="q-pa-none tw-w-full"
+            stack-label
+            outlined
+            filled
+            dense
+            v-bind:readonly="disableName"
+            v-bind:disable="disableName"
+            :rules="[
+              (val: any) => !!val || 'Field is required!',
+              isValidMethodName,
+            ]"
+            no-error-icon
+            tabindex="0"
+            style="min-width: 300px"
+          />
+          <q-icon
+            :key="functionName"
+            v-if="isValidMethodName() !== true"
+            :name="outlinedInfo"
+            size="20px"
+            class="q-ml-xs cursor-pointer"
+            :class="store.state.theme === 'dark' ? 'text-red-5' : 'text-red-7'"
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+              :offset="[2, 0]"
+            >
+              {{ isValidMethodName() }}
+            </q-tooltip>
+          </q-icon>
+        </div>
       </q-form>
     </div>
     <div class="add-function-actions flex justify-center">

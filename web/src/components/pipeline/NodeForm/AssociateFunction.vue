@@ -38,13 +38,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       />
     </div>
-    <div v-else class="stream-routing-container full-width q-pa-md">
-      <q-toggle
-        data-test="create-function-toggle"
-        class="q-mb-sm"
-        :label="isUpdating ? 'Edit function' : 'Create new function'"
-        v-model="createNewFunction"
-      />
+    <div
+      v-else
+      class="stream-routing-container full-width q-pt-xs q-pb-md q-px-md"
+    >
+      <div class="tw-flex tw-items-center">
+        <q-toggle
+          data-test="create-function-toggle"
+          class="q-mb-sm tw-inline-block"
+          :label="isUpdating ? 'Edit function' : 'Create new function'"
+          v-model="createNewFunction"
+        />
+        <div
+          v-if="createNewFunction"
+          class="q-pb-sm container text-body2 tw-inline-block tw-pl-4 tw-text-gray-600"
+        >
+          ({{ t("alerts.newFunctionAssociationMsg") }})
+        </div>
+      </div>
       <q-form @submit="saveFunction">
         <div
           v-if="!createNewFunction"
@@ -80,11 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filter="filterFunctions"
               :error="functionExists"
             />
-    
           </div>
         </div>
 
-        <div v-if="createNewFunction" class="pipeline-add-function">
+        <div v-if="createNewFunction" class="pipeline-add-function tw-w-[95vw]">
           <AddFunction
             ref="addFunctionRef"
             :is-updated="isUpdating"
@@ -93,7 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="o2-input full-width" style="padding-top: 12px" v-if="!createNewFunction">
+        <div
+          class="o2-input full-width"
+          style="padding-top: 12px"
+          v-if="!createNewFunction"
+        >
           <q-toggle
             data-test="associate-function-after-flattening-toggle"
             class="q-mb-sm"
@@ -101,8 +115,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="afterFlattening"
           />
         </div>
-        <div v-else class="q-pb-sm container text-body2" style="width: 500px;">
-          {{t("alerts.newFunctionAssociationMsg")}}
+        <div v-else class="q-pb-sm container text-body2" style="width: 500px">
+          {{ t("alerts.newFunctionAssociationMsg") }}
         </div>
 
         <div
@@ -120,7 +134,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-btn
             data-test="associate-function-save-btn"
-            :label="createNewFunction ? t('alerts.createFunction') : t('alerts.save')"
+            :label="
+              createNewFunction ? t('alerts.createFunction') : t('alerts.save')
+            "
             class="text-bold no-border q-ml-md"
             color="secondary"
             padding="sm xl"
@@ -128,8 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
           />
           <q-btn
-          v-if="pipelineObj.isEditNode"
-          data-test="associate-function-delete-btn"
+            v-if="pipelineObj.isEditNode"
+            data-test="associate-function-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
             color="negative"
@@ -168,10 +184,6 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import { useQuasar } from "quasar";
 import { getImageURL } from "@/utils/zincutils";
 
-
-
-
-
 interface RouteCondition {
   column: string;
   operator: string;
@@ -186,7 +198,6 @@ interface StreamRoute {
   destinationStreamType: string;
   conditions: RouteCondition[];
 }
-
 
 const AddFunction = defineAsyncComponent(
   () => import("@/components/functions/AddFunction.vue"),
@@ -218,17 +229,22 @@ const emit = defineEmits([
 
 const { t } = useI18n();
 
-const { addNode, pipelineObj , deletePipelineNode } = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
 const addFunctionRef: any = ref(null);
 
 const isUpdating = ref(false);
 
-const selectedFunction = ref((pipelineObj.currentSelectedNodeData?.data as { name?: string })?.name || "");
+const selectedFunction = ref(
+  (pipelineObj.currentSelectedNodeData?.data as { name?: string })?.name || "",
+);
 
 const loading = ref(false);
 
-const afterFlattening = ref((pipelineObj.currentSelectedNodeData?.data as { after_flatten?: boolean })?.after_flatten || false);
+const afterFlattening = ref(
+  (pipelineObj.currentSelectedNodeData?.data as { after_flatten?: boolean })
+    ?.after_flatten || false,
+);
 
 const filteredFunctions: Ref<any[]> = ref([]);
 
@@ -245,8 +261,10 @@ const nodeLink = ref({
 });
 
 const computedStyleForFunction = computed(() => {
-      return createNewFunction.value ? {  width: '100%' } : {width: '100%',height: '100%',};
-    });
+  return createNewFunction.value
+    ? { width: "100%" }
+    : { width: "100%", height: "100%" };
+});
 
 const dialog = ref({
   show: false,
@@ -256,32 +274,34 @@ const dialog = ref({
 });
 
 watch(
-      () => props.functions,
-      (newVal) => {
-        filteredFunctions.value = [...newVal].sort((a:any, b:any) => {
-          return a.localeCompare(b);
-        });
-      },
-      {
-        deep: true,
-        immediate: true,
-      }
-    );
-onMounted(()=>{
-    if(pipelineObj.userSelectedNode){
-      pipelineObj.userSelectedNode = {};
-    }
-})
-
+  () => props.functions,
+  (newVal) => {
+    filteredFunctions.value = [...newVal].sort((a: any, b: any) => {
+      return a.localeCompare(b);
+    });
+  },
+  {
+    deep: true,
+    immediate: true,
+  },
+);
+onMounted(() => {
+  if (pipelineObj.userSelectedNode) {
+    pipelineObj.userSelectedNode = {};
+  }
+});
 
 const openCancelDialog = () => {
-  if(!isUpdating){
-    if(createNewFunction.value == true  && addFunctionRef.value.formData.name == "" && addFunctionRef.value.formData.function == "") {
-    createNewFunction.value = false;
-    return;
+  if (!isUpdating) {
+    if (
+      createNewFunction.value == true &&
+      addFunctionRef.value.formData.name == "" &&
+      addFunctionRef.value.formData.function == ""
+    ) {
+      createNewFunction.value = false;
+      return;
+    }
   }
-  }
-
 
   dialog.value.show = true;
   dialog.value.title = "Discard Changes";
@@ -289,7 +309,6 @@ const openCancelDialog = () => {
   dialog.value.okCallback = () => emit("cancel:hideform");
   pipelineObj.userClickedNode = {};
   pipelineObj.userSelectedNode = {};
-
 };
 
 const openDeleteDialog = () => {
@@ -302,9 +321,9 @@ const openDeleteDialog = () => {
 
 const saveFunction = () => {
   functionExists.value = false;
-  
+
   if (createNewFunction.value) {
-    if(addFunctionRef.value.formData.name == "" ){
+    if (addFunctionRef.value.formData.name == "") {
       q.notify({
         message: "Function Name is required",
         color: "negative",
@@ -313,8 +332,8 @@ const saveFunction = () => {
       });
       return;
     }
-    if(addFunctionRef.value.formData.function == ""){
-     q.notify({
+    if (addFunctionRef.value.formData.function == "") {
+      q.notify({
         message: "Function is required",
         color: "negative",
         position: "bottom",
@@ -364,23 +383,19 @@ const saveUpdatedLink = (link: { from: string; to: string }) => {
 };
 
 const deleteFunction = () => {
-  deletePipelineNode (pipelineObj.currentSelectedNodeID);
+  deletePipelineNode(pipelineObj.currentSelectedNodeID);
 
   emit("cancel:hideform");
 };
-const filterFunctions = (val:any, update:any) => {
-      const filtered = props.functions
-        .filter((func:any) =>
-          func.toLowerCase().includes(val.toLowerCase())
-        )
-        .sort((a:any, b:any) => a.localeCompare(b));
+const filterFunctions = (val: any, update: any) => {
+  const filtered = props.functions
+    .filter((func: any) => func.toLowerCase().includes(val.toLowerCase()))
+    .sort((a: any, b: any) => a.localeCompare(b));
 
-
-
-      update(() => {
-        filteredFunctions.value = filtered;
-      });
-    };
+  update(() => {
+    filteredFunctions.value = filtered;
+  });
+};
 </script>
 
 <style scoped>
