@@ -246,7 +246,9 @@ export default defineComponent({
 
     const isValidMethodName = () => {
       const methodPattern = /^[$A-Z_][0-9A-Z_$]*$/i;
-      return methodPattern.test(formData.value.name) || "Invalid method name.";
+      return (
+        methodPattern.test(formData.value.name) || "Invalid Function name."
+      );
     };
     const updateEditorContent = () => {
       if (formData.value.transType == "1") {
@@ -326,7 +328,8 @@ end`;
               $q.notify({
                 type: "negative",
                 message:
-                  JSON.stringify(err.response.data["error"]) ||
+                  JSON.stringify(err.response.data?.error) ||
+                  err.response.data?.message ||
                   "Function creation failed",
               });
               dismiss();
