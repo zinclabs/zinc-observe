@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="q-ml-sm tw-overflow-auto"
+          class="tw-overflow-auto q-mx-sm q-my-sm"
           style="height: calc(100vh - 57px)"
         >
           <!-- :templates="templates"

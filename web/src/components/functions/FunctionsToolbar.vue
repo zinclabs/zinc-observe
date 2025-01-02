@@ -3,7 +3,7 @@
     class="functions-toolbar tw-pb-1.5 tw-w-full tw-flex tw-justify-between tw-items-center"
   >
     <div class="tw-flex tw-items-center">
-      <div class="tw-mr-2">
+      <div class="tw-mr-2 add-function-back-btn">
         <div
           data-test="add-function-back-btn"
           class="flex justify-center items-center cursor-pointer"
@@ -19,12 +19,14 @@
           <q-icon name="arrow_back_ios_new" size="14px" />
         </div>
       </div>
-      <div class="tw-text-lg tw-w-full">Add Function</div>
+      <div class="tw-text-lg tw-w-full add-function-title q-mr-md">
+        Add Function
+      </div>
       <q-form ref="addFunctionForm" class="o2-input">
         <div class="tw-flex tw-items-center">
           <q-input
             v-model="functionName"
-            :label="t('function.name') + '*'"
+            :label="t('function.name')"
             color="input-border"
             bg-color="input-bg"
             class="q-pa-none tw-w-full"
@@ -65,7 +67,7 @@
     <div class="add-function-actions flex justify-center">
       <q-btn
         v-close-popup="true"
-        class="text-bold tw-border-primary"
+        class="text-bold tw-border-primary add-function-fullscreen-btn"
         :label="t('common.fullscreen')"
         :text-color="store.state.theme === 'dark' ? 'grey-1' : 'primary'"
         padding="sm"
@@ -75,23 +77,23 @@
       />
       <q-btn
         :label="t('function.testFunction')"
-        class="text-bold no-border tw-ml-[12px]"
+        class="text-bold no-border tw-ml-[12px] add-function-test-btn"
         color="primary"
         padding="sm md"
-        type="submit"
         no-caps
         @click="emit('test')"
       />
       <q-btn
         :label="t('function.save')"
-        class="text-bold no-border tw-ml-[12px]"
+        class="text-bold no-border tw-ml-[12px] add-function-save-btn"
         color="secondary"
         padding="sm md"
+        type="submit"
         no-caps
         @click="emit('save')"
       />
       <q-btn
-        class="cancel-btn text-bold tw-ml-[12px] tw-border-3 tw-border-red-600"
+        class="cancel-btn text-bold tw-ml-[12px] tw-border-3 tw-border-red-600 add-function-cancel-btn"
         :label="t('function.cancel')"
         text-color="negative"
         padding="sm md"
@@ -114,6 +116,7 @@ import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
 
 const { t } = useI18n();
 
@@ -139,6 +142,7 @@ const emit = defineEmits(["test", "save", "update:name", "back", "cancel"]);
 const addFunctionForm = ref(null);
 
 const isValidMethodName = () => {
+  if (!functionName.value) return "Field is required!";
   const methodPattern = /^[$A-Z_][0-9A-Z_$]*$/i;
   return methodPattern.test(props.name) || "Invalid method name.";
 };

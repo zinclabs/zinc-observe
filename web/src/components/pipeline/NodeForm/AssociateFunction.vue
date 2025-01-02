@@ -115,15 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="afterFlattening"
           />
         </div>
-        <div v-else class="q-pb-sm container text-body2" style="width: 500px">
-          {{ t("alerts.newFunctionAssociationMsg") }}
-        </div>
 
         <div
           class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
           <q-btn
+            v-if="!createNewFunction"
             data-test="associate-function-cancel-btn"
             class="text-bold"
             :label="t('alerts.cancel')"
@@ -133,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="openCancelDialog"
           />
           <q-btn
+            v-if="!createNewFunction"
             data-test="associate-function-save-btn"
             :label="
               createNewFunction ? t('alerts.createFunction') : t('alerts.save')
@@ -398,7 +397,7 @@ const filterFunctions = (val: any, update: any) => {
 };
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .stream-routing-title {
   font-size: 20px;
   padding-top: 16px;
@@ -407,19 +406,18 @@ const filterFunctions = (val: any, update: any) => {
   border-radius: 8px;
   /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
 }
+
+.pipeline-add-function {
+  :deep(.add-function-back-btn),
+  :deep(.add-function-fullscreen-btn),
+  :deep(.add-function-title) {
+    display: none;
+  }
+}
 </style>
 
 <style lang="scss">
 .pipeline-add-function {
-  .add-function-header,
-  .q-separator {
-    display: none;
-  }
-
-  .add-function-actions {
-    display: none;
-  }
-
   .add-function-name-input {
     width: 100%;
     margin-left: 0px !important;
