@@ -320,7 +320,7 @@ end`;
               dismiss();
               $q.notify({
                 type: "positive",
-                message: res.data.message,
+                message: res.data.message || "Function saved successfully",
               });
             })
             .catch((err) => {
