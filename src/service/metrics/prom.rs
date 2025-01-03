@@ -22,6 +22,7 @@ use config::{
     get_config,
     meta::{
         alerts::alert,
+        promql::*,
         self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
@@ -43,7 +44,7 @@ use proto::prometheus_rpc;
 use crate::{
     common::{
         infra::config::{METRIC_CLUSTER_LEADER, METRIC_CLUSTER_MAP},
-        meta::{prom::*, stream::SchemaRecords},
+        meta::stream::SchemaRecords,
     },
     service::{
         alerts::alert::AlertExt,

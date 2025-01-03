@@ -24,12 +24,14 @@ use hashbrown::HashMap;
 use promql_parser::parser::EvalStmt;
 use tokio::sync::{Mutex, RwLock, Semaphore};
 
+use super::Engine;
 use crate::service::promql::{
-    micros, micros_since_epoch, value::*, TableProvider, DEFAULT_LOOKBACK,
+    micros, micros_since_epoch, selector_visitor::MetricSelectorVisitor, value::*, TableProvider,
+    DEFAULT_LOOKBACK,
 };
 
 #[derive(Clone)]
-pub struct Query {
+pub struct PromqlContext {
     pub org_id: String,
     pub table_provider: Arc<Box<dyn TableProvider>>,
     /// The time boundaries for the evaluation. If start equals end an instant
@@ -40,6 +42,7 @@ pub struct Query {
     pub interval: i64,
     /// Default look back from sample search.
     pub lookback_delta: i64,
+    pub query_exemplars: bool,
     /// key — metric name; value — time series data
     pub data_cache: Arc<RwLock<HashMap<String, Value>>>,
     pub scan_stats: Arc<RwLock<ScanStats>>,
@@ -47,8 +50,8 @@ pub struct Query {
     pub data_loading: Arc<Mutex<bool>>,
 }
 
-impl Query {
-    pub fn new<P>(org_id: &str, provider: P, timeout: u64) -> Self
+impl PromqlContext {
+    pub fn new<P>(org_id: &str, provider: P, query_exemplars: bool, timeout: u64) -> Self
     where
         P: TableProvider,
     {
@@ -60,6 +63,7 @@ impl Query {
             start: now,
             end: now,
             interval: five_min,
+            query_exemplars,
             lookback_delta: five_min,
             data_cache: Arc::new(RwLock::new(HashMap::default())),
             data_loading: Arc::new(Mutex::new(false)),
@@ -89,7 +93,7 @@ impl Query {
             result_type = Some("matrix".to_string());
         } else {
             // Instant query
-            let mut engine = super::Engine::new(ctx, self.start);
+            let mut engine = Engine::new(ctx, self.start);
             let (mut value, result_type_exec) = engine.exec(&expr).await?;
             if let Value::Float(val) = value {
                 value = Value::Sample(Sample::new(self.end, val));
@@ -112,7 +116,7 @@ impl Query {
             let time = self.start + (self.interval * i);
             let expr = expr.clone();
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let mut engine = super::Engine::new(ctx.clone(), time);
+            let mut engine = Engine::new(ctx.clone(), time);
             let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
                 tokio::task::spawn(async move {
                     let ret = engine.exec(&expr).await;
@@ -183,6 +187,96 @@ impl Query {
             .into_iter()
             .map(|(sig, samples)| {
                 RangeValue::new(merged_metrics.get(&sig).unwrap().to_owned(), samples)
+            })
+            .collect::<Vec<_>>();
+
+        // sort data
+        let mut value = Value::Matrix(merged_data);
+        value.sort();
+        Ok((value, result_type, *self.scan_stats.read().await))
+    }
+
+    /// Query exemplars
+    /// need rewrite the query to only have selectors
+    /// and no need query lookback
+    /// and need merge exemplars to a single array
+    #[tracing::instrument(name = "promql:engine:query_exemplars", skip_all)]
+    pub async fn query_exemplars(
+        &mut self,
+        stmt: EvalStmt,
+    ) -> Result<(Value, Option<String>, ScanStats)> {
+        let cfg = config::get_config();
+        self.start = micros_since_epoch(stmt.start);
+        self.end = micros_since_epoch(stmt.end);
+
+        // pick all selectors from stmt
+        let mut visitor = MetricSelectorVisitor::default();
+        promql_parser::util::walk_expr(&mut visitor, &stmt.expr).unwrap();
+        let _selectors = visitor.exprs_to_string();
+
+        let ctx = Arc::new(self.clone());
+
+        // always be exemplars result type.
+        let result_type = Some("exemplars".to_string());
+
+        let mut instant_vectors = Vec::new();
+        let mut tasks = Vec::new();
+        let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
+        for expr in visitor.exprs {
+            let time = self.start;
+            let expr = Arc::new(expr);
+            let permit = semaphore.clone().acquire_owned().await.unwrap();
+            let mut engine = Engine::new(ctx.clone(), time);
+            let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
+                tokio::task::spawn(async move {
+                    let ret = engine.exec(&expr).await;
+                    drop(permit);
+                    ret
+                });
+            tasks.push((time, task));
+        }
+
+        for (_time, ret) in tasks {
+            let (result, _result_type_exec) = match ret.await {
+                Ok(Ok((value, result_type))) => (value, result_type),
+                Ok(Err(e)) => {
+                    log::error!("Error executing query engine: {}", e);
+                    return Err(e);
+                }
+                Err(e) => {
+                    log::error!("Error executing query task: {}", e);
+                    return Err(DataFusionError::Execution(e.to_string()));
+                }
+            };
+
+            match result {
+                Value::Matrix(vs) => instant_vectors.extend(vs),
+                _ => continue,
+            };
+        }
+
+        // empty result quick return
+        if instant_vectors.is_empty() {
+            return Ok((Value::None, result_type, *self.scan_stats.read().await));
+        }
+
+        // merge data
+        let mut merged_data = HashMap::new();
+        let mut merged_metrics = HashMap::new();
+        for value in instant_vectors {
+            merged_data
+                .entry(signature(&value.labels))
+                .or_insert_with(Vec::new)
+                .extend(value.exemplars.unwrap_or_default());
+            merged_metrics.insert(signature(&value.labels), value.labels);
+        }
+        let merged_data = merged_data
+            .into_iter()
+            .map(|(sig, exemplars)| {
+                RangeValue::new_with_exemplars(
+                    merged_metrics.get(&sig).unwrap().to_owned(),
+                    exemplars,
+                )
             })
             .collect::<Vec<_>>();
 

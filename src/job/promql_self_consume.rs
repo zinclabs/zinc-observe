@@ -16,14 +16,14 @@
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::cluster::get_internal_grpc_token,
+    meta::{cluster::get_internal_grpc_token, stream::StreamType},
     metrics::get_registry,
     utils::{prom_json_encoder::JsonEncoder, util::zero_or},
 };
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use proto::cluster_rpc::{
-    ingest_client::IngestClient, IngestionData, IngestionRequest, IngestionType, StreamType,
+    ingest_client::IngestClient, IngestionData, IngestionRequest, IngestionType,
 };
 use serde_json::Value;
 use tokio::time::{self, Duration};
@@ -50,7 +50,7 @@ async fn send_metrics(config: &config::Config, metrics: Vec<Value>) -> Result<()
     let req = IngestionRequest {
         org_id: org.to_owned(),
         stream_name: "".to_owned(),
-        stream_type: StreamType::Metrics.into(),
+        stream_type: StreamType::Metrics.to_string(),
         data: Some(IngestionData::from(metrics)),
         ingestion_type: Some(IngestionType::Json.into()),
     };

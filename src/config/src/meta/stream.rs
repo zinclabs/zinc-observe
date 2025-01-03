@@ -92,17 +92,9 @@ impl From<&str> for StreamType {
     }
 }
 
-impl From<StreamType> for cluster_rpc::StreamType {
-    fn from(value: StreamType) -> Self {
-        match value {
-            StreamType::Logs => cluster_rpc::StreamType::Logs,
-            StreamType::Metrics => cluster_rpc::StreamType::Metrics,
-            StreamType::Traces => cluster_rpc::StreamType::Traces,
-            StreamType::EnrichmentTables => cluster_rpc::StreamType::EnrichmentTables,
-            StreamType::Filelist => cluster_rpc::StreamType::Filelist,
-            StreamType::Metadata => cluster_rpc::StreamType::Metadata,
-            StreamType::Index => cluster_rpc::StreamType::Index,
-        }
+impl From<String> for StreamType {
+    fn from(s: String) -> Self {
+        StreamType::from(s.as_str())
     }
 }
 

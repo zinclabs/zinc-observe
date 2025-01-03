@@ -17,6 +17,7 @@ use sea_orm::{
     entity::prelude::*, ColumnTrait, ConnectionTrait, DatabaseBackend, EntityTrait,
     FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Schema, Set,
 };
+use serde::{Deserialize, Serialize};
 
 use super::get_lock;
 use crate::{
@@ -48,7 +49,7 @@ impl RelationTrait for Relation {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-#[derive(FromQueryResult, Debug)]
+#[derive(FromQueryResult, Debug, Serialize, Deserialize)]
 pub struct ShortUrlRecord {
     pub short_id: String,
     pub original_url: String,

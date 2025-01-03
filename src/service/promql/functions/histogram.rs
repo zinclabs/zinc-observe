@@ -13,14 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::promql::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL};
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
-use crate::{
-    common::meta::prom::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL},
-    service::promql::value::{
-        signature_without_labels, InstantValue, Labels, LabelsExt, Sample, Signature, Value,
-    },
+use crate::service::promql::value::{
+    signature_without_labels, InstantValue, Labels, LabelsExt, Sample, Signature, Value,
 };
 
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33

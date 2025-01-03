@@ -16,13 +16,9 @@
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
-use bytes::Bytes;
 use chrono::Utc;
 use config::get_config;
-use infra::{
-    db::{Event, NEED_WATCH},
-    table::short_urls,
-};
+use infra::{db::Event, table::short_urls};
 
 use crate::{common::infra::config::SHORT_URLS, service::db};
 
@@ -50,16 +46,11 @@ pub async fn set(short_id: &str, entry: short_urls::ShortUrlRecord) -> Result<()
         return Err(e).context("Failed to add short URL to DB");
     }
 
-    // trigger watch event by putting empty value to cluster coordinator
-    let cluster_coordinator = super::get_coordinator().await;
-    cluster_coordinator
-        .put(
-            &format!("{SHORT_URL_KEY}{short_id}"),
-            Bytes::new(),
-            NEED_WATCH,
-            None,
-        )
-        .await?;
+    // trigger watch event cluster coordinator
+    cluster::emit_put_event(short_id).await?;
+    // trigger watch event super cluster
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_put_event(short_id, entry).await?;
 
     Ok(())
 }
@@ -154,17 +145,11 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
             // delete from db
             short_urls::batch_remove(expired_short_ids.clone()).await?;
 
-            // delete from cache
-            let cluster_coordinator = super::get_coordinator().await;
+            // delete from cache & notify super cluster
             for short_id in expired_short_ids {
-                cluster_coordinator
-                    .delete(
-                        &format!("{SHORT_URL_KEY}{short_id}"),
-                        false,
-                        NEED_WATCH,
-                        None,
-                    )
-                    .await?;
+                cluster::emit_delete_event(&short_id).await?;
+                #[cfg(feature = "enterprise")]
+                super_cluster::emit_delete_event(&short_id).await?;
             }
         }
     }
@@ -178,4 +163,84 @@ pub async fn gc_cache(retention_period_minutes: i64) -> Result<(), anyhow::Error
 
 fn days_to_minutes(days: i64) -> i64 {
     days * 24 * 60
+}
+
+/// Helper functions for sending events to cache watchers in the cluster.
+mod cluster {
+    use super::SHORT_URL_KEY;
+
+    /// Sends event to the cluster cache watchers indicating that a new short URL entry has been
+    /// added.
+    pub async fn emit_put_event(short_id: &str) -> Result<(), infra::errors::Error> {
+        let key = short_url_key(short_id);
+        let value = bytes::Bytes::new();
+        let cluster_coordinator = infra::db::get_coordinator().await;
+        cluster_coordinator
+            .put(&key, value, infra::db::NEED_WATCH, None)
+            .await?;
+        Ok(())
+    }
+
+    /// Sends event to the cluster cache watchers indicating that a short URL entry has been
+    /// deleted.
+    pub async fn emit_delete_event(short_id: &str) -> Result<(), infra::errors::Error> {
+        let key = short_url_key(short_id);
+        let cluster_coordinator = infra::db::get_coordinator().await;
+        cluster_coordinator
+            .delete(&key, false, infra::db::NEED_WATCH, None)
+            .await?;
+        Ok(())
+    }
+
+    fn short_url_key(short_id: &str) -> String {
+        format!("{SHORT_URL_KEY}{short_id}")
+    }
+}
+
+/// Helper fuunctions for sending events to the super cluster queue.
+#[cfg(feature = "enterprise")]
+mod super_cluster {
+    use config::utils::json;
+    use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
+
+    use super::{short_urls, SHORT_URL_KEY};
+
+    /// Sends event to super cluster queue for a new short URL entry.
+    pub async fn emit_put_event(
+        short_id: &str,
+        entry: short_urls::ShortUrlRecord,
+    ) -> Result<(), infra::errors::Error> {
+        let key = short_url_key(short_id);
+        let value = json::to_vec(&entry.original_url)?.into();
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::short_url_put(
+                &key,
+                value,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Sends event to super cluster queue for a deleted short URL entry.
+    pub async fn emit_delete_event(short_id: &str) -> Result<(), infra::errors::Error> {
+        let key = short_url_key(short_id);
+        if get_o2_config().super_cluster.enabled {
+            o2_enterprise::enterprise::super_cluster::queue::short_url_delete(
+                &key,
+                infra::db::NEED_WATCH,
+                None,
+            )
+            .await
+            .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    fn short_url_key(short_id: &str) -> String {
+        format!("{SHORT_URL_KEY}{short_id}")
+    }
 }

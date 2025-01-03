@@ -17,14 +17,15 @@ use std::sync::Arc;
 
 use arrow_schema::Field;
 use config::{
-    meta::stream::{StreamSettings, StreamStats, StreamType},
+    meta::{
+        promql::Metadata,
+        stream::{StreamSettings, StreamStats, StreamType},
+    },
     utils::json,
 };
 use datafusion::arrow::datatypes::Schema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-use super::prom::Metadata;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Stream {

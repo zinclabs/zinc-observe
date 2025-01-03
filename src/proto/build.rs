@@ -27,8 +27,6 @@ fn main() -> Result<()> {
         .type_attribute("FileKey", "#[derive(Eq)]")
         .type_attribute("FileKey", "#[derive(serde::Serialize)]")
         .type_attribute("IdxFileName", "#[derive(Eq)]")
-        .type_attribute("FileDescriptor", "#[derive(Eq)]")
-        .type_attribute("FileDescriptor", "#[derive(serde::Serialize)]")
         .type_attribute("FileMeta", "#[derive(Eq)]")
         .type_attribute("FileMeta", "#[derive(serde::Serialize)]")
         .type_attribute("Job", "#[derive(Eq)]")
@@ -43,8 +41,13 @@ fn main() -> Result<()> {
         .type_attribute("SearchAggResponse", "#[derive(Eq)]")
         .type_attribute("SearchAggResponse", "#[derive(serde::Serialize)]")
         .type_attribute("Series", "#[derive(serde::Serialize)]")
-        .type_attribute("Label", "#[derive(serde::Serialize)]")
-        .type_attribute("Sample", "#[derive(serde::Serialize)]")
+        .type_attribute("Label", "#[derive(serde::Deserialize,serde::Serialize)]")
+        .type_attribute("Sample", "#[derive(serde::Deserialize,serde::Serialize)]")
+        .type_attribute("Exemplar", "#[derive(serde::Deserialize,serde::Serialize)]")
+        .type_attribute(
+            "Exemplars",
+            "#[derive(serde::Deserialize,serde::Serialize)]",
+        )
         .type_attribute("MetricsQueryStmt", "#[derive(serde::Serialize)]")
         .type_attribute("MetricsQueryRequest", "#[derive(serde::Serialize)]")
         .type_attribute("MetricsQueryResponse", "#[derive(serde::Serialize)]")

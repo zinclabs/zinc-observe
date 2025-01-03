@@ -26,6 +26,7 @@ use utoipa::ToSchema;
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct Alert {
     #[serde(default)]
+    #[schema(read_only)]
     pub id: Option<Ksuid>,
 
     #[serde(default)]
@@ -70,10 +71,12 @@ pub struct Alert {
 
     /// Time when alert was last triggered. Unix timestamp.
     #[serde(default)]
+    #[schema(read_only)]
     pub last_triggered_at: Option<i64>,
 
     /// Time when alert was last satisfied. Unix timestamp.
     #[serde(default)]
+    #[schema(read_only)]
     pub last_satisfied_at: Option<i64>,
 
     #[serde(default)]
@@ -81,9 +84,11 @@ pub struct Alert {
 
     /// Time when alert was last updated. Unix timestamp.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(read_only)]
     pub updated_at: Option<i64>,
 
     #[serde(default)]
+    #[schema(read_only)]
     pub last_edited_by: Option<String>,
 }
 

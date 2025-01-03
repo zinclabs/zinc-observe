@@ -517,7 +517,16 @@ pub async fn list_v2<C: ConnectionTrait>(
     let alerts = db::alerts::alert::list_with_folders(conn, params)
         .await?
         .into_iter()
-        .filter(|(_f, a)| is_all_permitted || permissions.contains(&format!("alert:{}", a.name)))
+        .filter(|(_f, a)| {
+            // Include the alert if all alerts are permitted.
+            is_all_permitted
+                // Include the alert if the alert is permitted with the old OpenFGA identifier.
+                || permissions.contains(&format!("alert:{}", a.name))
+                // Include the alert if the alert is permitted with the new OpenFGA identifier.
+                || a.id
+                    .filter(|id| permissions.contains(&format!("alert:{id}")))
+                    .is_some()
+        })
         .collect_vec();
     Ok(alerts)
 }

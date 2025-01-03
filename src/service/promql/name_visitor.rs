@@ -16,7 +16,7 @@
 use std::collections::HashSet;
 
 use promql_parser::{
-    parser::{self, Expr},
+    parser::{Expr, VectorSelector},
     util::ExprVisitor,
 };
 
@@ -24,7 +24,21 @@ pub struct MetricNameVisitor {
     pub(crate) name: HashSet<String>,
 }
 
-fn get_name_from_expr(vector_selector: &parser::VectorSelector) -> String {
+impl MetricNameVisitor {
+    pub fn new() -> Self {
+        Self {
+            name: HashSet::new(),
+        }
+    }
+}
+
+impl Default for MetricNameVisitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn get_name_from_expr(vector_selector: &VectorSelector) -> String {
     vector_selector.name.as_ref().unwrap().to_string()
 }
 
@@ -35,35 +49,11 @@ impl ExprVisitor for MetricNameVisitor {
         match expr {
             Expr::VectorSelector(vector_selector) => {
                 self.name.insert(get_name_from_expr(vector_selector));
-                return Ok(true);
             }
             Expr::MatrixSelector(matrix_selector) => {
                 self.name.insert(get_name_from_expr(&matrix_selector.vs));
-                return Ok(true);
             }
-            Expr::NumberLiteral(_) | Expr::StringLiteral(_) => return Ok(false),
-            Expr::Unary(uni) => {
-                let _ = self.pre_visit(&uni.expr);
-            }
-            Expr::Binary(bin) => {
-                let _ = self.pre_visit(&bin.lhs);
-                let _ = self.pre_visit(&bin.rhs);
-            }
-            Expr::Paren(_) => return Ok(true),
-            Expr::Subquery(sub) => {
-                let _ = self.pre_visit(&sub.expr);
-            }
-            Expr::Call(call) => {
-                for expr in &call.args.args {
-                    let _ = self.pre_visit(expr);
-                }
-            }
-            Expr::Extension(_) => {
-                return Ok(false);
-            }
-            Expr::Aggregate(aggr) => {
-                let _ = self.pre_visit(&aggr.expr);
-            }
+            _ => {}
         }
         Ok(true)
     }
@@ -71,14 +61,12 @@ impl ExprVisitor for MetricNameVisitor {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use promql_parser::parser;
 
-    use crate::service::promql::name_visitor::MetricNameVisitor;
+    use super::*;
 
     #[test]
-    fn name_test() {
+    fn test_name_visitor() {
         let promql = r#"sum by(k8s_node_name)(
                             rate(container_fs_reads_bytes_total{
                                 container!= "",
@@ -92,9 +80,7 @@ mod tests {
                             )"#;
 
         let ast = parser::parse(promql).unwrap();
-        let mut visitor = MetricNameVisitor {
-            name: HashSet::new(),
-        };
+        let mut visitor = MetricNameVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
 
         assert_eq!(visitor.name.len(), 2);
@@ -102,9 +88,7 @@ mod tests {
         let promql = r#"http_requests_total{environment=~"staging|testing|development",method!="GET"} offset 5m"#;
 
         let ast = parser::parse(promql).unwrap();
-        let mut visitor = MetricNameVisitor {
-            name: HashSet::new(),
-        };
+        let mut visitor = MetricNameVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
         assert_eq!(visitor.name.len(), 1);
     }

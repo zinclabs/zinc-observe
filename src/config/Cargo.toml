@@ -61,6 +61,7 @@ segment.workspace = true
 sha256.workspace = true
 sqlparser.workspace = true
 sqlx.workspace = true
+strum.workspace = true
 svix-ksuid.workspace = true
 sysinfo.workspace = true
 tantivy.workspace = true

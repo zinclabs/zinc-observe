@@ -463,6 +463,20 @@ pub struct Http {
     pub addr: String,
     #[env_config(name = "ZO_HTTP_IPV6_ENABLED", default = false)]
     pub ipv6_enabled: bool,
+    #[env_config(name = "ZO_HTTP_TLS_ENABLED", default = false)]
+    pub tls_enabled: bool,
+    #[env_config(name = "ZO_HTTP_TLS_CERT_PATH", default = "")]
+    pub tls_cert_path: String,
+    #[env_config(name = "ZO_HTTP_TLS_KEY_PATH", default = "")]
+    pub tls_key_path: String,
+    #[env_config(name = "ZO_HTTP_TLS_MIN_VERSION", default = "", help = "Supported values: "1.2" or "1.3", default is all_version")]
+    pub tls_min_version: String,
+    #[env_config(
+        name = "ZO_HTTP_TLS_ROOT_CERTIFICATES",
+        default = "webpki",
+        help = "this value must use webpki or native. it means use standard root certificates from webpki-roots or native-roots as a rustls certificate store"
+    )]
+    pub tls_root_certificates: String,
 }
 
 #[derive(EnvConfig)]
@@ -1540,6 +1554,11 @@ pub fn init() -> Config {
         panic!("common config error: {e}");
     }
 
+    // check http config
+    if let Err(e) = check_http_config(&mut cfg) {
+        panic!("common config error: {e}")
+    }
+
     // check data path config
     if let Err(e) = check_path_config(&mut cfg) {
         panic!("data path config error: {e}");
@@ -1709,6 +1728,18 @@ fn check_grpc_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             || cfg.grpc.tls_key_path.is_empty())
     {
         return Err(anyhow::anyhow!("ZO_GRPC_TLS_CERT_DOMAIN, ZO_GRPC_TLS_CERT_PATH and ZO_GRPC_TLS_KEY_PATH must be set when ZO_GRPC_TLS_ENABLED is true"));
+    }
+    Ok(())
+}
+
+fn check_http_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.http.tls_enabled
+        && (cfg.http.tls_cert_path.is_empty() || cfg.http.tls_key_path.is_empty())
+    {
+        return Err(anyhow::anyhow!(
+            "When ZO_HTTP_TLS_ENABLED=true, both ZO_HTTP_TLS_CERT_PATH \
+             and ZO_HTTP_TLS_KEY_PATH must be set."
+        ));
     }
     Ok(())
 }

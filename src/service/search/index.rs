@@ -82,6 +82,7 @@ impl Debug for IndexCondition {
 pub enum Condition {
     // field, value
     Equal(String, String),
+    Regex(String, String),
     In(String, Vec<String>),
     MatchAll(String),
     FuzzyMatchAll(String, u8),
@@ -164,6 +165,7 @@ impl Condition {
     pub fn to_query(&self) -> String {
         match self {
             Condition::Equal(field, value) => format!("{}={}", field, value),
+            Condition::Regex(field, value) => format!("{}=~{}", field, value),
             Condition::In(field, values) => format!("{} IN ({})", field, values.join(",")),
             Condition::MatchAll(value) => format!("{}:{}", INDEX_FIELD_NAME_FOR_ALL, value),
             Condition::FuzzyMatchAll(value, distance) => format!(
@@ -262,6 +264,10 @@ impl Condition {
                 let term = Term::from_field_text(field, value);
                 Box::new(TermQuery::new(term, IndexRecordOption::Basic))
             }
+            Condition::Regex(field, value) => {
+                let field = schema.get_field(field)?;
+                Box::new(RegexQuery::from_pattern(value, field)?)
+            }
             Condition::In(field, values) => {
                 let field = schema.get_field(field)?;
                 let terms: Vec<Box<dyn Query>> = values
@@ -342,6 +348,9 @@ impl Condition {
             Condition::Equal(field, _) => {
                 fields.insert(field.clone());
             }
+            Condition::Regex(field, _) => {
+                fields.insert(field.clone());
+            }
             Condition::In(field, _) => {
                 fields.insert(field.clone());
             }
@@ -363,6 +372,9 @@ impl Condition {
         let mut fields = HashSet::new();
         match self {
             Condition::Equal(field, _) => {
+                fields.insert(field.clone());
+            }
+            Condition::Regex(field, _) => {
                 fields.insert(field.clone());
             }
             Condition::In(field, _) => {
@@ -394,6 +406,9 @@ impl Condition {
                 let field = schema.field(index);
                 let right = get_scalar_value(value, field.data_type())?;
                 Ok(Arc::new(BinaryExpr::new(left, Operator::Eq, right)))
+            }
+            Condition::Regex(..) => {
+                unreachable!("Condition::Regex query only support for promql")
             }
             Condition::In(name, values) => {
                 let index = schema.index_of(name).unwrap();

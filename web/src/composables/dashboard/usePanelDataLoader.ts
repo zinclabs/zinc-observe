@@ -1439,7 +1439,7 @@ export const usePanelDataLoader = (
           error?.response?.data.message ||
           error?.message ||
           error?.error ||
-          error.error_detail;
+          error?.error_detail;
 
         const trimmedErrorMessage =
           errorDetailValue?.length > 300

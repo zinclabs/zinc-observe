@@ -13,14 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::cluster::LOCAL_NODE;
+use config::{cluster::LOCAL_NODE, meta::promql::ClusterLeader};
 use hashbrown::HashMap;
 use tokio::time::{self, Duration};
 
-use crate::{
-    common::{infra::config::METRIC_CLUSTER_LEADER, meta::prom::ClusterLeader},
-    service::db,
-};
+use crate::{common::infra::config::METRIC_CLUSTER_LEADER, service::db};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_ingester() {

@@ -84,6 +84,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const editorRef: any = ref();
+    // editor object is used to interact with the monaco editor instance
     let editorObj: any = null;
     const { searchObj } = useLogs();
 
@@ -192,6 +193,7 @@ export default defineComponent({
         },
         minimap: { enabled: false },
         readOnly: props.readOnly,
+        renderValidationDecorations: "on",
       });
 
       editorObj.onDidChangeModelContent(
@@ -396,8 +398,22 @@ export default defineComponent({
       editorRef.value.dispatchEvent(escEvent);
     };
 
-    const formatDocument = () => {
-      editorObj?.getAction("editor.action.formatDocument")?.run();
+    const formatDocument = async () => {
+      // As Monaco editor does not support formatting in read-only mode, we need to temporarily disable it while formatting
+      return new Promise((resolve) => {
+        editorObj.updateOptions({ readOnly: false });
+        editorObj
+          .getAction("editor.action.formatDocument")
+          .run()
+          .then(() => {
+            editorObj.updateOptions({ readOnly: props.readOnly });
+            resolve(true);
+          })
+          .catch(() => {
+            editorObj.updateOptions({ readOnly: props.readOnly });
+            resolve(false);
+          });
+      });
     };
 
     const getCursorIndex = () => {
@@ -406,6 +422,87 @@ export default defineComponent({
         editorObj?.getModel().getOffsetAt(currentPosition) - 1;
       return cursorIndex || null;
     };
+
+    const getModel = () => {
+      return editorObj?.getModel();
+    };
+
+    const getValue = () => {
+      return editorObj?.getValue();
+    };
+
+    const decorateRanges = (ranges: any[]) => {
+      // Highlight the ranges
+      const decorations = ranges.map((range) => {
+        return {
+          range: new monaco.Range(range.startLine, 1, range.endLine, 1),
+          options: {
+            isWholeLine: true,
+            className: "highlight-error", // Add this class to style the highlighted lines
+            glyphMarginClassName: "error-glyph", // Optional: add a custom icon to the gutter
+          },
+        };
+      });
+
+      console.log("decorations", decorations);
+
+      const decorationIds = editorObj.deltaDecorations([], decorations);
+      console.log("decorationIds", decorationIds);
+    };
+
+    function addErrorDiagnostics(ranges: any) {
+      // const markers = [
+      //   {
+      //     resource: {
+      //       $mid: 1,
+      //       external: "inmemory://model/4",
+      //       path: "/4",
+      //       scheme: "inmemory",
+      //       authority: "model",
+      //     },
+      //     owner: "owner",
+      //     code: "MY_ERROR_CODE",
+      //     severity: monaco.MarkerSeverity.Error,
+      //     message: "Error: Something went wrong",
+      //     startLineNumber: 2,
+      //     startColumn: 1,
+      //     endLineNumber: 7,
+      //     endColumn: 1,
+      //   },
+      //   {
+      //     resource: {
+      //       $mid: 1,
+      //       external: "inmemory://model/4",
+      //       path: "/4",
+      //       scheme: "inmemory",
+      //       authority: "model",
+      //     },
+      //     owner: "owner",
+      //     code: "MY_ERROR_CODE",
+      //     severity: monaco.MarkerSeverity.Error,
+      //     message: "Error: Something went wrong",
+      //     startLineNumber: 8,
+      //     startColumn: 1,
+      //     endLineNumber: 13,
+      //     endColumn: 1,
+      //   },
+      // ];
+
+      // Set markers to the model
+      // monaco.editor.setModelMarkers(getModel(), "owner", markers);
+      const markers = ranges.map((range: any) => ({
+        severity: monaco.MarkerSeverity.Error, // Mark as error
+        startLineNumber: range.startLine,
+        startColumn: 1, // Start of the line
+        endLineNumber: range.endLine,
+        endColumn: 1, // End of the line
+        message: range.error, // The error message
+        code: "", // Optional error code
+      }));
+
+      monaco.editor.setModelMarkers(getModel(), "owner", []);
+      monaco.editor.setModelMarkers(getModel(), "owner", markers);
+    }
 
     return {
       editorRef,
@@ -417,6 +514,10 @@ export default defineComponent({
       getCursorIndex,
       searchObj,
       formatDocument,
+      getModel,
+      getValue,
+      decorateRanges,
+      addErrorDiagnostics,
     };
   },
 });
@@ -442,5 +543,11 @@ export default defineComponent({
       visibility: visible !important;
     }
   }
+}
+
+.highlight-error {
+  background-color: rgba(255, 0, 0, 0.1);
+  text-decoration: underline;
+  text-decoration-color: red;
 }
 </style>

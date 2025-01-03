@@ -979,17 +979,17 @@ async fn handle_derived_stream_triggers(
                     // Ingest result into destination stream
                     if ingestion_error_msg.is_none() {
                         for (dest_stream, records) in json_data_by_stream {
-                            let (org_id, stream_name, stream_type): (String, String, i32) = {
+                            let (org_id, stream_name, stream_type): (String, String, String) = {
                                 (
                                     dest_stream.org_id.into(),
                                     dest_stream.stream_name.into(),
-                                    cluster_rpc::StreamType::from(dest_stream.stream_type).into(),
+                                    dest_stream.stream_type.to_string(),
                                 )
                             };
                             let req = cluster_rpc::IngestionRequest {
                                 org_id: org_id.clone(),
                                 stream_name: stream_name.clone(),
-                                stream_type,
+                                stream_type: stream_type.clone(),
                                 data: Some(cluster_rpc::IngestionData::from(records)),
                                 ingestion_type: Some(cluster_rpc::IngestionType::Json.into()),
                             };

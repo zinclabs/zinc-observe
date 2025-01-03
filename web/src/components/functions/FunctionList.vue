@@ -144,43 +144,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
-    <q-dialog v-model="confirmForceDelete"  persistent>
-  <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto;">
-    <q-card-section class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center" >
-      <div>Pipelines Associated with  <strong> {{ selectedDelete.name}}</strong> </div>
-          <q-icon  name="close" size="18px" @click="closeDialog" style="cursor: pointer" />
-    </q-card-section>
-    <q-card-section>
-  <div v-if="transformedPipelineList.length > 0" class="pipeline-list-container">
-    <q-list class="scrollable-list">
-    <q-item
-      v-for="(pipeline, index) in transformedPipelineList"
-      :key="pipeline.value"
-      clickable
-      @click="onPipelineSelect(pipeline)"
-    >
-      <q-item-section>
-        {{ index + 1 }}. {{ pipeline.label }}
-      </q-item-section>
-    </q-item>
-  </q-list>
-  </div>
-  <div v-else>
-    <div class="text-h6 text-center">No pipelines associated with this function</div>
-  </div>
-    </q-card-section>
-
-  </q-card>
-</q-dialog>
-
-
-
-
+    <q-dialog v-model="confirmForceDelete" persistent>
+      <q-card style="width: 40vw; max-height: 90vh; overflow-y: auto">
+        <q-card-section
+          class="text-h6 dialog-heading tw-flex tw-justify-between tw-items-center"
+        >
+          <div>
+            Pipelines Associated with
+            <strong> {{ selectedDelete.name }}</strong>
+          </div>
+          <q-icon
+            name="close"
+            size="18px"
+            @click="closeDialog"
+            style="cursor: pointer"
+          />
+        </q-card-section>
+        <q-card-section>
+          <div
+            v-if="transformedPipelineList.length > 0"
+            class="pipeline-list-container"
+          >
+            <q-list class="scrollable-list">
+              <q-item
+                v-for="(pipeline, index) in transformedPipelineList"
+                :key="pipeline.value"
+                clickable
+                @click="onPipelineSelect(pipeline)"
+              >
+                <q-item-section>
+                  {{ index + 1 }}. {{ pipeline.label }}
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </div>
+          <div v-else>
+            <div class="text-h6 text-center">
+              No pipelines associated with this function
+            </div>
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, ref,computed,watch,onMounted } from "vue";
+import {
+  defineAsyncComponent,
+  defineComponent,
+  ref,
+  computed,
+  watch,
+  onMounted,
+} from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useQuasar, type QTableProps } from "quasar";
@@ -192,7 +209,10 @@ import NoData from "../shared/grid/NoData.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
-import { outlinedDelete ,outlinedAccountTree} from "@quasar/extras/material-icons-outlined";
+import {
+  outlinedDelete,
+  outlinedAccountTree,
+} from "@quasar/extras/material-icons-outlined";
 import useLogs from "@/composables/useLogs";
 
 export default defineComponent({
@@ -223,61 +243,61 @@ export default defineComponent({
     const confirmForceDelete = ref<boolean>(false);
     const { searchObj } = useLogs();
     const pipelineList = ref([
-"Pipeline Alpha",
-  "Pipeline Beta",
-  "Pipeline Gamma",
-  "Pipeline Delta",
-  "Pipeline Epsilon",
-  "Pipeline Zeta",
-  "Pipeline Eta",
-  "Pipeline Theta",
-  "Pipeline Iota",
-  "Pipeline Kappa",
-  "Pipeline Lambda",
-  "Pipeline Mu",
-  "Pipeline Nu",
-  "Pipeline Xi",
-  "Pipeline Omicron",
-  "Pipeline Pi",
-  "Pipeline Rho",
-  "Pipeline Sigma",
-  "Pipeline Tau",
-  "Pipeline Upsilon",
-  "Pipeline Phi",
-  "Pipeline Chi",
-  "Pipeline Psi",
-  "Pipeline Omega",
-  "Pipeline One",
-  "Pipeline Two",
-  "Pipeline Three",
-  "Pipeline Four",
-  "Pipeline Five",
-  "Pipeline Six",
-  "Pipeline Seven",
-  "Pipeline Eight",
-  "Pipeline Nine",
-  "Pipeline Ten",
-  "Pipeline Eleven",
-  "Pipeline Twelve",
-  "Pipeline Thirteen",
-  "Pipeline Fourteen",
-  "Pipeline Fifteen",
-  "Pipeline Sixteen",
-  "Pipeline Seventeen",
-  "Pipeline Eighteen",
-  "Pipeline Nineteen",
-  "Pipeline Twenty",
-  "Pipeline Twenty-One",
-  "Pipeline Twenty-Two",
-  "Pipeline Twenty-Three",
-  "Pipeline Twenty-Four",
-  "Pipeline Twenty-Five",
-  "Pipeline Twenty-Six",
-  "Pipeline Twenty-Seven",
-  "Pipeline Twenty-Eight",
-  "Pipeline Twenty-Nine",
-  "Pipeline Thirty"
-]);
+      "Pipeline Alpha",
+      "Pipeline Beta",
+      "Pipeline Gamma",
+      "Pipeline Delta",
+      "Pipeline Epsilon",
+      "Pipeline Zeta",
+      "Pipeline Eta",
+      "Pipeline Theta",
+      "Pipeline Iota",
+      "Pipeline Kappa",
+      "Pipeline Lambda",
+      "Pipeline Mu",
+      "Pipeline Nu",
+      "Pipeline Xi",
+      "Pipeline Omicron",
+      "Pipeline Pi",
+      "Pipeline Rho",
+      "Pipeline Sigma",
+      "Pipeline Tau",
+      "Pipeline Upsilon",
+      "Pipeline Phi",
+      "Pipeline Chi",
+      "Pipeline Psi",
+      "Pipeline Omega",
+      "Pipeline One",
+      "Pipeline Two",
+      "Pipeline Three",
+      "Pipeline Four",
+      "Pipeline Five",
+      "Pipeline Six",
+      "Pipeline Seven",
+      "Pipeline Eight",
+      "Pipeline Nine",
+      "Pipeline Ten",
+      "Pipeline Eleven",
+      "Pipeline Twelve",
+      "Pipeline Thirteen",
+      "Pipeline Fourteen",
+      "Pipeline Fifteen",
+      "Pipeline Sixteen",
+      "Pipeline Seventeen",
+      "Pipeline Eighteen",
+      "Pipeline Nineteen",
+      "Pipeline Twenty",
+      "Pipeline Twenty-One",
+      "Pipeline Twenty-Two",
+      "Pipeline Twenty-Three",
+      "Pipeline Twenty-Four",
+      "Pipeline Twenty-Five",
+      "Pipeline Twenty-Six",
+      "Pipeline Twenty-Seven",
+      "Pipeline Twenty-Eight",
+      "Pipeline Twenty-Nine",
+      "Pipeline Thirty",
+    ]);
     const selectedPipeline = ref("");
     const columns: any = ref<QTableProps["columns"]>([
       {
@@ -302,8 +322,7 @@ export default defineComponent({
       },
     ]);
 
-     const onPipelineSelect = (pipeline:any) =>{
-
+    const onPipelineSelect = (pipeline: any) => {
       const routeUrl = router.resolve({
         name: "pipelineEditor",
         query: {
@@ -312,17 +331,14 @@ export default defineComponent({
         },
       }).href;
 
-      window.open(routeUrl, '_blank');
-
-      }
+      window.open(routeUrl, "_blank");
+    };
 
     const getJSTransforms = () => {
       const dismiss = $q.notify({
         spinner: true,
         message: "Please wait while loading functions...",
       });
-
-
 
       jsTransformService
         .list(
@@ -331,7 +347,7 @@ export default defineComponent({
           "name",
           false,
           "",
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res) => {
           var counter = 1;
@@ -368,12 +384,12 @@ export default defineComponent({
           console.log("--", err);
 
           dismiss();
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             $q.notify({
-            type: "negative",
-            message: "Error while pulling function.",
-            timeout: 2000,
-          });
+              type: "negative",
+              message: "Error while pulling function.",
+              timeout: 2000,
+            });
           }
         });
     };
@@ -414,12 +430,11 @@ export default defineComponent({
     };
 
     const transformedPipelineList = computed(() => {
-      return pipelineList.value.map((pipeline:any) => ({
+      return pipelineList.value.map((pipeline: any) => ({
         label: pipeline.name,
-        value: pipeline.id
+        value: pipeline.id,
       }));
     });
-
 
     const showAddUpdateFn = (props: any) => {
       formData.value = props.row;
@@ -481,7 +496,7 @@ export default defineComponent({
       jsTransformService
         .delete(
           store.state.selectedOrganization.identifier,
-          selectedDelete.value.name
+          selectedDelete.value.name,
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -500,30 +515,31 @@ export default defineComponent({
           }
         })
         .catch((err) => {
-          if(err.response.data.code == 409){
+          if (err.response.data.code == 409) {
             $q.notify({
-                type: "negative",
-                message: "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
-                timeout: 10000,
-                actions: [
-                  {
-                    label: "View",
-                    color: "white",
-                    handler: () => {
-                      forceRemoveFunction(err.response.data["message"]);
-                    }
-                  }
-                ]
-              });
+              type: "negative",
+              message:
+                "Function deletion failed as it is associated with pipelines. Click on view button to get associated pipelines.",
+              timeout: 10000,
+              actions: [
+                {
+                  label: "View",
+                  color: "white",
+                  handler: () => {
+                    forceRemoveFunction(err.response.data["message"]);
+                  },
+                },
+              ],
+            });
             return;
           }
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             $q.notify({
-            type: "negative",
-            message:
-              JSON.stringify(err.response.data["message"]) ||
-              "Function deletion failed.",
-          });
+              type: "negative",
+              message:
+                JSON.stringify(err.response.data["message"]) ||
+                "Function deletion failed.",
+            });
           }
         });
 
@@ -543,36 +559,36 @@ export default defineComponent({
     };
 
     const getAssociatedPipelines = (props: any) => {
-      selectedDelete.value = props.row
-      jsTransformService.getAssociatedPipelines(
-        store.state.selectedOrganization.identifier,
-        props.row.name
-      ).then((res: any) => {
-        pipelineList.value = res.data.list;
-        confirmForceDelete.value = true;
-      }).catch((err) => {
-        console.log(err);
-      });
-    }
+      selectedDelete.value = props.row;
+      jsTransformService
+        .getAssociatedPipelines(
+          store.state.selectedOrganization.identifier,
+          props.row.name,
+        )
+        .then((res: any) => {
+          pipelineList.value = res.data.list;
+          confirmForceDelete.value = true;
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    };
 
-    const forceRemoveFunction = (message : any) =>{
+    const forceRemoveFunction = (message: any) => {
       const match = message.match(/\[([^\]]+)\]/);
       if (match) {
         // Convert the matched string to an array of pipeline names
         pipelineList.value = JSON.parse(match[0].replace(/'/g, '"'));
       }
-     
 
       confirmForceDelete.value = true;
-    }
+    };
 
-    const closeDialog = () =>{
+    const closeDialog = () => {
       confirmForceDelete.value = false;
-    }
+    };
 
-    const forceDeleteFn = () =>{
-
-    }
+    const forceDeleteFn = () => {};
 
     return {
       t,
@@ -631,8 +647,6 @@ export default defineComponent({
     // },
   },
   watch: {
-
-
     // selectedOrg(newVal: any, oldVal: any) {
     //   this.verifyOrganizationStatus(
     //     this.store.state.organizations,
@@ -662,11 +676,9 @@ export default defineComponent({
   max-height: 200px; /* Adjust based on item height to fit 5 items */
   overflow-y: auto;
 }
-.dialog-heading{
+.dialog-heading {
   border-bottom: 1px solid $border-color;
-
 }
-
 
 .scrollable-list::-webkit-scrollbar {
   width: 8px;
@@ -679,11 +691,9 @@ export default defineComponent({
 
 .scrollable-list::-webkit-scrollbar-thumb:hover {
   background-color: blue; /* Darker shade on hover */
-
 }
 
 .scrollable-list::-webkit-scrollbar-track {
   background-color: blue; /* Track color */
 }
-
 </style>

@@ -9,37 +9,21 @@ package cluster;
 message EmptyRequest {}
 message EmptyResponse {}
 
-message FileDescriptor {
-    FileMeta   meta      = 1;
-    StreamType file_type = 2;
-}
-
 message FileMeta {
-    int64  min_ts         = 1; // microseconds
-    int64  max_ts         = 2; // microseconds
+    int64 min_ts          = 1; // microseconds
+    int64 max_ts          = 2; // microseconds
     int64 records         = 3;
     int64 original_size   = 4;
     int64 compressed_size = 5;
     int64 index_size      = 6;
 }
 
-enum StreamType {
-    LOGS             = 0;
-    METRICS          = 1;
-    TRACES           = 2;
-    METADATA         = 3;
-    EnrichmentTables = 4;
-    FILELIST         = 5;
-    INDEX            = 6;
-
-}
-
 // Job information for a request
 message Job {
-    string trace_id = 1;
-    string      job = 2;
-    int32     stage = 3;
-    int32 partition = 4;
+    string trace_id  = 1;
+    string job       = 2;
+    int32  stage     = 3;
+    int32  partition = 4;
 }
 
 message ScanStats {

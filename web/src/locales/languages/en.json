@@ -65,7 +65,16 @@
     "horizontal": "Horizontal",
     "custom": "Custom",
     "none": "None",
-    "auto": "Auto"
+    "auto": "Auto",
+    "duration": "Duration",
+    "fullscreen": "Go Full Screen",
+    "query": "Query",
+    "output": "Output",
+    "selectStream": "Select Stream",
+    "unsavedTitle": "Unsaved Changes",
+    "unsavedMessage": "You have unsaved changes. Are you sure you want to leave?",
+    "cancelTitle": "Cancel Changes",
+    "cancelMessage": "Are you sure you want to cancel the changes?"
   },
   "search": {
     "metrics": "Metrics",
@@ -458,7 +467,7 @@
     "search": "Search Function",
     "name": "Name",
     "function": "Function Detail",
-    "save": "Save",
+    "save": "Save Function",
     "jsfunction": "Function",
     "stream_name": "Stream Name",
     "order": "Order",
@@ -487,7 +496,9 @@
     "appendData": "Append data to existing Enrichment Table",
     "deleteAssociatedFunction": "Delete Associated Function",
     "streamPipeline": "Pipelines",
-    "streamRouting": "Stream Routing"
+    "streamRouting": "Stream Routing",
+    "testFunction": "Test Function",
+    "errorDetails": "Error"
   },
   "confirmDialog": {
     "cancel": "Cancel",

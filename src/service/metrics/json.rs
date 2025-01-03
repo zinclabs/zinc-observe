@@ -21,6 +21,7 @@ use config::{
     cluster::LOCAL_NODE,
     meta::{
         alerts::alert::Alert,
+        promql::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
         self_reporting::usage::UsageType,
         stream::{PartitioningDetails, StreamParams, StreamType},
     },
@@ -35,7 +36,6 @@ use crate::{
     common::meta::{
         authz::Authz,
         ingestion::{IngestionResponse, StreamStatus},
-        prom::{Metadata, HASH_LABEL, METADATA_LABEL, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
         stream::SchemaRecords,
     },
     service::{

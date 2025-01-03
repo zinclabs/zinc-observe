@@ -149,7 +149,12 @@ async fn register() -> Result<()> {
         id: new_node_id,
         uuid: LOCAL_NODE.uuid.clone(),
         name: cfg.common.instance_name.clone(),
-        http_addr: format!("http://{}:{}", get_local_http_ip(), cfg.http.port),
+        http_addr: format!(
+            "{}://{}:{}",
+            get_http_schema(),
+            get_local_http_ip(),
+            cfg.http.port
+        ),
         grpc_addr: format!(
             "{}://{}:{}",
             get_grpc_schema(),
@@ -234,7 +239,12 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
             id: unsafe { LOCAL_NODE_ID },
             uuid: LOCAL_NODE.uuid.clone(),
             name: cfg.common.instance_name.clone(),
-            http_addr: format!("http://{}:{}", get_local_http_ip(), cfg.http.port),
+            http_addr: format!(
+                "{}://{}:{}",
+                get_http_schema(),
+                get_local_http_ip(),
+                cfg.http.port
+            ),
             grpc_addr: format!(
                 "{}://{}:{}",
                 get_grpc_schema(),

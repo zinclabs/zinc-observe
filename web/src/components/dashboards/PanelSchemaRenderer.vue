@@ -791,7 +791,7 @@ export default defineComponent({
         store.state.selectedOrganization.identifier,
       );
       logsUrl.searchParams.set("quick_mode", "false");
-      logsUrl.searchParams.set("show_histogram", "true");
+      logsUrl.searchParams.set("show_histogram", "false");
 
       return logsUrl;
     };
@@ -837,10 +837,18 @@ export default defineComponent({
           if (!parser) {
             await importSqlParser();
           }
-
+          
           const ast = await parseQuery(originalQuery, parser);
           if (!ast) return;
+          
+          const tableAliases = ast.from
+            ?.filter((fromEntry: any) => fromEntry.as)
+            .map((fromEntry: any) => fromEntry.as);
 
+          const aliasClause = tableAliases?.length
+            ? ` AS ${tableAliases.join(", ")}`
+            : "";
+            
           const breakdownColumn = breakdown[0]?.column;
           const breakdownValue = drilldownParams[0]?.seriesName;
           const whereClause = buildWhereClause(
@@ -849,10 +857,12 @@ export default defineComponent({
             breakdownValue,
           );
 
-          const modifiedQuery =
+          let modifiedQuery =
             drilldownData.data.logsMode === "auto"
-              ? `SELECT * FROM "${streamName}" ${whereClause}`
+              ? `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`
               : drilldownData.data.logsQuery;
+
+          modifiedQuery = modifiedQuery.replace(/`/g, '"');
 
           const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
 

@@ -120,7 +120,7 @@ pub async fn search_parquet(
         if let Some((min_ts, max_ts)) = query.time_range {
             if file.meta.min_ts > max_ts || file.meta.max_ts < min_ts {
                 log::debug!(
-                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{}]",
+                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
                     query.trace_id,
                     &file.key,
                     file.meta.min_ts,
@@ -486,7 +486,7 @@ async fn get_file_list_inner(
                 && ((max_ts > 0 && file_min_ts > max_ts) || (min_ts > 0 && file_max_ts < min_ts))
             {
                 log::debug!(
-                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{}]",
+                    "[trace_id {}] skip wal parquet file: {} time_range: [{},{})",
                     query.trace_id,
                     &file,
                     file_min_ts,

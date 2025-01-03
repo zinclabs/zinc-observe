@@ -15,13 +15,11 @@
 
 use std::{collections::HashSet, sync::Arc};
 
+use config::meta::promql::NAME_LABEL;
 use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
 
-use crate::{
-    common::meta::prom::NAME_LABEL,
-    service::promql::value::{InstantValue, Label, Value},
-};
+use crate::service::promql::value::{InstantValue, Label, Value};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#label_join
 pub(crate) fn label_join(

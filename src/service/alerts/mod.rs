@@ -151,6 +151,7 @@ impl QueryConditionExt for QueryCondition {
                         promql::micros(promql::MINIMAL_INTERVAL),
                         (end - start) / promql::MAX_DATA_POINTS,
                     ),
+                    query_exemplars: false,
                     no_cache: None,
                 };
                 let resp = match promql::search::search(org_id, &req, "", 0).await {

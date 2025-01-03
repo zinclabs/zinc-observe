@@ -26,7 +26,7 @@ pub mod logs;
 pub mod metrics;
 pub mod organization;
 pub mod pipeline;
-pub mod prom;
+pub mod promql;
 pub mod rum;
 pub mod search;
 pub mod service_accounts;

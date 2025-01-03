@@ -20,7 +20,7 @@ use vrl::{
     prelude::Function,
 };
 
-use crate::meta::stream::StreamType;
+use crate::{meta::stream::StreamType, utils::json};
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -37,6 +37,32 @@ pub struct Transform {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub streams: Option<Vec<StreamOrder>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct TestVRLRequest {
+    pub function: String,         // VRL function as a string
+    pub events: Vec<json::Value>, // List of events (JSON objects)
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct TestVRLResponse {
+    pub results: Vec<VRLResult>, // Transformed events
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct VRLResult {
+    pub message: String,
+    pub event: json::Value,
+}
+
+impl VRLResult {
+    pub fn new(message: &str, event: json::Value) -> Self {
+        Self {
+            message: message.to_string(),
+            event,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]

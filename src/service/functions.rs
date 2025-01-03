@@ -19,17 +19,21 @@ use actix_web::{
     http::{self, StatusCode},
     HttpResponse,
 };
-use config::meta::{
-    function::{FunctionList, Transform},
-    pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
+use config::{
+    meta::{
+        function::{FunctionList, TestVRLResponse, Transform, VRLResult, VRLResultResolver},
+        pipeline::{PipelineDependencyItem, PipelineDependencyResponse},
+    },
+    utils::json,
 };
 
 use crate::{
+    common,
     common::{
         meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
         utils::auth::{remove_ownership, set_ownership},
     },
-    service::{db, ingestion::compile_vrl_function},
+    service::{db, ingestion::compile_vrl_function, search::RESULT_ARRAY},
 };
 
 const FN_SUCCESS: &str = "Function saved successfully";
@@ -74,6 +78,115 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             )))
         }
     }
+}
+
+#[tracing::instrument(skip(org_id, function))]
+pub async fn test_run_function(
+    org_id: &str,
+    mut function: String,
+    events: Vec<json::Value>,
+) -> Result<HttpResponse, anyhow::Error> {
+    // Append a dot at the end of the function if it doesn't exist
+    if !function.ends_with('.') {
+        function = format!("{} \n .", function);
+    }
+
+    let apply_over_hits = RESULT_ARRAY.is_match(&function);
+    if apply_over_hits {
+        function = RESULT_ARRAY.replace(&function, "").to_string();
+    }
+
+    let runtime_config = match compile_vrl_function(&function, org_id) {
+        Ok(program) => {
+            let registry = program
+                .config
+                .get_custom::<vector_enrichment::TableRegistry>()
+                .unwrap();
+            registry.finish_load();
+            program
+        }
+        Err(e) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST.into(),
+                e.to_string(),
+            )))
+        }
+    };
+
+    let mut runtime = common::utils::functions::init_vrl_runtime();
+    let fields = runtime_config.fields;
+    let program = runtime_config.program;
+
+    let mut transformed_events = vec![];
+    if apply_over_hits {
+        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+            &mut runtime,
+            &VRLResultResolver {
+                program: program.clone(),
+                fields: fields.clone(),
+            },
+            json::Value::Array(events),
+            org_id,
+            &[String::new()],
+        );
+
+        if err.is_some() {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                StatusCode::BAD_REQUEST.into(),
+                err.unwrap(),
+            )));
+        }
+
+        ret_val
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| {
+                let flattened_array = v
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .map(|item| config::utils::flatten::flatten(item.clone()).unwrap())
+                    .collect::<Vec<_>>();
+                if flattened_array.is_empty() {
+                    return None;
+                }
+                Some(serde_json::Value::Array(flattened_array))
+            })
+            .for_each(|transform| {
+                transformed_events.push(VRLResult::new("", transform));
+            });
+    } else {
+        events.into_iter().for_each(|event| {
+            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+                &mut runtime,
+                &config::meta::function::VRLResultResolver {
+                    program: program.clone(),
+                    fields: fields.clone(),
+                },
+                event.clone(),
+                org_id,
+                &[String::new()],
+            );
+            if let Some(err) = err {
+                transformed_events.push(VRLResult::new(&err, event));
+                return;
+            }
+
+            let transform = if !ret_val.is_null() {
+                config::utils::flatten::flatten(ret_val).unwrap()
+            } else {
+                "".into()
+            };
+            transformed_events.push(VRLResult::new("", transform));
+        });
+    }
+
+    let results = TestVRLResponse {
+        results: transformed_events,
+    };
+
+    Ok(HttpResponse::Ok().json(results))
 }
 
 #[tracing::instrument(skip(func))]
@@ -281,6 +394,7 @@ async fn check_existing_fn(org_id: &str, fn_name: &str) -> Option<Transform> {
 
 #[cfg(test)]
 mod tests {
+    use actix_http::body::to_bytes;
     use config::meta::{function::StreamOrder, stream::StreamType};
 
     use super::*;
@@ -328,5 +442,40 @@ mod tests {
         assert!(delete_function("nexus".to_string(), "dummyfn".to_owned())
             .await
             .is_ok());
+    }
+
+    #[tokio::test]
+    async fn validate_test_function_processing() {
+        use serde_json::json;
+
+        let org_id = "test_org";
+        let function = r#"
+        . = {
+            "new_field": "new_value",
+            "nested": {
+                "key": 42
+            }
+        }
+        .
+    "#
+        .to_string();
+
+        let events = vec![json!({
+            "original_field": "original_value"
+        })];
+
+        let response = test_run_function(org_id, function, events).await.unwrap();
+        assert_eq!(response.status(), http::StatusCode::OK);
+
+        let body: TestVRLResponse =
+            serde_json::from_slice(&*to_bytes(response.into_body()).await.unwrap()).unwrap();
+
+        // Validate transformed events
+        assert_eq!(body.results.len(), 1);
+        assert_eq!(body.results[0].message, "");
+        assert_eq!(
+            body.results[0].event,
+            json! {{"nested_key":42,"new_field":"new_value"}}
+        );
     }
 }

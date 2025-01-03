@@ -236,10 +236,10 @@ pub(super) async fn ingest_reporting_data(
         }
     } else {
         // call gRPC ingestion service
-        let (org_id, stream_name, stream_type): (String, String, i32) = (
+        let (org_id, stream_name, stream_type): (String, String, String) = (
             stream_params.org_id.into(),
             stream_params.stream_name.into(),
-            cluster_rpc::StreamType::from(stream_params.stream_type).into(),
+            stream_params.stream_type.to_string(),
         );
 
         let req = cluster_rpc::IngestionRequest {

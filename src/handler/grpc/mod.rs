@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use config::ider;
 use opentelemetry::propagation::Extractor;
 use proto::cluster_rpc;
@@ -51,6 +53,7 @@ impl From<promql::MetricsQueryRequest> for cluster_rpc::MetricsQueryRequest {
             start: req.start,
             end: req.end,
             step: req.step,
+            query_exemplars: req.query_exemplars,
         };
 
         let job = cluster_rpc::Job {
@@ -100,6 +103,26 @@ impl From<&promql::value::Sample> for cluster_rpc::Sample {
         cluster_rpc::Sample {
             time: req.timestamp,
             value: req.value,
+        }
+    }
+}
+
+impl From<&promql::value::Exemplar> for cluster_rpc::Exemplar {
+    fn from(req: &promql::value::Exemplar) -> Self {
+        cluster_rpc::Exemplar {
+            time: req.timestamp,
+            value: req.value,
+            labels: req.labels.iter().map(|x| x.as_ref().into()).collect(),
+        }
+    }
+}
+
+impl From<&cluster_rpc::Exemplar> for promql::value::Exemplar {
+    fn from(req: &cluster_rpc::Exemplar) -> Self {
+        promql::value::Exemplar {
+            timestamp: req.time,
+            value: req.value,
+            labels: req.labels.iter().map(|x| Arc::new(x.into())).collect(),
         }
     }
 }

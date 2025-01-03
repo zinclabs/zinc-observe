@@ -18,17 +18,15 @@ use std::{
     sync::Arc,
 };
 
+use config::meta::promql::NAME_LABEL;
 use datafusion::error::{DataFusionError, Result};
 use once_cell::sync::Lazy;
 use promql_parser::parser::{token, BinaryExpr, VectorMatchCardinality};
 use rayon::prelude::*;
 
-use crate::{
-    common::meta::prom::NAME_LABEL,
-    service::promql::{
-        binaries::scalar_binary_operations,
-        value::{signature, InstantValue, Label, LabelsExt, Sample, Signature, Value},
-    },
+use crate::service::promql::{
+    binaries::scalar_binary_operations,
+    value::{signature, InstantValue, Label, LabelsExt, Sample, Signature, Value},
 };
 
 // DROP_METRIC_VECTOR_BIN_OP if the operation is one of these, drop the metric

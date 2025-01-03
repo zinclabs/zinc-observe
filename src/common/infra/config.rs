@@ -20,6 +20,7 @@ use config::{
         alerts::{alert::Alert, destinations::Destination, templates::Template},
         dashboards::reports,
         function::Transform,
+        promql::ClusterLeader,
         stream::StreamParams,
     },
     RwAHashMap, RwHashMap,
@@ -33,8 +34,7 @@ use vector_enrichment::TableRegistry;
 
 use crate::{
     common::meta::{
-        maxmind::MaxmindClient, organization::OrganizationSetting, prom::ClusterLeader,
-        syslog::SyslogRoute, user::User,
+        maxmind::MaxmindClient, organization::OrganizationSetting, syslog::SyslogRoute, user::User,
     },
     handler::http::request::websocket::session::WsSession,
     service::{

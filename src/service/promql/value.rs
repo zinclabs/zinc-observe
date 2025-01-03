@@ -15,7 +15,7 @@
 
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 
-use config::FxIndexMap;
+use config::{meta::promql::NAME_LABEL, utils::json, FxIndexMap};
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -23,8 +23,6 @@ use serde::{
     ser::{SerializeSeq, SerializeStruct, Serializer},
     Serialize,
 };
-
-use crate::common::meta::prom::NAME_LABEL;
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
 static RE_VALID_LABEL_NAME: Lazy<Regex> =
@@ -139,7 +137,7 @@ impl LabelsExt for Labels {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Label {
     pub name: String,
     pub value: String,
@@ -186,6 +184,54 @@ impl Sample {
 
     pub(crate) fn is_nan(&self) -> bool {
         self.value.is_nan()
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Exemplar {
+    /// Time in microseconds
+    pub timestamp: i64,
+    pub value: f64,
+    pub labels: Labels,
+}
+
+impl Serialize for Exemplar {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_struct("exemplars", 3)?;
+        let labels_map = self
+            .labels
+            .iter()
+            .map(|l| (l.name.as_str(), l.value.as_str()))
+            .collect::<FxIndexMap<_, _>>();
+        seq.serialize_field("timestamp", &(self.timestamp / 1_000_000))?;
+        seq.serialize_field("value", &self.value.to_string())?;
+        seq.serialize_field("labels", &labels_map)?;
+        seq.end()
+    }
+}
+
+impl From<&json::Map<String, json::Value>> for Exemplar {
+    fn from(data: &json::Map<String, json::Value>) -> Self {
+        let timestamp = data.get("_timestamp").map(|v| v.as_i64().unwrap_or(0));
+        let value = data.get("value").map(|v| v.as_f64().unwrap_or(0.0));
+        let mut labels = vec![];
+        for (k, v) in data.iter() {
+            if k == "_timestamp" || k == "value" {
+                continue;
+            }
+            labels.push(Arc::new(Label::new(
+                k.to_string(),
+                json::get_string_value(v),
+            )));
+        }
+        Self {
+            timestamp: timestamp.unwrap_or(0),
+            value: value.unwrap_or(0.0),
+            labels,
+        }
     }
 }
 
@@ -238,6 +284,7 @@ impl TimeWindow {
 pub struct RangeValue {
     pub labels: Labels,
     pub samples: Vec<Sample>,
+    pub exemplars: Option<Vec<Exemplar>>,
     pub time_window: Option<TimeWindow>,
 }
 
@@ -246,6 +293,18 @@ impl RangeValue {
     pub fn get_sample_values(&self) -> Vec<f64> {
         self.samples.iter().map(|sample| sample.value).collect()
     }
+
+    pub fn extend(&mut self, other: RangeValue) {
+        self.samples.extend(other.samples);
+        // check exemplars
+        if let Some(exemplars) = &other.exemplars {
+            if let Some(self_exemplars) = &mut self.exemplars {
+                self_exemplars.extend(exemplars.iter().cloned());
+            } else {
+                self.exemplars = Some(exemplars.clone());
+            }
+        }
+    }
 }
 
 impl Serialize for RangeValue {
@@ -253,15 +312,27 @@ impl Serialize for RangeValue {
     where
         S: Serializer,
     {
-        let mut seq = serializer.serialize_struct("range_value", 2)?;
-        let labels_map = self
-            .labels
-            .iter()
-            .map(|l| (l.name.as_str(), l.value.as_str()))
-            .collect::<FxIndexMap<_, _>>();
-        seq.serialize_field("metric", &labels_map)?;
-        seq.serialize_field("values", &self.samples)?;
-        seq.end()
+        if self.exemplars.is_none() {
+            let mut seq = serializer.serialize_struct("range_value", 2)?;
+            let labels_map = self
+                .labels
+                .iter()
+                .map(|l| (l.name.as_str(), l.value.as_str()))
+                .collect::<FxIndexMap<_, _>>();
+            seq.serialize_field("metric", &labels_map)?;
+            seq.serialize_field("values", &self.samples)?;
+            seq.end()
+        } else {
+            let mut seq = serializer.serialize_struct("range_value", 2)?;
+            let labels_map = self
+                .labels
+                .iter()
+                .map(|l| (l.name.as_str(), l.value.as_str()))
+                .collect::<FxIndexMap<_, _>>();
+            seq.serialize_field("seriesLabels", &labels_map)?;
+            seq.serialize_field("exemplars", &self.exemplars.as_ref().unwrap())?;
+            seq.end()
+        }
     }
 }
 
@@ -273,6 +344,19 @@ impl RangeValue {
         Self {
             labels,
             samples: Vec::from_iter(samples),
+            exemplars: None,
+            time_window: None,
+        }
+    }
+
+    pub(crate) fn new_with_exemplars<S>(labels: Labels, exemplars: S) -> Self
+    where
+        S: IntoIterator<Item = Exemplar>,
+    {
+        Self {
+            labels,
+            samples: vec![],
+            exemplars: Some(Vec::from_iter(exemplars)),
             time_window: None,
         }
     }

@@ -15,18 +15,15 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use config::FxIndexMap;
+use config::{meta::promql::NAME_LABEL, FxIndexMap};
 use datafusion::error::{DataFusionError, Result};
 use itertools::Itertools;
 use promql_parser::parser::{Expr as PromExpr, LabelModifier};
 use rayon::prelude::*;
 
-use crate::{
-    common::meta::prom::NAME_LABEL,
-    service::promql::{
-        value::{InstantValue, Label, Labels, LabelsExt, Sample, Signature, Value},
-        Engine,
-    },
+use crate::service::promql::{
+    value::{InstantValue, Label, Labels, LabelsExt, Sample, Signature, Value},
+    Engine,
 };
 
 mod avg;

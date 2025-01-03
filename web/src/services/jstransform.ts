@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { TestFunctionPayload } from "@/ts/interfaces/function";
 
 const jstransform = {
   list: (
@@ -22,10 +23,10 @@ const jstransform = {
     sort_by: string,
     desc: boolean,
     name: string,
-    org_identifier: string
+    org_identifier: string,
   ) => {
     return http().get(
-      `/api/${org_identifier}/functions?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+      `/api/${org_identifier}/functions?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
     );
   },
   create: (org_identifier: string, data: any) => {
@@ -46,30 +47,30 @@ const jstransform = {
     org_identifier: string,
     stream_name: string,
     stream_type: string,
-    data: any
+    data: any,
   ) => {
     return http().put(
       `/api/${org_identifier}/${stream_name}/functions/${data.name}?type=${stream_type}`,
-      data
+      data,
     );
   },
   delete_stream_function: (
     org_identifier: string,
     stream_name: string,
     stream_type: string,
-    transform_name: string
+    transform_name: string,
   ) => {
     return http().delete(
-      `/api/${org_identifier}/${stream_name}/functions/${transform_name}?type=${stream_type}`
+      `/api/${org_identifier}/${stream_name}/functions/${transform_name}?type=${stream_type}`,
     );
   },
   stream_function: (
     org_identifier: string,
     stream_name: string,
-    stream_type: string
+    stream_type: string,
   ) => {
     return http().get(
-      `/api/${org_identifier}/streams/${stream_name}/functions?type=${stream_type}`
+      `/api/${org_identifier}/streams/${stream_name}/functions?type=${stream_type}`,
     );
   },
   apply_stream_function: (
@@ -77,33 +78,36 @@ const jstransform = {
     stream_name: string,
     stream_type: string,
     function_name: string,
-    data: any
+    data: any,
   ) => {
     return http().put(
       `/api/${org_identifier}/streams/${stream_name}/functions/${function_name}?type=${stream_type}`,
-      data
+      data,
     );
   },
   remove_stream_function: (
     org_identifier: string,
     stream_name: string,
     stream_type: string,
-    function_name: string
+    function_name: string,
   ) => {
     return http().delete(
-      `/api/${org_identifier}/streams/${stream_name}/functions/${function_name}?type=${stream_type}`
+      `/api/${org_identifier}/streams/${stream_name}/functions/${function_name}?type=${stream_type}`,
     );
   },
   create_enrichment_table: (
     org_identifier: string,
     table_name: string,
     data: any,
-    append: boolean
+    append: boolean,
   ) => {
     return http({ headers: { "Content-Type": "multipart/form-data" } }).post(
       `/api/${org_identifier}/enrichment_tables/${table_name}?append=${append}`,
-      data
+      data,
     );
+  },
+  test: (org_identifier: string, data: TestFunctionPayload) => {
+    return http().post(`/api/${org_identifier}/functions/test`, data);
   },
 };
 

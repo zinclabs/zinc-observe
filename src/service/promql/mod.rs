@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
+    collections::HashSet,
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -21,6 +22,7 @@ use std::{
 use async_trait::async_trait;
 use config::meta::search::ScanStats;
 use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContext};
+use promql_parser::label::Matchers;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -33,10 +35,12 @@ mod functions;
 #[cfg(feature = "enterprise")]
 pub mod name_visitor;
 pub mod search;
+pub mod selector_visitor;
+mod utils;
 pub mod value;
 
 pub use engine::Engine;
-pub use exec::Query;
+pub use exec::PromqlContext;
 
 pub(crate) const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub(crate) const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s
@@ -53,6 +57,8 @@ pub trait TableProvider: Sync + Send + 'static {
         org_id: &str,
         stream_name: &str,
         time_range: (i64, i64),
+        machers: Matchers,
+        label_selector: Option<HashSet<String>>,
         filters: &mut [(String, Vec<String>)],
     ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats)>>;
 }
@@ -63,6 +69,7 @@ pub struct MetricsQueryRequest {
     pub start: i64,
     pub end: i64,
     pub step: i64,
+    pub query_exemplars: bool,
     pub no_cache: Option<bool>,
 }
 
@@ -86,6 +93,18 @@ pub struct QueryResponse {
     pub status: Status,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<QueryResult>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExemplarsResponse {
+    pub status: Status,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<value::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_type: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

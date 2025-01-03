@@ -10,7 +10,6 @@ import "cluster/common.proto";
 
 service Metrics {
     rpc Query (MetricsQueryRequest) returns (MetricsQueryResponse) {}
-    rpc WalFile (MetricsWalFileRequest) returns (MetricsWalFileResponse) {}
 }
 
 message MetricsQueryRequest {
@@ -27,12 +26,13 @@ message MetricsQueryStmt {
     int64             start = 2;
     int64               end = 3;
     int64              step = 4;
+    bool    query_exemplars = 5;
 }
 
 message MetricsQueryResponse {
     Job                 job = 1;
     int32              took = 2;
-    string      result_type = 3; // vector, matrix, scalar
+    string      result_type = 3; // vector, matrix, scalar, exemplars
     repeated Series  result = 4;
     ScanStats    scan_stats = 5;
 }
@@ -43,6 +43,7 @@ message Series {
     optional Sample  sample = 3;
     optional double  scalar = 4;
     optional string stringliteral = 5;
+    optional Exemplars  exemplars = 6;
 }
 
 message Label {
@@ -55,26 +56,12 @@ message Sample {
     double value = 2;
 }
 
-message MetricsWalFileRequest {
-    string      org_id = 1;
-    string stream_name = 2;
-    int64   start_time = 3;
-    int64     end_time = 4;
-    repeated MetricsWalFileFilter filters = 5;
+message Exemplars {
+    repeated Exemplar exemplars = 1;
 }
 
-message MetricsWalFileFilter {
-    string          field = 1;
-    repeated string value = 2; 
-}
-
-message MetricsWalFileResponse {
-    repeated MetricsWalFile files = 1;
-}
-
-message MetricsWalFile {
-    string       name = 1;
-    string schema_key = 2;
-    bytes        body = 3;
-    int64        size = 4;
+message Exemplar {
+    int64            time = 1;
+    double          value = 2;
+    repeated Label labels = 3;
 }

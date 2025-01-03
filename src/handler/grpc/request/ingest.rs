@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use actix_web::http::StatusCode;
-use config::{metrics, utils::json};
+use config::{meta::stream::StreamType, metrics, utils::json};
 use proto::cluster_rpc::{
-    ingest_server::Ingest, IngestionRequest, IngestionResponse, IngestionType, StreamType,
+    ingest_server::Ingest, IngestionRequest, IngestionResponse, IngestionType,
 };
 use tonic::{Request, Response, Status};
 
@@ -34,11 +34,12 @@ impl Ingest for Ingester {
         let start = std::time::Instant::now();
         let req = request.into_inner();
         let org_id = req.org_id;
+        let stream_type: StreamType = req.stream_type.into();
         let stream_name = req.stream_name;
         let in_data = req.data.unwrap_or_default();
 
-        let resp = match StreamType::try_from(req.stream_type) {
-            Ok(StreamType::Logs) => {
+        let resp = match stream_type {
+            StreamType::Logs => {
                 let log_ingestion_type = req.ingestion_type.unwrap_or_default();
                 let data = bytes::Bytes::from(in_data.data);
                 match create_log_ingestion_req(log_ingestion_type, &data) {
@@ -55,7 +56,7 @@ impl Ingest for Ingester {
                     .map_or_else(Err, |_| Ok(())),
                 }
             }
-            Ok(StreamType::Metrics) => {
+            StreamType::Metrics => {
                 let log_ingestion_type: IngestionType = req
                     .ingestion_type
                     .unwrap_or_default()
@@ -74,7 +75,7 @@ impl Ingest for Ingester {
                         .map_err(|e| anyhow::anyhow!("error in ingesting metrics {}", e))
                 }
             }
-            Ok(StreamType::EnrichmentTables) => {
+            StreamType::EnrichmentTables => {
                 let json_records: Vec<json::Map<String, json::Value>> =
                     json::from_slice(&in_data.data).unwrap_or({
                         let vec_value: Vec<json::Value> = json::from_slice(&in_data.data).unwrap();

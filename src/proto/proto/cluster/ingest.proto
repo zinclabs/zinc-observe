@@ -18,9 +18,9 @@ message IngestionData {
 
 message IngestionRequest {
     string                         org_id = 1;
-    string                    stream_name = 2;
-    IngestionData                    data = 3;
-    StreamType                stream_type = 4;
+    string                    stream_type = 2;
+    string                    stream_name = 3;
+    IngestionData                    data = 4;
     optional IngestionType ingestion_type = 5;
 }
 

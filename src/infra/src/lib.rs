@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod cache;
+pub mod cluster_coordinator;
 pub mod db;
 pub mod dist_lock;
 pub mod errors;

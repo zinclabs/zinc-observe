@@ -16,6 +16,11 @@
 use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
 
 use async_recursion::async_recursion;
+use config::{
+    get_config,
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    utils::json,
+};
 use datafusion::{
     arrow::{
         array::{Float64Array, Int64Array, StringArray},
@@ -23,7 +28,7 @@ use datafusion::{
     },
     error::{DataFusionError, Result},
     functions_aggregate::min_max::max,
-    prelude::{col, lit, SessionContext},
+    prelude::{col, lit, DataFrame, SessionContext},
 };
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -36,15 +41,16 @@ use promql_parser::{
     },
 };
 
-use crate::{
-    common::meta::prom::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
-    service::promql::{
-        aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
-    },
+use super::{
+    utils::{apply_label_selector, apply_matchers},
+    PromqlContext,
+};
+use crate::service::promql::{
+    aggregations, binaries, functions, micros, value::*, DEFAULT_MAX_SERIES_PER_QUERY,
 };
 
 pub struct Engine {
-    ctx: Arc<super::exec::Query>,
+    ctx: Arc<PromqlContext>,
     /// The time boundaries for the evaluation.
     time: i64,
     /// Filters to include certain columns
@@ -53,7 +59,7 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub fn new(ctx: Arc<super::exec::Query>, time: i64) -> Self {
+    pub fn new(ctx: Arc<PromqlContext>, time: i64) -> Self {
         Self {
             ctx,
             time,
@@ -133,6 +139,10 @@ impl Engine {
     /// Help function to extract columns from [LabelModifier].
     /// Aggregation function topk & bottomk are special cases where
     /// modifier is applied to grouped result -> not columns filtered.
+    /// For promql:
+    ///     sum(irate(zo_incoming_requests{namespace="ziox"}[5m])) by (exported_endpoint)
+    /// we need to extract the columns `exported_endpoint` from the modifier. Because
+    /// the result will be grouped by `exported_endpoint`, and don't consider other labesl.
     fn extract_columns_from_modifier(
         &mut self,
         modifier: &Option<LabelModifier>,
@@ -250,6 +260,7 @@ impl Engine {
                         .map(|v| RangeValue {
                             labels: v.labels.to_owned(),
                             samples: vec![v.sample],
+                            exemplars: None,
                             time_window: time_window.clone(),
                         })
                         .collect(),
@@ -257,6 +268,7 @@ impl Engine {
                         vec![RangeValue {
                             labels: v.labels.to_owned(),
                             samples: vec![v.sample],
+                            exemplars: None,
                             time_window,
                         }]
                     }
@@ -265,11 +277,13 @@ impl Engine {
                     Value::Sample(s) => vec![RangeValue {
                         labels: Labels::default(),
                         samples: vec![s],
+                        exemplars: None,
                         time_window,
                     }],
                     Value::Float(val) => vec![RangeValue {
                         labels: Labels::default(),
                         samples: vec![Sample::new(self.time, val)],
+                        exemplars: None,
                         time_window,
                     }],
                     v => {
@@ -459,9 +473,15 @@ impl Engine {
                 })
                 .filter(|v| start < v.timestamp && v.timestamp <= eval_ts)
                 .collect();
+            let exemplars = if self.ctx.query_exemplars {
+                metric.exemplars.clone()
+            } else {
+                None
+            };
             values.push(RangeValue {
                 labels: metric.labels.clone(),
                 samples,
+                exemplars,
                 time_window: Some(TimeWindow::new(eval_ts, range)),
             });
         }
@@ -480,8 +500,60 @@ impl Engine {
             return Ok(()); // data is already loading
         }
 
-        // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
+        let table_name = selector.name.as_ref().unwrap();
+        let metrics = match self.selector_load_data_inner(selector, range).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("[PromQL] Failed to load data for stream: {table_name}, error: {e:?}");
+                *data_loaded = true;
+                return Err(e);
+            }
+        };
 
+        // no data, return immediately
+        if metrics.is_empty() {
+            *data_loaded = true;
+            self.ctx
+                .data_cache
+                .write()
+                .await
+                .insert(table_name.to_string(), Value::None);
+            return Ok(());
+        }
+
+        // cache data
+        let mut metric_values = metrics.into_values().collect::<Vec<_>>();
+        for metric in metric_values.iter_mut() {
+            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            if self.ctx.query_exemplars && metric.exemplars.is_some() {
+                metric
+                    .exemplars
+                    .as_mut()
+                    .unwrap()
+                    .sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+            }
+        }
+        let values = if metric_values.is_empty() {
+            Value::None
+        } else {
+            Value::Matrix(metric_values)
+        };
+        self.ctx
+            .data_cache
+            .write()
+            .await
+            .insert(table_name.to_string(), values);
+        *data_loaded = true;
+        Ok(())
+    }
+
+    #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
+    async fn selector_load_data_inner(
+        &self,
+        selector: &VectorSelector,
+        range: Option<Duration>,
+    ) -> Result<HashMap<String, RangeValue>> {
+        // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
         let mut start = self.ctx.start - range.map_or(self.ctx.lookback_delta, micros);
         let mut end = self.ctx.end; // 30 minutes + 5m = 35m
 
@@ -501,9 +573,11 @@ impl Engine {
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
         log::info!(
-            "[PromQL] Loading data for stream: {}, filter: {:?}",
+            "[PromQL] Loading data for stream: {}, range: [{},{}), filter: {:?}",
             table_name,
-            selector
+            start,
+            end,
+            selector.to_string(),
         );
 
         let mut filters = selector
@@ -521,16 +595,32 @@ impl Engine {
         let ctxs = self
             .ctx
             .table_provider
-            .create_context(&self.ctx.org_id, table_name, (start, end), &mut filters)
+            .create_context(
+                &self.ctx.org_id,
+                table_name,
+                (start, end),
+                selector.matchers.clone(),
+                self.col_filters.clone(),
+                &mut filters,
+            )
             .await?;
 
         let mut tasks = Vec::new();
         for (ctx, schema, scan_stats) in ctxs {
             let selector = selector.clone();
             let col_filters = &self.col_filters;
+            let query_exemplars = self.ctx.query_exemplars;
             let task = tokio::time::timeout(Duration::from_secs(self.ctx.timeout), async move {
-                selector_load_data_from_datafusion(ctx, schema, selector, start, end, col_filters)
-                    .await
+                selector_load_data_from_datafusion(
+                    ctx,
+                    schema,
+                    selector,
+                    start,
+                    end,
+                    col_filters,
+                    query_exemplars,
+                )
+                .await
             });
             tasks.push(task);
             // update stats
@@ -550,40 +640,14 @@ impl Engine {
                 break;
             }
             for (key, value) in task_result? {
-                let metric = metrics
-                    .entry(key)
-                    .or_insert_with(|| RangeValue::new(value.labels, Vec::with_capacity(20)));
-                metric.samples.extend(value.samples);
+                if let Some(metric) = metrics.get_mut(&key) {
+                    metric.extend(value);
+                } else {
+                    metrics.insert(key, value);
+                }
             }
         }
-
-        // no data, return immediately
-        if metrics.is_empty() {
-            self.ctx
-                .data_cache
-                .write()
-                .await
-                .insert(table_name.to_string(), Value::None);
-            return Ok(());
-        }
-
-        // cache data
-        let mut metric_values = metrics.into_values().collect::<Vec<_>>();
-        for metric in metric_values.iter_mut() {
-            metric.samples.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
-        }
-        let values = if metric_values.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(metric_values)
-        };
-        self.ctx
-            .data_cache
-            .write()
-            .await
-            .insert(table_name.to_string(), values);
-        *data_loaded = true;
-        Ok(())
+        Ok(metrics)
     }
 
     async fn aggregate_exprs(
@@ -1011,6 +1075,7 @@ async fn selector_load_data_from_datafusion(
     start: i64,
     end: i64,
     label_selector: &Option<HashSet<String>>,
+    query_exemplars: bool,
 ) -> Result<HashMap<String, RangeValue>> {
     let cfg = config::get_config();
     let table_name = selector.name.as_ref().unwrap();
@@ -1025,76 +1090,11 @@ async fn selector_load_data_from_datafusion(
         }
     };
 
-    for mat in selector.matchers.matchers.iter() {
-        if mat.name == cfg.common.column_timestamp
-            || mat.name == VALUE_LABEL
-            || schema.field_with_name(&mat.name).is_err()
-        {
-            continue;
-        }
-        match &mat.op {
-            MatchOp::Equal => {
-                df_group = df_group.filter(col(mat.name.clone()).eq(lit(mat.value.clone())))?
-            }
-            MatchOp::NotEqual => {
-                df_group = df_group.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
-            }
-            MatchOp::Re(regex) => {
-                let regexp_match_udf =
-                    crate::service::search::datafusion::udf::regexp_udf::REGEX_MATCH_UDF.clone();
-                df_group = df_group.filter(
-                    regexp_match_udf.call(vec![col(mat.name.clone()), lit(regex.as_str())]),
-                )?
-            }
-            MatchOp::NotRe(regex) => {
-                let regexp_not_match_udf =
-                    crate::service::search::datafusion::udf::regexp_udf::REGEX_NOT_MATCH_UDF
-                        .clone();
-                df_group = df_group.filter(
-                    regexp_not_match_udf.call(vec![col(mat.name.clone()), lit(regex.as_str())]),
-                )?
-            }
-        }
-    }
+    df_group = apply_matchers(df_group, &schema, &selector.matchers)?;
 
-    if let Some(label_selector) = label_selector {
-        if !label_selector.is_empty() {
-            let schema_fields = schema
-                .fields()
-                .iter()
-                .map(|f| f.name())
-                .collect::<HashSet<_>>();
-            let mut def_labels = vec![
-                HASH_LABEL.to_string(),
-                VALUE_LABEL.to_string(),
-                BUCKET_LABEL.to_string(),
-                cfg.common.column_timestamp.to_string(),
-            ];
-            for label in label_selector.iter() {
-                if def_labels.contains(label) {
-                    def_labels.retain(|x| x != label);
-                }
-            }
-            // include only found columns and required _timestamp, hash, value, le cols
-            let selected_cols: Vec<_> = label_selector
-                .iter()
-                .chain(def_labels.iter())
-                .filter_map(|label| {
-                    if schema_fields.contains(label) {
-                        Some(col(label))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            df_group = match df_group.select(selected_cols) {
-                Ok(df) => df,
-                Err(e) => {
-                    log::error!("Selecting cols error: {}", e);
-                    return Ok(HashMap::default());
-                }
-            };
-        }
+    match apply_label_selector(df_group, &schema, label_selector) {
+        Some(dataframe) => df_group = dataframe,
+        None => return Ok(HashMap::default()),
     }
 
     let label_cols = df_group
@@ -1103,7 +1103,10 @@ async fn selector_load_data_from_datafusion(
         .iter()
         .filter_map(|field| {
             let name = field.name();
-            if name == &cfg.common.column_timestamp || name == VALUE_LABEL {
+            if name == &cfg.common.column_timestamp
+                || name == VALUE_LABEL
+                || name == EXEMPLARS_LABEL
+            {
                 None
             } else {
                 Some(col(name))
@@ -1188,7 +1191,21 @@ async fn selector_load_data_from_datafusion(
         }
     }
 
-    let batches = df_group
+    if query_exemplars {
+        load_exemplars_from_datafusion(&mut metrics, df_group).await?;
+    } else {
+        load_samples_from_datafusion(&mut metrics, df_group).await?;
+    }
+
+    Ok(metrics)
+}
+
+async fn load_samples_from_datafusion(
+    metrics: &mut HashMap<String, RangeValue>,
+    df: DataFrame,
+) -> Result<()> {
+    let cfg = get_config();
+    let batches = df
         .select_columns(&[&cfg.common.column_timestamp, HASH_LABEL, VALUE_LABEL])?
         .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
         .collect()
@@ -1222,5 +1239,56 @@ async fn selector_load_data_from_datafusion(
             }
         }
     }
-    Ok(metrics)
+
+    Ok(())
+}
+
+async fn load_exemplars_from_datafusion(
+    metrics: &mut HashMap<String, RangeValue>,
+    df: DataFrame,
+) -> Result<()> {
+    let cfg = get_config();
+    let batches = df
+        .filter(col(EXEMPLARS_LABEL).is_not_null())?
+        .select_columns(&[HASH_LABEL, EXEMPLARS_LABEL])?
+        .sort(vec![col(&cfg.common.column_timestamp).sort(true, true)])?
+        .collect()
+        .await?;
+
+    for batch in &batches {
+        let hash_values = batch
+            .column_by_name(HASH_LABEL)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let exemplars_values = batch
+            .column_by_name(EXEMPLARS_LABEL)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        for i in 0..batch.num_rows() {
+            let hash = hash_values.value(i);
+            let exemplar = exemplars_values.value(i);
+            if let Some(range_val) = metrics.get_mut(hash) {
+                if let Ok(exemplars) = json::from_str::<Vec<json::Value>>(exemplar) {
+                    for exemplar in exemplars {
+                        if let Some(exemplar) = exemplar.as_object() {
+                            if range_val.exemplars.is_none() {
+                                range_val.exemplars = Some(vec![]);
+                            }
+                            range_val
+                                .exemplars
+                                .as_mut()
+                                .unwrap()
+                                .push(Exemplar::from(exemplar));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
