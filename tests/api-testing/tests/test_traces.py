@@ -4,7 +4,7 @@ import time
 
 def valid_trace():
     start_time = int(time.time()*1000000000)
-    end_time = start_time+6*100000
+    end_time = start_time+60000*100000
     json_str =  """{"resourceSpans": [
     {"resource": {
         "attributes": [{
@@ -87,19 +87,34 @@ def valid_trace():
     return json.loads(json_str)
 
 
+# def test_e2e_valid_trace_ingestion(create_session, base_url):
+#     """Valid trace should get ingested."""
+
+#     session = create_session
+#     url = base_url
+#     org_id = "default"
+#     for _ in range(1000):
+#     trace = valid_trace()
+#     resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
+
+#     assert (
+#         resp_post_trace.status_code == 200
+#     ), f"Post trace expected 200, but got {resp_post_trace.status_code} {resp_post_trace.content}"
+
 def test_e2e_valid_trace_ingestion(create_session, base_url):
     """Valid trace should get ingested."""
 
     session = create_session
     url = base_url
-    org_id = "default"
+    org_id = "shyam_organization_36_V1x8HnML6Bk8g6V"
+    for _ in range(1000):
+        trace = valid_trace()
+        resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces", json=trace)
 
-    trace = valid_trace()
-    resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
+        assert (
+            resp_post_trace.status_code == 200
+        ), f"Post trace expected 200, but got {resp_post_trace.status_code} {resp_post_trace.content}"
 
-    assert (
-        resp_post_trace.status_code == 200
-    ), f"Post trace expected 200, but got {resp_post_trace.status_code} {resp_post_trace.content}"
 
 def test_e2e_old_trace_ingestion(create_session, base_url):
     """Traces outside the time range should get be skipped."""
