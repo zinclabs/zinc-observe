@@ -30,7 +30,7 @@ use o2_enterprise::enterprise::{
 };
 
 use super::db::org_users::get_cached_user_org;
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 use crate::common::meta::user::{InviteStatus, UserInvite, UserInviteList};
 use crate::{
     common::{

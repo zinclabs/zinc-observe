@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 use chrono::{Duration, Utc};
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 use config::{get_config, SMTP_CLIENT};
 use config::{
     ider,
@@ -27,7 +27,7 @@ use config::{
     },
     utils::rand::generate_random_string,
 };
-#[cfg(feature = "enterprise")]
+#[cfg(feature = "cloud")]
 use lettre::{message::SinglePart, AsyncTransport, Message};
 #[cfg(feature = "cloud")]
 use o2_enterprise::enterprise::cloud::org_invites;
