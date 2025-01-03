@@ -137,7 +137,7 @@ export class RemoteSnapshotLocation implements SnapshotLocation {
     try {
       const response = await this.s3.send(command);
 
-      console.log("RemoteSnapshot: checkVersionExists- response", response);
+      // console.log("RemoteSnapshot: checkVersionExists- response", response);
 
       // Check if there are any objects under the given prefix
       return !!(response.Contents && response.Contents.length > 0);
