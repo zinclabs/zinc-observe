@@ -1,5 +1,4 @@
 {
-    "location": "local",
     "bucket": "o2-snapshots-storage",
     "basePath": "https://s3.amazonaws.com",
     "region": "us-east-2",
