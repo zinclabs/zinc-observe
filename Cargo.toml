@@ -22,9 +22,9 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["cloud"]
-enterprise = ["dep:o2_enterprise"]
-cloud = ["enterprise", "o2_enterprise/cloud"]
+default = []
+enterprise = []
+cloud = []
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
 profiling = ["dep:pyroscope", "dep:pyroscope_pprofrs"]
@@ -112,7 +112,6 @@ log.workspace = true
 maxminddb = "0.23.0"
 memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
-o2_enterprise = { version = "0.1.0", path = "../o2-enterprise", optional = true, default-features = false }
 once_cell.workspace = true
 opentelemetry = "0.25"
 opentelemetry_sdk = { version = "0.25", features = [
@@ -225,7 +224,12 @@ report_server = { path = "src/report_server" }
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = { version = "4.9", features = ["rustls-0_23"] }
 actix-web-prometheus = { version = "0.1", features = ["process"] }
-actix-tls = { version = "3.4", features = ["connect", "uri", "rustls-0_23-native-roots", "rustls-0_23-webpki-roots"] }
+actix-tls = { version = "3.4", features = [
+    "connect",
+    "uri",
+    "rustls-0_23-native-roots",
+    "rustls-0_23-webpki-roots",
+] }
 anyhow = "1.0"
 arc-swap = "1.7.1"
 argon2 = { version = "0.5", features = ["alloc", "password-hash"] }
@@ -300,7 +304,10 @@ reqwest = { version = "0.12", default-features = false, features = [
     "stream",
 ] }
 rustls-pemfile = "2"
-rustls = { version = "0.23.20", default-features = false, features = ["std", "tls12"]}
+rustls = { version = "0.23.20", default-features = false, features = [
+    "std",
+    "tls12",
+] }
 sea-orm = { version = "1.1.0", features = [
     "sqlx-all",
     "runtime-tokio-rustls",
