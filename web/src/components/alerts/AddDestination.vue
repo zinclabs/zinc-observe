@@ -96,7 +96,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             tabindex="0"
           />
         </div>
-        <div class="col-6 row q-py-xs">
+        <div
+         
+          class="col-6 row q-py-xs"
+        >
           <div class="col-12">
             <q-select
               data-test="add-destination-template-select"
@@ -111,12 +114,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               dense
               :rules="[(val: any) => !!val || 'Field is required!']"
+              :disable="formData.type === 'external_destination'"
               tabindex="0"
             />
           </div>
         </div>
 
-        <template v-if="formData.type === 'http'">
+        <template
+          v-if="
+            formData.type === 'http' || formData.type === 'external_destination'
+          "
+        >
           <div class="col-6 q-py-xs">
             <q-input
               data-test="add-destination-url-input"
@@ -356,9 +364,24 @@ const tabs = computed(() => [
     style: {
       width: "fit-content",
       padding: "4px 14px",
-      background: formData.value.type === "email" ? "#5960B2" : "#ffffff",
+      background: formData.value.type === "email" ? "#5960B2" : "",
       border: "none !important",
       color: formData.value.type === "email" ? "#ffffff !important" : "",
+    },
+  },
+  {
+    label: "External Destination",
+    value: "external_destination",
+    style: {
+      width: "fit-content",
+      padding: "4px 14px",
+      background:
+        formData.value.type === "external_destination" ? "#5960B2" : "",
+      border: "none !important",
+      color:
+        formData.value.type === "external_destination"
+          ? "#ffffff !important"
+          : "",
     },
   },
 ]);
@@ -401,11 +424,16 @@ const getFormattedTemplates = computed(() =>
 const isValidDestination = computed(
   () =>
     formData.value.name &&
-    ((formData.value.url &&
+((formData.value.url &&
       formData.value.method &&
       formData.value.type === "http") ||
-      (formData.value.type === "email" && formData.value.emails.length)) &&
-    formData.value.template
+  (formData.value.type === "email" && formData.value.emails.length) ||
+      (formData.value.type === "external_destination" &&
+        formData.value.url &&
+        formData.value.method)) &&
+    (formData.value.type !== "external_destination"
+      ? formData.value.template
+      : true),
 );
 const saveDestination = () => {
   if (!isValidDestination.value) {
