@@ -16,22 +16,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <q-page class="q-pa-none" style="min-height: inherit">
+    <q-btn
+      data-test="logs-search-field-list-collapse-btn"
+      :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
+      :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
+      dense
+      size="12px"
+      round
+      class="q-mr-xs field-list-collapse-btn tw-absolute tw-top-0 tw-z-10"
+      color="primary"
+      :style="{
+        left: showSidebar ? splitterModel - 14 + 'px' : '-8px',
+      }"
+      @click="collapseSidebar"
+    />
     <q-splitter
       v-model="splitterModel"
       unit="px"
-      style="min-height: calc(100vh - 47px)"
+      :limits="[0, 300]"
+      class="tw-overflow-hidden"
     >
       <template v-slot:before>
-        <div class="functions-tabs">
+        <div v-if="showSidebar" class="functions-tabs">
           <q-tabs
             v-model="activeTab"
             indicator-color="transparent"
             inline-label
             vertical
           >
-          <q-route-tab
+            <q-route-tab
               v-if="
-                !store.state.zoConfig?.custom_hide_menus?.split(',')
+                !store.state.zoConfig?.custom_hide_menus
+                  ?.split(',')
                   .includes('pipelines')
               "
               data-test="stream-pipelines-tab"
@@ -70,14 +86,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('function.enrichmentTables')"
               content-class="tab_content"
             />
-
-
-
           </q-tabs>
         </div>
       </template>
       <template v-slot:after>
-        <div class="q-mx-md q-my-sm">
+        <div
+          class="tw-overflow-auto q-mx-sm q-my-sm"
+          style="height: calc(100vh - 57px)"
+        >
           <!-- :templates="templates"
             :functionAssociatedStreams="functionAssociatedStreams"
             @get:functionAssociatedStreams="getFunctionAssociatedStreams"
@@ -90,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
+import { defineComponent, ref, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -106,18 +122,41 @@ export default defineComponent({
     const functionAssociatedStreams = ref([]);
     const splitterModel = ref(220);
 
+    const lastSplitterPosition = ref(splitterModel.value);
+
+    const showSidebar = ref(true);
+
+    watch(
+      () => router.currentRoute.value,
+      (currentRoute: any) => {
+        if (
+          currentRoute.name === "functionList" &&
+          currentRoute.query.action === "add"
+        ) {
+          if (showSidebar.value) collapseSidebar();
+        }
+      },
+    );
+
     watch(
       () => router.currentRoute.value.name,
       (routeName) => {
         // This is added to redirect to functionList if the user is on functions route
         // This case happens when user clicks on functions from menu when he is already on functions page
         if (routeName === "pipeline") router.back();
-      }
+      },
     );
 
     onBeforeMount(() => {
       redirectRoute();
     });
+
+    const collapseSidebar = () => {
+      if (showSidebar.value) lastSplitterPosition.value = splitterModel.value;
+      showSidebar.value = !showSidebar.value;
+      splitterModel.value = showSidebar.value ? lastSplitterPosition.value : 0;
+    };
+
     const redirectRoute = () => {
       if (router.currentRoute.value.name === "pipeline") {
         router.replace({
@@ -138,12 +177,18 @@ export default defineComponent({
       functionAssociatedStreams,
       activeTab,
       templates,
+      collapseSidebar,
+      showSidebar,
     };
   },
 });
 </script>
 
 <style scoped lang="scss">
+:deep(.q-splitter__before) {
+  overflow: visible;
+}
+
 .q-table {
   &__top {
     border-bottom: 1px solid $border-color;

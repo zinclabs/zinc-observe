@@ -44,6 +44,7 @@ pub mod session;
 pub mod short_url;
 pub mod stream;
 pub mod syslogs_route;
+pub mod tls;
 pub mod traces;
 pub mod users;
 

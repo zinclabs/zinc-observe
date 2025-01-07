@@ -45,6 +45,7 @@ use crate::{
                 get_search_type_from_request, get_stream_type_from_request,
                 get_use_cache_from_request, get_work_group,
             },
+            stream::get_settings_max_query_range,
         },
     },
     service::{
@@ -204,6 +205,7 @@ pub async fn search(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
+    req.use_cache = Some(use_cache);
 
     // set search event type
     if req.search_type.is_none() {
@@ -237,7 +239,9 @@ pub async fn search(
         if let Some(settings) =
             infra::schema::get_settings(&org_id, &stream_name, stream_type).await
         {
-            let max_query_range = settings.max_query_range;
+            let max_query_range =
+                get_settings_max_query_range(settings.max_query_range, &org_id, Some(&user_id))
+                    .await;
             if max_query_range > 0
                 && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
             {
@@ -265,7 +269,6 @@ pub async fn search(
         stream_type,
         Some(user_id),
         &req,
-        use_cache,
         range_error,
     )
     .instrument(http_span)
@@ -485,6 +488,7 @@ pub async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
+        use_cache: None,
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span.clone())
@@ -538,6 +542,7 @@ pub async fn around(
         timeout,
         search_type: Some(SearchEventType::UI),
         search_event_context: None,
+        use_cache: None,
     };
     let search_res = SearchService::search(&trace_id, &org_id, stream_type, user_id.clone(), &req)
         .instrument(http_span)
@@ -878,6 +883,7 @@ async fn values_v1(
         timeout,
         search_type: Some(SearchEventType::Values),
         search_event_context: None,
+        use_cache: Some(use_cache),
     };
 
     // skip fields which aren't part of the schema
@@ -941,7 +947,6 @@ async fn values_v1(
             actual_stream_type,
             Some(user_id.to_string()),
             &req,
-            use_cache,
             "".to_string(),
         )
         .instrument(http_span)
@@ -1111,6 +1116,12 @@ pub async fn search_partition(
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
     let org_id = org_id.into_inner();
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
     let stream_type = match get_stream_type_from_request(&query) {
         Ok(v) => v.unwrap_or(StreamType::Logs),
@@ -1125,9 +1136,16 @@ pub async fn search_partition(
         return Ok(MetaHttpResponse::bad_request(e));
     }
 
-    let search_res = SearchService::search_partition(&trace_id, &org_id, stream_type, &req, false)
-        .instrument(http_span)
-        .await;
+    let search_res = SearchService::search_partition(
+        &trace_id,
+        &org_id,
+        Some(&user_id),
+        stream_type,
+        &req,
+        false,
+    )
+    .instrument(http_span)
+    .await;
 
     // do search
     match search_res {

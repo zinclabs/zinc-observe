@@ -356,7 +356,7 @@ async fn check_status(id: i64, job_id: &str, org_id: &str) -> Result<(), anyhow:
     Ok(())
 }
 
-async fn merge_response(
+pub async fn merge_response(
     jobs: Vec<PartitionJob>,
     limit: i64,
     offset: i64,
@@ -370,6 +370,10 @@ async fn merge_response(
         let path = job.result_path.as_ref().unwrap();
         let res = get_result(path, cluster).await?;
         response.push(res);
+    }
+
+    if response.is_empty() {
+        return Ok(Response::default());
     }
 
     // if only one partition job, return directly

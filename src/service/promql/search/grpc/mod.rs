@@ -20,12 +20,16 @@ use std::{
 };
 
 use async_trait::async_trait;
-use config::meta::search::ScanStats;
+use config::{
+    meta::search::ScanStats,
+    utils::time::{now_micros, second_micros},
+};
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use infra::{cache::tmpfs, errors::Result};
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 
+use super::Value;
 use crate::service::{
     promql::{value, PromqlContext, TableProvider, DEFAULT_LOOKBACK},
     search,
@@ -53,8 +57,15 @@ impl TableProvider for StorageProvider {
         let mut resp = Vec::new();
         // register storage table
         let trace_id = self.trace_id.to_owned() + "-storage-" + stream_name;
-        let ctx =
-            storage::create_context(&trace_id, org_id, stream_name, time_range, filters).await?;
+        let ctx = storage::create_context(
+            &trace_id,
+            org_id,
+            stream_name,
+            time_range,
+            matchers.clone(),
+            filters,
+        )
+        .await?;
         resp.push(ctx);
         // register Wal table
         if self.need_wal {
@@ -80,7 +91,53 @@ impl TableProvider for StorageProvider {
 pub async fn search(
     req: &cluster_rpc::MetricsQueryRequest,
 ) -> Result<cluster_rpc::MetricsQueryResponse> {
-    let start = std::time::Instant::now();
+    let cfg = config::get_config();
+    let start_time = std::time::Instant::now();
+    let query = req.query.as_ref().unwrap();
+    let max_interval = cfg.limit.metrics_max_search_interval_per_group * 3_600_000_000; // convert hours to microseconds
+
+    let start = query.start;
+    let end = query.end;
+    let step = query.step;
+
+    let mut results = Vec::new();
+    if start == end {
+        results.push(search_inner(req).await?);
+    } else {
+        let group_interval = max_interval - max_interval % step;
+        let group = generate_search_group(start, end, step, group_interval);
+        for (start, end) in group {
+            let mut req = req.clone();
+            req.need_wal =
+                end >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
+            req.query.as_mut().unwrap().start = start;
+            req.query.as_mut().unwrap().end = end;
+            let resp = search_inner(&req).await?;
+            results.push(resp);
+        }
+    }
+
+    let mut resp = cluster_rpc::MetricsQueryResponse {
+        job: req.job.clone(),
+        took: start_time.elapsed().as_millis() as i32,
+        result_type: results[0].1.clone(),
+        ..Default::default()
+    };
+
+    let mut scan_stats = ScanStats::default();
+    for (value, _, stats) in results {
+        add_value(&mut resp, value);
+        scan_stats.add(&stats);
+    }
+    resp.scan_stats = Some(cluster_rpc::ScanStats::from(&scan_stats));
+
+    Ok(resp)
+}
+
+#[tracing::instrument(name = "promql:search:grpc:search_inner", skip_all, fields(org_id = req.org_id))]
+pub async fn search_inner(
+    req: &cluster_rpc::MetricsQueryRequest,
+) -> Result<(Value, String, ScanStats)> {
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
 
     let org_id = &req.org_id;
@@ -134,18 +191,29 @@ pub async fn search(
     tmpfs::delete(&trace_id, true).unwrap();
 
     scan_stats.format_to_mb();
-    let mut resp = cluster_rpc::MetricsQueryResponse {
-        job: req.job.clone(),
-        took: start.elapsed().as_millis() as i32,
-        result_type,
-        scan_stats: Some(cluster_rpc::ScanStats::from(&scan_stats)),
-        ..Default::default()
-    };
+    Ok((value, result_type, scan_stats))
+}
 
-    match value {
-        value::Value::None => {
-            return Ok(resp);
+/// generate search group
+/// if the last group is less than group_interval * 25%, it will be merged into the previous group
+fn generate_search_group(start: i64, end: i64, step: i64, group_interval: i64) -> Vec<(i64, i64)> {
+    let mut resp = Vec::new();
+    let mut start = start;
+    while start < end {
+        let next = start + group_interval;
+        if next >= end - group_interval / 4 {
+            resp.push((start, end));
+            break;
         }
+        resp.push((start, next));
+        start = next + step;
+    }
+    resp
+}
+
+fn add_value(resp: &mut cluster_rpc::MetricsQueryResponse, value: Value) {
+    match value {
+        value::Value::None => {}
         value::Value::Instant(v) => {
             resp.result.push(cluster_rpc::Series {
                 metric: v.labels.iter().map(|x| x.as_ref().into()).collect(),
@@ -209,6 +277,37 @@ pub async fn search(
             });
         }
     }
+}
 
-    Ok(resp)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_search_group() {
+        // test case 1: normal case
+        let resp = generate_search_group(0, 10, 2, 4);
+        let expected = vec![(0, 4), (6, 10)];
+        assert_eq!(resp, expected);
+
+        // test case 2: start == end
+        let resp = generate_search_group(0, 0, 2, 4);
+        let expected = vec![];
+        assert_eq!(resp, expected);
+
+        // test case 3: start > end
+        let resp = generate_search_group(10, 0, 2, 4);
+        let expected = vec![];
+        assert_eq!(resp, expected);
+
+        // test case 4, the last group is greater than group_interval * 25%
+        let resp = generate_search_group(0, 11, 2, 8);
+        let expected = vec![(0, 8), (10, 11)];
+        assert_eq!(resp, expected);
+
+        // test case 5, the last group is less than group_interval * 25%
+        let resp = generate_search_group(0, 10, 2, 8);
+        let expected = vec![(0, 10)];
+        assert_eq!(resp, expected);
+    }
 }

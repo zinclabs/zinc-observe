@@ -324,6 +324,14 @@ impl FromRequest for AuthExtractor {
                         .map_or(path_columns[1], |model| model.key),
                     path_columns[2]
                 )
+            } else if method.eq("GET") && path_columns[1].starts_with("dashboards") {
+                format!(
+                    "{}:{}",
+                    OFGA_MODELS
+                        .get(path_columns[1])
+                        .map_or(path_columns[1], |model| model.key),
+                    path_columns[2] // dashboard id
+                )
             } else {
                 format!(
                     "{}:{}",

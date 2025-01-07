@@ -60,7 +60,7 @@ use {
 
 use super::self_reporting::report_request_usage_stats;
 use crate::{
-    common::{self, infra::cluster as infra_cluster},
+    common::{self, infra::cluster as infra_cluster, utils::stream::get_settings_max_query_range},
     handler::grpc::request::search::Searcher,
 };
 
@@ -546,6 +546,7 @@ pub async fn search_multi(
 pub async fn search_partition(
     trace_id: &str,
     org_id: &str,
+    user_id: Option<&str>,
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
@@ -621,9 +622,16 @@ pub async fn search_partition(
             .await?;
             max_query_range = max(
                 max_query_range,
-                stream_settings.max_query_range * 3600 * 1_000_000,
+                get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
+                    .await
+                    * 3600
+                    * 1_000_000,
             );
-            max_query_range_in_hour = max(max_query_range_in_hour, stream_settings.max_query_range);
+            max_query_range_in_hour = max(
+                max_query_range_in_hour,
+                get_settings_max_query_range(stream_settings.max_query_range, org_id, user_id)
+                    .await,
+            );
             files.extend(stream_files);
         } else {
             // data retention in seconds
@@ -1092,6 +1100,7 @@ pub fn server_internal_error(error: impl ToString) -> Error {
 pub async fn search_partition_multi(
     trace_id: &str,
     org_id: &str,
+    user_id: &str,
     stream_type: StreamType,
     req: &search::MultiSearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
@@ -1101,6 +1110,7 @@ pub async fn search_partition_multi(
         match search_partition(
             trace_id,
             org_id,
+            Some(user_id),
             stream_type,
             &search::SearchPartitionRequest {
                 start_time: req.start_time,

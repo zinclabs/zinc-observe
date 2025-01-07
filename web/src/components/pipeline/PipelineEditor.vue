@@ -100,7 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     full-height
     maximized
   >
-    <div data-test="pipeline-nodes-list-dragable" class="stream-routing-dialog-container full-height">
+    <div
+      data-test="pipeline-nodes-list-dragable"
+      class="stream-routing-dialog-container full-height"
+    >
       <QueryForm
         v-if="pipelineObj.dialog.name === 'query'"
         :stream-name="pipeline.stream_name"
@@ -119,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :functions="functionOptions"
         :associated-functions="associatedFunctions"
         @cancel:hideform="resetDialog"
-       @add:function = "refreshFunctionList"
+        @add:function="refreshFunctionList"
       />
 
       <StreamNode
@@ -170,8 +173,7 @@ import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
-import {MarkerType} from "@vue-flow/core";
-
+import { MarkerType } from "@vue-flow/core";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
@@ -182,9 +184,7 @@ const queryImage = getImageURL("images/pipeline/query.svg");
 
 const PipelineFlow = defineAsyncComponent(
   () => import("@/plugins/pipelines/PipelineFlow.vue"),
-
 );
-
 
 interface Routing {
   [key: string]: RouteCondition[];
@@ -243,7 +243,7 @@ const plotChart: any = ref({
           position: "bottom",
         },
         draggable: true,
-        edgeSymbol: [ "arrow"],
+        edgeSymbol: ["arrow"],
         edgeSymbolSize: [10, 10],
         edgeLabel: {
           fontSize: 20,
@@ -281,7 +281,6 @@ const confirmDialogMeta: any = ref({
   data: null,
   onConfirm: () => {},
 });
-
 
 const nodeTypes: any = [
   {
@@ -342,7 +341,6 @@ const nodeTypes: any = [
 ];
 const functions = ref<{ [key: string]: Function }>({});
 
-
 const { pipelineObj, resetPipelineData } = useDragAndDrop();
 pipelineObj.nodeTypes = nodeTypes;
 pipelineObj.functions = functions;
@@ -351,15 +349,15 @@ const nodes: Ref<Node[]> = ref([]);
 
 const hasInputType = computed(() => {
   return pipelineObj.currentSelectedPipeline.nodes.some(
-    (node : any) => node.io_type === "input",
+    (node: any) => node.io_type === "input",
   );
 });
 
 const nodeLinks = ref<{ [key: string]: NodeLink }>({});
 
-const refreshFunctionList = () =>{
+const refreshFunctionList = () => {
   getFunctions();
-}
+};
 const functionOptions = ref<string[]>([]);
 
 const streamRoutes = ref<{ [key: string]: any }>({});
@@ -397,45 +395,45 @@ onBeforeMount(() => {
   } else {
     pipelineObj.isEditPipeline = false;
     resetPipelineData();
-
   }
   getFunctions();
 });
 
-onMounted(()=>{
+onMounted(() => {
   window.addEventListener("beforeunload", beforeUnloadHandler);
-})
+});
 
-onUnmounted(()=>{
+onUnmounted(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
-})
+});
 
 let forceSkipBeforeUnloadListener = false;
 
-onBeforeRouteLeave ((to, from, next) => {
-      // check if it is a force navigation, then allow
-      if(forceSkipBeforeUnloadListener) {
-        next()
-        return;
-      }
-      // else continue to warn user
-      if ((from.path === "/pipeline/pipelines/edit") && pipelineObj.dirtyFlag || (from.path === "/pipeline/pipelines/add" && pipelineObj.currentSelectedPipeline.nodes.length > 1)) {
-        const confirmMessage = t("pipeline.unsavedMessage");
-        if (window.confirm(confirmMessage)) {
-          // User confirmed, allow navigation
-          next();
-        } else {
-          // User canceled, prevent navigation
-          next(false);
-        }
-      } else {
-        // No unsaved changes or not leaving the edit route, allow navigation
-        next();
-      }
-    });
-
-
-
+onBeforeRouteLeave((to, from, next) => {
+  // check if it is a force navigation, then allow
+  if (forceSkipBeforeUnloadListener) {
+    next();
+    return;
+  }
+  // else continue to warn user
+  if (
+    (from.path === "/pipeline/pipelines/edit" && pipelineObj.dirtyFlag) ||
+    (from.path === "/pipeline/pipelines/add" &&
+      pipelineObj.currentSelectedPipeline.nodes.length)
+  ) {
+    const confirmMessage = t("pipeline.unsavedMessage");
+    if (window.confirm(confirmMessage)) {
+      // User confirmed, allow navigation
+      next();
+    } else {
+      // User canceled, prevent navigation
+      next(false);
+    }
+  } else {
+    // No unsaved changes or not leaving the edit route, allow navigation
+    next();
+  }
+});
 
 const getPipeline = () => {
   const route = router.currentRoute.value;
@@ -450,24 +448,22 @@ const getPipeline = () => {
       _pipeline.edges.forEach((edge: any) => {
         edge.markerEnd = {
           type: MarkerType.ArrowClosed,
-          width: 20,  // Increase arrow width
+          width: 20, // Increase arrow width
           height: 20, // Increase arrow height
         };
         edge.style = {
           ...edge.style, // Preserve existing styles
           strokeWidth: 2,
         };
-        edge.type = 'custom';
+        edge.type = "custom";
         edge.animated = true;
       });
 
-
-
-      _pipeline.nodes.forEach((node : any) => {
+      _pipeline.nodes.forEach((node: any) => {
         node.type = node.io_type;
       });
 
-      _pipeline.nodes.forEach((node : any) => {
+      _pipeline.nodes.forEach((node: any) => {
         node.type = node.io_type;
       });
 
@@ -488,9 +484,7 @@ const getPipeline = () => {
       }
 
       pipelineObj.currentSelectedPipeline = _pipeline;
-      pipelineObj.pipelineWithoutChange = JSON.parse(
-        JSON.stringify(_pipeline),
-      );
+      pipelineObj.pipelineWithoutChange = JSON.parse(JSON.stringify(_pipeline));
     });
 };
 
@@ -504,7 +498,7 @@ const getFunctions = () => {
       "name",
       false,
       "",
-      store.state.selectedOrganization.identifier
+      store.state.selectedOrganization.identifier,
     )
     .then((res) => {
       functions.value = {};
@@ -520,7 +514,6 @@ const getFunctions = () => {
 };
 
 const resetDialog = () => {
-
   pipelineObj.dialog.show = false;
   pipelineObj.dialog.name = "";
   editingFunctionName.value = "";
@@ -528,7 +521,6 @@ const resetDialog = () => {
 };
 
 const savePipeline = async () => {
-
   forceSkipBeforeUnloadListener = true;
   if (pipelineObj.currentSelectedPipeline.name === "") {
     q.notify({
@@ -541,14 +533,13 @@ const savePipeline = async () => {
   }
   // Find the input node
   const inputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
-    (node:any) =>
+    (node: any) =>
       node?.io_type === "input" &&
-      (node.data?.node_type === "stream" || node.data?.node_type === "query")
+      (node.data?.node_type === "stream" || node.data?.node_type === "query"),
   );
 
   const outputNodeIndex = pipelineObj.currentSelectedPipeline.nodes.findIndex(
-    (node:any) =>
-      node?.io_type === "output"
+    (node: any) => node?.io_type === "output",
   );
 
   if (inputNodeIndex === -1) {
@@ -559,11 +550,7 @@ const savePipeline = async () => {
       timeout: 3000,
     });
     return;
-  }
-  
-  
-
-  else if(outputNodeIndex === -1){
+  } else if (outputNodeIndex === -1) {
     q.notify({
       message: "Destination node is required",
       color: "negative",
@@ -571,17 +558,19 @@ const savePipeline = async () => {
       timeout: 3000,
     });
     return;
-  }
-  else {
-
-    pipelineObj.currentSelectedPipeline.nodes.map((node : any) => {
-      if (node.data.node_type === "stream" && node.data.stream_name && node.data.stream_name.hasOwnProperty("value")) {
+  } else {
+    pipelineObj.currentSelectedPipeline.nodes.map((node: any) => {
+      if (
+        node.data.node_type === "stream" &&
+        node.data.stream_name &&
+        node.data.stream_name.hasOwnProperty("value")
+      ) {
         node.data.stream_name = node.data.stream_name.value;
       }
     });
     const nodes = pipelineObj.currentSelectedPipeline.nodes as any[];
 
-    const inputNode : any = nodes.splice(inputNodeIndex, 1)[0];
+    const inputNode: any = nodes.splice(inputNodeIndex, 1)[0];
     nodes.unshift(inputNode);
     if (inputNode.data.node_type === "stream") {
       pipelineObj.currentSelectedPipeline.source.source_type = "realtime";
@@ -592,7 +581,7 @@ const savePipeline = async () => {
 
   pipelineObj.currentSelectedPipeline.org =
     store.state.selectedOrganization.identifier;
-    if(findMissingEdges()){
+  if (findMissingEdges()) {
     q.notify({
       message: "Please connect all nodes before saving",
       color: "negative",
@@ -603,21 +592,20 @@ const savePipeline = async () => {
   }
 
   const isValid = isValidNodes(pipelineObj.currentSelectedPipeline.nodes);
-  if(!isValid){
-    confirmDialogBasicPipeline.value  = true;
+  if (!isValid) {
+    confirmDialogBasicPipeline.value = true;
     return;
   }
 
   await onSubmitPipeline();
- 
-}
+};
 
 const confirmSaveBasicPipeline = async () => {
   confirmDialogBasicPipeline.value = false;
   await onSubmitPipeline();
-}
+};
 
-const onSubmitPipeline = async () =>{
+const onSubmitPipeline = async () => {
   const dismiss = q.notify({
     message: "Saving pipeline...",
     position: "bottom",
@@ -632,11 +620,10 @@ const onSubmitPipeline = async () =>{
         data: pipelineObj.currentSelectedPipeline,
         org_identifier: store.state.selectedOrganization.identifier,
       });
-      
 
   saveOperation
     .then(() => {
-      if(pipelineObj.isEditPipeline){
+      if (pipelineObj.isEditPipeline) {
         pipelineObj.isEditPipeline = false;
       }
       q.notify({
@@ -653,24 +640,24 @@ const onSubmitPipeline = async () =>{
       });
     })
     .catch((error) => {
-      if(pipelineObj.isEditPipeline){
+      if (pipelineObj.isEditPipeline) {
         pipelineObj.isEditPipeline = true;
       }
-       
 
-
-      if(error.response?.data?.message === "Invalid Pipeline: empty edges list"){
+      if (
+        error.response?.data?.message === "Invalid Pipeline: empty edges list"
+      ) {
         q.notify({
           message: "Please connect all nodes",
           color: "negative",
           position: "bottom",
           timeout: 3000,
         });
-      }
-      else{
-        if(error.response.status != 403){
+      } else {
+        if (error.response.status != 403) {
           q.notify({
-            message: error.response?.data?.message || "Error while saving pipeline",
+            message:
+              error.response?.data?.message || "Error while saving pipeline",
             color: "negative",
             position: "bottom",
             timeout: 3000,
@@ -683,33 +670,33 @@ const onSubmitPipeline = async () =>{
     });
 };
 
-
-
 const openCancelDialog = () => {
- 
-  if(pipelineObj.dirtyFlag ||( !pipelineObj.isEditPipeline && pipelineObj.currentSelectedPipeline.nodes.length > 1)){
+  if (
+    pipelineObj.dirtyFlag ||
+    (!pipelineObj.isEditPipeline &&
+      pipelineObj.currentSelectedPipeline.nodes.length > 1)
+  ) {
     confirmDialogMeta.value.show = true;
     confirmDialogMeta.value.title = t("common.cancelChanges");
-    confirmDialogMeta.value.message = "Are you sure you want to cancel changes?";
+    confirmDialogMeta.value.message =
+      "Are you sure you want to cancel changes?";
     confirmDialogMeta.value.onConfirm = () => {
-    resetPipelineData();
+      resetPipelineData();
+      router.push({
+        name: "pipelines",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+    };
+  } else {
     router.push({
       name: "pipelines",
       query: {
         org_identifier: store.state.selectedOrganization.identifier,
       },
     });
-  };;
   }
-  else{
-    router.push({
-      name: "pipelines",
-      query: {
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
-    });
-  }
-
 };
 const resetConfirmDialog = () => {
   confirmDialogMeta.value.show = false;
@@ -719,7 +706,7 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.data = null;
 };
 
-const resetBasicDialog = () =>{
+const resetBasicDialog = () => {
   confirmDialogBasicPipeline.value = false;
   router.push({
     name: "pipelines",
@@ -727,26 +714,28 @@ const resetBasicDialog = () =>{
       org_identifier: store.state.selectedOrganization.identifier,
     },
   });
-}
-
-
+};
 
 const findMissingEdges = () => {
   const nodes = pipelineObj.currentSelectedPipeline.nodes;
   const edges = pipelineObj.currentSelectedPipeline.edges;
 
   // Collect node IDs that are part of edges (either source or target)
-  const outgoingConnections = new Set(edges.map((edge:any) => edge.source));
-  const incomingConnections = new Set(edges.map((edge:any) => edge.target));
+  const outgoingConnections = new Set(edges.map((edge: any) => edge.source));
+  const incomingConnections = new Set(edges.map((edge: any) => edge.target));
 
   // Find nodes that are not connected properly
-  const unconnectedNodes = nodes.filter((node:any) => {
-    if (node.type === 'default') {
+  const unconnectedNodes = nodes.filter((node: any) => {
+    if (node.type === "default") {
       // Check for both incoming and outgoing edges
-      return !incomingConnections.has(node.id) || !outgoingConnections.has(node.id);
+      return (
+        !incomingConnections.has(node.id) || !outgoingConnections.has(node.id)
+      );
     } else {
       // Check for at least one connection (incoming or outgoing)
-      return !incomingConnections.has(node.id) && !outgoingConnections.has(node.id);
+      return (
+        !incomingConnections.has(node.id) && !outgoingConnections.has(node.id)
+      );
     }
   });
 
@@ -757,24 +746,26 @@ const findMissingEdges = () => {
 
   return false; // All nodes are properly connected
 };
-const isValidNodes = (nodes:any) =>{
-  if(nodes.length > 2){
+const isValidNodes = (nodes: any) => {
+  if (nodes.length > 2) {
     return true;
   }
-  const inputNode = nodes.find((node:any) => node.io_type === "input");
-  const outputNode = nodes.find((node:any) => node.io_type === "output");
+  const inputNode = nodes.find((node: any) => node.io_type === "input");
+  const outputNode = nodes.find((node: any) => node.io_type === "output");
 
-  if(inputNode.data.node_type !== 'stream'){
+  if (inputNode.data.node_type !== "stream") {
     return true;
   }
-  if(inputNode.data.node_type === 'stream' && outputNode.data.node_type === 'stream' && inputNode.data.stream_name === outputNode.data.stream_name && inputNode.data.stream_type === outputNode.data.stream_type){
+  if (
+    inputNode.data.node_type === "stream" &&
+    outputNode.data.node_type === "stream" &&
+    inputNode.data.stream_name === outputNode.data.stream_name &&
+    inputNode.data.stream_type === outputNode.data.stream_type
+  ) {
     return false;
   }
   return true;
-
-}
-
-
+};
 
 // Drag n Drop methods
 
@@ -799,14 +790,18 @@ const updateNewFunction = (_function: Function) => {
 };
 
 const beforeUnloadHandler = (e: any) => {
-      //check is data updated or not
-      if (pipelineObj.dirtyFlag || (pipelineObj.currentSelectedPipeline.nodes.length > 1 && !pipelineObj.isEditPipeline)) {
-        // Display a confirmation message
-        const confirmMessage = t("pipeline.unsavedMessage"); // Some browsers require a return statement to display the message
-        e.returnValue = confirmMessage;
-        return confirmMessage;
-      }
-    };
+  //check is data updated or not
+  if (
+    pipelineObj.dirtyFlag ||
+    (pipelineObj.currentSelectedPipeline.nodes.length > 1 &&
+      !pipelineObj.isEditPipeline)
+  ) {
+    // Display a confirmation message
+    const confirmMessage = t("pipeline.unsavedMessage"); // Some browsers require a return statement to display the message
+    e.returnValue = confirmMessage;
+    return confirmMessage;
+  }
+};
 </script>
 
 <style scoped lang="scss">
@@ -819,7 +814,7 @@ const beforeUnloadHandler = (e: any) => {
 }
 
 .pipeline-chart-container {
-height: 80vh;
+  height: 80vh;
   border-radius: 12px;
   width: calc(100% - 200px);
 }

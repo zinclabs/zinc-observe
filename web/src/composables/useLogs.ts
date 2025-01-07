@@ -288,6 +288,15 @@ const intervalMap: any = {
   "1 day": 24 * 60 * 60 * 1000 * 1000,
 };
 
+const {
+  fetchQueryDataWithWebSocket,
+  sendSearchMessageBasedOnRequestId,
+  cancelSearchQueryBasedOnRequestId,
+  closeSocketBasedOnRequestId,
+} = useSearchWebSocket();
+
+const searchPartitionMap = reactive<{ [key: string]: number }>({});
+
 const useLogs = () => {
   const store = useStore();
   const { t } = useI18n();
@@ -300,13 +309,6 @@ const useLogs = () => {
   const fieldValues = ref();
 
   const notificationMsg = ref("");
-
-  const {
-    fetchQueryDataWithWebSocket,
-    sendSearchMessageBasedOnRequestId,
-    cancelSearchQueryBasedOnRequestId,
-    closeSocketBasedOnRequestId,
-  } = useSearchWebSocket();
 
   const { updateFieldKeywords } = useSqlSuggestions();
 
@@ -2072,6 +2074,12 @@ const useLogs = () => {
       const parsedSQL: any = fnParsedSQL();
       searchObj.meta.resultGrid.showPagination = true;
       if (searchObj.meta.sqlMode == true) {
+        // if query has aggregation or groupby then we need to set size to -1 to get all records
+        // issue #5432
+        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+          queryReq.query.size = -1;
+        }
+
         if (isLimitQuery(parsedSQL)) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
@@ -2084,14 +2092,7 @@ const useLogs = () => {
         }
 
         if (isDistinctQuery(parsedSQL)) {
-          searchObj.meta.resultGrid.showPagination = false;
           delete queryReq.query.track_total_hits;
-        }
-
-        // if query has aggregation or groupby then we need to set size to -1 to get all records
-        // issue #5432
-        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
-          queryReq.query.size = -1;
         }
       }
 
@@ -3300,13 +3301,13 @@ const useLogs = () => {
       let endCount;
 
       let totalCount = Math.max(
-        searchObj.data.queryResults.hits.length,
+        searchObj.data.queryResults.hits?.length,
         searchObj.data.queryResults.total,
       );
 
       if (!searchObj.meta.resultGrid.showPagination) {
-        endCount = searchObj.data.queryResults.hits.length;
-        totalCount = searchObj.data.queryResults.hits.length;
+        endCount = searchObj.data.queryResults.hits?.length;
+        totalCount = searchObj.data.queryResults.hits?.length;
       } else {
         endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
         if (
@@ -3442,7 +3443,6 @@ const useLogs = () => {
         errorMsg: "",
         errorDetail: "",
       };
-      return true;
     } catch (e: any) {
       console.log("Error while generating histogram data", e);
       notificationMsg.value = "Error while generating histogram data.";
@@ -3579,6 +3579,8 @@ const useLogs = () => {
             searchObj.meta.showHistogram = false;
             searchObj.data.searchAround.histogramHide = true;
           }
+
+          searchObj.data.histogram.chartParams.title = "";
           // segment.track("Button Click", {
           //   button: "Search Around Data",
           //   user_org: store.state.selectedOrganization.identifier,
@@ -4112,7 +4114,9 @@ const useLogs = () => {
 
   const cancelQuery = () => {
     if (searchObj.communicationMethod === "ws") {
-      sendCancelSearchMessage();
+      sendCancelSearchMessage([
+        ...searchObj.data.searchWebSocketRequestIdsAndTraceIds,
+      ]);
       return;
     }
 
@@ -4466,9 +4470,7 @@ const useLogs = () => {
 
   const getDataThroughWebSocket = (isPagination: boolean) => {
     try {
-      if (isPagination) {
-        searchObj.data.queryResults.hits = [];
-      } else {
+      if (!isPagination) {
         resetQueryData();
         searchObj.data.queryResults = {};
       }
@@ -4571,6 +4573,12 @@ const useLogs = () => {
       searchObj.meta.resultGrid.showPagination = true;
 
       if (searchObj.meta.sqlMode == true) {
+        // if query has aggregation or groupby then we need to set size to -1 to get all records
+        // issue #5432
+        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+          queryReq.query.size = -1;
+        }
+
         if (isLimitQuery(parsedSQL)) {
           queryReq.query.size = parsedSQL.limit.value[0].value;
           searchObj.meta.resultGrid.showPagination = false;
@@ -4583,7 +4591,6 @@ const useLogs = () => {
         }
 
         if (isDistinctQuery(parsedSQL)) {
-          searchObj.meta.resultGrid.showPagination = false;
           delete queryReq.query.track_total_hits;
         }
       }
@@ -4644,6 +4651,7 @@ const useLogs = () => {
     try {
       if (searchObj.data.isOperationCancelled) {
         closeSocketBasedOnRequestId(requestId);
+        showCancelSearchNotification();
         return;
       }
 
@@ -4681,6 +4689,11 @@ const useLogs = () => {
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse | WebSocketErrorResponse,
   ) => {
+    searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
+      ? searchPartitionMap[payload.traceId]
+      : 0;
+    searchPartitionMap[payload.traceId]++;
+
     if (response.type === "search_response") {
       if (payload.type === "search") {
         handleLogsResponse(
@@ -4688,6 +4701,7 @@ const useLogs = () => {
           payload.isPagination,
           payload.traceId,
           response,
+          searchPartitionMap[payload.traceId] > 1,
         );
       }
 
@@ -4707,7 +4721,7 @@ const useLogs = () => {
     if (response.type === "cancel_response") {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
-      handleCancelQuery();
+      showCancelSearchNotification();
     }
   };
 
@@ -4716,6 +4730,7 @@ const useLogs = () => {
     isPagination: boolean,
     traceId: string,
     response: any,
+    appendResult: boolean = false,
   ) => {
     try {
       const parsedSQL = fnParsedSQL();
@@ -4764,23 +4779,16 @@ const useLogs = () => {
 
       resetFieldValues();
 
-      // Refresh Interval
       if (
         searchObj.meta.refreshInterval > 0 &&
-        router.currentRoute.value.name == "logs" &&
-        searchObj.data.queryResults.hasOwnProperty("hits") &&
-        searchObj.data.queryResults.hits.length > 0
+        router.currentRoute.value.name == "logs"
       ) {
-        searchObj.data.queryResults.from = response.content.from;
-        searchObj.data.queryResults.scan_size = response.content.scan_size;
-        searchObj.data.queryResults.took = response.content.took;
-        searchObj.data.queryResults.aggs = response.content.aggs;
-        const lastRecordTimeStamp = parseInt(
-          searchObj.data.queryResults.hits[0][
-            store.state.zoConfig.timestamp_column
-          ],
-        );
-        searchObj.data.queryResults.hits = response.content.hits;
+        searchObj.data.queryResults.from = response.content.results.from;
+        searchObj.data.queryResults.scan_size =
+          response.content.results.scan_size;
+        searchObj.data.queryResults.took = response.content.results.took;
+        searchObj.data.queryResults.aggs = response.content.results.aggs;
+        searchObj.data.queryResults.hits = response.content.results.hits;
       }
 
       if (!searchObj.meta.refreshInterval) {
@@ -4792,10 +4800,7 @@ const useLogs = () => {
         // Scan-size and took time in histogram title
         // For the initial request, we get histogram and logs data. So, we need to sum the scan_size and took time of both the requests.
         // For the pagination request, we only get logs data. So, we need to consider scan_size and took time of only logs request.
-        if (
-          searchObj.data.queryResults.hasOwnProperty("hits") &&
-          searchObj.data.queryResults.hits.length > 0
-        ) {
+        if (appendResult) {
           searchObj.data.queryResults.hits.push(
             ...response.content.results.hits,
           );
@@ -4945,8 +4950,15 @@ const useLogs = () => {
     searchObj.data.queryResults.result_cache_ratio +=
       response.content.results.result_cache_ratio;
 
-    generateHistogramData();
-    refreshPagination(true); // check whats this
+    (async () => {
+      try {
+        generateHistogramData();
+        refreshPagination(true);
+      } catch (error) {
+        console.error("Error processing histogram data:", error);
+        searchObj.loadingHistogram = false;
+      }
+    })();
 
     // queryReq.query.start_time =
     //   searchObj.data.queryResults.partitionDetail.paginations[
@@ -4998,7 +5010,7 @@ const useLogs = () => {
     searchObj.data.queryResults.aggs = [];
     if (shouldShowHistogram) {
       searchObj.meta.refreshHistogram = false;
-      if (searchObj.data.queryResults.hits.length > 0) {
+      if (searchObj.data.queryResults.hits?.length > 0) {
         searchObjDebug["histogramStartTime"] = performance.now();
         resetHistogramError();
 
@@ -5020,6 +5032,21 @@ const useLogs = () => {
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
       resetHistogramWithError("Histogram is not available for limit queries.");
     } else if (searchObj.meta.sqlMode && isDistinctQuery(parsedSQL)) {
+      let aggFlag = false;
+      if (parsedSQL) {
+        aggFlag = hasAggregation(parsedSQL?.columns);
+      }
+      if (
+        queryReq.query.from == 0 &&
+        searchObj.data.queryResults.hits?.length > 0 &&
+        !aggFlag
+      ) {
+        setTimeout(async () => {
+          searchObjDebug["pagecountStartTime"] = performance.now();
+          getPageCountThroughSocket(queryReq);
+          searchObjDebug["pagecountEndTime"] = performance.now();
+        }, 0);
+      }
       resetHistogramWithError(
         "Histogram is not available for DISTINCT queries.",
       );
@@ -5030,12 +5057,11 @@ const useLogs = () => {
       }
       if (
         queryReq.query.from == 0 &&
-        searchObj.data.queryResults.hits.length > 0 &&
+        searchObj.data.queryResults.hits?.length > 0 &&
         !aggFlag
       ) {
         setTimeout(async () => {
           searchObjDebug["pagecountStartTime"] = performance.now();
-          // TODO : check the page count request
           getPageCountThroughSocket(queryReq);
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
@@ -5074,11 +5100,7 @@ const useLogs = () => {
     if (requestId) removeRequestId(requestId);
 
     // Any case where below logic may end in recursion
-    console.log(
-      "handleSearchClose",
-      requestId,
-      searchObj.data.isOperationCancelled,
-    );
+    if (payload.traceId) delete searchPartitionMap[payload.traceId];
 
     if (searchObj.data.isOperationCancelled) {
       searchObj.loading = false;
@@ -5153,7 +5175,7 @@ const useLogs = () => {
 
     // 20009 is the code for query cancelled
     if (code === 20009) {
-      handleCancelQuery();
+      showCancelSearchNotification();
     }
 
     if (trace_id) removeTraceId(trace_id);
@@ -5220,8 +5242,6 @@ const useLogs = () => {
 
       totalPages = Math.ceil(total / rowsPerPage);
 
-      console.log("Total Pages", searchObj.data.queryResults.total, totalPages);
-
       for (let i = 0; i < totalPages; i++) {
         if (i + 1 > currentPage + 10) {
           break;
@@ -5254,23 +5274,23 @@ const useLogs = () => {
     addRequestId(requestId, payload.traceId);
   };
 
-  const sendCancelSearchMessage = () => {
+  const sendCancelSearchMessage = (searchRequests: any[]) => {
     try {
+      if (!searchRequests.length) return;
+
       searchObj.data.isOperationCancelled = true;
 
       // loop on all requestIds
-      searchObj.data.searchWebSocketRequestIdsAndTraceIds.forEach(
-        ({ requestId, traceId }) => {
-          cancelSearchQueryBasedOnRequestId(requestId, traceId);
-        },
-      );
+      searchRequests.forEach(({ requestId, traceId }) => {
+        cancelSearchQueryBasedOnRequestId(requestId, traceId);
+      });
     } catch (error: any) {
       console.error("Failed to cancel WebSocket searches:", error);
       showErrorNotification("Failed to cancel search operations");
     }
   };
 
-  const handleCancelQuery = () => {
+  const showCancelSearchNotification = () => {
     $q.notify({
       message: "Running query cancelled successfully",
       color: "positive",

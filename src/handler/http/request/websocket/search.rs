@@ -34,9 +34,11 @@ use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
     common::{
         meta::search::{CachedQueryResponse, MultiCachedQueryResponse, QueryDelta},
-        utils::websocket::{
-            calc_queried_range, get_max_query_range, get_search_type_from_ws_req,
-            update_histogram_interval_in_query,
+        utils::{
+            stream::get_max_query_range,
+            websocket::{
+                calc_queried_range, get_search_type_from_ws_req, update_histogram_interval_in_query,
+            },
         },
     },
     handler::http::request::websocket::{session::send_message, utils::WsServerEvents},
@@ -206,7 +208,8 @@ pub async fn handle_search_request(
             // `max_query_range` is used initialize `remaining_query_range`
             // set max_query_range to i64::MAX if it is 0, to ensure unlimited query range
             // for cache only search
-            let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
+            let max_query_range =
+                get_max_query_range(&stream_names, org_id, user_id, stream_type).await; // hours
             let remaining_query_range = if max_query_range == 0 {
                 i64::MAX
             } else {
@@ -236,7 +239,8 @@ pub async fn handle_search_request(
                 "[WS_SEARCH] trace_id: {} No cache found, processing search request",
                 trace_id
             );
-            let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
+            let max_query_range =
+                get_max_query_range(&stream_names, org_id, user_id, stream_type).await; // hours
 
             do_partitioned_search(
                 req_id,
@@ -266,7 +270,8 @@ pub async fn handle_search_request(
         }
     } else {
         // Step 4: Search without cache for req with from > 0
-        let max_query_range = get_max_query_range(&stream_names, org_id, stream_type).await; // hours
+        let max_query_range =
+            get_max_query_range(&stream_names, org_id, user_id, stream_type).await; // hours
 
         do_partitioned_search(
             req_id,
@@ -539,7 +544,7 @@ async fn process_delta(
     req.payload.query.start_time = delta.delta_start_time;
     req.payload.query.end_time = delta.delta_end_time;
 
-    let partition_resp = get_partitions(&req, org_id).await?;
+    let partition_resp = get_partitions(&req, org_id, user_id).await?;
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {
@@ -695,6 +700,7 @@ async fn process_delta(
 async fn get_partitions(
     req: &SearchEventReq,
     org_id: &str,
+    user_id: &str,
 ) -> Result<SearchPartitionResponse, Error> {
     let search_payload = req.payload.clone();
     let search_partition_req = SearchPartitionRequest {
@@ -713,6 +719,7 @@ async fn get_partitions(
     let res = SearchService::search_partition(
         &req.trace_id,
         org_id,
+        Some(user_id),
         req.stream_type,
         &search_partition_req,
         false,
@@ -826,7 +833,7 @@ async fn do_partitioned_search(
     let modified_start_time = req.payload.query.start_time;
     let modified_end_time = req.payload.query.end_time;
 
-    let partition_resp = get_partitions(req, org_id).await?;
+    let partition_resp = get_partitions(req, org_id, user_id).await?;
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {

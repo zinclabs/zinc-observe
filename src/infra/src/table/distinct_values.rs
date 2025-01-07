@@ -17,6 +17,7 @@ use sea_orm::{
     entity::prelude::*, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter,
     Schema, Set,
 };
+use serde::{Deserialize, Serialize};
 
 use super::get_lock;
 use crate::{
@@ -24,7 +25,7 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[sea_orm(rs_type = "String", db_type = "String(StringLen::N(16))")]
 pub enum OriginType {
     #[sea_orm(string_value = "stream")]
@@ -66,7 +67,7 @@ impl RelationTrait for Relation {
 
 impl ActiveModelBehavior for ActiveModel {}
 
-#[derive(FromQueryResult, Debug)]
+#[derive(FromQueryResult, Debug, Serialize, Deserialize)]
 pub struct DistinctFieldRecord {
     pub origin: OriginType,
     pub origin_id: String,
@@ -74,6 +75,12 @@ pub struct DistinctFieldRecord {
     pub stream_name: String,
     pub stream_type: String,
     pub field_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BatchDeleteMessage {
+    pub origin_type: OriginType,
+    pub id: String,
 }
 
 impl DistinctFieldRecord {

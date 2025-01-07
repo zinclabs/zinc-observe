@@ -489,6 +489,7 @@ const useStreams = () => {
       "full_text_search_keys",
       "bloom_filter_fields",
       "defined_schema_fields",
+      "extended_retention_days",
     ];
 
     let updatedSettings: any = {};
@@ -508,6 +509,7 @@ const useStreams = () => {
 
       let add: any[] = [];
       let remove: any[] = [];
+
 
       if (
         attribute === "partition_keys" &&
@@ -538,6 +540,21 @@ const useStreams = () => {
           // Only keep in `remove` if not in `add` and `disabled` is false
           return !isInAdd && item.disabled === false;
         });
+      } else if (attribute === "extended_retention_days") {
+        add = currentArray.filter(
+          (currentItem: any) =>
+            !previousArray.some(
+              (previousItem: any) =>
+                JSON.stringify(currentItem) === JSON.stringify(previousItem),
+            ),
+        );
+        remove = previousArray.filter(
+          (previousItem: any) =>
+            !currentArray.some(
+              (currentItem: any) =>
+                JSON.stringify(previousItem) === JSON.stringify(currentItem),
+            ),
+        );
       } else {
         // For other attributes, do a simple array comparison
         add = currentArray.filter((item: any) => !previousArray.includes(item));

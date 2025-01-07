@@ -106,7 +106,7 @@ pub(crate) async fn create_context(
 /// get file list from local cache, no need match_source, each file will be
 /// searched
 #[allow(clippy::too_many_arguments)]
-#[tracing::instrument(name = "promql:search:grpc:wal:get_file_list", skip(trace_id))]
+#[tracing::instrument(name = "promql:search:grpc:wal:get_file_list", skip(trace_id, schema))]
 async fn get_wal_batches(
     trace_id: &str,
     org_id: &str,

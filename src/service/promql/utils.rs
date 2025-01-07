@@ -26,6 +26,8 @@ use datafusion::{
 };
 use promql_parser::label::{MatchOp, Matchers};
 
+use crate::service::search::datafusion::udf::regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF};
+
 pub fn apply_matchers(df: DataFrame, schema: &Schema, matchers: &Matchers) -> Result<DataFrame> {
     let cfg = get_config();
     let mut df = df;
@@ -42,19 +44,15 @@ pub fn apply_matchers(df: DataFrame, schema: &Schema, matchers: &Matchers) -> Re
                 df = df.filter(col(mat.name.clone()).not_eq(lit(mat.value.clone())))?
             }
             MatchOp::Re(regex) => {
-                let regexp_match_udf =
-                    crate::service::search::datafusion::udf::regexp_udf::REGEX_MATCH_UDF.clone();
-                df = df.filter(
-                    regexp_match_udf.call(vec![col(mat.name.clone()), lit(regex.as_str())]),
-                )?
+                let regexp_match_udf = REGEX_MATCH_UDF.clone();
+                let regex = format!("^{}$", regex.as_str());
+                df = df.filter(regexp_match_udf.call(vec![col(mat.name.clone()), lit(regex)]))?
             }
             MatchOp::NotRe(regex) => {
-                let regexp_not_match_udf =
-                    crate::service::search::datafusion::udf::regexp_udf::REGEX_NOT_MATCH_UDF
-                        .clone();
-                df = df.filter(
-                    regexp_not_match_udf.call(vec![col(mat.name.clone()), lit(regex.as_str())]),
-                )?
+                let regexp_not_match_udf = REGEX_NOT_MATCH_UDF.clone();
+                let regex = format!("^{}$", regex.as_str());
+                df =
+                    df.filter(regexp_not_match_udf.call(vec![col(mat.name.clone()), lit(regex)]))?
             }
         }
     }

@@ -24,7 +24,7 @@
       <div
         v-for="(field, index) in (fields as any)"
         :key="field.uuid"
-        class="flex justify-start items-end q-col-gutter-sm q-pb-sm"
+        class="flex justify-start items-end q-col-gutter-sm"
         :data-test="`alert-conditions-${index + 1}`"
       >
         <div data-test="add-stream-field-name-input" class="q-ml-none o2-input flex items-center ">

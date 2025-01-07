@@ -715,7 +715,7 @@ export default defineComponent({
       const selected_stream: any = await getStream(
         stream_name,
         formData.value.stream_type,
-        true
+        true,
       );
       selected_stream.schema.forEach(function (item: any) {
         triggerCols.value.push(item.name);
@@ -727,7 +727,7 @@ export default defineComponent({
       const streams: any = await getStream(
         stream_name,
         formData.value.stream_type,
-        true
+        true,
       );
 
       if (streams && Array.isArray(streams.schema)) {
@@ -758,7 +758,7 @@ export default defineComponent({
       () => {
         filteredColumns.value = [...triggerCols.value];
       },
-      { immediate: true }
+      { immediate: true },
     );
     const filterColumns = (options: any[], val: String, update: Function) => {
       let filteredOptions: any[] = [];
@@ -771,7 +771,7 @@ export default defineComponent({
       update(() => {
         const value = val.toLowerCase();
         filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1
+          (column: any) => column.toLowerCase().indexOf(value) > -1,
         );
       });
       return filteredOptions;
@@ -783,7 +783,7 @@ export default defineComponent({
         indexOptions.value = streams.value[formData.value.stream_type].map(
           (data: any) => {
             return data.name;
-          }
+          },
         );
         return;
       }
@@ -823,7 +823,7 @@ export default defineComponent({
     const removeField = (field: any) => {
       formData.value.query_condition.conditions =
         formData.value.query_condition.conditions.filter(
-          (_field: any) => _field.id !== field.id
+          (_field: any) => _field.id !== field.id,
         );
     };
 
@@ -838,7 +838,7 @@ export default defineComponent({
     const removeVariable = (variable: any) => {
       formData.value.context_attributes =
         formData.value.context_attributes.filter(
-          (_variable: any) => _variable.id !== variable.id
+          (_variable: any) => _variable.id !== variable.id,
         );
     };
 
@@ -867,7 +867,7 @@ export default defineComponent({
     const getFormattedCondition = (
       column: string,
       operator: string,
-      value: number | string
+      value: number | string,
     ) => {
       let condition = "";
       switch (operator) {
@@ -915,7 +915,7 @@ export default defineComponent({
             return getFormattedCondition(
               condition.column,
               condition.operator,
-              value
+              value,
             );
           }
         })
@@ -940,14 +940,14 @@ export default defineComponent({
         formData.value.query_condition.aggregation.group_by.forEach(
           (column: any) => {
             if (column.trim().length) groupByCols.push(column);
-          }
+          },
         );
 
         let concatGroupBy = "";
         if (groupByCols.length) {
           groupByAlias = ", x_axis_2";
           concatGroupBy = `, concat(${groupByCols.join(
-            ",' : ',"
+            ",' : ',",
           )}) as x_axis_2`;
         }
 
@@ -994,7 +994,7 @@ export default defineComponent({
         // As default is a reserved keyword in sql-parser, we are replacing it with default1
         const regex = /\bdefault\b/g;
         const columns = parser.astify(
-          sqlQuery.replace(regex, "default1")
+          sqlQuery.replace(regex, "default1"),
         ).columns;
         for (const column of columns) {
           if (column.expr.column === "*") {
@@ -1032,19 +1032,19 @@ export default defineComponent({
       });
 
       payload.trigger_condition.threshold = parseInt(
-        formData.value.trigger_condition.threshold
+        formData.value.trigger_condition.threshold,
       );
 
       payload.trigger_condition.period = parseInt(
-        formData.value.trigger_condition.period
+        formData.value.trigger_condition.period,
       );
 
       payload.trigger_condition.frequency = parseInt(
-        formData.value.trigger_condition.frequency
+        formData.value.trigger_condition.frequency,
       );
 
       payload.trigger_condition.silence = parseInt(
-        formData.value.trigger_condition.silence
+        formData.value.trigger_condition.silence,
       );
 
       payload.description = formData.value.description.trim();
@@ -1169,7 +1169,7 @@ export default defineComponent({
 
       if (formData.value.query_condition.vrl_function)
         query.query.query_fn = b64EncodeUnicode(
-          formData.value.query_condition.vrl_function
+          formData.value.query_condition.vrl_function,
         );
 
       validateSqlQueryPromise.value = new Promise((resolve, reject) => {
@@ -1332,7 +1332,7 @@ export default defineComponent({
             (res: any) => {
               if (res.length > 1) this.showTimezoneWarning = true;
               this.formData.trigger_condition.timezone = res[0];
-            }
+            },
           );
         }
       }
@@ -1340,14 +1340,14 @@ export default defineComponent({
       if (this.formData.query_condition.vrl_function) {
         this.showVrlFunction = true;
         this.formData.query_condition.vrl_function = b64DecodeUnicode(
-          this.formData.query_condition.vrl_function
+          this.formData.query_condition.vrl_function,
         );
       }
     }
 
     this.formData.is_real_time = this.formData.is_real_time.toString();
     this.formData.context_attributes = Object.keys(
-      this.formData.context_attributes
+      this.formData.context_attributes,
     ).map((attr) => {
       return {
         key: attr,
@@ -1430,7 +1430,7 @@ export default defineComponent({
         const convertedDateTime = this.convertDateToTimestamp(
           date,
           time,
-          this.formData.trigger_condition.timezone
+          this.formData.trigger_condition.timezone,
         );
 
         this.formData.tz_offset = convertedDateTime.offset;
@@ -1472,7 +1472,7 @@ export default defineComponent({
             this.store.state.selectedOrganization.identifier,
             payload.stream_name,
             payload.stream_type,
-            payload
+            payload,
           );
           callAlert
             .then((res: { data: any }) => {
@@ -1510,7 +1510,7 @@ export default defineComponent({
             this.store.state.selectedOrganization.identifier,
             payload.stream_name,
             payload.stream_type,
-            payload
+            payload,
           );
 
           callAlert

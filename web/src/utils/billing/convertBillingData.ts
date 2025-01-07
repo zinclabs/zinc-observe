@@ -86,9 +86,9 @@ export const convertBillingData = (params:any) => {
         },
       },
       formatter: function (name: any) {
-        if (name.length == 0) return "";        
-        const date = new Date(name[0].data[0]);
-        return `${formatDate(date)} <br/> ${name[0].marker} ${name[0].seriesName} : <b>${name[0].value[1]}MB</b>`;
+        if (name?.length == 0) return "";
+        const date = new Date(name?.[0]?.data?.[0]);
+        return `${formatDate(date)} <br/> ${name?.map((item: any) => `${item?.marker} ${item?.seriesName} : <b>${item?.value?.[1]}MB</b>`).join("<br/>")}`;
       },
     },
     xAxis: {

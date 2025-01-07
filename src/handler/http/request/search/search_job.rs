@@ -18,7 +18,11 @@ use std::{collections::HashMap, io::Error};
 use actix_web::{delete, get, http::StatusCode, post, web, HttpRequest, HttpResponse};
 use config::{
     get_config,
-    meta::{search::SearchEventType, sql::resolve_stream_names, stream::StreamType},
+    meta::{
+        search::{Request, SearchEventType},
+        sql::resolve_stream_names,
+        stream::StreamType,
+    },
     utils::json,
 };
 use infra::table::entity::search_jobs::Model as JobModel;
@@ -29,13 +33,13 @@ use crate::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
         utils::http::{
             get_or_create_trace_id, get_search_event_context_from_request,
-            get_stream_type_from_request,
+            get_stream_type_from_request, get_use_cache_from_request,
         },
     },
     handler::http::request::search::{job::cancel_query_inner, utils::check_stream_permissions},
     service::{
         db::search_job::{search_job_partitions::*, search_jobs::*},
-        search_jobs::get_result,
+        search_jobs::{get_result, merge_response},
     },
 };
 
@@ -69,6 +73,7 @@ pub async fn submit_job(
         Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
     };
 
+    let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
     let mut req: config::meta::search::Request = match json::from_slice(&body) {
         Ok(v) => v,
@@ -77,6 +82,7 @@ pub async fn submit_job(
     if let Err(e) = req.decode() {
         return Ok(MetaHttpResponse::bad_request(e));
     }
+    req.use_cache = Some(use_cache);
 
     // update timeout
     if req.timeout == 0 {
@@ -234,6 +240,9 @@ pub async fn get_job_result(
             "job_id: {job_id} error: {}",
             model.error_message.unwrap()
         )))
+    } else if model.status == 1 && model.partition_num != Some(1) {
+        let response = get_partition_result(&model).await;
+        Ok(response)
     } else if model.result_path.is_none() || model.cluster.is_none() {
         Ok(MetaHttpResponse::not_found(format!(
             "job_id: {job_id} don't have result_path or cluster"
@@ -241,10 +250,11 @@ pub async fn get_job_result(
     } else {
         let path = model.result_path.clone().unwrap();
         let cluster = model.cluster.clone().unwrap();
-        let response = get_result(&path, &cluster)
-            .await
-            .map_err(|e| Error::new(std::io::ErrorKind::Other, e.to_string()))?;
-        Ok(HttpResponse::Ok().json(response))
+        let response = get_result(&path, &cluster).await;
+        if let Err(e) = response {
+            return Ok(MetaHttpResponse::internal_error(e));
+        }
+        Ok(HttpResponse::Ok().json(response.unwrap()))
     }
 }
 
@@ -364,6 +374,30 @@ async fn cancel_job_inner(
 
     // 4. use cancel query function to cancel the query
     cancel_query_inner(org_id, &[&job.trace_id]).await
+}
+
+async fn get_partition_result(job: &JobModel) -> HttpResponse {
+    let req: Result<Request, serde_json::Error> = json::from_str(&job.payload);
+    if let Err(e) = req {
+        return MetaHttpResponse::internal_error(e);
+    }
+    let req = req.unwrap();
+    let limit = if req.query.size > 0 {
+        req.query.size
+    } else {
+        config::get_config().limit.query_default_limit
+    };
+    let offset = req.query.from;
+    let partition_jobs = get_partition_jobs(&job.id).await;
+    if let Err(e) = partition_jobs {
+        return MetaHttpResponse::internal_error(e);
+    }
+    let partition_jobs = partition_jobs.unwrap();
+    let response = merge_response(partition_jobs, limit, offset).await;
+    if let Err(e) = response {
+        return MetaHttpResponse::internal_error(e);
+    }
+    HttpResponse::Ok().json(response.unwrap())
 }
 
 // check permissions

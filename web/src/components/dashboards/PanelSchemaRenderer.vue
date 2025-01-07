@@ -791,7 +791,7 @@ export default defineComponent({
         store.state.selectedOrganization.identifier,
       );
       logsUrl.searchParams.set("quick_mode", "false");
-      logsUrl.searchParams.set("show_histogram", "true");
+      logsUrl.searchParams.set("show_histogram", "false");
 
       return logsUrl;
     };

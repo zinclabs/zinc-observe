@@ -135,12 +135,13 @@ impl Search for Searcher {
         let request = json::from_slice::<search::Request>(&req.request)
             .map_err(|e| Status::internal(format!("failed to parse search request: {e}")))?;
         let stream_type = StreamType::from(req.stream_type.as_str());
-        let ret = SearchService::search(
+        let ret = SearchService::cache::search(
             &req.trace_id,
             &req.org_id,
             stream_type,
             req.user_id.clone(),
             &request,
+            "".to_string(),
         )
         .await;
 
@@ -171,6 +172,7 @@ impl Search for Searcher {
         let ret = SearchService::search_partition(
             &req.trace_id,
             &req.org_id,
+            None,
             stream_type,
             &request,
             req.skip_max_query_range,

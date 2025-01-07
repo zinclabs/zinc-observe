@@ -401,7 +401,7 @@ test.describe("Pipeline testcases", () => {
     await page.getByRole("img", { name: "Function", exact: true }).click();
     await pipelinePage.toggleCreateFunction();
     await pipelinePage.enterFunctionName(randomFunctionName);
-    await page.locator(".view-lines").click();
+    await page.locator('[data-test="logs-vrl-function-editor"]').locator(".view-lines").click();
     // Type the function text with a delay to ensure each character registers
     await page.keyboard.type(".a=41", { delay: 100 });
     await page.keyboard.press("Enter");
@@ -415,7 +415,7 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(1000);
 
     // Optional: Add a brief wait to allow any validation messages to process
-    await pipelinePage.saveFunction();
+    await pipelinePage.saveNewFunction();
     await page.waitForTimeout(3000);
     await pipelinePage.saveFunction();
     await page.waitForTimeout(3000);
@@ -465,11 +465,11 @@ test.describe("Pipeline testcases", () => {
     await page.waitForTimeout(2000);
     await pipelinePage.toggleCreateFunction();
     await page.waitForTimeout(1000);
-    await pipelinePage.saveFunction();
+    await pipelinePage.saveNewFunction();
     await pipelinePage.assertFunctionNameRequiredErrorVisible();
   });
 
-  test("should display error when function name added but function is not added", async ({
+  test("should create function when name added but function is not added", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -482,8 +482,8 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.toggleCreateFunction();
     await page.waitForTimeout(1000);
     await pipelinePage.enterFunctionName(randomFunctionName);
-    await pipelinePage.saveFunction();
-    await pipelinePage.assertFunctionRequiredErrorVisible();
+    await pipelinePage.saveNewFunction();
+    await pipelinePage.assertFunctionNameRequiredErrorNotToBeVisible();
   });
 
   test.skip("should display error if query added without sql", async ({

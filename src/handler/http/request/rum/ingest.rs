@@ -196,7 +196,6 @@ pub async fn sessionreplay(
     rum_query_data: web::ReqData<RumExtraData>,
 ) -> Result<HttpResponse, Error> {
     let org_id = path.into_inner();
-
     let mut segment_payload = String::new();
     if let Err(_e) =
         ZlibDecoder::new(&payload.segment.data[..]).read_to_string(&mut segment_payload)

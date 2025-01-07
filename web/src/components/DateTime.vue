@@ -27,7 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       icon="schedule"
       icon-right="arrow_drop_down"
       class="date-time-button"
-      :class="selectedType + 'type'"
+      :class="{
+          [selectedType + 'type']: !disableRelative,
+          'hideRelative': disableRelative
+        }"
       :disable="disable"
     >
       <q-menu
@@ -39,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @before-show="onBeforeShow"
         @before-hide="onBeforeHide"
       >
-        <div class="flex justify-evenly q-py-sm">
+        <div v-if="!disableRelative" class="flex justify-evenly q-py-sm">
           <q-btn
             data-test="date-time-relative-tab"
             size="md"
@@ -66,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <q-separator />
         <q-tab-panels v-model="selectedType" animated>
-          <q-tab-panel name="relative" class="q-pa-none">
+          <q-tab-panel v-if="!disableRelative" name="relative" class="q-pa-none">
             <div class="date-time-table relative column">
               <div
                 class="relative-row q-px-md q-py-sm"
@@ -179,6 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ></q-tooltip
               >
               <div class="flex justify-center q-pa-none">
+                <!-- here add -->
                 <q-date
                   size="sm"
                   v-model="selectedDate"
@@ -186,12 +190,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   range
                   :locale="dateLocale"
                   :options="optionsFn"
+                  
                 />
               </div>
-              <div class="notePara">* You can choose multiple date</div>
-              <q-separator class="q-my-sm" />
+              <div  class="notePara">* You can choose multiple date</div>
+              <q-separator v-if="!disableRelative" class="q-my-sm" />
 
-              <table class="q-px-md startEndTime">
+              <table v-if="!hideRelativeTime" class="q-px-md startEndTime">
                 <tr>
                   <td class="label tw-px-2">Start time</td>
                   <td class="label tw-px-2">End time</td>
@@ -275,6 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tab-panel>
         </q-tab-panels>
         <q-select
+        v-if="!hideRelativeTimezone"
           data-test="datetime-timezone-select"
           v-model="timezone"
           :options="filteredTimezone"
@@ -299,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           popup-content-style="z-index: 10002"
         >
         </q-select>
-        <div v-if="!autoApply" class="flex justify-end q-py-sm q-px-md">
+        <div v-if="!autoApply " class="flex justify-end q-py-sm q-px-md">
           <q-separator class="q-my-sm" />
           <q-btn
             data-test="date-time-apply-btn"
@@ -329,6 +335,7 @@ import {
   nextTick,
   onActivated,
   onBeforeUnmount,
+  onBeforeMount,
 } from "vue";
 import {
   getImageURL,
@@ -381,6 +388,22 @@ export default defineComponent({
       type: String,
       default: "date-time-btn",
     },
+    disableRelative: {
+      type: Boolean,
+      default: false,
+    },
+    hideRelativeTime:{
+      type: Boolean,
+      default: false,
+    },
+    hideRelativeTimezone:{
+      type: Boolean,
+      default: false,
+    },
+    minDate: {
+      type: String,
+      default: null,
+    },
   },
 
   emits: ["on:date-change", "on:timezone-change"],
@@ -423,8 +446,11 @@ export default defineComponent({
       useLocalTimezone(selectedTimezone);
       store.dispatch("setTimezone", selectedTimezone);
       await nextTick();
-      if (selectedType.value == "absolute") saveDate("absolute");
-      else saveDate("relative");
+      if (props.autoApply) {
+        if (selectedType.value == "absolute") saveDate("absolute");
+        else saveDate("relative");
+      }
+
       emit("on:timezone-change");
     };
 
@@ -502,6 +528,7 @@ export default defineComponent({
 
     onMounted(() => {
       // updateDisplayValue();
+      if(props.disableRelative) setDateType("absolute");
       try {
         resetTime("", "");
 
@@ -530,7 +557,6 @@ export default defineComponent({
 
         if (props.queryRangeRestrictionInHour) computeRelativePeriod();
         // displayValue.value = getDisplayValue();
-
         saveDate(props.defaultType);
       } catch (e) {
         console.log(e);
@@ -569,7 +595,6 @@ export default defineComponent({
       selectedType.value = "relative";
       relativePeriod.value = period;
       relativeValue.value = value;
-
       if (props.autoApply) saveDate("relative");
     };
 
@@ -871,6 +896,9 @@ export default defineComponent({
     };
 
     const getDisplayValue = computed(() => {
+      if(props.disableRelative){
+        selectedType.value = "absolute";
+      }
       if (selectedType.value === "relative") {
         return `Past ${relativeValue.value} ${getPeriodLabel.value}`;
       } else {
@@ -878,8 +906,18 @@ export default defineComponent({
           // Here as if multiple dates is selected we get object with from and to keys
           // If single date is selected we get string with date value
           // So have added check for from and to
-          if (selectedDate.value?.from && selectedDate.value?.to) {
+          if (
+            selectedDate.value?.from &&
+            selectedDate.value?.to &&
+            !props.disableRelative
+          ) {
             return `${selectedDate.value.from} ${selectedTime.value.startTime} - ${selectedDate.value.to} ${selectedTime.value.endTime}`;
+          } else if (
+            selectedDate.value?.from &&
+            selectedDate.value?.to &&
+            props.disableRelative
+          ) {
+            return `${selectedDate.value.from} - ${selectedDate.value.to}`;
           } else {
             return `${selectedDate.value} ${selectedTime.value.startTime} - ${selectedDate.value} ${selectedTime.value.endTime}`;
           }
@@ -912,18 +950,21 @@ export default defineComponent({
     };
 
     const optionsFn = (date) => {
+
       const formattedDate = timestampToTimezoneDate(
         new Date().getTime(),
         store.state.timezone,
         "yyyy/MM/dd",
       );
+      if(props.disableRelative){
+        return date >= props.minDate;
+      }
       return date >= "1999/01/01" && date <= formattedDate;
     };
 
     const setDateType = (type) => {
       selectedType.value = type;
       // displayValue.value = getDisplayValue();
-
       if (props.autoApply)
         saveDate(type === "absolute" ? "absolute" : "relative-custom");
     };
@@ -1021,6 +1062,12 @@ export default defineComponent({
       }
     };
 
+    const showOnlyAbsolute = () =>{
+      if(props.disableRelative){
+        setDateType("absolute");
+      }
+    }
+
     return {
       t,
       datetimeBtn,
@@ -1058,6 +1105,7 @@ export default defineComponent({
       relativePeriodsSelect,
       computeRelativePeriod,
       onBeforeHide,
+      showOnlyAbsolute,
     };
   },
   computed: {
@@ -1080,6 +1128,10 @@ export default defineComponent({
     }
     &.absolutetype {
       min-width: 286px;
+    }
+    &.hideRelative{
+      background-color: red;
+      width: fit-content;
     }
   }
 }

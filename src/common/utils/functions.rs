@@ -57,6 +57,8 @@ pub fn get_vrl_compiler_config(org_id: &str) -> VRLCompilerConfig {
             );
         }
     }
+    drop(en_tables);
+
     if GEOIP_CITY_TABLE.read().is_some() {
         tables.insert(
             GEO_IP_CITY_ENRICHMENT_TABLE.to_owned(),

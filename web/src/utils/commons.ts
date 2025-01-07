@@ -522,6 +522,10 @@ export const getDashboard = async (
   if (store.state.organizationData.allDashboardData[dashboardId]) {
     return store.state.organizationData.allDashboardData[dashboardId];
   }
+  
+  if(!dashboardId){
+    return;
+  }
 
   const apiResponse = await dashboardService.get_Dashboard(
     store.state.selectedOrganization.identifier,

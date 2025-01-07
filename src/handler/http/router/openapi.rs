@@ -85,6 +85,7 @@ use crate::{common::meta, handler::http::request};
         request::functions::save_function,
         request::functions::delete_function,
         request::functions::list_pipeline_dependencies,
+        request::functions::test_function,
         request::dashboards::create_dashboard,
         request::dashboards::update_dashboard,
         request::dashboards::list_dashboards,
@@ -206,6 +207,7 @@ use crate::{common::meta, handler::http::request};
             config::meta::function::Transform,
             config::meta::function::FunctionList,
             config::meta::function::StreamOrder,
+            config::meta::function::TestVRLRequest,
             config::meta::sql::OrderBy,
             config::meta::search::Query,
             config::meta::search::Request,
@@ -264,6 +266,8 @@ use crate::{common::meta, handler::http::request};
             meta::syslog::SyslogRoutes,
             config::meta::promql::Metadata,
             config::meta::promql::MetricType,
+            // Functions
+
          ),
     ),
     modifiers(&SecurityAddon),

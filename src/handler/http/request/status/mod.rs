@@ -117,6 +117,7 @@ struct ConfigResponse<'a> {
     usage_enabled: bool,
     usage_publish_interval: i64,
     websocket_enabled: bool,
+    min_auto_refresh_interval: u32,
 }
 
 #[derive(Serialize)]
@@ -293,6 +294,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
         websocket_enabled: cfg.common.websocket_enabled,
+        min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
     }))
 }
 

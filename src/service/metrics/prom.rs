@@ -744,6 +744,7 @@ pub(crate) async fn get_series(
         timeout: 0,
         search_type: None,
         search_event_context: None,
+        use_cache: None,
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
@@ -889,6 +890,7 @@ pub(crate) async fn get_label_values(
         timeout: 0,
         search_type: None,
         search_event_context: None,
+        use_cache: None,
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
         Ok(resp) => resp

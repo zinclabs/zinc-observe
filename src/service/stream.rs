@@ -37,7 +37,7 @@ use infra::{
         unwrap_partition_time_level, unwrap_stream_settings, STREAM_RECORD_ID_GENERATOR,
         STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
-    table::distinct_values::{self, DistinctFieldRecord, OriginType},
+    table::distinct_values::{check_field_use, DistinctFieldRecord, OriginType},
 };
 
 use crate::{
@@ -46,7 +46,7 @@ use crate::{
         http::HttpResponse as MetaHttpResponse,
         stream::{Stream, StreamProperty},
     },
-    service::{db, metrics::get_prom_metadata_from_schema},
+    service::{db, db::distinct_values, metrics::get_prom_metadata_from_schema},
 };
 
 const LOCAL: &str = "disk";
@@ -448,24 +448,18 @@ pub async fn update_stream_settings(
 
             if !new_settings.distinct_value_fields.remove.is_empty() {
                 for f in &new_settings.distinct_value_fields.remove {
-                    let usage = match distinct_values::check_field_use(
-                        org_id,
-                        stream_name,
-                        stream_type.as_str(),
-                        f,
-                    )
-                    .await
-                    {
-                        Ok(entry) => entry,
-                        Err(e) => {
-                            return Ok(HttpResponse::InternalServerError().json(
-                                MetaHttpResponse::error(
-                                    http::StatusCode::INTERNAL_SERVER_ERROR.into(),
-                                    format!("error in updating settings : {e}"),
-                                ),
-                            ));
-                        }
-                    };
+                    let usage =
+                        match check_field_use(org_id, stream_name, stream_type.as_str(), f).await {
+                            Ok(entry) => entry,
+                            Err(e) => {
+                                return Ok(HttpResponse::InternalServerError().json(
+                                    MetaHttpResponse::error(
+                                        http::StatusCode::INTERNAL_SERVER_ERROR.into(),
+                                        format!("error in updating settings : {e}"),
+                                    ),
+                                ));
+                            }
+                        };
                     // if there are multiple uses, we cannot allow it to be removed
                     if usage.len() > 1 {
                         return Ok(HttpResponse::BadRequest().json(

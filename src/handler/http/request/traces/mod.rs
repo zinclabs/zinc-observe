@@ -143,7 +143,12 @@ pub async fn get_latest_traces(
         Span::none()
     };
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
-
+    let user_id = in_req
+        .headers()
+        .get("user_id")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
     // Check permissions on stream
@@ -214,6 +219,20 @@ pub async fn get_latest_traces(
         return Ok(MetaHttpResponse::bad_request("end_time is empty"));
     }
 
+    let max_query_range = crate::common::utils::stream::get_max_query_range(
+        &[stream_name.clone()],
+        org_id.as_str(),
+        &user_id,
+        StreamType::Traces,
+    )
+    .await;
+    if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
+        return Ok(MetaHttpResponse::bad_request(format!(
+            "Query range restriction over {} hours",
+            max_query_range
+        )));
+    }
+
     let timeout = query
         .get("timeout")
         .map_or(0, |v| v.parse::<i64>().unwrap_or(0));
@@ -275,6 +294,7 @@ pub async fn get_latest_traces(
         timeout,
         search_type: None,
         search_event_context: None,
+        use_cache: None,
     };
     let stream_type = StreamType::Traces;
     let user_id = in_req

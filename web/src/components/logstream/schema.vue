@@ -31,11 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="close" />
+          <q-btn v-close-popup="true" round
+flat icon="close" />
         </div>
       </div>
     </q-card-section>
     <q-separator />
+
     <q-card-section class="q-ma-none q-pa-none">
       <q-form ref="updateSettingsForm" @submit.prevent="onSubmit">
         <div
@@ -52,7 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           No data available.
         </div>
-        <div v-else class="indexDetailsContainer" style="height: 100vh">
+        <div v-else
+class="indexDetailsContainer" style="height: 100vh">
           <div
             class="titleContainer tw-flex tw-flex-col tw-items-flex-start tw-gap-5"
           >
@@ -62,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div data-test="schema-stream-title-text">
                 {{ t("alerts.stream_name") }}
-                <span class="title q-pl-xs"> {{ indexData.name }}</span>
+                <span class="title q-pl-xs" > {{ indexData.name }}</span>
               </div>
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -102,16 +105,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </div>
               <div
-                class="stream-time-container"
+                class="stream-time-container flex justify-between tw-gap-5"
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
                 data-test="schema-stream-title-text"
               >
-                {{ t("logStream.time") }}
-                <span class="title q-pl-xs">
-                  {{ indexData.stats.doc_time_min }}
+              
+
+                <span class="q-px-xs">
+                      Start Time:
+                 <span class="title">{{ indexData.stats.doc_time_min }}</span>
                 </span>
-                <span>to</span>
-                <span class="title">{{ indexData.stats.doc_time_max }}</span>
+                
+                <span class=" q-px-xs">
+                  End Time:
+                  <span class="title">{{ indexData.stats.doc_time_max }}</span>
+                </span>
+
               </div>
             </div>
           </div>
@@ -183,270 +192,386 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </div>
           </template>
+          <div>
+            <div class="flex justify-start">
+              <q-tabs v-model="activeMainTab" inline-label dense>
+                <!-- Schema Settings Tab with conditional class -->
+                <q-tab
+                  :class="{ 'text-primary': activeMainTab === 'schemaSettings' }"
+                  name="schemaSettings"
+                  icon="settings"
+                  label="Schema Settings"
+                />
 
-          <q-separator class="q-mb-md" />
+                <!-- Red Button Tab -->
+                <q-tab
+                :class="{ 'text-primary': activeMainTab === 'redButton' }"
+                  name="redButton"
+                  icon="backup"
+                  label="Extended Retention"
+                />
+              </q-tabs>
 
-          <div
-            class="title flex tw-justify-between tw-items-center"
-            data-test="schema-log-stream-mapping-title-text"
-          >
-            <div style="font-weight: 400">
-              <label
-                v-show="indexData.defaultFts"
-                style="font-weight: 600"
-                class="mapping-warning-msg"
-              >
-                {{ t("logStream.mapping") }} Default FTS keys used (no custom
-                keys set).</label
-              >
             </div>
-            <q-toggle
-              data-test="log-stream-store-original-data-toggle-btn"
-              v-model="storeOriginalData"
-              :label="t('logStream.storeOriginalData')"
-              @click="formDirtyFlag = true"
-              left-label
-              dense
-            />
           </div>
-          <div class="flex justify-between items-center full-width q-mb-md">
-            <div>
-              <app-tabs
-                v-if="isSchemaEvolutionEnabled"
-                class="schema-fields-tabs"
-                style="
-                  border: 1px solid #8a8a8a;
-                  border-radius: 4px;
-                  overflow: hidden;
-                "
-                data-test="schema-fields-tabs"
-                :tabs="tabs"
-                :active-tab="activeTab"
-                @update:active-tab="updateActiveTab"
+          <!-- schema settings tab -->
+          <div v-if="activeMainTab == 'schemaSettings'">
+            <div
+              class="title flex tw-justify-between tw-items-center"
+              data-test="schema-log-stream-mapping-title-text"
+            >
+              <div style="font-weight: 400" class="q-mt-md">
+                <label
+                  v-show="indexData.defaultFts"
+                  style="font-weight: 600"
+                  class="mapping-warning-msg"
+                >
+                  {{ t("logStream.mapping") }} Default FTS keys used (no custom
+                  keys set).</label
+                >
+              </div>
+              <q-toggle
+                data-test="log-stream-store-original-data-toggle-btn"
+                v-model="storeOriginalData"
+                :label="t('logStream.storeOriginalData')"
+                @click="formDirtyFlag = true"
+                left-label
+                dense
               />
             </div>
+            <div class="flex justify-between items-center full-width q-mb-md">
+              <div>
+                <app-tabs
+                  v-if="isSchemaEvolutionEnabled"
+                  class="schema-fields-tabs"
+                  style="
+                    border: 1px solid #8a8a8a;
+                    border-radius: 4px;
+                    overflow: hidden;
+                  "
+                  data-test="schema-fields-tabs"
+                  :tabs="tabs"
+                  :active-tab="activeTab"
+                  @update:active-tab="updateActiveTab"
+                />
+              </div>
 
-            <div class="flex items-center tw-gap-4">
-              <q-input
-                data-test="schema-field-search-input"
-                v-model="filterField"
-                data-cy="schema-index-field-search-input"
-                filled
-                borderless
-                dense
-                debounce="1"
-                :placeholder="t('search.searchField')"
-              >
-                <template #prepend>
-                  <q-icon name="search" />
-                </template>
-              </q-input>
-              <q-btn
-                color="primary"
-                data-test="schema-add-fields-title"
-                @click="openDialog"
-                class="font-weight-bold"
-              >
-                Add Field(s)
-              </q-btn>
+              <div class="flex items-center tw-gap-4">
+                <q-input
+                  data-test="schema-field-search-input"
+                  v-model="filterField"
+                  data-cy="schema-index-field-search-input"
+                  filled
+                  borderless
+                  dense
+                  debounce="1"
+                  :placeholder="t('search.searchField')"
+                >
+                  <template #prepend>
+                    <q-icon name="search" />
+                  </template>
+                </q-input>
+                <q-btn
+                  color="primary"
+                  data-test="schema-add-fields-title"
+                  @click="openDialog"
+                  class="q-my-sm text-bold no-border"
+                  padding="sm md"
+                  no-caps
+                  dense
+                  :disable="isDialogOpen"
+                >
+                  Add Field(s)
+                </q-btn>
+              </div>
             </div>
-          </div>
-          <div class="q-mb-md" v-if="isDialogOpen">
-            <q-card class="add-fields-card">
-              <!-- Header Section -->
-              <q-card-section>
-                <div class="tw-flex tw-justify-between tw-items-center">
-                  <div class="text-h6">Add Field(s)</div>
-                  <div>
-                    <q-btn
-                      data-test="add-stream-cancel-btn"
-                      icon="close"
-                      class="q-my-sm text-bold q-mr-md"
-                      text-color="light-text"
-                      padding="sm md"
-                      no-caps
-                      dense
-                      flat
-                      @click="closeDialog"
-                    />
+            <div class="q-mb-md" v-if="isDialogOpen">
+              <q-card class="add-fields-card">
+                <!-- Header Section -->
+                <q-card-section class="q-pa-none" style="padding: 8px 16px 6px 16px">
+                  <div class="tw-flex tw-justify-between tw-items-center">
+                    <div class="text-h6">Add Field(s)</div>
+                    <div>
+                      <q-btn
+                        data-test="add-stream-cancel-btn"
+                        icon="close"
+                        class=" text-bold q-mr-md"
+                        text-color="light-text"
+                        no-caps
+                        dense
+                        flat
+                        @click="closeDialog"
+                      />
+                    </div>
                   </div>
-                </div>
-              </q-card-section>
-              <!-- Main Content (Scrollable if necessary) -->
-              <q-card-section
-                class="q-pa-none"
-                style="flex: 1; overflow-y: auto"
-              >
-                <StreamFieldsInputs
-                  :fields="newSchemaFields"
-                  :showHeader="false"
-                  :isInSchema="true"
-                  :visibleInputs="{
-                    name: true,
-                    type: false,
-                    index_type: false,
-                  }"
-                  @add="addSchemaField"
-                  @remove="removeSchemaField"
-                />
-              </q-card-section>
-            </q-card>
-          </div>
-
-          <!-- Note: Drawer max-height to be dynamically calculated with JS -->
-          <div
-            :class="
-              store.state.theme === 'dark'
-                ? 'dark-theme-table'
-                : 'light-theme-table'
-            "
-            style="margin-bottom: 30px"
-          >
-            <q-table
-              ref="qTable"
-              data-test="schema-log-stream-field-mapping-table"
-              :rows="indexData.schema"
-              :columns="columns"
-              :row-key="(row) => 'tr_' + row.name"
-              :filter="`${filterField}@${activeTab}`"
-              :filter-method="filterFieldFn"
-              :pagination="pagination"
-              selection="multiple"
-              v-model:selected="selectedFields"
-              class="q-table"
-              id="schemaFieldList"
-              :rows-per-page-options="[]"
-              dense
-            >
-              <template v-slot:header="props">
-                <q-tr :props="props">
-                  <q-th>
-                    <q-checkbox v-model="props.selected" color="primary" />
-                  </q-th>
-                  <q-th
-                    v-for="col in props.cols"
-                    :key="col.name"
-                    :props="props"
-                  >
-                    <span v-if="col.icon">
-                      <q-icon color="primary" :name="outlinedPerson"></q-icon>
-                      <q-icon color="primary" :name="outlinedSchema"></q-icon>
-                    </span>
-                    <span v-else>
-                      {{ col.label }}
-                    </span>
-                  </q-th>
-                </q-tr>
-              </template>
-              <template v-slot:header-selection="scope">
-                <q-td class="text-center">
-                  <q-checkbox
-                    v-if="
-                      !(
-                        scope.name == store.state.zoConfig.timestamp_column ||
-                        scope.name == allFieldsName
-                      )
-                    "
-                    :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
-                    v-model="scope.selected"
-                    size="sm"
+                </q-card-section>
+                <!-- Main Content (Scrollable if necessary) -->
+                <q-card-section
+                  class="q-pa-none"
+                  style="flex: 1; overflow-y: auto; padding: 4px 16px 6px 16px"
+                >
+                  <StreamFieldsInputs
+                    :fields="newSchemaFields"
+                    :showHeader="false"
+                    :isInSchema="true"
+                    :visibleInputs="{
+                      name: true,
+                      type: false,
+                      index_type: false,
+                    }"
+                    @add="addSchemaField"
+                    @remove="removeSchemaField"
                   />
-                </q-td>
-              </template>
+                </q-card-section>
+              </q-card>
+            </div>
 
-              <template v-slot:body-selection="scope">
-                <q-td class="text-center q-td--no-hover">
-                  <q-checkbox
-                    v-if="
-                      !(
-                        scope.row.name ==
-                          store.state.zoConfig.timestamp_column ||
-                        scope.row.name == allFieldsName
-                      )
-                    "
-                    :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
-                    v-model="scope.selected"
-                    size="sm"
-                  />
-                </q-td>
-              </template>
-
-              <template v-slot:body-cell-name="props">
-                <q-td class="q-td--no-hover field-name">{{
-                  props.row.name
-                }}</q-td>
-              </template>
-              <template v-slot:body-cell-type="props">
-                <q-td>{{ props.row.type }}</q-td>
-              </template>
-              <template v-slot:body-cell-settings="props">
-                <q-td class="text-left" v-if="props.row.isUserDefined">
-                  <q-icon color="primary" :name="outlinedPerson"></q-icon>
-                  <q-icon color="primary" :name="outlinedSchema"></q-icon>
-                </q-td>
-                <q-td v-else> </q-td>
-              </template>
-              <template v-slot:body-cell-index_type="props">
-                <q-td data-test="schema-stream-index-select">
-                  <q-select
-                    v-if="
-                      !(
-                        props.row.name ==
-                          store.state.zoConfig.timestamp_column ||
-                        props.row.name == allFieldsName
-                      )
-                    "
-                    v-model="props.row.index_type"
-                    :options="streamIndexType"
-                    :popup-content-style="{ textTransform: 'capitalize' }"
-                    color="input-border"
-                    bg-color="input-bg"
-                    class="stream-schema-index-select q-py-xs fit q-pa-xs"
-                    size="xs"
-                    :option-disable="
-                      (_option) => disableOptions(props.row, _option)
-                    "
-                    multiple
-                    :max-values="2"
-                    map-options
-                    emit-value
-                    autoclose
-                    clearable
-                    stack-label
-                    outlined
-                    filled
-                    dense
-                    style="min-width: 300px; max-width: 300px"
-                    @update:model-value="markFormDirty(props.row.name, 'fts')"
-                  />
-                </q-td>
-              </template>
-
-              <template #bottom="scope">
-                <QTablePagination
-                  :scope="scope"
-                  :position="'bottom'"
-                  :resultTotal="resultTotal"
-                  :perPageOptions="perPageOptions"
-                  @update:changeRecordPerPage="changePagination"
-                />
-              </template>
-            </q-table>
-
-            <!-- floating footer for the table -->
+            <!-- Note: Drawer max-height to be dynamically calculated with JS -->
             <div
               :class="
-                store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'
+                store.state.theme === 'dark'
+                  ? 'dark-theme-table'
+                  : 'light-theme-table'
               "
-              class="floating-buttons q-px-md q-py-xs"
+              style="margin-bottom: 30px"
             >
-              <div v-if="indexData.schema.length > 0" class="q-mt-sm">
-                <span class="q-px-sm q-py-md"
+              <q-table
+                ref="qTable"
+                data-test="schema-log-stream-field-mapping-table"
+                :rows="indexData.schema"
+                :columns="columns"
+                :row-key="(row) => 'tr_' + row.name"
+                :filter="`${filterField}@${activeTab}`"
+                :filter-method="filterFieldFn"
+                :pagination="pagination"
+                selection="multiple"
+                v-model:selected="selectedFields"
+                class="q-table"
+                id="schemaFieldList"
+                :rows-per-page-options="[]"
+                dense
+              >
+                <template v-slot:header="props">
+                  <q-tr :props="props">
+                    <q-th>
+                      <q-checkbox v-model="props.selected" color="primary" />
+                    </q-th>
+                    <q-th
+                      v-for="col in props.cols"
+                      :key="col.name"
+                      :props="props"
+                    >
+                      <span v-if="col.icon">
+                        <q-icon color="primary" :name="outlinedPerson"></q-icon>
+                        <q-icon color="primary" :name="outlinedSchema"></q-icon>
+                      </span>
+                      <span v-else>
+                        {{ col.label }}
+                      </span>
+                    </q-th>
+                  </q-tr>
+                </template>
+                <template v-slot:header-selection="scope">
+                  <q-td class="text-center">
+                    <q-checkbox
+                      v-if="
+                        !(
+                          scope.name == store.state.zoConfig.timestamp_column ||
+                          scope.name == allFieldsName
+                        )
+                      "
+                      :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
+                      v-model="scope.selected"
+                      size="sm"
+                    />
+                  </q-td>
+                </template>
+
+                <template v-slot:body-selection="scope">
+                  <q-td class="text-center q-td--no-hover">
+                    <q-checkbox
+                      v-if="
+                        !(
+                          scope.row.name ==
+                            store.state.zoConfig.timestamp_column ||
+                          scope.row.name == allFieldsName
+                        )
+                      "
+                      :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
+                      v-model="scope.selected"
+                      size="sm"
+                    />
+                  </q-td>
+                </template>
+
+                <template v-slot:body-cell-name="props">
+                  <q-td class="q-td--no-hover field-name">{{
+                    props.row.name
+                  }}</q-td>
+                </template>
+                <template v-slot:body-cell-type="props">
+                  <q-td>{{ props.row.type }}</q-td>
+                </template>
+                <template v-slot:body-cell-settings="props">
+                  <q-td class="text-left" v-if="props.row.isUserDefined">
+                    <q-icon color="primary" :name="outlinedPerson"></q-icon>
+                    <q-icon color="primary" :name="outlinedSchema"></q-icon>
+                  </q-td>
+                  <q-td v-else> </q-td>
+                </template>
+                <template v-slot:body-cell-index_type="props">
+                  <q-td data-test="schema-stream-index-select">
+                    <q-select
+                      v-if="
+                        !(
+                          props.row.name ==
+                            store.state.zoConfig.timestamp_column ||
+                          props.row.name == allFieldsName
+                        )
+                      "
+                      v-model="props.row.index_type"
+                      :options="streamIndexType"
+                      :popup-content-style="{ textTransform: 'capitalize' }"
+                      color="input-border"
+                      bg-color="input-bg"
+                      class="stream-schema-index-select q-py-xs fit q-pa-xs"
+                      size="xs"
+                      :option-disable="
+                        (_option) => disableOptions(props.row, _option)
+                      "
+                      multiple
+                      :max-values="2"
+                      map-options
+                      emit-value
+                      autoclose
+                      clearable
+                      stack-label
+                      outlined
+                      filled
+                      dense
+                      style="min-width: 300px; max-width: 300px"
+                      @update:model-value="markFormDirty(props.row.name, 'fts')"
+                    />
+                  </q-td>
+                </template>
+
+                <template #bottom="scope">
+                  <QTablePagination
+                    :scope="scope"
+                    :position="'bottom'"
+                    :resultTotal="resultTotal"
+                    :perPageOptions="perPageOptions"
+                    @update:changeRecordPerPage="changePagination"
+                  />
+                </template>
+              </q-table>
+            </div>
+          </div>
+          <!-- red button tab -->
+          <div v-else>
+            <div
+              class="mapping-warning-msg q-mb-sm q-mt-sm"
+              style="width: fit-content"
+            >
+              <span style="font-weight: 600">
+                <q-icon name="info" class="q-mr-xs" size="16px" />
+
+                Additional
+                {{ store.state.zoConfig.extended_data_retention_days }} days of extension
+                will be applied to the selected date ranges</span
+              >
+            </div>
+            <div class="q-mt-sm">
+              <div class="text-center q-mt-sm tw-flex items-center ">
+                <div class="flex items-center">
+                  <span class="text-bold"> Select Date</span>
+                <date-time
+                  class="q-mx-sm"
+                  @on:date-change="dateChangeValue"
+                  disable-relative
+                  hide-relative-time
+                  hide-relative-timezone
+                  :minDate="minDate"
+                />
+                </div>
+                <span class="text-bold">
+                  (UTC Timezone)
+                </span>
+
+              </div>
+
+              <div class="q-mt-sm" style="margin-bottom: 30px">
+                <q-table
+                  ref="qTable"
+                  :row-key="(row, index) => 'tr_' + row.index"
+                  data-test="schema-log-stream-field-mapping-table"
+                  :rows="redBtnRows"
+                  :columns="redBtnColumns"
+                  :pagination="pagination"
+                  selection="multiple"
+                  v-model:selected="selectedDateFields"
+                  class="q-table"
+                  id="schemaFieldList"
+                  :rows-per-page-options="[]"
+                  dense
+                >
+                  <template v-slot:header-selection="scope">
+                    <q-td class="text-center">
+                      <q-checkbox
+                        :data-test="`schema-stream-delete-${scope.name}-field-fts-key-checkbox`"
+                        v-model="scope.selected"
+                        size="sm"
+                      />
+                    </q-td>
+                  </template>
+
+                  <!-- Body Slot for Selection -->
+                  <template v-slot:body-selection="scope">
+                    <q-td class="text-center q-td--no-hover">
+                      <q-checkbox
+                        :data-test="`schema-stream-delete-${scope.row.name}-field-fts-key-checkbox`"
+                        v-model="scope.selected"
+                        size="sm"
+                      />
+                    </q-td>
+                  </template>
+
+
+                  <template #bottom="scope">
+                    <QTablePagination
+                      :scope="scope"
+                      :position="'bottom'"
+                      :resultTotal="redBtnRows.length"
+                      :perPageOptions="perPageOptions"
+                      @update:changeRecordPerPage="changePagination"
+                    />
+                  </template>
+                </q-table>
+              </div>
+            </div>
+          </div>
+          <!-- floating footer for the table -->
+
+          <div
+            :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
+            class="floating-buttons q-px-md q-py-xs"
+          >
+            <div
+              v-if="indexData.schema.length > 0"
+              class="q-mt-sm flex items-center justify-between"
+            >
+              <div class="flex items-center">
+                <span
+                  v-if="activeMainTab == 'schemaSettings'"
+                  class="q-px-sm q-py-md"
                   ><strong> {{ selectedFields.length }}</strong> fields
                   selected</span
                 >
                 <q-btn
-                  v-if="isSchemaEvolutionEnabled"
+                  v-if="
+                    isSchemaEvolutionEnabled &&
+                    activeMainTab == 'schemaSettings'
+                  "
                   data-test="schema-add-field-button"
                   class="q-my-sm no-border text-bold q-mr-md"
                   padding="sm md"
@@ -465,8 +590,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t("logStream.addSchemaField")
                   }}
                 </q-btn>
+                {{   }}
                 <q-btn
-                  v-bind:disable="!selectedFields.length"
+                  v-bind:disable="
+                  !selectedFields.length &&  (!selectedDateFields.length) 
+                  "
                   data-test="schema-delete-button"
                   class="q-my-sm text-bold btn-delete"
                   text-color="red"
@@ -475,17 +603,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dense
                   flat
                   style="border: 1px red solid"
-                  @click="confirmQueryModeChangeDialog = true"
+                  @click="activeMainTab == 'schemaSettings' ? confirmQueryModeChangeDialog = true : confirmDeleteDatesDialog = true"
                 >
                   <span class="flex items-center tw-gap-1">
                     <q-icon size="14px" :name="outlinedDelete" />
                     {{ t("logStream.delete") }}
                   </span>
                 </q-btn>
+              </div>
+              <div class="flex justify-end">
                 <q-btn
                   v-close-popup="true"
                   data-test="schema-cancel-button"
-                  class="q-my-sm text-bold float-right q-ml-md btn-delete"
+                  class="q-my-sm text-bold q-ml-md btn-delete"
                   :label="t('logStream.cancel')"
                   text-color="red"
                   padding="sm md"
@@ -498,7 +628,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-bind:disable="!formDirtyFlag"
                   data-test="schema-update-settings-button"
                   :label="t('logStream.updateSettings')"
-                  class="q-my-sm text-bold no-border q-ml-md float-right"
+                  class="q-my-sm text-bold no-border q-ml-md"
                   color="secondary"
                   padding="sm xl"
                   type="submit"
@@ -523,17 +653,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:cancel="confirmQueryModeChangeDialog = false"
     v-model="confirmQueryModeChangeDialog"
   />
+  <ConfirmDialog
+    title="Delete Dates"
+    :message="t('logStream.deleteDatesMessage')"
+    @update:ok="deleteDates()"
+    @update:cancel="confirmDeleteDatesDialog = false"
+    v-model="confirmDeleteDatesDialog"
+  />
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, onBeforeMount, reactive, ref } from "vue";
+import {
+  computed,
+  defineComponent,
+  onBeforeMount,
+  reactive,
+  ref,
+  onMounted,
+  watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useQuasar, date, format } from "quasar";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
-import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
+import {
+  formatSizeFromMB,
+  getImageURL,
+  timestampToTimezoneDate,
+  convertDateToTimestamp,
+} from "@/utils/zincutils";
 import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
@@ -547,6 +697,8 @@ import {
   outlinedPerson,
   outlinedDelete,
 } from "@quasar/extras/material-icons-outlined";
+
+import DateTime from "@/components/DateTime.vue";
 
 const defaultValue: any = () => {
   return {
@@ -572,6 +724,7 @@ export default defineComponent({
     StreamFieldsInputs,
     AppTabs,
     QTablePagination,
+    DateTime,
   },
   setup({ modelValue }) {
     const { t } = useI18n();
@@ -584,19 +737,27 @@ export default defineComponent({
     const storeOriginalData = ref(false);
     const maxQueryRange = ref(0);
     const confirmQueryModeChangeDialog = ref(false);
+    const confirmDeleteDatesDialog = ref(false);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
     const rowsPerPage = ref(20);
     const filterField = ref("");
     const router = useRouter();
     const qTable = ref(null);
+    const minDate = ref(null);
+    const selectedDateFields = ref([]);
+    const IsdeleteBtnVisible = ref(false);
+    const redBtnRows = ref([]);
+
     const newSchemaFields = ref([]);
     const activeTab = ref("allFields");
+    const activeMainTab = ref("schemaSettings");
     let previousSchemaVersion: any = null;
     const approxPartition = ref(false);
     const isDialogOpen = ref(false);
+    const redDaysList = ref([]);
     const resultTotal = ref<number>(0);
-    const perPageOptions: any = [
+    const perPageOptions : any = [
       { label: "5", value: 5 },
       { label: "10", value: 10 },
       { label: "20", value: 20 },
@@ -638,6 +799,18 @@ export default defineComponent({
         disabled: !hasUserDefinedSchema.value,
       },
     ]);
+    const mainTabs = computed(() => [
+      {
+        value: "schemaSettings",
+        label: `Schema Settings`,
+        disabled: false,
+      },
+      {
+        value: "redButton",
+        label: `Extended Retention`,
+        disabled: false,
+      },
+    ]);
 
     const streamIndexType = [
       { label: "Full text search", value: "fullTextSearchKey" },
@@ -668,7 +841,6 @@ export default defineComponent({
     const markFormDirty = () => {
       formDirtyFlag.value = true;
     };
-
     const deleteFields = async () => {
       loadingState.value = true;
       await streamService
@@ -766,6 +938,7 @@ export default defineComponent({
 
     const setSchema = (streamResponse) => {
       const schemaMapping = new Set([]);
+
       if (streamResponse?.settings) {
         // console.log("streamResponse:", streamResponse);
         previousSchemaVersion = JSON.parse(
@@ -783,6 +956,19 @@ export default defineComponent({
             });
           });
       }
+      if (Array.isArray(streamResponse.settings.extended_retention_days)) {
+        redBtnRows.value = [];
+        indexData.value.extended_retention_days = streamResponse.settings.extended_retention_days;
+        streamResponse.settings.extended_retention_days.forEach((field, index) => {
+          redBtnRows.value.push({
+            index: index,
+            original_start: field.start,
+            original_end: field.end,
+            start: convertUnixToQuasarFormat(field.start),
+            end: convertUnixToQuasarFormat(field.end),
+          });
+        });
+      }
 
       if (
         streamResponse.settings.full_text_search_keys.length == 0 &&
@@ -798,11 +984,11 @@ export default defineComponent({
 
       indexData.value.stats.doc_time_max = date.formatDate(
         parseInt(streamResponse.stats.doc_time_max) / 1000,
-        "YYYY-MM-DDTHH:mm:ss:SSZ",
+        "YYYY-MM-DD THH:mm:ss:SS Z",
       );
       indexData.value.stats.doc_time_min = date.formatDate(
         parseInt(streamResponse.stats.doc_time_min) / 1000,
-        "YYYY-MM-DDTHH:mm:ss:SSZ",
+        "YYYY-MM-DD THH:mm:ss:SS Z",
       );
 
       indexData.value.defined_schema_fields =
@@ -812,6 +998,7 @@ export default defineComponent({
         dataRetentionDays.value =
           streamResponse.settings.data_retention ||
           store.state.zoConfig.data_retention_days;
+      calculateDateRange();
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
       storeOriginalData.value =
@@ -885,6 +1072,7 @@ export default defineComponent({
         full_text_search_keys: [],
         bloom_filter_fields: [],
         defined_schema_fields: [...indexData.value.defined_schema_fields],
+        extended_retention_days: [...indexData.value.extended_retention_days],
       };
       if (showDataRetention.value && dataRetentionDays.value < 1) {
         q.notify({
@@ -903,7 +1091,9 @@ export default defineComponent({
 
       if (showDataRetention.value) {
         settings["data_retention"] = Number(dataRetentionDays.value);
+        calculateDateRange();
       }
+
       settings["store_original_data"] = storeOriginalData.value;
       settings["approx_partition"] = approxPartition.value;
 
@@ -912,9 +1102,24 @@ export default defineComponent({
           field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
         ),
       );
-
       // Push unique and normalized field names to settings.defined_schema_fields
       settings.defined_schema_fields.push(...newSchemaFieldsSet);
+
+      redDaysList.value.forEach((field) => {
+        settings.extended_retention_days.push({
+          start: field.start,
+          end: field.end,
+        });
+      });
+      if (selectedDateFields.value.length > 0) {
+        selectedDateFields.value.forEach((field) => {
+          // Filter out the items only if both start and end match
+          settings.extended_retention_days = settings.extended_retention_days.filter((item) => {
+            return !(item.start === field.start && item.end === field.end);
+            });
+        });
+      };
+
 
       let added_part_keys = [];
       for (var property of indexData.value.schema) {
@@ -980,10 +1185,13 @@ export default defineComponent({
         settings.partition_keys =
           settings.partition_keys.concat(added_part_keys);
       }
-
       loadingState.value = true;
 
       newSchemaFields.value = [];
+
+      redDaysList.value = [];
+
+      selectedDateFields.value = [];
 
       let modifiedSettings = getUpdatedSettings(
         previousSchemaVersion,
@@ -1154,6 +1362,23 @@ export default defineComponent({
       },
     ];
 
+    const redBtnColumns = [
+      {
+        name: "start",
+        label: t("logStream.extendedStartDate"),
+        align: "center",
+        sortable: true,
+        field: "start",
+      },
+      {
+        name: "end",
+        label: t("logStream.extendedEndDate"),
+        align: "center",
+        sortable: true,
+        field: "end",
+      },
+    ];
+
     const addSchemaField = () => {
       newSchemaFields.value.push({
         name: "",
@@ -1185,6 +1410,9 @@ export default defineComponent({
       } else {
         resultTotal.value = indexData.value.schema.length;
       }
+    };
+    const updateActiveMainTab = (tab) => {
+      activeMainTab.value = tab;
     };
 
     const updateDefinedSchemaFields = () => {
@@ -1272,10 +1500,87 @@ export default defineComponent({
         resultTotal.value = streamResponse.schema?.length;
       }
     };
+    function convertUnixToQuasarFormat(unixMicroseconds: any) {
+      if (!unixMicroseconds) return "";
+      const unixSeconds = unixMicroseconds / 1e6;
+      const dateToFormat = new Date(unixSeconds * 1000);
+      const formattedDate = dateToFormat.toISOString();
+      return date.formatDate(formattedDate, "DD-MM-YYYY");
+
+    }
+    function formatDate(dateString) {
+      const date = new Date(dateString); // Convert to Date object
+      const day = String(date.getDate()).padStart(2, '0'); // Get day with leading zero
+      const month = String(date.getMonth() + 1).padStart(2, '0'); // Get month with leading zero
+      const year = date.getFullYear(); // Get the full year
+      
+      return `${day}-${month}-${year}`; // Return formatted date
+    }
+
+
+
+
+
+
+
+
+
+    const dateChangeValue = (value) => {
+
+      const selectedFromDate = value.hasOwnProperty('selectedDate') && formatDate(value.selectedDate.from)
+      const selectedToDate =value.hasOwnProperty('selectedDate') && formatDate(value.selectedDate.to)
+      if (value.relativeTimePeriod == null) {
+        try {
+            const startTimestamp = convertDateToTimestamp(selectedFromDate, "00:00", 'UTC').timestamp;
+            const endTimestamp = convertDateToTimestamp(selectedToDate, "00:00", 'UTC').timestamp;
+            
+            if (startTimestamp && endTimestamp) {
+              redDaysList.value.push({
+                start: startTimestamp,
+                end: endTimestamp,
+              });
+              onSubmit();
+            }
+          } catch (error) {
+            console.error('Error processing date selection:', error);
+          }
+      }
+    };
+    const calculateDateRange = () => {
+      const today = new Date();
+      const currentDate = new Date(today);
+      currentDate.setDate(today.getDate() - (dataRetentionDays.value - 1)); // Adjust to the desired number of days (dataRetentionDays of  days in this case)
+
+      const formattedDate = timestampToTimezoneDate(
+        new Date().getTime(), // Current timestamp
+        store.state.timezone, // Get the timezone from the store
+        "yyyy/MM/dd", // Desired format
+      );
+      // Format minDate using timestampToTimezoneDate for a custom format
+      minDate.value = timestampToTimezoneDate(
+        currentDate.getTime(),
+        store.state.timezone,
+        "yyyy/MM/dd", // Desired format
+      );
+    };
+
+
+    const deleteDates = () => {
+      selectedDateFields.value = selectedDateFields.value.map((field) => {
+        return {
+          start: field.original_start,
+          end: field.original_end,
+        };
+      });
+      formDirtyFlag.value = true;
+      onSubmit();
+      };
+
     return {
       t,
       q,
       store,
+      dateChangeValue,
       isCloud,
       indexData,
       getSchema,
@@ -1292,6 +1597,7 @@ export default defineComponent({
       showDataRetention,
       formatSizeFromMB,
       confirmQueryModeChangeDialog,
+      confirmDeleteDatesDialog,
       deleteFields,
       markFormDirty,
       formDirtyFlag,
@@ -1327,6 +1633,17 @@ export default defineComponent({
       outlinedSchema,
       outlinedDelete,
       openDialog,
+      calculateDateRange,
+      minDate,
+      mainTabs,
+      activeMainTab,
+      updateActiveMainTab,
+      redBtnColumns,
+      redBtnRows,
+      selectedDateFields,
+      redDaysList,
+      deleteDates,
+      IsdeleteBtnVisible,
     };
   },
   created() {
@@ -1457,6 +1774,42 @@ export default defineComponent({
   color: #865300;
 }
 
+.q-item {
+  padding: 3px 8px;
+  margin: 0 8px;
+  border-radius: 6px;
+
+  /* Overriding default height */
+  min-height: 30px;
+
+  &.q-router-link--active {
+    background-color: $primary;
+    color: white;
+
+    &::before {
+      content: " ";
+
+      position: absolute;
+      top: 0;
+      background-color: inherit;
+    }
+  }
+
+  &.ql-item-mini {
+    margin: 0;
+
+    &::before {
+      display: none;
+    }
+  }
+}
+
+.q-item__section--avatar {
+  margin: 0;
+  padding: 0;
+  min-width: 40px;
+}
+
 // .sticky-buttons {
 //   position: sticky;
 //   bottom: 0px;
@@ -1490,6 +1843,9 @@ export default defineComponent({
 //     box-shadow: 6px 6px 18px var(--q-dark);
 //   }
 // }
+.single-line-tab {
+  display: inline-flex;
+}
 </style>
 
 <style lang="scss">
@@ -1559,6 +1915,19 @@ export default defineComponent({
     }
   }
 }
+.main-fields-tabs {
+  height: fit-content;
+  color: var(--q-light);
+  .rum-tab {
+    padding: 4px 12px !important;
+
+    &.active {
+      color: white !important;
+      border-bottom: 5px solid var(--q-primary) !important;
+      background-color: rgba(88, 96, 178, 0.6);
+    }
+  }
+}
 .floating-buttons {
   position: sticky;
   bottom: 0;
@@ -1573,5 +1942,12 @@ export default defineComponent({
 .light-theme {
   background-color: var(--q-light);
   backdrop-filter: blur(10px);
+}
+
+.warning-text {
+  color: #f5a623;
+  border: 1px solid #f5a623;
+  border-radius: 10px;
+  padding: 6px 3px;
 }
 </style>

@@ -135,7 +135,7 @@ impl RemoteScanNode {
         } else {
             self.search_infos.file_id_list[partition].clone()
         };
-        file_id_list.is_empty()
+        !file_id_list.is_empty()
     }
 
     // used in RemoteScanExec

@@ -55,12 +55,12 @@ pub async fn search(
     stream_type: StreamType,
     user_id: Option<String>,
     in_req: &search::Request,
-    use_cache: bool,
     range_error: String,
 ) -> Result<search::Response, Error> {
     let start = std::time::Instant::now();
     let started_at = Utc::now().timestamp_micros();
     let cfg = get_config();
+    let use_cache = in_req.use_cache.unwrap_or(false);
 
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();

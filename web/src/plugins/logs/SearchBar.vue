@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <q-toggle
           data-test="logs-search-bar-show-query-toggle-btn"
           v-model="searchObj.meta.toggleFunction"
-          :icon="'img:' + getImageURL('images/common/function.svg')"
+          :icon="functionToggleIcon"
           title="Toggle Function Editor"
           class="float-left"
           size="32px"
@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             auto-close
             size="12px"
             icon="save"
-            :icon-right="'img:' + getImageURL('images/common/function.svg')"
+            :icon-right="iconRight"
             :title="t('search.functionPlaceholder')"
             split
             class="no-outline saved-views-dropdown no-border btn-function"
@@ -2714,6 +2714,26 @@ export default defineComponent({
       );
       disable.value = panelsValues.some((item: any) => item === true);
     });
+    const iconRight = computed(() => {
+      return (
+        "img:" +
+        getImageURL(
+          store.state.theme === "dark"
+            ? "images/common/function_dark.svg"
+            : "images/common/function.svg",
+        )
+      );
+    });
+    const functionToggleIcon = computed(() => {
+      return (
+        "img:" +
+        getImageURL(
+          searchObj.meta.toggleFunction
+            ? "images/common/function_dark.svg"
+            : "images/common/function.svg",
+        )
+      );
+    });
 
     // [END] cancel running queries
 
@@ -2803,6 +2823,8 @@ export default defineComponent({
       backgroundColorStyle,
       editorWidthToggleFunction,
       fnParsedSQL,
+      iconRight,
+      functionToggleIcon,
     };
   },
   computed: {

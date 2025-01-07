@@ -56,6 +56,7 @@ class PipelinePage {
     this.createFunctionToggle = page.locator('[data-test="create-function-toggle"] div').nth(2);
     this.functionNameLabel = page.locator('[data-test="add-function-node-routing-section"]').getByLabel('Name');
     this.associateFunctionSaveButton = page.locator('[data-test="associate-function-save-btn"]');
+    this.associateNewFunctionSaveButton = page.locator('[data-test="add-function-save-btn"]');
     this.functionNameRequiredError = page.getByText('Function Name is required')
     this.functionRequiredError = page.getByText('Function is required')
     this.streamSelectionError = page.getByText('Please select Stream from the')
@@ -64,7 +65,7 @@ class PipelinePage {
     this.fieldRequiredError = page.getByText('Field is required!')
     this.tableRowsLocator = page.locator("tbody tr");
     this.confirmButton = page.locator('[data-test="confirm-button"]');
-    this.functionNameInput = page.locator('[data-test="add-function-node-routing-section"] input[aria-label="Name"]');
+    this.functionNameInput = page.locator('[data-test="add-function-name-input"]');
     this.addConditionSaveButton = page.locator('[data-test="add-condition-save-btn"]');
     this.pipelineMenu = '[data-test="menu-link-\\/pipeline-item"]';
     this.enrichmentTableTab =
@@ -242,12 +243,20 @@ async saveFunction() {
   await this.associateFunctionSaveButton.click();
 }
 
+async saveNewFunction() {
+  await this.associateNewFunctionSaveButton.click();
+}
+
 async enterFunctionName(name) {
   await this.functionNameInput.fill(name);
 }
 
 async assertFunctionNameRequiredErrorVisible() {
   await expect(this.functionNameRequiredError).toBeVisible();
+}
+
+async assertFunctionNameRequiredErrorNotToBeVisible() {
+  await expect(this.functionNameRequiredError).not.toBeVisible();
 }
 
 async assertFunctionRequiredErrorVisible() {

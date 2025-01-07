@@ -17,9 +17,8 @@ use actix_web::{
     dev::ServiceRequest,
     error::{ErrorForbidden, ErrorUnauthorized},
     http::{header, Method},
-    web, Error,
+    web, Error, HttpRequest,
 };
-use actix_web_httpauth::extractors::basic::BasicAuth;
 use config::{get_config, utils::base64};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
@@ -462,7 +461,7 @@ pub async fn validate_user_for_query_params(
 
 pub async fn validator_aws(
     req: ServiceRequest,
-    _credentials: Option<BasicAuth>,
+    _: Option<HttpRequest>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let cfg = get_config();
     let path = req
@@ -507,7 +506,7 @@ pub async fn validator_aws(
 
 pub async fn validator_gcp(
     req: ServiceRequest,
-    _credentials: Option<BasicAuth>,
+    _: Option<HttpRequest>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let cfg = get_config();
     let path = req
@@ -549,7 +548,7 @@ pub async fn validator_gcp(
 
 pub async fn validator_rum(
     req: ServiceRequest,
-    _credentials: Option<BasicAuth>,
+    _: Option<HttpRequest>,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
     let path = req
         .request()
@@ -570,7 +569,6 @@ pub async fn validator_rum(
     let query =
         web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
             .unwrap();
-
     let token = query.get("oo-api-key").or_else(|| query.get("o2-api-key"));
     match token {
         Some(token) => match validate_token(token, org_id_end_point[0]).await {

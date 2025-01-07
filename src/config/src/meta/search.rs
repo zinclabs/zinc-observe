@@ -61,6 +61,9 @@ pub struct Request {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub search_event_context: Option<SearchEventContext>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub use_cache: Option<bool>, // used for search job,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -486,6 +489,7 @@ impl SearchHistoryRequest {
             timeout: 0,
             search_type: Some(SearchEventType::Other),
             search_event_context: None,
+            use_cache: None,
         };
         Ok(search_req)
     }
@@ -1016,6 +1020,7 @@ impl MultiStreamRequest {
                 timeout: self.timeout,
                 search_type: self.search_type,
                 search_event_context: self.search_event_context.clone(),
+                use_cache: None,
             });
         }
         res

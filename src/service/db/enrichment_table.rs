@@ -52,6 +52,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Vec<vrl::value::Value>, any
         timeout: 0,
         search_type: None,
         search_event_context: None,
+        use_cache: None,
     };
     // do search
     match SearchService::search("", org_id, StreamType::EnrichmentTables, None, &req).await {

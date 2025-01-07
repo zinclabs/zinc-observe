@@ -432,13 +432,9 @@ pub async fn delete_by_date(
 
     // update stream stats retention time
     let mut stats = cache::stats::get_stream_stats(org_id, stream_name, stream_type);
-    let mut min_ts = if time_range.1 > BASE_TIME.timestamp_micros() {
-        time_range.1
-    } else {
-        infra_file_list::get_min_ts(org_id, stream_type, stream_name)
-            .await
-            .unwrap_or_default()
-    };
+    let mut min_ts = infra_file_list::get_min_ts(org_id, stream_type, stream_name)
+        .await
+        .unwrap_or_default();
     if min_ts == 0 {
         min_ts = stats.doc_time_min;
     };
