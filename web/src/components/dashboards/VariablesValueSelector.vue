@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="item.value"
           :variableItem="item"
           @update:model-value="onVariablesValueUpdated(index)"
+          :loadOptions="loadVariableOptions"
         />
       </div>
       <div v-else-if="item.type == 'constant'">
@@ -260,15 +261,15 @@ export default defineComponent({
     );
 
     // you may need to query the data if the variable configs or the data/time changes
-    watch(
-      () => props.selectedTimeDate,
-      () => {
-        // reject all promises
-        rejectAllPromises();
+    // watch(
+    //   () => props.selectedTimeDate,
+    //   () => {
+    //     // reject all promises
+    //     rejectAllPromises();
 
-        loadAllVariablesData();
-      }
-    );
+    //     loadAllVariablesData();
+    //   },
+    // );
     watch(
       () => variablesData,
       () => {
@@ -427,9 +428,155 @@ export default defineComponent({
       }
     };
 
+    const loadVariableOptions = async (currentVariable) => {
+      console.log(
+        "[VariablesValueSelector] loadVariableOptions called",
+        currentVariable,
+      );
+
+      console.log(
+        `[VariablesValueSelector] loadVariableOptions is called for currentVariable.name ${currentVariable.name}`,
+      );
+      console.log(
+        "[VariablesValueSelector] currentVariable whole object",
+        currentVariable,
+      );
+
+      await loadApiCallForQueryValues(currentVariable.name);
+
+      console.log(
+        "[VariablesValueSelector] variablesDependencyGraph",
+        variablesDependencyGraph,
+      );
+
+      console.log(
+        `[VariablesValueSelector] Loading dependent variables for JSON object of currentVariable ${JSON.stringify(
+          currentVariable,
+          null,
+          2,
+        )}`,
+      );
+      console.log(
+        `[VariablesValueSelector] Loading dependent variables for variablesDependencyGraph ${JSON.stringify(variablesDependencyGraph)}`,
+      );
+
+      // Check for dependent variables
+      const dependentVariables: any =
+        JSON.stringify(
+          variablesDependencyGraph[currentVariable.name]?.childVariables,
+        ) || [];
+      console.log(
+        `[VariablesValueSelector] Loading dependent variables for dependentGraphName ${dependentVariables}`,
+      );
+
+      console.log(
+        `[VariablesValueSelector] Dependent variables of ${currentVariable.name} are ${dependentVariables}`,
+      );
+    };
+
+    const loadApiCallForQueryValues = async (variableName) => {
+      return new Promise(async (resolve, reject) => {
+        console.log(
+          `[VariablesValueSelector] API call for ${variableName} is starting.`,
+        );
+
+        // Check if the variable exists in the list
+        const currentVariable = variablesData.values.find(
+          (variable) => variable.name === variableName,
+        );
+        console.log(
+          "[VariablesValueSelector] currentVariable",
+          currentVariable,
+        );
+
+        if (!currentVariable) {
+          console.log(
+            `[VariablesValueSelector] Variable ${variableName} not found.`,
+          );
+          return resolve(false);
+        }
+
+        // Set up conditions for variable-specific API calls
+        switch (currentVariable.type) {
+          case "query_values":
+            await handleQueryValuesApiCall(currentVariable, resolve, reject);
+            break;
+          default:
+            console.log(
+              `[VariablesValueSelector] No specific API call configured for ${currentVariable.name}`,
+            );
+            resolve(true);
+            break;
+        }
+      });
+    };
+
+    const handleQueryValuesApiCall = async (
+      currentVariable,
+      resolve,
+      reject,
+    ) => {
+      try {
+        console.log(
+          `[VariablesValueSelector] Handling query_values API call for ${currentVariable.name}`,
+        );
+
+        // Prepare the query parameters based on the variable
+        const filterConditions = currentVariable?.query_data?.filter ?? [];
+        let queryContext = `SELECT ${store.state.zoConfig.timestamp_column || "_timestamp"} FROM '${currentVariable?.query_data?.stream}'`;
+        const constructedFilter = filterConditions.map((condition) => ({
+          name: condition.name,
+          operator: condition.operator,
+          value: condition.value,
+        }));
+
+        queryContext = await addLabelsToSQlQuery(
+          queryContext,
+          constructedFilter,
+        );
+
+        // Perform API call for query values
+        const res = await streamService.fieldValues({
+          org_identifier: store.state.selectedOrganization.identifier,
+          stream_name: currentVariable.query_data.stream,
+          start_time: new Date(
+            props.selectedTimeDate?.start_time?.toISOString(),
+          ).getTime(),
+          end_time: new Date(
+            props.selectedTimeDate?.end_time?.toISOString(),
+          ).getTime(),
+          fields: [currentVariable.query_data.field],
+          size: currentVariable?.query_data?.max_record_size ?? 10,
+          query_context: queryContext,
+        });
+
+        // Process the response and handle options
+        if (res.data.hits.length) {
+          currentVariable.options = res.data.hits[0].values.map((value) => ({
+            label: value.zo_sql_key ? value.zo_sql_key.toString() : "<blank>",
+            value: value.zo_sql_key.toString(),
+          }));
+          resolve(true);
+        } else {
+          currentVariable.options = [];
+          resolve(true);
+        }
+      } catch (err) {
+        console.error(
+          `[VariablesValueSelector] Error during query_values API call for ${currentVariable.name}:`,
+          err,
+        );
+        currentVariable.options = [];
+        resolve(true);
+      }
+    };
+
     // get single variable data based on index
     const loadSingleVariableDataByIndex = async (variableIndex: number) => {
       return new Promise(async (resolve, reject) => {
+        console.log(
+          `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex}`,
+        );
         // if variableIndex is not valid, return
         if (variableIndex < 0) resolve(false);
 
@@ -438,11 +585,17 @@ export default defineComponent({
 
         // if currentVariable is undefined, return
         if (!currentVariable) {
+          console.log(
+            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} but currentVariable is undefined`,
+          );
           return resolve(false);
         }
 
         // assign current promise reject object to currentlyExecutingPromises object
         if (currentlyExecutingPromises[currentVariable.name]) {
+          console.log(
+            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and currentVariable.name is ${currentVariable.name} and currentlyExecutingPromises[currentVariable.name] is true, so rejecting that promise`,
+          );
           // if the variable is already loading, reject that promise
           currentlyExecutingPromises[currentVariable.name](false);
         }
@@ -451,6 +604,9 @@ export default defineComponent({
 
         // need to load the current variable
         if (currentVariable.isVariableLoadingPending == false) {
+          console.log(
+            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and currentVariable.isVariableLoadingPending is false, so resolving that promise`,
+          );
           return resolve(false);
         }
 
@@ -458,6 +614,9 @@ export default defineComponent({
           isInvalidDate(props.selectedTimeDate?.start_time) ||
           isInvalidDate(props.selectedTimeDate?.end_time)
         ) {
+          console.log(
+            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and props.selectedTimeDate?.start_time or props.selectedTimeDate?.end_time is invalid, so resolving that promise`,
+          );
           return resolve(false);
         }
 
@@ -465,9 +624,12 @@ export default defineComponent({
         const isAnyDepndentVariableLoadingPending = variablesDependencyGraph[
           currentVariable.name
         ].parentVariables.find((parentVariable: any) => {
+          console.log(
+            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and currentVariable.name is ${currentVariable.name} and parentVariable is ${parentVariable}`,
+          );
           // get whole parent variable object from parent variable name
           const variableData = variablesData?.values?.find(
-            (variable: any) => variable?.name == parentVariable
+            (variable: any) => variable?.name == parentVariable,
           );
 
           // if parentVariable is not loaded, return
@@ -478,12 +640,18 @@ export default defineComponent({
 
         // if any dependent variable is loading, return
         if (isAnyDepndentVariableLoadingPending) {
+          console.log(
+            `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and isAnyDepndentVariableLoadingPending is true, so resolving that promise`,
+          );
           return resolve(false);
         }
 
         switch (currentVariable.type) {
           case "query_values": {
             try {
+              console.log(
+                `[VariablesValueSelector] loadSingleVariableDataByIndex is called for index ${variableIndex} and currentVariable.type is query_values`,
+              );
               // set loading as true
               currentVariable.isLoading = true;
 
@@ -766,6 +934,7 @@ export default defineComponent({
       variablesData.values.forEach((variable: any) => {
         variable.isVariableLoadingPending = true;
       });
+      console.log("loadAllVariablesData", variablesData.values);
 
       Promise.all(
         variablesData.values.map((it: any, index: number) =>
@@ -814,6 +983,7 @@ export default defineComponent({
       variablesData,
       changeInitialVariableValues,
       onVariablesValueUpdated,
+      loadVariableOptions,
     };
   },
 });
