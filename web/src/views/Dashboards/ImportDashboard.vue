@@ -448,7 +448,7 @@ export default defineComponent({
     });
 
     watch(jsonStr, (newVal) => {
-      if (newVal) {
+      if (newVal && newVal !== JSON.stringify(JSON.parse(newVal), null, 2)) {
         try {
           if (typeof newVal === "object") {
             jsonStr.value = JSON.stringify(newVal, null, 2);
