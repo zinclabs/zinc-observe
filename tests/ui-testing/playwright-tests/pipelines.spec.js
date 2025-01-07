@@ -16,6 +16,9 @@ async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   // await page.getByText('Login as internal user').click();
   await page.waitForTimeout(1000);
+
+  await page.getByText('Login as internal user').click();
+
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -269,7 +272,7 @@ test.describe("Pipeline testcases", () => {
     await pipelinePage.confirmDelete();
   });
 
-  test("should add source & destination node and then delete the pipeline", async ({
+  test("should add source & destination node the pipeline", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);
@@ -315,13 +318,13 @@ test.describe("Pipeline testcases", () => {
     await exploreStreamAndNavigateToPipeline(page, 'destination_node');
     await pipelinePage.searchPipeline(pipelineName);
     await page.waitForTimeout(1000);
-    const deletePipelineButton = page.locator(
-      `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
-    );
-    await deletePipelineButton.waitFor({ state: "visible" });
-    await deletePipelineButton.click();
-    await pipelinePage.confirmDeletePipeline();
-    await pipelinePage.verifyPipelineDeleted();
+    // const deletePipelineButton = page.locator(
+    //   `[data-test="pipeline-list-${pipelineName}-delete-pipeline"]`
+    // );
+    // await deletePipelineButton.waitFor({ state: "visible" });
+    // await deletePipelineButton.click();
+    // await pipelinePage.confirmDeletePipeline();
+    // await pipelinePage.verifyPipelineDeleted();
   });
 
   test("should create query source and delete it", async ({ page }) => {

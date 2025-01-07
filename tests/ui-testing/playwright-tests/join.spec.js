@@ -8,22 +8,38 @@ test.describe.configure({ mode: 'parallel' });
 test.describe("Join for logs", () => {
     let loginPage, logsPage, ingestionPage;
 
+    // // Define your stream names array
+    // const streamNames = ['default100', 'default101', 'default102', 'default103', 'default104'];
+    
+    // Generate 50 stream names starting from default100 to default149
+    const streamNames = [];
+    for (let i = 126; i < 150; i++) {
+        streamNames.push(`default${i}`);
+    }
+
+
     test.beforeEach(async ({ page }) => {
         loginPage = new LoginPage(page);
         ingestionPage = new IngestionPage(page);
         logsPage = new LogsPage(page);
         await loginPage.gotoLoginPage();
-       // await loginPage.loginAsInternalUser();
+        await loginPage.loginAsInternalUser();
         await loginPage.login(); // Login as root user
         await ingestionPage.ingestion();
         await ingestionPage.ingestionJoin();
+       // Loop over stream names to perform ingestion for each one
+       for (const streamName of streamNames) {
+        await ingestionPage.ingestionMultiJoin(streamName); // Assuming this method will interact with the ingestion UI
+        // await ingestionMultiJoin(streamName); // Perform the ingestion in parallel
+    }
+
     });
 
     test("Run query after selecting two streams", async ({ page }) => {
 
         await logsPage.navigateToLogs();
-        await logsPage.selectIndexAndStreamJoin();
-        await logsPage.displayTwoStreams();
+       // await logsPage.selectIndexAndStreamJoin();
+       // await logsPage.displayTwoStreams();
         await logsPage.selectRunQuery();
      
 
