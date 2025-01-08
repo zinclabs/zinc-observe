@@ -442,6 +442,7 @@ export default defineComponent({
         currentVariable,
       );
 
+      // Load API call for the current variable
       await loadApiCallForQueryValues(currentVariable.name);
 
       console.log(
@@ -449,29 +450,22 @@ export default defineComponent({
         variablesDependencyGraph,
       );
 
-      console.log(
-        `[VariablesValueSelector] Loading dependent variables for JSON object of currentVariable ${JSON.stringify(
-          currentVariable,
-          null,
-          2,
-        )}`,
-      );
-      console.log(
-        `[VariablesValueSelector] Loading dependent variables for variablesDependencyGraph ${JSON.stringify(variablesDependencyGraph)}`,
-      );
-
       // Check for dependent variables
-      const dependentVariables: any =
-        JSON.stringify(
-          variablesDependencyGraph[currentVariable.name]?.childVariables,
-        ) || [];
-      console.log(
-        `[VariablesValueSelector] Loading dependent variables for dependentGraphName ${dependentVariables}`,
-      );
+      const dependentVariables =
+        variablesDependencyGraph[currentVariable.name]?.childVariables || [];
 
       console.log(
         `[VariablesValueSelector] Dependent variables of ${currentVariable.name} are ${dependentVariables}`,
       );
+
+      // Trigger API calls for dependent variables
+      for (const dependentVariable of dependentVariables) {
+        console.log(
+          `[VariablesValueSelector] Loading API for dependent variable: ${dependentVariable}`,
+        );
+
+        await loadApiCallForQueryValues(dependentVariable);
+      }
     };
 
     const loadApiCallForQueryValues = async (variableName) => {
