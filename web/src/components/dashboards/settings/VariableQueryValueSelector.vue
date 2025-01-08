@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
       @blur="applyChanges"
-      @focus="onFocus"
+      @focus="loadFieldValues"
     >
       <template v-slot:no-option>
         <q-item>
@@ -189,22 +189,22 @@ export default defineComponent({
         );
         return;
       }
-      props.variableItem.isLoading = true;
-      console.debug("Loading field values for", props.variableItem, "started");
-      props.loadOptions(props.variableItem).finally(() => {
-        props.variableItem.isLoading = false;
+      loadVariableTemp();
+    };
+
+    const loadVariableTemp = () => {
+      try {
         console.debug(
           "Loading field values for",
           props.variableItem,
           "completed",
         );
+        props.loadOptions(props.variableItem);
         options.value = props.variableItem.options;
         console.log("options", options.value);
-      });
-    };
-
-    const onFocus = () => {
-      loadFieldValues();
+      } catch (error) {
+        console.error("Error loading options:", error);
+      }
     };
 
     return {
@@ -216,7 +216,6 @@ export default defineComponent({
       displayValue,
       applyChanges,
       loadFieldValues,
-      onFocus,
     };
   },
 });
