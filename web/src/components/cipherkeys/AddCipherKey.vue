@@ -72,27 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             tabindex="0"
           />
         </div>
-        <div class="col-4 o2-input flex q-mx-md q-mt-md">
-          <q-select
-            data-test="add-cipher-key-type-input"
-            v-model="formData.key.store.type"
-            :label="t('cipherKey.type') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop full-width"
-            stack-label
-            outlined
-            filled
-            dense
-            :options="cipherKeyTypes"
-            option-value="value"
-            option-label="label"
-            map-options
-            emit-value
-            :rules="[(val: any) => !!val || 'Type is required']"
-            tabindex="0"
-          />
-        </div>
       </div>
 
       <q-stepper
@@ -116,6 +95,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :done="step > 1"
         >
           <div>
+            <div class="q-w-lg">
+              <q-select
+                data-test="add-cipher-key-type-input"
+                v-model="formData.key.store.type"
+                :label="t('cipherKey.type') + ' *'"
+                color="input-border"
+                bg-color="input-bg"
+                class="showLabelOnTop full-width"
+                stack-label
+                outlined
+                filled
+                dense
+                :options="cipherKeyTypes"
+                option-value="value"
+                option-label="label"
+                map-options
+                emit-value
+                :rules="[(val: any) => !!val || 'Type is required']"
+                tabindex="0"
+              />
+            </div>
             <add-openobserve-type
               v-if="formData.key.store.type == 'local'"
               v-model:formData="formData"
