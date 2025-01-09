@@ -1,6 +1,8 @@
 import { test, expect } from "./baseFixtures";
 
 
+
+
 import { LogoManagementPage } from "../pages/logoManagementPage.js";
 
 import { LoginPage } from '../pages/loginPage.js';
@@ -24,11 +26,12 @@ test('Logo Upload on Management ', async ({ page }) => {
     const filePath = path.resolve(__dirname, './attachment/imagesAuto.png');
 
     const loginPage = new LoginPage(page);
-    const logoManagementPage = new LogoManagementPage(page);
 
     // Example usage in Playwright POM
 const logoName = generateRandomLogoName();
 console.log(`Generated logo name: ${logoName}`);
+
+    const logoManagementPage = new LogoManagementPage(page);
  
     // Step 1: Navigate to the application and login
  
@@ -41,7 +44,8 @@ console.log(`Generated logo name: ${logoName}`);
     await loginPage.loginAsInternalUser();
  
     await loginPage.login();
- 
+
+
     // Step 2: Navigate to Logs Page
 
 
@@ -50,11 +54,14 @@ console.log(`Generated logo name: ${logoName}`);
     await logoManagementPage.clickSaveSubmit();
 
     await logoManagementPage.updateCustomLogoText(logoName );
+   
 
     console.log(`Uploading file from path: ${filePath}`);
     //
     await logoManagementPage.uploadLogo(filePath);
+    
 
 
     await page.waitForTimeout(5000); // Adjust or remove as needed
 });
+
