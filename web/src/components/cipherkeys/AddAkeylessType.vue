@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Add input filed for base URL, access id with URL validation from q-input-->
     <q-input
       data-test="add-cipher-key-akeyless-baseurl-input"
-      v-model="frmData.key.store.akeyless.base_url"
+      v-model="formData.key.store.akeyless.base_url"
       :label="t('cipherKey.baseURL') + ' *'"
       color="input-border"
       bg-color="input-bg"
@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Add input filed for access id with URL validation from q-input -->
     <q-input
       data-test="add-cipher-key-akeyless-access-id-input"
-      v-model="frmData.key.store.akeyless.access_id"
+      v-model="formData.key.store.akeyless.access_id"
       :label="t('cipherKey.accessId') + ' *'"
       color="input-border"
       bg-color="input-bg"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <q-select
       data-test="add-cipher-key-auth-method-input"
-      v-model="frmData.key.store.akeyless.auth.type"
+      v-model="formData.key.store.akeyless.auth.type"
       :label="t('cipherKey.authenticationType') + ' *'"
       color="input-border q-w-lg"
       bg-color="input-bg"
@@ -71,16 +71,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <fieldset
       class="q-fieldset q-pa-md q-w-lg"
-      v-if="frmData.key.store.akeyless.auth.type != ''"
+      v-if="formData.key.store.akeyless.auth.type != ''"
     >
       <legend class="q-caption bg-white q-px-sm">
-        {{ getAuthenticationTypeLabel(frmData.key.store.akeyless.auth.type) }}
+        {{ getAuthenticationTypeLabel(formData.key.store.akeyless.auth.type) }}
         Configuration
       </legend>
-      <div v-if="frmData.key.store.akeyless.auth.type === 'access_key'">
+      <div v-if="formData.key.store.akeyless.auth.type === 'access_key'">
         <q-input
           data-test="add-cipher-key-akeyless-access-key-input"
-          v-model="frmData.key.store.akeyless.auth.access_key"
+          v-model="formData.key.store.akeyless.auth.access_key"
           :label="t('cipherKey.accessKey') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -92,10 +92,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rules="[(val: any) => !!val || 'Access Key is required']"
         />
       </div>
-      <div v-if="frmData.key.store.akeyless.auth.type === 'ldap'">
+      <div v-if="formData.key.store.akeyless.auth.type === 'ldap'">
         <q-input
           data-test="add-cipher-key-akeyless-ldap-username-input"
-          v-model="frmData.key.store.akeyless.auth.ldap.username"
+          v-model="formData.key.store.akeyless.auth.ldap.username"
           :label="t('cipherKey.ldapUsername') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-input
           data-test="add-cipher-key-akeyless-ldap-password-input"
-          v-model="frmData.key.store.akeyless.auth.ldap.password"
+          v-model="formData.key.store.akeyless.auth.ldap.password"
           :label="t('cipherKey.ldapPassword') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </fieldset>
     <q-select
       data-test="add-cipher-key-secret-type-input"
-      v-model="frmData.key.store.akeyless.store.type"
+      v-model="formData.key.store.akeyless.store.type"
       :label="t('cipherKey.secretType') + ' *'"
       color="input-border q-w-lg"
       bg-color="input-bg"
@@ -142,16 +142,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <fieldset
       class="q-fieldset q-pa-md q-w-lg"
-      v-if="frmData.key.store.akeyless.store.type != ''"
+      v-if="formData.key.store.akeyless.store.type != ''"
     >
       <legend class="q-caption bg-white q-px-sm">
-        {{ getSecretOptionLabel(frmData.key.store.akeyless.store.type) }}
+        {{ getSecretOptionLabel(formData.key.store.akeyless.store.type) }}
         Configuration
       </legend>
-      <div v-if="frmData.key.store.akeyless.store.type === 'static_secret'">
+      <div v-if="formData.key.store.akeyless.store.type === 'static_secret'">
         <q-input
           data-test="add-cipher-key-akeyless-static-secret-name-input"
-          v-model="frmData.key.store.akeyless.store.static_secret"
+          v-model="formData.key.store.akeyless.store.static_secret"
           :label="t('cipherKey.staticSecretName') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -163,10 +163,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rules="[(val: any) => !!val || 'Static Secret Name is required']"
         />
       </div>
-      <div v-if="frmData.key.store.akeyless.store.type === 'dfc'">
+      <div v-if="formData.key.store.akeyless.store.type === 'dfc'">
         <q-input
           data-test="add-cipher-key-akeyless-dfc-name-input"
-          v-model="frmData.key.store.akeyless.store.dfc.name"
+          v-model="formData.key.store.akeyless.store.dfc.name"
           :label="t('cipherKey.dfcName') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-input
           data-test="add-cipher-key-akeyless-dfc-iv-input"
-          v-model="frmData.key.store.akeyless.store.dfc.iv"
+          v-model="formData.key.store.akeyless.store.dfc.iv"
           :label="t('cipherKey.dfcIV') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <q-input
           data-test="add-cipher-key-akeyless-dfc-encrypted-data-input"
-          v-model="frmData.key.store.akeyless.store.dfc.encrypted_data"
+          v-model="formData.key.store.akeyless.store.dfc.encrypted_data"
           :label="t('cipherKey.dfcEncryptedData') + ' *'"
           color="input-border"
           bg-color="input-bg"
@@ -252,7 +252,6 @@ export default defineComponent({
   },
   setup(props: any, { emit }) {
     const { t } = useI18n();
-    const frmData = ref(props.formData || {});
 
     const authenticationTypeOptions = ref([
       { label: "Access Key", value: "access_key" },
@@ -279,7 +278,6 @@ export default defineComponent({
 
     return {
       t,
-      frmData,
       authenticationTypeOptions,
       secretTypeOptions,
       getSecretOptionLabel,

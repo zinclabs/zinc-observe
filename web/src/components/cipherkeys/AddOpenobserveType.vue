@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <q-input
       data-test="add-cipher-key-openobserve-secret-input"
-      v-model="frmData.key.store.local"
+      v-model="formData.key.store.local"
       :label="t('cipherKey.secret') + ' *'"
       color="input-border"
       bg-color="input-bg"
@@ -43,10 +43,8 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18n();
-    const frmData = ref(props.formData || {});
     return {
       t,
-      frmData,
     };
   },
 });
