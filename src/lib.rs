@@ -21,6 +21,7 @@ pub mod handler;
 pub mod job;
 pub mod router;
 pub mod service;
+pub mod table;
 
 pub(crate) static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),

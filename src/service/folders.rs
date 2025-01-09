@@ -21,14 +21,14 @@ use config::{
         folder::{Folder, DEFAULT_FOLDER},
     },
 };
-use infra::{
-    db::{connect_to_orm, ORM_CLIENT},
-    table::{self, folders::FolderType},
-};
+use infra::db::{connect_to_orm, ORM_CLIENT};
 
-use crate::common::{
-    meta::authz::Authz,
-    utils::auth::{remove_ownership, set_ownership},
+use crate::{
+    common::{
+        meta::authz::Authz,
+        utils::auth::{remove_ownership, set_ownership},
+    },
+    table::{self, folders::FolderType},
 };
 
 /// Errors that can occur when interacting with folders.

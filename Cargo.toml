@@ -149,6 +149,7 @@ rust-embed-for-web = "11.2.1"
 rustls.workspace = true
 rustls-pemfile.workspace = true
 sea-orm.workspace = true
+sea-orm-migration.workspace = true
 segment.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -156,6 +157,7 @@ sha256.workspace = true
 snafu.workspace = true
 snap.workspace = true
 sqlparser.workspace = true
+sqlx.workspace = true
 strum.workspace = true
 svix-ksuid.workspace = true
 sysinfo.workspace = true
@@ -193,9 +195,11 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dev-dependencies]
 async-walkdir.workspace = true
+collapse.workspace = true
 expect-test.workspace = true
 base64 = "0.21"
 float-cmp = "0.9"
+sea-orm = { workspace = true, features = ["mock"] }
 
 [workspace]
 members = [

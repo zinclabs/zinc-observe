@@ -32,7 +32,6 @@ use config::{
 };
 use cron::Schedule;
 use futures::{future::try_join_all, StreamExt};
-use infra::table;
 use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
     AsyncTransport, Message,
@@ -45,6 +44,7 @@ use crate::{
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
     service::{db, short_url},
+    table,
 };
 
 pub async fn save(

@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    errors::{self, DbError, Error},
+};
 use sea_orm::{
     entity::prelude::*, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, QueryFilter,
     Schema, Set,
@@ -20,10 +24,6 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 
 use super::get_lock;
-use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
-    errors::{self, DbError, Error},
-};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
 #[sea_orm(rs_type = "String", db_type = "String(StringLen::N(16))")]

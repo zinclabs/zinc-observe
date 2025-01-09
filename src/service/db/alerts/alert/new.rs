@@ -25,12 +25,11 @@ use config::{
 use infra::{
     cluster_coordinator::alerts as cluster,
     db::{connect_to_orm, ORM_CLIENT},
-    table::alerts as table,
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
-use crate::{common::infra::config::STREAM_ALERTS, service::db};
+use crate::{common::infra::config::STREAM_ALERTS, service::db, table::alerts as table};
 
 pub async fn get_by_id<C: ConnectionTrait>(
     conn: &C,

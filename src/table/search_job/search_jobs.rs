@@ -14,6 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::cluster::LOCAL_NODE;
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    errors,
+};
 use sea_orm::{
     prelude::Expr,
     sea_query::{Keyword, LockType, SimpleExpr},
@@ -33,10 +37,7 @@ use super::{
     },
     common::{OperatorType, Value},
 };
-use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
-    errors, orm_err,
-};
+use crate::orm_err;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum JobOperator {

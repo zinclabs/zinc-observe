@@ -262,7 +262,7 @@ pub mod deprecated {
     ) -> impl Responder {
         let org_id = path.into_inner();
         let folder = body.into_inner().into();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = crate::table::folders::FolderType::Dashboards;
         match folders::save_folder(&org_id, folder, folder_type, false).await {
             Ok(folder) => {
                 let body: CreateFolderResponseBody = folder.into();
@@ -305,7 +305,7 @@ pub mod deprecated {
     ) -> impl Responder {
         let (org_id, folder_id) = path.into_inner();
         let folder = body.into_inner().into();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = crate::table::folders::FolderType::Dashboards;
         match folders::update_folder(&org_id, &folder_id, folder_type, folder).await {
             Ok(_) => HttpResponse::Ok().body("Folder updated"),
             Err(err) => err.into(),
@@ -341,7 +341,7 @@ pub mod deprecated {
             return HttpResponse::Forbidden().finish();
         };
 
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = crate::table::folders::FolderType::Dashboards;
         match folders::list_folders(&org_id, user_id, folder_type).await {
             Ok(folders) => {
                 let body: ListFoldersResponseBody = folders.into();
@@ -372,7 +372,7 @@ pub mod deprecated {
     #[get("/{org_id}/folders/{folder_id}")]
     pub async fn get_folder(path: web::Path<(String, String)>) -> impl Responder {
         let (org_id, folder_id) = path.into_inner();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = crate::table::folders::FolderType::Dashboards;
         match folders::get_folder(&org_id, &folder_id, folder_type).await {
             Ok(folder) => {
                 let body: CreateFolderResponseBody = folder.into();
@@ -404,7 +404,7 @@ pub mod deprecated {
     #[delete("/{org_id}/folders/{folder_id}")]
     async fn delete_folder(path: web::Path<(String, String)>) -> impl Responder {
         let (org_id, folder_id) = path.into_inner();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = crate::table::folders::FolderType::Dashboards;
         match folders::delete_folder(&org_id, &folder_id, folder_type).await {
             Ok(()) => HttpResponse::Ok().body("Folder deleted"),
             Err(err) => err.into(),

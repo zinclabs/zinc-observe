@@ -40,10 +40,7 @@ use config::{
     SMTP_CLIENT,
 };
 use cron::Schedule;
-use infra::{
-    schema::unwrap_stream_settings,
-    table::{self, folders::FolderType},
-};
+use infra::schema::unwrap_stream_settings;
 use itertools::Itertools;
 use lettre::{message::MultiPart, AsyncTransport, Message};
 use sea_orm::{ConnectionTrait, TransactionTrait};
@@ -60,6 +57,7 @@ use crate::{
         search::sql::RE_ONLY_SELECT,
         short_url,
     },
+    table::{self, folders::FolderType},
 };
 
 /// Errors that can occur when interacting with alerts.

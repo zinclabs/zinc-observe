@@ -14,16 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::folder::Folder;
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    errors,
+};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, DatabaseConnection,
     EntityTrait, ModelTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 
 use super::entity::folders::{ActiveModel, Column, Entity, Model};
-use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
-    errors,
-};
 
 /// Indicates the type of data that the folder can contain.
 #[derive(Debug, Clone, Copy)]

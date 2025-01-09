@@ -21,6 +21,10 @@ use config::meta::{
     },
     folder::Folder,
 };
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    errors::{self, GetDashboardError},
+};
 use sea_orm::{
     prelude::Expr, sea_query::Func, ActiveModelTrait, ActiveValue::NotSet, ColumnTrait,
     DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
@@ -32,10 +36,6 @@ use super::{
     distinct_values::{self, OriginType},
     entity::{dashboards, folders},
     folders::FolderType,
-};
-use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
-    errors::{self, GetDashboardError},
 };
 
 impl TryFrom<dashboards::Model> for Dashboard {

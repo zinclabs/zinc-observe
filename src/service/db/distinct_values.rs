@@ -15,31 +15,30 @@
 
 #[cfg(feature = "enterprise")]
 use config::utils::json;
-#[cfg(feature = "enterprise")]
-use infra::table::distinct_values::BatchDeleteMessage;
-use infra::{
-    errors,
-    table::distinct_values::{DistinctFieldRecord, OriginType},
-};
+use infra::errors;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::infra::config::get_config;
+
+#[cfg(feature = "enterprise")]
+use crate::table::distinct_values::BatchDeleteMessage;
+use crate::table::distinct_values::{DistinctFieldRecord, OriginType};
 
 pub async fn add(record: DistinctFieldRecord) -> Result<(), errors::Error> {
     #[cfg(feature = "enterprise")]
     emit_put_event(&record).await?;
-    infra::table::distinct_values::add(record).await
+    crate::table::distinct_values::add(record).await
 }
 
 pub async fn remove(record: DistinctFieldRecord) -> Result<(), errors::Error> {
     #[cfg(feature = "enterprise")]
     emit_delete_event(&record).await?;
-    infra::table::distinct_values::remove(record).await
+    crate::table::distinct_values::remove(record).await
 }
 
 pub async fn batch_remove(origin: OriginType, origin_id: &str) -> Result<(), errors::Error> {
     #[cfg(feature = "enterprise")]
     emit_batch_delete_event(&origin, origin_id).await?;
-    infra::table::distinct_values::batch_remove(origin, origin_id).await
+    crate::table::distinct_values::batch_remove(origin, origin_id).await
 }
 
 /// Sends event to super cluster queue for a new distinct values entry.

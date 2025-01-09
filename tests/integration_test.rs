@@ -127,8 +127,11 @@ mod tests {
         config::init().await.unwrap();
         // init infra
         infra::init().await.unwrap();
+        openobserve::table::run_unmanaged_migrations()
+            .await
+            .unwrap();
         // db migration steps, since it's separated out
-        infra::table::migrate().await.unwrap();
+        openobserve::table::migrate().await.unwrap();
         openobserve::common::infra::init().await.unwrap();
         // ingester init
         ingester::init().await.unwrap();

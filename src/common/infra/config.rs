@@ -27,7 +27,6 @@ use config::{
 };
 use dashmap::DashMap;
 use hashbrown::HashMap;
-use infra::table::short_urls::ShortUrlRecord;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use vector_enrichment::TableRegistry;
@@ -41,6 +40,7 @@ use crate::{
         db::scheduler as db_scheduler, enrichment::StreamTable, enrichment_table::geoip::Geoip,
         pipeline::batch_execution::ExecutablePipeline,
     },
+    table::short_urls::ShortUrlRecord,
 };
 
 // global version variables

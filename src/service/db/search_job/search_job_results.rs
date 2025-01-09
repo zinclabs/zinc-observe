@@ -13,21 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::{errors, table::entity::search_job_results::Model as JobResult};
+use infra::errors;
 #[cfg(feature = "enterprise")]
 use {
-    infra::table::search_job::search_job_results::JobResultOperator,
+    crate::table::search_job::search_job_results::JobResultOperator,
     o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
     o2_enterprise::enterprise::super_cluster,
 };
 
+use crate::table::entity::search_job_results::Model as JobResult;
+
 // query search_job_results table
 pub async fn get_job_result(job_id: &str) -> Result<Vec<JobResult>, errors::Error> {
-    infra::table::search_job::search_job_results::get(job_id).await
+    crate::table::search_job::search_job_results::get(job_id).await
 }
 
 pub async fn clean_deleted_job_result(job_id: &str) -> Result<(), errors::Error> {
-    infra::table::search_job::search_job_results::clean_deleted_job_result(job_id).await?;
+    crate::table::search_job::search_job_results::clean_deleted_job_result(job_id).await?;
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {

@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    errors,
+};
 use sea_orm::{
     prelude::Expr,
     sea_query::{LockType, SimpleExpr},
@@ -24,10 +28,7 @@ use super::{
     super::{entity::search_job_partitions::*, get_lock},
     common::{OperatorType, Value},
 };
-use crate::{
-    db::{connect_to_orm, ORM_CLIENT},
-    errors, orm_err,
-};
+use crate::orm_err;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum PartitionJobOperator {

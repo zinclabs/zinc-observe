@@ -18,9 +18,9 @@ use std::sync::Arc;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
 use config::get_config;
-use infra::{db::Event, table::short_urls};
+use infra::db::Event;
 
-use crate::{common::infra::config::SHORT_URLS, service::db};
+use crate::{common::infra::config::SHORT_URLS, service::db, table::short_urls};
 
 // DBKey to set short URL's
 pub const SHORT_URL_KEY: &str = "/short_urls/";

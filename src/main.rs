@@ -204,6 +204,13 @@ async fn main() -> Result<(), anyhow::Error> {
                 job_init_tx.send(false).ok();
                 panic!("infra init failed: {}", e);
             }
+            if let Err(e) = openobserve::table::run_unmanaged_migrations().await {
+                job_init_tx.send(false).ok();
+                panic!(
+                    "migrations for distinct_values and short_urls could not complete: {}",
+                    e
+                );
+            }
             if let Err(e) = common_infra::init().await {
                 job_init_tx.send(false).ok();
                 panic!("common infra init failed: {}", e);
@@ -229,7 +236,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 .expect("migrate resource names into supported ofga format failed");
 
             // migrate infra_sea_orm
-            if let Err(e) = infra::table::migrate().await {
+            if let Err(e) = openobserve::table::migrate().await {
                 job_init_tx.send(false).ok();
                 panic!("infra sea_orm migrate failed: {}", e);
             }

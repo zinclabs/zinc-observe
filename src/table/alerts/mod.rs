@@ -25,6 +25,7 @@ use config::meta::{
     stream::StreamType as MetaStreamType,
 };
 use hashbrown::HashMap;
+use infra::errors::{self, FromStrError, PutAlertError};
 use itertools::Itertools;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait, PaginatorTrait,
@@ -36,7 +37,6 @@ use super::{
     entity::{alerts, folders},
     folders::FolderType,
 };
-use crate::errors::{self, FromStrError, PutAlertError};
 
 pub mod intermediate;
 

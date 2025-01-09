@@ -14,8 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::ider;
-use infra::{
-    errors, orm_err,
+use infra::errors;
+#[cfg(feature = "enterprise")]
+use {
+    crate::table::search_job::search_jobs::JobOperator, config::cluster::LOCAL_NODE,
+    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
+    o2_enterprise::enterprise::super_cluster,
+};
+
+use crate::{
+    orm_err,
     table::{
         entity::search_jobs::Model,
         search_job::{
@@ -23,12 +31,6 @@ use infra::{
             search_jobs::{Filter, MetaColumn, SetOperator},
         },
     },
-};
-#[cfg(feature = "enterprise")]
-use {
-    config::cluster::LOCAL_NODE, infra::table::search_job::search_jobs::JobOperator,
-    o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config,
-    o2_enterprise::enterprise::super_cluster,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -67,7 +69,7 @@ pub async fn submit(
         error_message: None,
     };
 
-    infra::table::search_job::search_jobs::submit(job.clone().into()).await?;
+    crate::table::search_job::search_jobs::submit(job.clone().into()).await?;
 
     // super cluster, add a new job
     #[cfg(feature = "enterprise")]
@@ -85,7 +87,7 @@ pub async fn submit(
 // get a oldest job and lock it
 pub async fn get_job() -> Result<Option<Model>, errors::Error> {
     let updated_at = chrono::Utc::now().timestamp_micros();
-    let res = infra::table::search_job::search_jobs::get_job(updated_at).await?;
+    let res = crate::table::search_job::search_jobs::get_job(updated_at).await?;
 
     // TODO: need other call to set the get job's status
     #[cfg(feature = "enterprise")]
@@ -106,7 +108,7 @@ pub async fn get_job() -> Result<Option<Model>, errors::Error> {
 
 pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i64, errors::Error> {
     let updated_at = chrono::Utc::now().timestamp_micros();
-    let res = infra::table::search_job::search_jobs::cancel_job(job_id, updated_at).await?;
+    let res = crate::table::search_job::search_jobs::cancel_job(job_id, updated_at).await?;
 
     // super cluster, cancel a job
     #[cfg(feature = "enterprise")]
@@ -137,7 +139,7 @@ pub async fn set_job_error_message(job_id: &str, error_message: &str) -> Result<
             (MetaColumn::Status, Value::i64(2)),
         ],
     };
-    infra::table::search_job::search_jobs::set(operator.clone()).await?;
+    crate::table::search_job::search_jobs::set(operator.clone()).await?;
 
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
@@ -166,7 +168,7 @@ pub async fn set_job_finish(job_id: &str, path: &str) -> Result<(), errors::Erro
             (MetaColumn::EndedAt, Value::i64(updated_at)),
         ],
     };
-    let res = infra::table::search_job::search_jobs::set(operator.clone()).await;
+    let res = crate::table::search_job::search_jobs::set(operator.clone()).await;
 
     match res {
         Ok(res) if res.rows_affected == 1 => {}
@@ -197,7 +199,7 @@ pub async fn set_partition_num(job_id: &str, partition_num: i64) -> Result<(), e
         update: vec![(MetaColumn::PartitionNum, Value::i64(partition_num))],
     };
 
-    infra::table::search_job::search_jobs::set(operator.clone()).await?;
+    crate::table::search_job::search_jobs::set(operator.clone()).await?;
 
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
@@ -222,7 +224,7 @@ pub async fn set_job_deleted(job_id: &str) -> Result<bool, errors::Error> {
         update: vec![(MetaColumn::Status, Value::i64(4))],
     };
 
-    let res = infra::table::search_job::search_jobs::set(operator.clone()).await;
+    let res = crate::table::search_job::search_jobs::set(operator.clone()).await;
     let res = match res {
         Ok(res) if res.rows_affected == 1 => true,
         Ok(_) => false,
@@ -252,7 +254,7 @@ pub async fn update_running_job(job_id: &str) -> Result<(), errors::Error> {
         update: vec![(MetaColumn::UpdatedAt, Value::i64(updated_at))],
     };
 
-    infra::table::search_job::search_jobs::set(operator.clone()).await?;
+    crate::table::search_job::search_jobs::set(operator.clone()).await?;
 
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
@@ -280,7 +282,7 @@ pub async fn check_running_jobs(updated_at: i64) -> Result<(), errors::Error> {
         update: vec![(MetaColumn::Status, Value::i64(0))],
     };
 
-    infra::table::search_job::search_jobs::set(operator.clone()).await?;
+    crate::table::search_job::search_jobs::set(operator.clone()).await?;
 
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
@@ -296,7 +298,7 @@ pub async fn check_running_jobs(updated_at: i64) -> Result<(), errors::Error> {
 }
 
 pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
-    infra::table::search_job::search_jobs::clean_deleted_job(job_id).await?;
+    crate::table::search_job::search_jobs::clean_deleted_job(job_id).await?;
 
     // super cluster, set the job's status
     #[cfg(feature = "enterprise")]
@@ -316,7 +318,7 @@ pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
 pub async fn retry_search_job(job_id: &str) -> Result<(), errors::Error> {
     let trace_id = ider::uuid();
     let updated_at = chrono::Utc::now().timestamp_micros();
-    infra::table::search_job::search_jobs::retry_search_job(job_id, &trace_id, updated_at).await?;
+    crate::table::search_job::search_jobs::retry_search_job(job_id, &trace_id, updated_at).await?;
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
@@ -335,13 +337,13 @@ pub async fn retry_search_job(job_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn get(job_id: &str, org_id: &str) -> Result<Model, errors::Error> {
-    infra::table::search_job::search_jobs::get(job_id, org_id).await
+    crate::table::search_job::search_jobs::get(job_id, org_id).await
 }
 
 pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Error> {
-    infra::table::search_job::search_jobs::list_status_by_org_id(org_id).await
+    crate::table::search_job::search_jobs::list_status_by_org_id(org_id).await
 }
 
 pub async fn get_deleted_jobs() -> Result<Vec<Model>, errors::Error> {
-    infra::table::search_job::search_jobs::get_deleted_jobs().await
+    crate::table::search_job::search_jobs::get_deleted_jobs().await
 }

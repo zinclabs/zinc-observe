@@ -27,10 +27,9 @@ use config::meta::{
     search::SearchEventType as MetaSearchEventType,
     stream::StreamType as MetaStreamType,
 };
+use infra::errors::{FromI16Error, FromStrError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-
-use crate::errors::{FromI16Error, FromStrError};
 
 /// Query historic data comparison. Stored in the DB as a JSON object.
 #[derive(Serialize, Deserialize)]

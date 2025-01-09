@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
-
-use super::{entity::search_queue::*, get_lock};
-use crate::{
+use infra::{
     db::{connect_to_orm, ORM_CLIENT},
     errors,
 };
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
+
+use super::{entity::search_queue::*, get_lock};
 
 pub async fn add(work_group: &str, user_id: &str, trace_id: &str) -> Result<(), errors::Error> {
     let record = ActiveModel {

@@ -18,16 +18,15 @@ use config::meta::{
     stream::{DistinctField, StreamSettings, StreamType},
 };
 use hashbrown::HashMap;
-use infra::{
-    db as infra_db,
-    schema::get_settings,
+use infra::{db as infra_db, schema::get_settings};
+
+use crate::{
+    service::{dashboards::get_query_variables, stream::save_stream_settings},
     table::{
         dashboards,
         distinct_values::{self, DistinctFieldRecord, OriginType},
     },
 };
-
-use crate::service::{dashboards::get_query_variables, stream::save_stream_settings};
 
 type SettingsCache = HashMap<(String, String, StreamType), StreamSettings>;
 

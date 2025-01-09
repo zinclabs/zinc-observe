@@ -37,7 +37,6 @@ use infra::{
         unwrap_partition_time_level, unwrap_stream_settings, STREAM_RECORD_ID_GENERATOR,
         STREAM_SCHEMAS, STREAM_SCHEMAS_COMPRESSED, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
     },
-    table::distinct_values::{check_field_use, DistinctFieldRecord, OriginType},
 };
 
 use crate::{
@@ -47,6 +46,7 @@ use crate::{
         stream::{Stream, StreamProperty},
     },
     service::{db, db::distinct_values, metrics::get_prom_metadata_from_schema},
+    table::distinct_values::{check_field_use, DistinctFieldRecord, OriginType},
 };
 
 const LOCAL: &str = "disk";

@@ -15,12 +15,9 @@
 
 use chrono::Utc;
 use config::{get_config, utils::md5};
-use infra::{
-    errors::{DbError, Error},
-    table::short_urls::ShortUrlRecord,
-};
+use infra::errors::{DbError, Error};
 
-use crate::service::db;
+use crate::{service::db, table::short_urls::ShortUrlRecord};
 
 const SHORT_URL_WEB_PATH: &str = "/short/";
 

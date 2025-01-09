@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::utils::file::set_permission;
-use infra::{file_list as infra_file_list, table};
+use infra::file_list as infra_file_list;
 
 use crate::{
     cli::data::{
@@ -23,6 +23,7 @@ use crate::{
     },
     common::{infra::config::USERS, meta, migration},
     service::{compact, db, file_list, users},
+    table,
 };
 
 pub async fn cli() -> Result<bool, anyhow::Error> {
@@ -153,6 +154,9 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
 
     // init infra, create data dir & tables
     infra::init().await.expect("infra init failed");
+    crate::table::run_unmanaged_migrations()
+        .await
+        .expect("migrations for distinct_values and short_urls could not complete");
     match name {
         "reset" => {
             let component = command.get_one::<String>("component").unwrap();
@@ -287,7 +291,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         "seaorm-rollback" => match command.subcommand() {
             Some(("all", _)) => {
                 println!("Rolling back all");
-                infra::table::down(None).await?
+                crate::table::down(None).await?
             }
             Some(("last", sub_matches)) => {
                 let n = sub_matches
@@ -295,7 +299,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     .map(|n| n.to_owned())
                     .unwrap_or(1);
                 println!("Rolling back {n}");
-                infra::table::down(Some(n)).await?
+                crate::table::down(Some(n)).await?
             }
             Some((name, _)) => {
                 return Err(anyhow::anyhow!("unsupported sub command: {name}"));
