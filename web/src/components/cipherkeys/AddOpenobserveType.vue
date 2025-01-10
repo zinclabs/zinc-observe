@@ -39,7 +39,43 @@ import { useI18n } from "vue-i18n";
 export default defineComponent({
   name: "AddOpenobserveType",
   props: {
-    formData: Object,
+    formData: {
+      type: Object,
+      required: true,
+      default: () => ({
+        key: {
+          store: {
+            type: "local",
+            akeyless: {
+              base_url: "",
+              access_id: "",
+              auth: {
+                type: "access_key",
+                access_key: "",
+                ldap: {
+                  username: "",
+                  password: "",
+                },
+              },
+              store: {
+                type: "static_secret",
+                static_secret: "",
+                dfc: {
+                  name: "",
+                  iv: "",
+                  encrypted_data: "",
+                },
+              },
+            },
+            local: "",
+          },
+          mechanism: {
+            type: "simple",
+            simple_algorithm: "aes-256-siv",
+          },
+        },
+      }),
+    },
   },
   setup(props) {
     const { t } = useI18n();
