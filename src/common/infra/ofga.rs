@@ -91,6 +91,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     if let Some(existing_model) = &existing_meta {
         if meta.version == existing_model.version {
             log::info!("OFGA model already exists & no changes required");
+            o2_enterprise::enterprise::common::infra::config::OFGA_STORE_ID
+                .insert("store_id".to_owned(), existing_model.store_id.clone());
             if !init_tuples.is_empty() {
                 match update_tuples(init_tuples, vec![]).await {
                     Ok(_) => {

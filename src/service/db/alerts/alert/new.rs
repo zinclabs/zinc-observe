@@ -72,7 +72,7 @@ pub async fn set(
     stream_name: &str,
     alert: Alert,
     create: bool,
-) -> Result<(), infra::errors::Error> {
+) -> Result<Alert, infra::errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match table::put(client, org_id, "default", alert).await {
         Ok(alert) => {
@@ -96,10 +96,10 @@ pub async fn set(
 
             if create {
                 match db::scheduler::push(trigger).await {
-                    Ok(_) => Ok(()),
+                    Ok(_) => Ok(alert),
                     Err(e) => {
                         log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
-                        Ok(())
+                        Ok(alert)
                     }
                 }
             } else if db::scheduler::exists(
@@ -110,18 +110,18 @@ pub async fn set(
             .await
             {
                 match db::scheduler::update_trigger(trigger).await {
-                    Ok(_) => Ok(()),
+                    Ok(_) => Ok(alert),
                     Err(e) => {
                         log::error!("Failed to update trigger for alert {schedule_key}: {}", e);
-                        Ok(())
+                        Ok(alert)
                     }
                 }
             } else {
                 match db::scheduler::push(trigger).await {
-                    Ok(_) => Ok(()),
+                    Ok(_) => Ok(alert),
                     Err(e) => {
                         log::error!("Failed to save trigger for alert {schedule_key}: {}", e);
-                        Ok(())
+                        Ok(alert)
                     }
                 }
             }

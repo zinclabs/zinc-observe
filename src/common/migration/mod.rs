@@ -17,6 +17,8 @@ use config::cluster::LOCAL_NODE;
 use schema::migrate_resource_names;
 use version_compare::Version;
 
+#[cfg(feature = "enterprise")]
+pub mod alerts_openfga_ids;
 pub mod dashboards;
 pub mod file_list;
 pub mod meta;

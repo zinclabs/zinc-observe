@@ -117,6 +117,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         .help("the parquet file name"),
                 ),
             clap::Command::new("migrate-schemas").about("migrate from single row to row per schema version"),
+            clap::Command::new("migrate-alerts-rbac").about("migrate RBAC identifier for alerts in OpenFGA"),
             clap::Command::new("seaorm-rollback").about("rollback SeaORM migration steps")
                 .subcommand(
                     clap::Command::new("all")
@@ -283,6 +284,11 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             println!("Running schema migration to row per schema version");
             #[allow(deprecated)]
             migration::schema::run().await?
+        }
+        "migrate-alerts-rbac" =>
+        {
+            #[cfg(feature = "enterprise")]
+            migration::alerts_openfga_ids::run().await?
         }
         "seaorm-rollback" => match command.subcommand() {
             Some(("all", _)) => {

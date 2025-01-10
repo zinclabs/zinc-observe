@@ -36,6 +36,8 @@ use infra::db::{connect_to_orm, ORM_CLIENT};
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use svix_ksuid::Ksuid;
 
+use crate::common::{meta::authz::Authz, utils::auth::set_ownership};
+
 pub async fn get_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -67,7 +69,15 @@ pub async fn set(
     if should_use_meta_alerts() {
         old::set(org_id, stream_type, stream_name, &alert, create).await
     } else {
-        new::set(org_id, stream_type, stream_name, alert, create).await
+        let alert = new::set(org_id, stream_type, stream_name, alert, create).await?;
+        if !create {
+            return Ok(());
+        }
+
+        if let Some(alert_id) = alert.id.map(|id| id.to_string()) {
+            set_ownership(org_id, "alerts", Authz::new(&alert_id)).await;
+        }
+        Ok(())
     }
 }
 

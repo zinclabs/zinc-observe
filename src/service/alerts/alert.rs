@@ -415,6 +415,10 @@ pub async fn create<C: TransactionTrait>(
     prepare_alert(org_id, &stream_name, &alert_name, &mut alert, true).await?;
 
     let alert = db::alerts::alert::create(conn, org_id, folder_id, alert).await?;
+    if let Some(id) = alert.id.map(|id| id.to_string()) {
+        set_ownership(&alert.org_id, "alerts", Authz::new(&id)).await;
+    }
+
     Ok(alert)
 }
 
@@ -539,14 +543,12 @@ pub async fn delete_by_id<C: ConnectionTrait>(
     let Some(alert) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
         return Ok(());
     };
-
-    match db::alerts::alert::delete_by_id(conn, org_id, alert_id).await {
-        Ok(_) => {
-            remove_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
-            Ok(())
-        }
-        Err(e) => Err(e.into()),
+    db::alerts::alert::delete_by_id(conn, org_id, alert_id).await?;
+    if let Some(id) = alert.id.map(|id| id.to_string()) {
+        remove_ownership(org_id, "alerts", Authz::new(&id)).await;
     }
+    remove_ownership(org_id, "alerts", Authz::new(&alert.name)).await;
+    Ok(())
 }
 
 pub async fn delete_by_name(
@@ -555,19 +557,19 @@ pub async fn delete_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<(), AlertError> {
-    if db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name)
-        .await
-        .is_err()
-    {
+    let Some(alert) =
+        db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await?
+    else {
         return Err(AlertError::AlertNotFound);
+    };
+
+    db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, name).await?;
+    remove_ownership(org_id, "alerts", Authz::new(name)).await;
+    if let Some(alert_id) = alert.id.map(|id| id.to_string()) {
+        remove_ownership(org_id, "alerts", Authz::new(&alert_id)).await;
     }
-    match db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, name).await {
-        Ok(_) => {
-            remove_ownership(org_id, "alerts", Authz::new(name)).await;
-            Ok(())
-        }
-        Err(e) => Err(e.into()),
-    }
+
+    Ok(())
 }
 
 pub async fn enable_by_id<C: ConnectionTrait + TransactionTrait>(
