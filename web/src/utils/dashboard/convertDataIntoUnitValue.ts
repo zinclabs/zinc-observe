@@ -447,6 +447,11 @@ export const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
 };
 
 export function buildSQLQueryFromInput(fields: any): string {
+  // if fields type is raw, return rawQuery
+  if (fields.type === "raw") {
+    return `${fields?.rawQuery ?? ""}`;
+  }
+
   // Extract functionName and args from the input
   const { functionName, args } = fields;
 
@@ -458,6 +463,11 @@ export function buildSQLQueryFromInput(fields: any): string {
   // If the function is not found, throw an error
   if (!selectedFunction) {
     throw new Error(`Function "${functionName}" is not supported.`);
+  }
+
+  // if selectedFunction is null, simply return the first argument
+  if (selectedFunction.functionName === null) {
+    return `${args?.[0]?.value ?? fields.column ?? ""}`;
   }
 
   // Validate the provided args against the function's argument definitions
@@ -507,4 +517,44 @@ export function buildSQLQueryFromInput(fields: any): string {
 
   // Construct the SQL query string
   return `${functionName}(${sqlArgs.join(", ")})`;
+}
+
+export function addMissingArgs(fields: any): any {
+  const { functionName, args } = fields;
+
+  // Find the function definition in functionValidation
+  const functionDef = functionValidation.find(
+    (fn: any) => fn.functionName === functionName,
+  );
+
+  if (!functionDef) {
+    return fields;
+  }
+
+  const updatedArgs = [...args]; // Clone the existing args array
+
+  // Iterate through the function definition's arguments
+  functionDef.args.forEach((argDef: any) => {
+    const isArgProvided = updatedArgs.some((arg: any) => {
+      // Check if the argument's type matches any of the required types
+      return argDef.type.includes(arg.type);
+    });
+
+    if (!isArgProvided) {
+      // If the argument is missing, add it
+      const argType = argDef.type[0]; // Always take the first type
+      const defaultValue =
+        argDef.defaultValue !== undefined ? argDef.defaultValue : "";
+
+      updatedArgs.push({
+        type: argType,
+        value: defaultValue,
+      });
+    }
+  });
+
+  return {
+    ...fields,
+    args: updatedArgs,
+  };
 }
