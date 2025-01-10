@@ -286,7 +286,7 @@ const setupTemplateData = () => {
         name,
       )
         .then((response) => {
-          formData.value = {...response.data, ...formData.value};
+          formData.value = { ...formData.value, ...response.data };
           originalData.value = JSON.stringify(formData.value);
         })
         .catch((error) => {
