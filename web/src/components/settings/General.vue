@@ -26,7 +26,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="q-w-md q-mx-lg">
       <q-form @submit.stop="onSubmit.execute">
         <q-input
-          data-test="general-settings-scrape-interval"
           v-model.number="scrapeIntereval"
           type="number"
           min="0"
@@ -65,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </div>
-    <div id="enterpriseFeature" >
+    <div id="enterpriseFeature" v-if="config.isEnterprise == 'true'">
       <div class="q-px-md q-py-md">
         <div class="text-body1 text-bold">
           {{ t("settings.enterpriseTitle") }}
@@ -75,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-mx-lg">
         <div class="q-gutter-sm row q-mt-xs">
           <div
-            v-if="1==1"
+            v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
             class="q-gutter-md row items-start"
           >
             <q-input
