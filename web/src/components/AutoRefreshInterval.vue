@@ -61,13 +61,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             no-caps
             :flat="Number(modelValue) !== item.value"
             size="md"
-            :class="
+            :class="[
               'no-border ' +
-              (Number(modelValue) === item.value ? 'selected' : '')
-            "
+                (Number(modelValue) === item.value ? 'selected' : ''),
+            ]"
             @click="onItemClick(item)"
             v-close-popup="true"
+            :disable="item.disabled"
           >
+            <q-tooltip
+              v-if="item.disabled"
+              style="z-index: 10001; font-size: 14px"
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+            >
+              {{ minRangeRestrictionMessageVal }}
+            </q-tooltip>
             {{ item.label }}
           </q-btn>
         </div>
@@ -84,6 +94,7 @@ import {
   watch,
   onActivated,
   onDeactivated,
+  onMounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -101,6 +112,14 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    minRangeRestrictionMessage: {
+      type: String,
+      default: "",
+    },
+    minRefreshInterval: {
+      type: Number,
+      default: 500,
+    },
   },
   emits: ["update:modelValue", "trigger"],
   setup(props: any, { emit }) {
@@ -113,23 +132,23 @@ export default defineComponent({
 
     const refreshTimes = [
       [
-        { label: "5 sec", value: 5 },
-        { label: "1 min", value: 60 },
-        { label: "1 hr", value: 3600 },
+        { label: "5 sec", value: 5, disabled: false },
+        { label: "1 min", value: 60, disabled: false },
+        { label: "1 hr", value: 3600, disabled: false },
       ],
       [
-        { label: "10 sec", value: 10 },
-        { label: "5 min", value: 300 },
-        { label: "2 hr", value: 7200 },
+        { label: "10 sec", value: 10, disabled: false },
+        { label: "5 min", value: 300, disabled: false },
+        { label: "2 hr", value: 7200, disabled: false },
       ],
       [
-        { label: "15 sec", value: 15 },
-        { label: "15 min", value: 900 },
-        { label: "1 day", value: 86400 },
+        { label: "15 sec", value: 15, disabled: false },
+        { label: "15 min", value: 900, disabled: false },
+        { label: "1 day", value: 86400, disabled: false },
       ],
       [
-        { label: "30 sec", value: 30 },
-        { label: "30 min", value: 1800 },
+        { label: "30 sec", value: 30, disabled: false },
+        { label: "30 min", value: 1800, disabled: false },
       ],
     ];
 
@@ -147,7 +166,7 @@ export default defineComponent({
     const selectedLabel = computed(
       () =>
         refreshTimes.flat().find((it: any) => it.value == selectedValue.value)
-          ?.label || generateDurationLabel(selectedValue.value)
+          ?.label || generateDurationLabel(selectedValue.value),
     );
 
     // update model when the selection has changed
@@ -175,6 +194,34 @@ export default defineComponent({
       }, selectedValue.value * 1000);
     };
 
+    const minRangeRestrictionMessageVal = ref("");
+
+    watch(
+      () => props.minRefreshInterval,
+      () => {
+        updateDisabledFlags();
+      },
+    );
+
+    const isDisabled = (value: number) => {
+      return value < props.minRefreshInterval;
+    };
+
+    const updateDisabledFlags = () => {
+      refreshTimes.forEach((row) => {
+        row.forEach((item) => {
+          console.log("item", item, isDisabled(item.value));
+          item.disabled = isDisabled(item.value);
+        });
+      });
+      minRangeRestrictionMessageVal.value = `The minimum refresh interval is ${props.minRefreshInterval} seconds. Please adjust the minimum refresh interval accordingly.`;
+    };
+
+    onMounted(() => {
+      // Initialize the disabled flags on component mount
+      updateDisabledFlags();
+    });
+
     // on component mount and unmount, update the intervals
     onActivated(() => {
       resetTimers();
@@ -191,6 +238,7 @@ export default defineComponent({
       selectedLabel,
       refreshTimes,
       onItemClick,
+      minRangeRestrictionMessageVal,
     };
   },
 });
