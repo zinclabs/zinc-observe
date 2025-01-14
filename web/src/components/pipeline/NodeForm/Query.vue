@@ -28,24 +28,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
       <q-form ref="queryFormRef" @submit="saveQueryData">
         <div>
-
-            <q-select
-              v-model="streamRoute.stream_type"
-              :options="streamTypes"
-              :label="t('alerts.streamType') + ' *'"
-              :popup-content-style="{ textTransform: 'lowercase' }"
-              color="input-border"
-              bg-color="input-bg"
-              class="showLabelOnTop no-case"
-              stack-label
-              outlined
-              filled
-              dense
-              v-bind:readonly="isUpdating"
-              v-bind:disable="isUpdating"
-              :rules="[(val: any) => !!val || 'Field is required!']"
-              style="width: 400px"
-            />
+          <q-select
+            v-model="streamRoute.stream_type"
+            :options="streamTypes"
+            :label="t('alerts.streamType') + ' *'"
+            :popup-content-style="{ textTransform: 'lowercase' }"
+            color="input-border"
+            bg-color="input-bg"
+            class="showLabelOnTop no-case"
+            stack-label
+            outlined
+            filled
+            dense
+            v-bind:readonly="isUpdating"
+            v-bind:disable="isUpdating"
+            :rules="[(val: any) => !!val || 'Field is required!']"
+            style="width: 400px"
+          />
           <scheduled-pipeline
             ref="scheduledAlertRef"
             :columns="filteredColumns"
@@ -69,7 +68,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex justify-start full-width"
           :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
         >
-      
           <q-btn
             data-test="stream-routing-query-cancel-btn"
             class="text-bold"
@@ -89,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="submit"
           />
           <q-btn
-          v-if="pipelineObj.isEditNode"
+            v-if="pipelineObj.isEditNode"
             data-test="stream-routing-query-delete-btn"
             :label="t('pipeline.deleteNode')"
             class="text-bold no-border q-ml-md"
@@ -132,7 +130,7 @@ import searchService from "@/services/search";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 const VariablesInput = defineAsyncComponent(
-  () => import("@/components/alerts/VariablesInput.vue")
+  () => import("@/components/alerts/VariablesInput.vue"),
 );
 
 interface RouteCondition {
@@ -159,7 +157,6 @@ interface StreamRoute {
     frequency: string;
     cron: string;
     timezone: any;
-
   };
   context_attributes: any;
   description: string;
@@ -221,7 +218,7 @@ const isAggregationEnabled = ref(false);
 
 const queryFormRef = ref<any>(null);
 
-const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
 
 const nodeLink = ref({
   from: "",
@@ -235,10 +232,15 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const getDefaultStreamRoute : any = () => {
+const getDefaultStreamRoute: any = () => {
   if (pipelineObj.isEditNode) {
     return pipelineObj.currentSelectedNodeData.data;
   }
+
+  const frequency = store.state?.zoConfig?.min_auto_refresh_interval
+    ? Math.ceil(store.state?.zoConfig?.min_auto_refresh_interval / 60)
+    : 15;
+
   return {
     name: "",
     conditions: [{ column: "", operator: "", value: "", id: getUUID() }],
@@ -252,7 +254,7 @@ const getDefaultStreamRoute : any = () => {
       period: 15,
       frequency_type: "minutes",
       cron: "",
-      frequency: 15,
+      frequency: frequency <= 15 ? 15 : frequency,
     },
     context_attributes: [
       {
@@ -267,9 +269,9 @@ const getDefaultStreamRoute : any = () => {
 };
 
 onMounted(() => {
-  
   if (pipelineObj.isEditNode) {
-    streamRoute.value = pipelineObj.currentSelectedNodeData?.data as StreamRoute;
+    streamRoute.value = pipelineObj.currentSelectedNodeData
+      ?.data as StreamRoute;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -279,7 +281,8 @@ onMounted(() => {
 
 onActivated(() => {
   if (pipelineObj.isEditNode) {
-    streamRoute.value = pipelineObj.currentSelectedNodeData?.data as StreamRoute;
+    streamRoute.value = pipelineObj.currentSelectedNodeData
+      ?.data as StreamRoute;
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -302,7 +305,7 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1
+      (column: any) => column.toLowerCase().indexOf(value) > -1,
     );
   });
   return filteredOptions;
@@ -323,7 +326,7 @@ const updateStreamFields = async () => {
   const streams: any = await getStream(
     props.streamName,
     props.streamType,
-    true
+    true,
   );
 
   if (streams && Array.isArray(streams.schema)) {
@@ -356,7 +359,6 @@ const openCancelDialog = () => {
   dialog.value.title = "Discard Changes";
   dialog.value.message = "Are you sure you want to cancel routing changes?";
   dialog.value.okCallback = closeDialog;
-
 };
 
 // TODO OK : Add check for duplicate routing name
@@ -368,7 +370,6 @@ const saveQueryData = async () => {
   try {
     await validateSqlQuery();
     await validateSqlQueryPromise.value;
-
   } catch (e) {
     return false;
   }
@@ -380,8 +381,10 @@ const saveQueryData = async () => {
   });
 
   const formData = streamRoute.value;
-  if(typeof formData.trigger_condition.period === 'string') {
-    formData.trigger_condition.period = parseInt(formData.trigger_condition.period);
+  if (typeof formData.trigger_condition.period === "string") {
+    formData.trigger_condition.period = parseInt(
+      formData.trigger_condition.period,
+    );
   }
   let queryPayload = {
     node_type: "query", // required
@@ -397,7 +400,6 @@ const saveQueryData = async () => {
       aggregation: formData.query_condition.aggregation,
       vrl_function: null,
       search_event_type: "DerivedStream",
-
     },
     trigger_condition: {
       // same as before
@@ -438,8 +440,7 @@ const deleteRoute = () => {
   //   },
   //   type: "condition",
   // });
-  deletePipelineNode (pipelineObj.currentSelectedNodeID);
-
+  deletePipelineNode(pipelineObj.currentSelectedNodeID);
 
   emit("cancel:hideform");
 };
@@ -455,12 +456,11 @@ const addVariable = () => {
 const removeVariable = (variable: any) => {
   streamRoute.value.context_attributes =
     streamRoute.value.context_attributes.filter(
-      (_variable: any) => _variable.id !== variable.id
+      (_variable: any) => _variable.id !== variable.id,
     );
 };
 
 const validateSqlQuery = () => {
-
   const query = buildQueryPayload({
     sqlMode: true,
     streamName: streamRoute.value.name as string,
@@ -469,7 +469,6 @@ const validateSqlQuery = () => {
   delete query.aggs;
 
   query.query.sql = streamRoute.value.query_condition.sql;
-
 
   validateSqlQueryPromise.value = new Promise((resolve, reject) => {
     searchService
@@ -483,9 +482,11 @@ const validateSqlQuery = () => {
         resolve("");
       })
       .catch((err: any) => {
-        if (  err) {
+        if (err) {
           isValidSqlQuery.value = false;
-          const message = err?.response?.data?.message ? `Invalid SQL Query: ${err?.response?.data?.message}` : "Invalid SQL Query";
+          const message = err?.response?.data?.message
+            ? `Invalid SQL Query: ${err?.response?.data?.message}`
+            : "Invalid SQL Query";
           q.notify({
             type: "negative",
             message: `${message}`,
@@ -497,7 +498,6 @@ const validateSqlQuery = () => {
         resolve("");
       });
   });
-
 };
 </script>
 
