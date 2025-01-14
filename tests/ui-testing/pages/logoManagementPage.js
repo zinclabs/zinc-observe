@@ -60,6 +60,7 @@ export
         }
     
     await expect(this.page.getByText('Unauthorized Access')).not.toBeVisible();
+    await this.page.waitForSelector('[data-test="settings_ent_logo_custom_text"]');
     await this.customLogoTextBox.click();
     await expect(this.page.getByText('Unauthorized Access')).not.toBeVisible();
     await this.customLogoTextBox.fill(text);
