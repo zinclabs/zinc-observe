@@ -140,7 +140,7 @@ pub async fn save(
 }
 
 pub async fn delete(
-    derived_stream: DerivedStream,
+    derived_stream: &DerivedStream,
     pipeline_name: &str,
     pipeline_id: &str,
 ) -> Result<(), anyhow::Error> {
