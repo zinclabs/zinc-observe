@@ -72,5 +72,77 @@ def test_cipher_data(create_session, base_url):
     print("Data ingested successfully, status code: ", resp.status_code)
     return resp.status_code == 200
 
+def test_get_cipher_keys(create_session, base_url):
+    """Running an E2E test for all cipher_keys."""
+
+    session = create_session
+    org_id = "default"
+
+    resp_get_cipher_keys = session.get(f"{base_url}api/{org_id}/cipher_keys")
+
+    print(resp_get_cipher_keys.content)
+    assert (
+        resp_get_cipher_keys.status_code == 200
+    ), f"Get all cipher_keys list 200, but got {resp_get_cipher_keys.status_code} {resp_get_cipher_keys.content}"
+
+def test_cipher_key(create_session, base_url):
+    """Running an E2E test for create cipher_key."""
+    cipher_name = f"cipher_{random.randint(1000, 9999)}"  # Make the name unique
+    session = create_session
+    org_id = "default"
+    payload = {
+            "name":cipher_name,
+            "key":{"store":{"type":"local","akeyless":{"base_url":"","access_id":"","auth":{"type":"access_key","access_key":"","ldap":{"username":"","password":""}},"store":{"type":"static_secret","static_secret":"","dfc":{"name":"","iv":"","encrypted_data":""}}},"local":"{\"primaryKeyId\":2939429116,\"key\":[{\"keyData\":{\"typeUrl\":\"type.googleapis.com/google.crypto.tink.AesSivKey\",\"value\":\"EkDqH9D86ii0QPF8EBhcZI1PkBKKdDGMPDS2wFITqqfjQ77RQbDROhhAXI8m5qUcYNbflns8Xo//BORbgtX0msbf\",\"keyMaterialType\":\"SYMMETRIC\"},\"status\":\"ENABLED\",\"keyId\":2939429116,\"outputPrefixType\":\"TINK\"}]}"},"mechanism":{"type":"tink_keyset","simple_algorithm":"aes-256-siv"}}}
+    
+    resp_create_cipher_key = session.post(
+            f"{base_url}api/{org_id}/cipher_keys", json=payload
+        )
+    
+    print(resp_create_cipher_key.content)
+    
+    assert (
+            resp_create_cipher_key.status_code == 200
+        ), f"Expected 200, but got {resp_create_cipher_key.status_code} {resp_create_cipher_key.content}"
+
+    resp_get_cipher_key = session.get(
+            f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+        )
+    
+    print(resp_get_cipher_key.content)
+    
+    assert (
+            resp_get_cipher_key.status_code == 200
+        ), f"Expected 200, but got {resp_get_cipher_key.status_code} {resp_get_cipher_key.content}"
+
+    payload = {
+        "name":cipher_name,
+        "key":{"mechanism":{"type":"tink_keyset"},"store":{"type":"local","local":"{\"primaryKeyId\":2939429116,\"key\":[{\"keyData\":{\"typeUrl\":\"type.googleapis.com/google.crypto.tink.AesSivKey\",\"value\":\"EkDqH9D86ii0QPF8EBhcZI1PkBKKdDGMPDS2wFITqqfjQ77RQbDROhhAXI8m5qUcYNbflns8Xo//BORbgtX0msbf\",\"keyMaterialType\":\"SYMMETRIC\"},\"status\":\"ENABLED\",\"keyId\":2939429116,\"outputPrefixType\":\"TINK\"}]}"}}}
+    
+    resp_update_cipher_key = session.put(
+            f"{base_url}api/{org_id}/cipher_keys", json=payload
+        )
+    
+    print(resp_update_cipher_key.content)
+    
+    assert (
+            resp_update_cipher_key.status_code == 200
+        ), f"Expected 200, but got {resp_update_cipher_key.status_code} {resp_update_cipher_key.content}"
+
+    resp_delete_cipher_key = session.delete(
+            f"{base_url}api/{org_id}/cipher_keys/{cipher_name}"
+        )
+    
+    print(resp_delete_cipher_key.content)
+    
+    assert (
+            resp_delete_cipher_key.status_code == 200
+        ), f"Expected 200, but got {resp_delete_cipher_key.status_code} {resp_delete_cipher_key.content}"
+
+   
+
+
+
+
+
 
 
