@@ -1239,6 +1239,18 @@ export default defineComponent({
       window.open(url, "_blank");
     };
 
+    const HTTP_FORBIDDEN = 403;
+
+    const handleAlertError = (err: any) => {
+      if (err.response?.status !== HTTP_FORBIDDEN) {
+        console.log(err);
+        q.notify({
+          type: "negative",
+          message: err.response?.data?.message || err.response?.data?.error,
+        });
+      }
+    };
+
     return {
       t,
       q,
@@ -1304,6 +1316,7 @@ export default defineComponent({
       showTimezoneWarning,
       updateMultiTimeRange,
       routeToCreateDestination,
+      handleAlertError,
     };
   },
 
@@ -1496,13 +1509,7 @@ export default defineComponent({
             })
             .catch((err: any) => {
               dismiss();
-              if (err.response?.status != 403) {
-                this.q.notify({
-                  type: "negative",
-                  message:
-                    err.response?.data?.error || err.response?.data?.message,
-                });
-              }
+              this.handleAlertError(err);
             });
           segment.track("Button Click", {
             button: "Update Alert",
@@ -1534,13 +1541,7 @@ export default defineComponent({
             })
             .catch((err: any) => {
               dismiss();
-              if (err.response?.status != 403) {
-                this.q.notify({
-                  type: "negative",
-                  message:
-                    err.response?.data?.error || err.response?.data?.message,
-                });
-              }
+              this.handleAlertError(err);
             });
           segment.track("Button Click", {
             button: "Save Alert",

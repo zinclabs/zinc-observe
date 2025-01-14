@@ -118,7 +118,7 @@ export default defineComponent({
     },
     minRefreshInterval: {
       type: Number,
-      default: 500,
+      default: 5,
     },
   },
   emits: ["update:modelValue", "trigger"],
@@ -210,7 +210,6 @@ export default defineComponent({
     const updateDisabledFlags = () => {
       refreshTimes.forEach((row) => {
         row.forEach((item) => {
-          console.log("item", item, isDisabled(item.value));
           item.disabled = isDisabled(item.value);
         });
       });
