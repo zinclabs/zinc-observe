@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="q-w-md q-mx-lg">
       <q-form @submit.stop="onSubmit.execute">
         <q-input
+          data-test="general-settings-scrape-interval"
           v-model.number="scrapeIntereval"
           type="number"
           min="0"
@@ -64,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </q-form>
     </div>
-    <div id="enterpriseFeature" v-if="config.isEnterprise == 'true'">
+    <div id="enterpriseFeature" >
       <div class="q-px-md q-py-md">
         <div class="text-body1 text-bold">
           {{ t("settings.enterpriseTitle") }}
