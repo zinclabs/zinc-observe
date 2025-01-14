@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="q-mx-lg">
         <div class="q-gutter-sm row q-mt-xs">
           <div
+            v-if="1==1"
             class="q-gutter-md row items-start"
           >
             <q-input
