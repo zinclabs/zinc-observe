@@ -33,7 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : ''
         }`"
       >
-        <div class="tw-flex justify-between items-center q-pa-xs tw-w-full tw-min-w-0">
+        <div
+          class="tw-flex justify-between items-center q-pa-xs tw-w-full tw-min-w-0"
+        >
           <div class="tw-flex tw-flex-1 tw-overflow-hidden">
             <q-btn
               v-if="!isFullscreen"
@@ -50,7 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="goBackToDashboardList"
               >{{ folderNameFromFolderId }}
             </span>
-            <q-spinner-dots v-if="!store.state.organizationData.folders.length" color="primary" size="2em" />
+            <q-spinner-dots
+              v-if="!store.state.organizationData.folders.length"
+              color="primary"
+              size="2em"
+            />
             <q-icon
               class="q-table__title tw-text-gray-400 tw-mt-1"
               name="chevron_right"
@@ -107,6 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AutoRefreshInterval
               v-model="refreshInterval"
               trigger
+              :min-refresh-interval="
+                store.state?.zoConfig?.min_auto_refresh_interval || 5
+              "
               @trigger="refreshData"
               class="dashboard-icons hideOnPrintMode"
               size="sm"
@@ -511,8 +520,7 @@ export default defineComponent({
     };
 
     const isVariablesChanged = computed(() => {
-          
-      return !isEqual(variablesData, refreshedVariablesData)
+      return !isEqual(variablesData, refreshedVariablesData);
     });
     // ======= [START] default variable values
 
