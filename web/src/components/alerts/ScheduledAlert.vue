@@ -822,7 +822,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="number"
                 dense
                 filled
-                min="1"
+                :min="
+                  Math.ceil(
+                    store.state?.zoConfig?.min_auto_refresh_interval / 60,
+                  ) || 1
+                "
                 style="background: none"
                 @update:model-value="updateTrigger"
               />

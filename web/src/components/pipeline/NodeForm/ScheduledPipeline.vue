@@ -16,7 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="scheduled-alerts">
-    <div v-if="!disableQueryTypeSelection" class="scheduled-pipeline-tabs q-mb-lg">
+    <div
+      v-if="!disableQueryTypeSelection"
+      class="scheduled-pipeline-tabs q-mb-lg"
+    >
       <q-tabs
         data-test="scheduled-pipeline-tabs"
         v-model="tab"
@@ -72,22 +75,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-            <query-editor
-              data-test="scheduled-pipeline-sql-editor"
-              ref="queryEditorRef"
-              editor-id="alerts-query-editor"
-              class="monaco-editor"
-              v-model:query="query"
-              :class="
-                query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''
-              "
-              @update:query="updateQueryValue"
-              @focus="queryEditorPlaceholderFlag = false"
-              @blur="onBlurQueryEditor"
-            />
-            <div class="text-negative q-mb-xs" style="height: 21px">
-              <span v-show="!isValidSqlQuery"> Invalid SQL Query</span>
-            </div>
+      <query-editor
+        data-test="scheduled-pipeline-sql-editor"
+        ref="queryEditorRef"
+        editor-id="alerts-query-editor"
+        class="monaco-editor"
+        v-model:query="query"
+        :class="query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''"
+        @update:query="updateQueryValue"
+        @focus="queryEditorPlaceholderFlag = false"
+        @blur="onBlurQueryEditor"
+      />
+      <div class="text-negative q-mb-xs" style="height: 21px">
+        <span v-show="!isValidSqlQuery"> Invalid SQL Query</span>
+      </div>
     </template>
 
     <div class="q-mt-sm">
@@ -140,7 +141,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="tab === 'custom'"
         class="flex justify-start items-center text-bold q-mb-lg"
       >
-        <div data-test="scheduled-pipeline-aggregation-title" style="width: 172px">
+        <div
+          data-test="scheduled-pipeline-aggregation-title"
+          style="width: 172px"
+        >
           Aggregation
         </div>
         <q-toggle
@@ -559,7 +563,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="number"
                 dense
                 filled
-                min="1"
+                :min="
+                  Math.ceil(
+                    store.state?.zoConfig?.min_auto_refresh_interval / 60,
+                  ) || 1
+                "
                 style="background: none"
                 @update:model-value="updateFrequency"
               />
@@ -713,7 +721,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="scheduled-pipeline-period-warning-text"
             v-else
             class="text-primary q-pt-xs"
-            style="font-size: 12px; line-height: 12px ;padding: 8px 0px;"
+            style="font-size: 12px; line-height: 12px; padding: 8px 0px"
           >
             Note: The period should be the same as frequency.
           </div>
@@ -747,7 +755,7 @@ import { useQuasar } from "quasar";
 import cronParser from "cron-parser";
 
 const QueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue")
+  () => import("@/components/QueryEditor.vue"),
 );
 
 const props = defineProps([
@@ -813,11 +821,11 @@ const regularFunctions = ["avg", "max", "min", "sum", "count"];
 const aggFunctions = computed(() =>
   props.alertData.stream_type === "metrics"
     ? [...regularFunctions, ...metricFunctions]
-    : [...regularFunctions]
+    : [...regularFunctions],
 );
 
 const _isAggregationEnabled = ref(
-  tab.value === "custom" && props.isAggregationEnabled
+  tab.value === "custom" && props.isAggregationEnabled,
 );
 
 const promqlCondition = ref(props.promql_condition);
@@ -975,7 +983,7 @@ watch(
   () => functionsList.value,
   (functions: any[]) => {
     functionOptions.value = [...functions];
-  }
+  },
 );
 
 const vrlFunctionContent = computed({
@@ -1084,7 +1092,7 @@ const filterNumericColumns = (val: string, update: Function) => {
   update(() => {
     const value = val.toLowerCase();
     filteredNumericColumns.value = getNumericColumns.value.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1
+      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
     );
   });
 };
@@ -1109,8 +1117,7 @@ const onBlurQueryEditor = () => {
 };
 
 const validateInputs = (notify: boolean = true) => {
-
-  if(cronJobError.value) {
+  if (cronJobError.value) {
     notify &&
       q.notify({
         type: "negative",
@@ -1119,9 +1126,8 @@ const validateInputs = (notify: boolean = true) => {
       });
     return false;
   }
-  
-    if (
 
+  if (
     Number(triggerData.value.period) < 1 ||
     isNaN(Number(triggerData.value.period))
   ) {
@@ -1204,19 +1210,18 @@ defineExpose({
 }
 .scheduled-alerts {
   .monaco-editor {
-  width: 100% !important;
-  min-width: 500px !important;
-  min-height: calc(100vh - 500px) !important;
-  border: 1px solid $border-color;
-  resize: vertical;
-  overflow: auto;
-}
+    width: 100% !important;
+    min-width: 500px !important;
+    min-height: calc(100vh - 500px) !important;
+    border: 1px solid $border-color;
+    resize: vertical;
+    overflow: auto;
+  }
 
   .q-btn {
     &.icon-dark {
       filter: none !important;
     }
   }
-
 }
 </style>

@@ -30,6 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <AutoRefreshInterval
           v-model="refreshInterval"
+          :min-refresh-interval="
+            store.state?.zoConfig?.min_auto_refresh_interval || 5
+          "
           trigger
           @trigger="refreshData"
         />
@@ -186,7 +189,7 @@ export default defineComponent({
       () => activePerformanceTab.value,
       () => {
         updateRoute();
-      }
+      },
     );
 
     const route = useRoute();
@@ -218,7 +221,7 @@ export default defineComponent({
 
     watch(
       () => routeName.value,
-      () => updateTabOnRouteChange()
+      () => updateTabOnRouteChange(),
     );
 
     const updateTabOnRouteChange = () => {
@@ -285,8 +288,8 @@ export default defineComponent({
       valueType: params.period
         ? "relative"
         : params.from && params.to
-        ? "absolute"
-        : "relative",
+          ? "absolute"
+          : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : null,
@@ -369,7 +372,7 @@ export default defineComponent({
         store,
         route.query.dashboard,
         panelId,
-        route.query.folder ?? "default"
+        route.query.folder ?? "default",
       );
       await loadDashboard();
     };

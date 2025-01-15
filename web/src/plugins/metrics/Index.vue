@@ -43,6 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
           v-model="refreshInterval"
           trigger
+          :min-refresh-interval="
+            store.state?.zoConfig?.min_auto_refresh_interval || 5
+          "
           @trigger="runQuery"
           class="dashboard-icons tw-mt-1"
           data-test="metrics-auto-refresh"
