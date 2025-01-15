@@ -120,8 +120,6 @@ async fn run_download_files() {
         }
     }
 
-    log::info!("Maxmind client initialized");
-
     Lazy::force(&CLIENT_INITIALIZED);
 }
 
