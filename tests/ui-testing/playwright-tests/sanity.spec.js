@@ -988,7 +988,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.getByRole('button', { name: 'Search History' }).click();
     await page.locator('[data-test="add-alert-title"]').click();
-    await page.getByText('arrow_back_ios_new').click();
+    await page.locator('text=arrow_back_ios_new').first().click();
     await page.waitForTimeout(1000);
 
     // Use a more specific locator for 'e2e_automate' by targeting its unique container or parent element
