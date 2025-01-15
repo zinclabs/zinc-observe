@@ -25,7 +25,6 @@
 //! `meta` table to access and store alerts will be removed.
 
 mod new;
-mod old;
 
 use config::meta::{
     alerts::alert::{Alert, ListAlertsParams},
@@ -51,11 +50,7 @@ pub async fn get_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, infra::errors::Error> {
-    if should_use_meta_alerts() {
-        old::get_by_name(org_id, stream_type, stream_name, name).await
-    } else {
-        new::get_by_name(org_id, stream_type, stream_name, name).await
-    }
+    new::get_by_name(org_id, stream_type, stream_name, name).await
 }
 
 pub async fn set(
@@ -65,21 +60,11 @@ pub async fn set(
     alert: Alert,
     create: bool,
 ) -> Result<(), infra::errors::Error> {
-    if should_use_meta_alerts() {
-        old::set(org_id, stream_type, stream_name, &alert, create).await
-    } else {
-        new::set(org_id, stream_type, stream_name, alert, create).await
-    }
+    new::set(org_id, stream_type, stream_name, alert, create).await
 }
 
 pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<(), anyhow::Error> {
-    if should_use_meta_alerts() {
-        old::set_without_updating_trigger(org_id, alert.stream_type, &alert.stream_name, &alert)
-            .await?;
-        Ok(())
-    } else {
-        new::set_without_updating_trigger(org_id, alert).await
-    }
+    new::set_without_updating_trigger(org_id, alert).await
 }
 
 pub async fn create<C: TransactionTrait>(
@@ -114,11 +99,7 @@ pub async fn delete_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<(), infra::errors::Error> {
-    if should_use_meta_alerts() {
-        old::delete_by_name(org_id, stream_type, stream_name, name).await
-    } else {
-        new::delete_by_name(org_id, stream_type, stream_name, name).await
-    }
+    new::delete_by_name(org_id, stream_type, stream_name, name).await
 }
 
 pub async fn list(
@@ -126,24 +107,20 @@ pub async fn list(
     stream_type: Option<StreamType>,
     stream_name: Option<&str>,
 ) -> Result<Vec<Alert>, infra::errors::Error> {
-    if should_use_meta_alerts() {
-        old::list(org_id, stream_type, stream_name).await
+    let params = ListAlertsParams::new(org_id).in_folder("default");
+    let params = if let Some(stream_name) = stream_name {
+        params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
     } else {
-        let params = ListAlertsParams::new(org_id).in_folder("default");
-        let params = if let Some(stream_name) = stream_name {
-            params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
-        } else {
-            params
-        };
+        params
+    };
 
-        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-        let alerts = new::list(client, params)
-            .await?
-            .into_iter()
-            .map(|(_f, a)| a)
-            .collect();
-        Ok(alerts)
-    }
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let alerts = new::list(client, params)
+        .await?
+        .into_iter()
+        .map(|(_f, a)| a)
+        .collect();
+    Ok(alerts)
 }
 
 pub async fn list_with_folders<C: ConnectionTrait>(
@@ -154,36 +131,13 @@ pub async fn list_with_folders<C: ConnectionTrait>(
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    if should_use_meta_alerts() {
-        old::watch().await
-    } else {
-        new::watch().await
-    }
+    new::watch().await
 }
 
 pub async fn cache() -> Result<(), anyhow::Error> {
-    if should_use_meta_alerts() {
-        old::cache().await
-    } else {
-        new::cache().await
-    }
+    new::cache().await
 }
 
 pub async fn reset() -> Result<(), anyhow::Error> {
-    if should_use_meta_alerts() {
-        old::reset().await
-    } else {
-        new::reset().await
-    }
-}
-
-/// Returns `true` if the `USE_META_ALERTS` environment variable is set to
-/// `"true"`, indicating that alerts should be accessed from and stored in the
-/// old `meta` table. Returns `false` otherwise, indicating that alerts should
-/// be stored from and stored in the new `alerts` table.
-fn should_use_meta_alerts() -> bool {
-    std::env::var("USE_META_ALERTS")
-        .ok()
-        .and_then(|s| s.parse::<bool>().ok())
-        .unwrap_or(false)
+    new::reset().await
 }
