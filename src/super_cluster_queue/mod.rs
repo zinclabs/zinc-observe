@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod alerts;
+mod cipher_keys;
 mod dashboards;
 mod distinct_values;
 mod meta;
@@ -42,6 +43,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_search_job_msg: search_job::process,
         on_dashboard_msg: dashboards::process,
         on_pipeline_msg: pipelines::process,
+        on_cipher_key_msg: cipher_keys::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,
