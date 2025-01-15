@@ -51,7 +51,7 @@ use {
         common::{
             auditor::{AuditMessage, HttpMeta, Protocol},
             infra::config::{get_config as get_o2_config, refresh_config as refresh_o2_config},
-            settings::{get_logo, get_logo_text},
+            settings::{get_logo, get_logo_text, get_warning_text},
         },
         dex::service::auth::{exchange_code, get_dex_jwks, get_dex_login, refresh_token},
     },
@@ -104,6 +104,7 @@ struct ConfigResponse<'a> {
     query_on_stream_selection: bool,
     show_stream_stats_doc_num: bool,
     custom_logo_text: String,
+    warning_text: String,
     custom_slack_url: String,
     custom_docs_url: String,
     rum: Rum,
@@ -213,8 +214,15 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         Some(data) => data,
         None => o2cfg.common.custom_logo_text.clone(),
     };
+    #[cfg(feature = "enterprise")]
+    let warning_text = match get_warning_text().await {
+        Some(data) => data,
+        None => o2cfg.common.warning_text.clone(),
+    };
     #[cfg(not(feature = "enterprise"))]
     let custom_logo_text = "".to_string();
+    #[cfg(not(feature = "enterprise"))]
+    let warning_text = "".to_string();
     #[cfg(feature = "enterprise")]
     let custom_slack_url = &o2cfg.common.custom_slack_url;
     #[cfg(not(feature = "enterprise"))]
@@ -271,6 +279,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         query_on_stream_selection: cfg.common.query_on_stream_selection,
         show_stream_stats_doc_num: cfg.common.show_stream_dates_doc_num,
         custom_logo_text,
+        warning_text,
         custom_slack_url: custom_slack_url.to_string(),
         custom_docs_url: custom_docs_url.to_string(),
         custom_logo_img: logo,

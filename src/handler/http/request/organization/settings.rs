@@ -223,3 +223,18 @@ async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
 async fn delete_logo_text() -> Result<HttpResponse, StdErr> {
     Ok(HttpResponse::Forbidden().json("Not Supported"))
 }
+
+#[cfg(feature = "enterprise")]
+#[post("/{org_id}/settings/warning")]
+async fn update_warning(body: web::Bytes) -> Result<HttpResponse, StdErr> {
+    match settings::update_warning_text(body).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(serde_json::json!({"successful": "true"}))),
+        Err(e) => Ok(MetaHttpResponse::internal_error(e)),
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[post("/{org_id}/settings/warning")]
+async fn update_warning() -> Result<HttpResponse, StdErr> {
+    Ok(HttpResponse::Forbidden().json("Not Supported"))
+}

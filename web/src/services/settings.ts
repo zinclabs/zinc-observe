@@ -29,6 +29,9 @@ const settings = {
   updateCustomText: (org_identifier: string, key: string, value: string) => {
     return http().post(`/api/${org_identifier}/settings/logo/text`, value);
   },
+  updateCustomWarning: (org_identifier: string, value: string) => {
+    return http().post(`/api/${org_identifier}/settings/warning`, value);
+  },
 };
 
 export default settings;

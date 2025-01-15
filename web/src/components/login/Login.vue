@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         no-caps
         style="width: 400px"
         @click="loginWithSSo"
+        :disable="showLoginWarning && !isLoginEnabled"
       >
         <div
           class="flex items-center justify-center full-width text-center relative"
@@ -102,6 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <span class="text-center"> Login with SSO</span>
         </div>
+        <q-tooltip
+          v-if="showLoginWarning && !isLoginEnabled"
+          anchor="center right"
+          self="center left"
+          :offset="[10, 10]"
+          class="tw-text-[12px]"
+          >{{ t("login.loginDisableTooltip") }}</q-tooltip
+        >
       </q-btn>
     </div>
 
@@ -118,8 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
       class="o2-input login-inputs"
     >
-      <q-form ref="loginform"
-class="q-gutter-md" @submit.prevent="">
+      <q-form ref="loginform" class="q-gutter-md" @submit.prevent="">
         <q-input
           v-model="name"
           data-cy="login-user-id"
@@ -148,7 +156,7 @@ class="q-gutter-md" @submit.prevent="">
           filled
         />
 
-        <div class="q-mt-lg q-mb-xl">
+        <div class="q-mt-lg q-mb-lg">
           <q-btn
             data-cy="login-sign-in"
             unelevated
@@ -160,9 +168,38 @@ class="q-gutter-md" @submit.prevent="">
             :loading="submitting"
             no-caps
             @click="onSignIn()"
-          />
+            :disable="showLoginWarning && !isLoginEnabled"
+          >
+            <q-tooltip
+              v-if="showLoginWarning && !isLoginEnabled"
+              anchor="center right"
+              self="center left"
+              :offset="[10, 10]"
+              class="tw-text-[12px]"
+              >{{ t("login.loginDisableTooltip") }}</q-tooltip
+            >
+          </q-btn>
         </div>
       </q-form>
+    </div>
+    <div v-if="showLoginWarning">
+      <div class="tw-pl-2 tw-break-all">
+        <q-icon
+          name="warning"
+          color="warning"
+          size="16px"
+          class="tw-relative tw-bottom-[2px]"
+        />
+        <span class="text-bold"> Warning: </span>
+        {{ store.state.zoConfig.warning_text }}
+      </div>
+      <q-checkbox
+        class="tw-mt-1"
+        v-model="isLoginEnabled"
+        :label="t('login.warningText')"
+        color="primary"
+        size="xs"
+      />
     </div>
   </div>
 </template>
@@ -204,6 +241,8 @@ export default defineComponent({
     const selectedOrg = ref({});
     let orgOptions = ref([{ label: Number, value: String }]);
 
+    const isLoginEnabled = ref(false);
+
     const submitting = ref(false);
 
     const loginAsInternalUser = ref(false);
@@ -216,6 +255,16 @@ export default defineComponent({
 
     const showSSO = computed(() => {
       return store.state.zoConfig.sso_enabled && config.isEnterprise === "true";
+    });
+
+    const isEnterprise = computed(() => {
+      return config.isEnterprise === "true";
+    });
+
+    const showLoginWarning = computed(() => {
+      return !!(
+        isEnterprise.value && store.state.zoConfig.warning_text?.trim()?.length
+      );
     });
 
     const showInternalLogin = computed(() => {
@@ -428,6 +477,8 @@ export default defineComponent({
       showInternalLogin,
       loginWithSSo,
       config,
+      isLoginEnabled,
+      showLoginWarning,
     };
   },
   methods: {

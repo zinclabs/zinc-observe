@@ -335,6 +335,7 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(organization::settings::delete_logo)
         .service(organization::settings::set_logo_text)
         .service(organization::settings::delete_logo_text)
+        .service(organization::settings::update_warning)
         .service(organization::org::org_summary)
         .service(organization::org::get_user_passcode)
         .service(organization::org::update_user_passcode)

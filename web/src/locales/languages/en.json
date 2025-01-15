@@ -232,7 +232,9 @@
     "cnfpassword": "Confirm Password",
     "singnInWithGoogle": "Continue with Google",
     "email": "Email",
-    "login": "Login"
+    "login": "Login",
+    "warningText": "I have read and understood the data handling policy.",
+    "loginDisableTooltip": "Acknowledge and Tick the box below to proceed."
   },
   "user": {
     "header": "Organization Member",
@@ -980,7 +982,8 @@
     "logDetails": "Log Details",
     "traceIdFieldName": "Trace ID Field Name",
     "spanIdFieldName": "Span ID Field Name",
-    "toggleIngestionLogsLabel": "Toggle Ingestion Logs"
+    "toggleIngestionLogsLabel": "Toggle Ingestion Logs",
+    "customLoginWarning": "Login Warning Message"
   },
   "reports": {
     "header": "Reports",

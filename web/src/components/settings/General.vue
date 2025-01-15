@@ -180,6 +180,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-file>
         </div>
+        <q-separator class="q-mt-md"></q-separator>
+        <div class="q-gutter-sm row q-mt-md">
+          <div class="q-gutter-md row items-start custom-login-warning">
+            <q-input
+              color="input-border"
+              bg-color="input-bg"
+              class="q-py-md showLabelOnTop tw-w-[500px]"
+              stack-label
+              outlined
+              filled
+              dense
+              data-test="settings_ent_logo_custom_text"
+              :label="t('settings.customLoginWarning')"
+              v-model.trim="customLoginWarning"
+              type="textarea"
+            />
+            <div
+              class="btn-group relative-position vertical-middle"
+              style="margin-top: 55px"
+            >
+              <q-btn
+                data-test="settings_ent_logo_custom_text_save_btn"
+                :loading="onSubmit.isLoading.value"
+                :label="t('dashboard.save')"
+                class="text-bold no-border q-mr-sm"
+                color="secondary"
+                size="sm"
+                type="submit"
+                no-caps
+                @click="updateCustomLoginWarning"
+              />
+
+              <q-btn
+                type="button"
+                size="sm"
+                :label="t('common.cancel')"
+                @click="customLoginWarning = store.state.zoConfig.warning_text"
+              ></q-btn>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -250,6 +291,8 @@ export default defineComponent({
       store.state?.organizationData?.organizationSettings?.scrape_interval ??
         15,
     );
+
+    const customLoginWarning = ref(store.state.zoConfig.warning_text ?? "");
 
     const enableWebsocketSearch = ref(
       store.state?.organizationData?.organizationSettings
@@ -476,6 +519,62 @@ export default defineComponent({
         });
     };
 
+    const updateCustomLoginWarning = () => {
+      loadingState.value = true;
+      let orgIdentifier = "default";
+      for (let item of store.state.organizations) {
+        if (item.type == "default") {
+          orgIdentifier = item.identifier;
+        }
+      }
+
+      customLoginWarning.value = sanitizeInput(customLoginWarning.value);
+      if (customText.value.length > 100) {
+        q.notify({
+          type: "negative",
+          message: "Text should be less than 100 characters.",
+          timeout: 2000,
+        });
+        loadingState.value = false;
+        return;
+      }
+
+      settingsService
+        .updateCustomWarning(
+          store.state.selectedOrganization?.identifier || orgIdentifier,
+          customLoginWarning.value,
+        )
+        .then(async (res: any) => {
+          if (res.status == 200) {
+            q.notify({
+              type: "positive",
+              message: "Logo text updated successfully.",
+              timeout: 2000,
+            });
+
+            let stateConfig = JSON.parse(JSON.stringify(store.state.zoConfig));
+            stateConfig.warning_text = customLoginWarning.value;
+            store.dispatch("setConfig", stateConfig);
+          } else {
+            q.notify({
+              type: "negative",
+              message: res?.message || "Error while updating image.",
+              timeout: 2000,
+            });
+          }
+        })
+        .catch((err) => {
+          q.notify({
+            type: "negative",
+            message: err?.message || "Something went wrong.",
+            timeout: 2000,
+          });
+        })
+        .finally(() => {
+          loadingState.value = false;
+        });
+    };
+
     interface CounterLabelParams {
       totalSize: string;
       filesNumber: number;
@@ -514,7 +613,16 @@ export default defineComponent({
       updateCustomText,
       confirmDeleteImage: ref(false),
       sanitizeInput,
+      customLoginWarning,
+      updateCustomLoginWarning,
     };
   },
 });
 </script>
+<style scoped lang="scss">
+.custom-login-warning {
+  :deep(.q-field__native) {
+    min-height: 70px;
+  }
+}
+</style>
