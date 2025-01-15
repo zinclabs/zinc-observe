@@ -4295,6 +4295,29 @@ const useLogs = () => {
 
       const newSelectedStreams: string[] = [];
 
+      const streams = new Set(
+        searchObj.data.stream.streamLists.map((stream: any) => stream.value),
+      );
+
+      if (parsedSQL?.with?.length) {
+        parsedSQL?.with?.forEach((withClause: any) => {
+          withClause.stmt.from.forEach((stream: any) => {
+            // Check if 'expr' and 'ast' exist, then access 'from' to get the table
+            if (stream.expr?.ast?.from) {
+              stream.expr.ast.from.forEach((subStream: any) => {
+                if (subStream.table != undefined && streams.has(stream.table)) {
+                  newSelectedStreams.push(subStream.table);
+                }
+              });
+            }
+            // Otherwise, return the table name directly
+            if (stream.table != undefined && streams.has(stream.table)) {
+              newSelectedStreams.push(stream.table);
+            }
+          });
+        });
+      }
+
       //for simple query get the table name from the parsedSQL object
       // this will handle joins as well
       if (parsedSQL?.from) {
@@ -4302,13 +4325,13 @@ const useLogs = () => {
           // Check if 'expr' and 'ast' exist, then access 'from' to get the table
           if (stream.expr?.ast?.from) {
             stream.expr.ast.from.forEach((subStream: any) => {
-              if (subStream.table != undefined) {
+              if (subStream.table != undefined && streams.has(stream.table)) {
                 newSelectedStreams.push(subStream.table);
               }
             });
           }
           // Otherwise, return the table name directly
-          if (stream.table != undefined) {
+          if (stream.table != undefined && streams.has(stream.table)) {
             newSelectedStreams.push(stream.table);
           }
         });
@@ -4320,9 +4343,10 @@ const useLogs = () => {
         while (nextTable) {
           // Map through each "from" array in the _next object, as it can contain multiple tables
           if (nextTable.from) {
-            nextTable.from.forEach((stream: { table: string }) =>
-              newSelectedStreams.push(stream.table),
-            );
+            nextTable.from.forEach((stream: { table: string }) => {
+              if (streams.has(stream.table))
+                newSelectedStreams.push(stream.table);
+            });
           }
           nextTable = nextTable._next;
         }
