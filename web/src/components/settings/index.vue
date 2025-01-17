@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           <q-route-tab
             data-test="alert-destinations-tab"
-            name="destinations"
+            name="alert_destinations"
             :to="{
               name: 'alertDestinations',
               query: {
@@ -67,6 +67,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             icon="location_on"
             :label="t('alert_destinations.header')"
+            content-class="tab_content"
+          />
+          <q-route-tab
+            data-test="pipeline-destinations-tab"
+            name="pipeline_destinations"
+            :to="{
+              name: 'pipelineDestinations',
+              query: {
+                org_identifier: store.state.selectedOrganization.identifier,
+              },
+            }"
+            icon="person_pin_circle"
+            :label="t('pipeline_destinations.header')"
             content-class="tab_content"
           />
           <q-route-tab

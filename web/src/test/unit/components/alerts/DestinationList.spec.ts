@@ -17,7 +17,7 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
 import { installQuasar } from "../../helpers/install-quasar-plugin";
 import { Dialog, Notify } from "quasar";
-import DestinationList from "@/components/alerts/DestinationList.vue";
+import DestinationList from "@/components/alerts/AlertsDestinationList.vue";
 import i18n from "@/locales";
 import store from "../../helpers/store";
 // @ts-ignore
@@ -56,12 +56,12 @@ describe("Alert List", async () => {
 
   it("Should render alerts title", () => {
     expect(
-      wrapper.find('[data-test="alert-destinations-list-title"]').text()
+      wrapper.find('[data-test="alert-destinations-list-title"]').text(),
     ).toBe("Destinations");
   });
   it("Should reder table with templates", () => {
     expect(
-      wrapper.find('[data-test="alert-destinations-list-table"]').exists()
+      wrapper.find('[data-test="alert-destinations-list-table"]').exists(),
     ).toBeTruthy();
   });
 
@@ -94,7 +94,7 @@ describe("Alert List", async () => {
 
   it("Should display add destination button", () => {
     expect(
-      wrapper.find('[data-test="alert-destination-list-add-alert-btn"]').text()
+      wrapper.find('[data-test="alert-destination-list-add-alert-btn"]').text(),
     ).toBe("Add Destination");
   });
 
@@ -122,8 +122,8 @@ describe("Alert List", async () => {
           `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/destinations/${destination_name}`,
           (req: any, res: any, ctx: any) => {
             return res(ctx.status(200), ctx.json({ code: 200 }));
-          }
-        )
+          },
+        ),
       );
       global.server.use(
         rest.get(
@@ -145,14 +145,14 @@ describe("Alert List", async () => {
                     },
                   },
                 ],
-              })
+              }),
             );
-          }
-        )
+          },
+        ),
       );
       await wrapper
         .find(
-          `[data-test="alert-destination-list-${destination_name}-delete-destination"]`
+          `[data-test="alert-destination-list-${destination_name}-delete-destination"]`,
         )
         .trigger("click");
       const mainWrapper = new DOMWrapper(document.body);

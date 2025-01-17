@@ -919,7 +919,7 @@
     "body": "Body"
   },
   "alert_destinations": {
-    "header": "Destinations",
+    "header": "Alert Destinations",
     "add": "Add Destination",
     "edit": "Edit",
     "search": "Search destination",
@@ -937,6 +937,9 @@
     "api_header_value": "Value",
     "add_template": "New Template",
     "skip_tls_verify": "Skip TLS Verify"
+  },
+  "pipeline_destinations": {
+    "header":"Pipeline Destinations"
   },
   "metrics": {
     "searchMetric": "Search for a Metric",

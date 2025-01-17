@@ -129,6 +129,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="pipelineObj.dialog.name === 'stream'"
         @cancel:hideform="resetDialog"
       />
+
+      <ExternalDestination
+        v-if="pipelineObj.dialog.name === 'external_destination'"
+        @cancel:hideform="resetDialog"
+       />
+      
     </div>
   </q-dialog>
   <confirm-dialog
@@ -174,10 +180,12 @@ import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
 import ConditionForm from "@/components/pipeline/NodeForm/Condition.vue";
 import { MarkerType } from "@vue-flow/core";
+import ExternalDestination from "./NodeForm/ExternalDestination.vue";
 
 const functionImage = getImageURL("images/pipeline/function.svg");
 const streamImage = getImageURL("images/pipeline/stream.svg");
 const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
+const externalOutputImage = getImageURL("images/pipeline/externalOutput.svg");
 const streamRouteImage = getImageURL("images/pipeline/route.svg");
 const conditionImage = getImageURL("images/pipeline/condition.svg");
 const queryImage = getImageURL("images/pipeline/query.svg");
@@ -336,6 +344,14 @@ const nodeTypes: any = [
     io_type: "output",
     icon: "img:" + streamOutputImage,
     tooltip: "Destination: Stream Node",
+    isSectionHeader: false,
+  },
+  {
+    label: "External",
+    subtype: "external_destination",
+    io_type: "output",
+    icon: "img:" + externalOutputImage,
+    tooltip: "Destination: External Destination Node",
     isSectionHeader: false,
   },
 ];

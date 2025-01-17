@@ -135,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else>
       <AddDestination
+        :is-alerts="true"
         :destination="editingDestination"
         :templates="templates"
         @cancel:hideform="toggleDestinationEditor"
@@ -278,6 +279,10 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
         })
         .then((res) => {
+          res.data = res.data.filter(
+            (destination: any) =>
+              destination.type == "http" || destination.type == "email",
+          );
           resultTotal.value = res.data.length;
           destinations.value = res.data.map((data: any, index: number) => ({
             ...data,
