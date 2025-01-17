@@ -19,7 +19,7 @@ use actix_cors::Cors;
 use actix_web::{
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse},
-    http::{header, ConnectionType, StatusCode},
+    http::header,
     middleware, web, HttpRequest, HttpResponse,
 };
 use actix_web_httpauth::middleware::HttpAuthentication;
@@ -41,12 +41,10 @@ use {
     },
 };
 
-use super::{
-    auth::validator::{validator_aws, validator_gcp, validator_proxy_url, validator_rum},
-    request::*,
-};
+use super::request::*;
 use crate::common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL};
 
+pub mod middlewares;
 pub mod openapi;
 pub mod ui;
 
@@ -145,43 +143,30 @@ async fn audit_middleware(
     next.call(req).await
 }
 
-async fn check_keep_alive(
-    req: ServiceRequest,
-    next: Next<impl MessageBody>,
-) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
-    let req_conn_type = req.head().connection_type();
-    let mut resp = next.call(req).await?;
-    if resp.status() >= StatusCode::BAD_REQUEST || req_conn_type == ConnectionType::Close {
-        resp.response_mut()
-            .head_mut()
-            .set_connection_type(ConnectionType::Close);
-    }
-    Ok(resp)
-}
-
 /// This is a very trivial proxy to overcome the cors errors while
 /// session-replay in rrweb.
-pub fn get_proxy_routes(cfg: &mut web::ServiceConfig) {
+pub fn get_proxy_routes(svc: &mut web::ServiceConfig) {
     let enable_authentication_on_route = true;
-    get_proxy_routes_inner(cfg, enable_authentication_on_route)
+    get_proxy_routes_inner(svc, enable_authentication_on_route)
 }
 
-pub fn get_proxy_routes_inner(cfg: &mut web::ServiceConfig, enable_validator: bool) {
+pub fn get_proxy_routes_inner(svc: &mut web::ServiceConfig, enable_validator: bool) {
     let cors = Cors::default()
         .allow_any_origin()
         .allow_any_method()
         .allow_any_header();
 
     if enable_validator {
-        let auth = HttpAuthentication::with_fn(validator_proxy_url);
-        cfg.service(
+        svc.service(
             web::resource("/proxy/{org_id}/{target_url:.*}")
-                .wrap(auth)
                 .wrap(cors)
+                .wrap(HttpAuthentication::with_fn(
+                    super::auth::validator::validator_proxy_url,
+                ))
                 .route(web::get().to(proxy)),
         );
     } else {
-        cfg.service(
+        svc.service(
             web::resource("/proxy/{org_id}/{target_url:.*}")
                 .wrap(cors)
                 .route(web::get().to(proxy)),
@@ -210,12 +195,12 @@ async fn proxy(
     Ok(HttpResponse::build(actix_web::http::StatusCode::from_u16(status).unwrap()).body(body))
 }
 
-pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
+pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
     let cors = get_cors();
-    cfg.service(status::healthz)
+    svc.service(status::healthz)
         .service(status::healthz_head)
         .service(status::schedulez);
-    cfg.service(
+    svc.service(
         web::scope("/auth")
             .wrap(cors.clone())
             .service(users::authentication)
@@ -223,7 +208,7 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
             .service(users::get_auth),
     );
 
-    cfg.service(
+    svc.service(
         web::scope("/node")
             .wrap(HttpAuthentication::with_fn(
                 super::auth::validator::oo_validator,
@@ -235,7 +220,7 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
     );
 
     if get_config().common.swagger_enabled {
-        cfg.service(
+        svc.service(
             SwaggerUi::new("/swagger/{_:.*}")
                 .url(
                     format!("{}/api-doc/openapi.json", get_config().common.base_uri),
@@ -243,14 +228,14 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
                 )
                 .url("/api-doc/openapi.json", openapi::ApiDoc::openapi()),
         );
-        cfg.service(web::redirect("/swagger", "/swagger/"));
-        cfg.service(web::redirect("/docs", "/swagger/"));
+        svc.service(web::redirect("/swagger", "/swagger/"));
+        svc.service(web::redirect("/docs", "/swagger/"));
     }
 
     if get_config().common.ui_enabled {
-        cfg.service(web::redirect("/", "./web/"));
-        cfg.service(web::redirect("/web", "./web/"));
-        cfg.service(
+        svc.service(web::redirect("/", "./web/"));
+        svc.service(web::redirect("/web", "./web/"));
+        svc.service(
             web::scope("/web")
                 .wrap_fn(|req, srv| {
                     let cfg = get_config();
@@ -289,9 +274,9 @@ pub fn get_basic_routes(cfg: &mut web::ServiceConfig) {
 }
 
 #[cfg(not(feature = "enterprise"))]
-pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
+pub fn get_config_routes(svc: &mut web::ServiceConfig) {
     let cors = get_cors();
-    cfg.service(
+    svc.service(
         web::scope("/config")
             .wrap(cors.clone())
             .service(status::zo_config)
@@ -301,9 +286,9 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
 }
 
 #[cfg(feature = "enterprise")]
-pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
+pub fn get_config_routes(svc: &mut web::ServiceConfig) {
     let cors = get_cors();
-    cfg.service(
+    svc.service(
         web::scope("/config")
             .wrap(cors)
             .service(status::zo_config)
@@ -316,17 +301,18 @@ pub fn get_config_routes(cfg: &mut web::ServiceConfig) {
     );
 }
 
-pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
+pub fn get_service_routes(svc: &mut web::ServiceConfig) {
+    let cfg = get_config();
     let cors = get_cors();
     // set server header
     #[cfg(feature = "enterprise")]
     let server = format!(
         "{}-{}",
         get_o2_config().super_cluster.region,
-        get_config().common.instance_name_short
+        cfg.common.instance_name_short
     );
     #[cfg(not(feature = "enterprise"))]
-    let server = get_config().common.instance_name_short.to_string();
+    let server = cfg.common.instance_name_short.to_string();
 
     let service = web::scope("/api")
         .wrap(from_fn(audit_middleware))
@@ -334,7 +320,8 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
             super::auth::validator::oo_validator,
         ))
         .wrap(cors.clone())
-        .wrap(from_fn(check_keep_alive))
+        .wrap(middlewares::SlowLog::new(cfg.limit.http_slow_log_threshold))
+        .wrap(from_fn(middlewares::check_keep_alive))
         .wrap(middleware::DefaultHeaders::new().add(("X-Api-Node", server)))
         .service(users::list)
         .service(users::save)
@@ -428,11 +415,13 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(folders::list_folders)
         .service(folders::update_folder)
         .service(folders::get_folder)
+        .service(folders::get_folder_by_name)
         .service(folders::delete_folder)
         .service(folders::deprecated::create_folder)
         .service(folders::deprecated::list_folders)
         .service(folders::deprecated::update_folder)
         .service(folders::deprecated::get_folder)
+        .service(folders::deprecated::get_folder_by_name)
         .service(folders::deprecated::delete_folder)
         .service(alerts::create_alert)
         .service(alerts::get_alert)
@@ -441,6 +430,7 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(alerts::list_alerts)
         .service(alerts::enable_alert)
         .service(alerts::trigger_alert)
+        .service(alerts::move_alerts)
         .service(alerts::deprecated::save_alert)
         .service(alerts::deprecated::update_alert)
         .service(alerts::deprecated::get_alert)
@@ -525,36 +515,39 @@ pub fn get_service_routes(cfg: &mut web::ServiceConfig) {
         .service(search::job::cancel_query)
         .service(search::job::query_status);
 
-    cfg.service(service);
+    svc.service(service);
 }
 
-pub fn get_other_service_routes(cfg: &mut web::ServiceConfig) {
+pub fn get_other_service_routes(svc: &mut web::ServiceConfig) {
     let cors = get_cors();
-    let amz_auth = HttpAuthentication::with_fn(validator_aws);
-    cfg.service(
+    svc.service(
         web::scope("/aws")
             .wrap(cors.clone())
-            .wrap(amz_auth)
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::validator_aws,
+            ))
             .service(logs::ingest::handle_kinesis_request),
     );
 
-    let gcp_auth = HttpAuthentication::with_fn(validator_gcp);
-    cfg.service(
+    svc.service(
         web::scope("/gcp")
             .wrap(cors.clone())
-            .wrap(gcp_auth)
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::validator_gcp,
+            ))
             .service(logs::ingest::handle_gcp_request),
     );
 
     // NOTE: Here the order of middlewares matter. Once we consume the api-token in
     // `rum_auth`, we drop it in the RumExtraData data.
     // https://docs.rs/actix-web/latest/actix_web/middleware/index.html#ordering
-    let rum_auth = HttpAuthentication::with_fn(validator_rum);
-    cfg.service(
+    svc.service(
         web::scope("/rum")
             .wrap(cors)
             .wrap(from_fn(RumExtraData::extractor))
-            .wrap(rum_auth)
+            .wrap(HttpAuthentication::with_fn(
+                super::auth::validator::validator_rum,
+            ))
             .service(rum::ingest::log)
             .service(rum::ingest::sessionreplay)
             .service(rum::ingest::data),

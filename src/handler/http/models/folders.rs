@@ -91,7 +91,7 @@ impl From<UpdateFolderRequestBody> for config::meta::folder::Folder {
     }
 }
 
-impl From<FolderType> for infra::table::folders::FolderType {
+impl From<FolderType> for config::meta::folder::FolderType {
     fn from(value: FolderType) -> Self {
         match value {
             FolderType::Dashboards => Self::Dashboards,

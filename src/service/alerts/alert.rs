@@ -28,7 +28,7 @@ use config::{
             destinations::{DestinationType, DestinationWithTemplate, HTTPType},
             FrequencyType, Operator, QueryType,
         },
-        folder::{Folder, DEFAULT_FOLDER},
+        folder::{Folder, FolderType, DEFAULT_FOLDER},
         search::{SearchEventContext, SearchEventType},
         sql::resolve_stream_names,
         stream::StreamType,
@@ -40,10 +40,7 @@ use config::{
     SMTP_CLIENT,
 };
 use cron::Schedule;
-use infra::{
-    schema::unwrap_stream_settings,
-    table::{self, folders::FolderType},
-};
+use infra::{schema::unwrap_stream_settings, table};
 use itertools::Itertools;
 use lettre::{message::MultiPart, AsyncTransport, Message};
 use sea_orm::{ConnectionTrait, TransactionTrait};
@@ -191,6 +188,7 @@ async fn create_default_alerts_folder(org_id: &str) -> Result<(), AlertError> {
     Ok(())
 }
 
+/// Validates the alert and prepares it before it is written to the database.
 async fn prepare_alert(
     org_id: &str,
     stream_name: &str,
@@ -396,6 +394,7 @@ async fn prepare_alert(
     Ok(())
 }
 
+/// Creates a new alert in the specified folder.
 pub async fn create<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
@@ -418,6 +417,26 @@ pub async fn create<C: TransactionTrait>(
     Ok(alert)
 }
 
+/// Moves the alerts into the specified destination folder.
+pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_ids: &[Ksuid],
+    dst_folder_id: &str,
+) -> Result<(), AlertError> {
+    for alert_id in alert_ids {
+        let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, *alert_id).await? else {
+            return Err(AlertError::AlertNotFound);
+        };
+
+        update(conn, org_id, Some(dst_folder_id), alert).await?;
+    }
+    Ok(())
+}
+
+/// Updates the alert.
+///
+/// Updates the alert's parent folder if a `folder_id` is given.
 pub async fn update<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
@@ -425,6 +444,7 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     mut alert: Alert,
 ) -> Result<Alert, AlertError> {
     if let Some(folder_id) = folder_id {
+        // Ensure that the destination folder exists.
         if !table::folders::exists(org_id, folder_id, FolderType::Alerts).await? {
             if folder_id == DEFAULT_FOLDER {
                 create_default_alerts_folder(org_id).await?;
@@ -436,12 +456,13 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
 
     let alert_name = alert.name.clone();
     let stream_name = alert.stream_name.clone();
-    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, true).await?;
+    prepare_alert(org_id, &stream_name, &alert_name, &mut alert, false).await?;
 
     let alert = db::alerts::alert::update(conn, org_id, folder_id, alert).await?;
     Ok(alert)
 }
 
+/// Gets the alert by its KSUID primary key.
 pub async fn get_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -501,6 +522,7 @@ pub async fn list(
     }
 }
 
+/// Gets a list of alerts.
 pub async fn list_v2<C: ConnectionTrait>(
     conn: &C,
     user_id: Option<&str>,
@@ -531,12 +553,13 @@ pub async fn list_v2<C: ConnectionTrait>(
     Ok(alerts)
 }
 
+/// Deletes an alert by its KSUID primary key.
 pub async fn delete_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), AlertError> {
-    let Some(alert) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+    let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
         return Ok(());
     };
 
@@ -570,18 +593,18 @@ pub async fn delete_by_name(
     }
 }
 
-pub async fn enable_by_id<C: ConnectionTrait>(
+/// Enables an alert.
+pub async fn enable_by_id<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
     should_enable: bool,
 ) -> Result<(), AlertError> {
-    let Some(mut alert) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+    let Some((_, mut alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
         return Err(AlertError::AlertNotFound);
     };
-    let stream_name = alert.stream_name.clone();
     alert.enabled = should_enable;
-    db::alerts::alert::set(org_id, alert.stream_type, &stream_name, alert, false).await?;
+    update(conn, org_id, None, alert).await?;
     Ok(())
 }
 
@@ -604,12 +627,13 @@ pub async fn enable_by_name(
     Ok(())
 }
 
+/// Triggers an alert.
 pub async fn trigger_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(String, String), AlertError> {
-    let Some(alert) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+    let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
         return Err(AlertError::AlertNotFound);
     };
     let now = Utc::now().timestamp_micros();

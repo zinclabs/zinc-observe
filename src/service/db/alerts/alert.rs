@@ -32,17 +32,16 @@ use svix_ksuid::Ksuid;
 
 use crate::{common::infra::config::STREAM_ALERTS, service::db};
 
+/// Gets the alert and its parent folder.
 pub async fn get_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
-) -> Result<Option<Alert>, infra::errors::Error> {
+) -> Result<Option<(Folder, Alert)>, infra::errors::Error> {
     // We cannot check the cache because the cache stores alerts by stream type
     // and stream name which are currently unknown.
-    let alert = table::get_by_id(conn, org_id, alert_id)
-        .await?
-        .map(|(_f, a)| a);
-    Ok(alert)
+    let folder_and_alert = table::get_by_id(conn, org_id, alert_id).await?;
+    Ok(folder_and_alert)
 }
 
 pub async fn get_by_name(
@@ -136,9 +135,9 @@ pub async fn set_without_updating_trigger(org_id: &str, alert: Alert) -> Result<
     cluster::emit_put_event(org_id, &alert).await?;
     #[cfg(feature = "enterprise")]
     if alert.id.is_some() {
-        super_cluster::emit_create_event(org_id, "default", alert.clone()).await?;
-    } else {
         super_cluster::emit_update_event(org_id, None, alert.clone()).await?;
+    } else {
+        super_cluster::emit_create_event(org_id, "default", alert.clone()).await?;
     }
     Ok(())
 }
@@ -149,7 +148,7 @@ pub async fn create<C: TransactionTrait>(
     folder_id: &str,
     alert: Alert,
 ) -> Result<Alert, infra::errors::Error> {
-    let alert = table::create(conn, org_id, folder_id, alert).await?;
+    let alert = table::create(conn, org_id, folder_id, alert, false).await?;
 
     cluster::emit_put_event(org_id, &alert).await?;
     #[cfg(feature = "enterprise")]
@@ -272,16 +271,55 @@ pub async fn delete_by_name(
     Ok(())
 }
 
-pub async fn list<C: ConnectionTrait>(
+pub async fn list(
+    org_id: &str,
+    stream_type: Option<StreamType>,
+    stream_name: Option<&str>,
+) -> Result<Vec<Alert>, infra::errors::Error> {
+    let params = ListAlertsParams::new(org_id).in_folder("default");
+    let params = if let Some(stream_name) = stream_name {
+        params.for_stream(stream_type.unwrap_or_default(), Some(stream_name))
+    } else {
+        params
+    };
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let alerts = table::list(client, params)
+        .await?
+        .into_iter()
+        .map(|(_f, a)| a)
+        .collect();
+    Ok(alerts)
+}
+
+pub async fn list_with_folders<C: ConnectionTrait>(
     conn: &C,
     params: ListAlertsParams,
 ) -> Result<Vec<(Folder, Alert)>, infra::errors::Error> {
-    let items = table::list(conn, params).await?.into_iter().collect();
-    Ok(items)
+    table::list(conn, params).await
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     cluster::watch_events(put_into_cache, delete_from_cache).await
+}
+
+pub async fn cache() -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let alerts = table::list_all(client).await?;
+
+    for alert in alerts {
+        let mut cacher = STREAM_ALERTS.write().await;
+        let stream_key = cache_stream_key(&alert.org_id, alert.stream_type, &alert.stream_name);
+        let group = cacher.entry(stream_key.to_string()).or_default();
+        group.push(alert);
+    }
+    log::info!("Alerts Cached");
+    Ok(())
+}
+
+pub async fn reset() -> Result<(), anyhow::Error> {
+    let key = "/alerts/";
+    Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
 }
 
 async fn put_into_cache(
@@ -344,25 +382,6 @@ async fn delete_from_cache(
     Ok(())
 }
 
-pub async fn cache() -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let alerts = table::list_all(client).await?;
-
-    for alert in alerts {
-        let mut cacher = STREAM_ALERTS.write().await;
-        let stream_key = cache_stream_key(&alert.org_id, alert.stream_type, &alert.stream_name);
-        let group = cacher.entry(stream_key.to_string()).or_default();
-        group.push(alert);
-    }
-    log::info!("Alerts Cached");
-    Ok(())
-}
-
-pub async fn reset() -> Result<(), anyhow::Error> {
-    let key = "/alerts/";
-    Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
-}
-
 /// Returns the key used to store alerts in the in-memory cache, grouped by
 /// stream.
 fn cache_stream_key(org: &str, stream_type: StreamType, stream_name: &str) -> String {
@@ -377,10 +396,7 @@ fn scheduler_key(stream_type: StreamType, stream_name: &str, alert_name: &str) -
 /// Helper functions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use config::{
-        meta::{alerts::alert::Alert, stream::StreamType},
-        utils::json,
-    };
+    use config::meta::{alerts::alert::Alert, stream::StreamType};
     use infra::errors::Error;
     use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
     use svix_ksuid::Ksuid;
@@ -393,11 +409,12 @@ mod super_cluster {
         alert: Alert,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
-            let value = json::to_vec(&alert)?.into();
-            o2_enterprise::enterprise::super_cluster::queue::put(&key, value, true, None)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
+            // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
+            // let value = json::to_vec(&alert)?.into();
+            log::debug!("Sending super cluster alert creation event: {:?}", alert);
+            // o2_enterprise::enterprise::super_cluster::queue::put(&key, value, true, None)
+            //     .await
+            //     .map_err(|e| Error::Message(e.to_string()))?;
             o2_enterprise::enterprise::super_cluster::queue::alerts_create(org, folder_id, alert)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
@@ -413,11 +430,12 @@ mod super_cluster {
         alert: Alert,
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
-            let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
-            let value = json::to_vec(&alert)?.into();
-            o2_enterprise::enterprise::super_cluster::queue::put(&key, value, true, None)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
+            // let key = alert_key(org, alert.stream_type, &alert.stream_name, &alert.name);
+            // let value = json::to_vec(&alert)?.into();
+            log::debug!("Sending super cluster alert update event: {:?}", alert);
+            // o2_enterprise::enterprise::super_cluster::queue::put(&key, value, true, None)
+            //     .await
+            //     .map_err(|e| Error::Message(e.to_string()))?;
             o2_enterprise::enterprise::super_cluster::queue::alerts_update(org, folder_id, alert)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;
@@ -436,9 +454,10 @@ mod super_cluster {
     ) -> Result<(), infra::errors::Error> {
         if get_o2_config().super_cluster.enabled {
             let key = alert_key(org, stream_type, stream_name, alert_name);
-            o2_enterprise::enterprise::super_cluster::queue::delete(&key, false, true, None)
-                .await
-                .map_err(|e| Error::Message(e.to_string()))?;
+            log::debug!("Sending super cluster alert delete event: {:?}", key);
+            // o2_enterprise::enterprise::super_cluster::queue::delete(&key, false, true, None)
+            //     .await
+            //     .map_err(|e| Error::Message(e.to_string()))?;
             o2_enterprise::enterprise::super_cluster::queue::alerts_delete(org, alert_id)
                 .await
                 .map_err(|e| Error::Message(e.to_string()))?;

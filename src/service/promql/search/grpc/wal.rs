@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use arrow::record_batch::RecordBatch;
 use config::{
@@ -68,6 +71,10 @@ pub(crate) async fn create_context(
                 DataFusionError::Execution(err.to_string())
             })?,
     );
+    if schema.fields().is_empty() {
+        // stream not found
+        return Ok(vec![]);
+    }
 
     // get wal record batches
     let (stats, batches, schema) = get_wal_batches(
@@ -97,6 +104,7 @@ pub(crate) async fn create_context(
 
     let ctx = prepare_datafusion_context(None, vec![], false, 0).await?;
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
+    log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
     resp.push((ctx, schema, stats));
 
@@ -106,7 +114,7 @@ pub(crate) async fn create_context(
 /// get file list from local cache, no need match_source, each file will be
 /// searched
 #[allow(clippy::too_many_arguments)]
-#[tracing::instrument(name = "promql:search:grpc:wal:get_file_list", skip(trace_id))]
+#[tracing::instrument(name = "promql:search:grpc:wal:get_file_list", skip(trace_id, schema))]
 async fn get_wal_batches(
     trace_id: &str,
     org_id: &str,
@@ -189,9 +197,24 @@ async fn get_wal_batches(
         ret.map(|data| (data, visit.scan_stats, visit.partial_err))
     }?;
 
-    let mut schema = Arc::new(Schema::empty());
-    if !batches.is_empty() {
-        schema = Arc::clone(&batches[0].schema());
+    if batches.is_empty() {
+        return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
     }
-    Ok((stats, batches, schema))
+
+    // remove the metadata
+    let schema = Arc::new(
+        batches[0]
+            .schema()
+            .as_ref()
+            .clone()
+            .with_metadata(HashMap::new()),
+    );
+    let mut new_batches = Vec::with_capacity(batches.len());
+    for batch in batches {
+        new_batches.push(RecordBatch::try_new(
+            schema.clone(),
+            batch.columns().to_vec(),
+        )?);
+    }
+    Ok((stats, new_batches, schema))
 }

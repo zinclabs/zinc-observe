@@ -484,6 +484,7 @@ pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::E
     let res = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Status.ne(4))
+        .order_by_desc(Column::CreatedAt)
         .all(client)
         .await;
 

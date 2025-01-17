@@ -22,6 +22,9 @@ pub mod job;
 pub mod router;
 pub mod service;
 
+#[cfg(feature = "enterprise")]
+pub mod super_cluster_queue;
+
 pub(crate) static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/ua_regex/regexes.yaml"

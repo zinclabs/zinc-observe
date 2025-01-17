@@ -198,6 +198,36 @@ pub async fn get_folder(path: web::Path<(String, FolderType, String)>) -> impl R
     }
 }
 
+/// GetFolderByName
+#[utoipa::path(
+    context_path = "/api",
+    tag = "Folders",
+    operation_id = "GetFolderByName",
+    security(
+        ("Authorization" = [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("folder_type" = FolderType, Path, description = "Type of data the folder can contain"),
+        ("folder_name" = String, Path, description = "Folder Name"),
+    ),
+    responses(
+        (status = StatusCode::OK, body = GetFolderResponseBody),
+        (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+    ),
+)]
+#[get("/v2/{org_id}/folders/{folder_type}/name/{folder_name}")]
+pub async fn get_folder_by_name(path: web::Path<(String, FolderType, String)>) -> impl Responder {
+    let (org_id, folder_type, folder_name) = path.into_inner();
+    match folders::get_folder_by_name(&org_id, &folder_name, folder_type.into()).await {
+        Ok(folder) => {
+            let body: CreateFolderResponseBody = folder.into();
+            HttpResponse::Ok().json(body)
+        }
+        Err(err) => err.into(),
+    }
+}
+
 /// DeleteFolder
 #[utoipa::path(
     context_path = "/api",
@@ -262,7 +292,7 @@ pub mod deprecated {
     ) -> impl Responder {
         let org_id = path.into_inner();
         let folder = body.into_inner().into();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::save_folder(&org_id, folder, folder_type, false).await {
             Ok(folder) => {
                 let body: CreateFolderResponseBody = folder.into();
@@ -305,7 +335,7 @@ pub mod deprecated {
     ) -> impl Responder {
         let (org_id, folder_id) = path.into_inner();
         let folder = body.into_inner().into();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::update_folder(&org_id, &folder_id, folder_type, folder).await {
             Ok(_) => HttpResponse::Ok().body("Folder updated"),
             Err(err) => err.into(),
@@ -341,7 +371,7 @@ pub mod deprecated {
             return HttpResponse::Forbidden().finish();
         };
 
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::list_folders(&org_id, user_id, folder_type).await {
             Ok(folders) => {
                 let body: ListFoldersResponseBody = folders.into();
@@ -372,8 +402,39 @@ pub mod deprecated {
     #[get("/{org_id}/folders/{folder_id}")]
     pub async fn get_folder(path: web::Path<(String, String)>) -> impl Responder {
         let (org_id, folder_id) = path.into_inner();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::get_folder(&org_id, &folder_id, folder_type).await {
+            Ok(folder) => {
+                let body: CreateFolderResponseBody = folder.into();
+                HttpResponse::Ok().json(body)
+            }
+            Err(err) => err.into(),
+        }
+    }
+
+    /// GetFolderByName
+    #[deprecated]
+    #[utoipa::path(
+        context_path = "/api",
+        tag = "Folders",
+        operation_id = "GetFolderByName",
+        security(
+            ("Authorization" = [])
+        ),
+        params(
+            ("org_id" = String, Path, description = "Organization name"),
+            ("folder_name" = String, Path, description = "Folder Name"),
+        ),
+        responses(
+            (status = StatusCode::OK, body = GetFolderResponseBody),
+            (status = StatusCode::NOT_FOUND, description = "Folder not found", body = HttpResponse),
+        ),
+    )]
+    #[get("/{org_id}/folders/name/{folder_name}")]
+    pub async fn get_folder_by_name(path: web::Path<(String, String)>) -> impl Responder {
+        let (org_id, folder_name) = path.into_inner();
+        let folder_type = config::meta::folder::FolderType::Dashboards;
+        match folders::get_folder_by_name(&org_id, &folder_name, folder_type).await {
             Ok(folder) => {
                 let body: CreateFolderResponseBody = folder.into();
                 HttpResponse::Ok().json(body)
@@ -404,7 +465,7 @@ pub mod deprecated {
     #[delete("/{org_id}/folders/{folder_id}")]
     async fn delete_folder(path: web::Path<(String, String)>) -> impl Responder {
         let (org_id, folder_id) = path.into_inner();
-        let folder_type = infra::table::folders::FolderType::Dashboards;
+        let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::delete_folder(&org_id, &folder_id, folder_type).await {
             Ok(()) => HttpResponse::Ok().body("Folder deleted"),
             Err(err) => err.into(),

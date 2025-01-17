@@ -314,7 +314,6 @@ pub static QUERY_DISK_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 // querier disk result cache stats
-
 pub static QUERY_DISK_RESULT_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -327,15 +326,41 @@ pub static QUERY_DISK_RESULT_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| 
     )
     .expect("Metric created")
 });
-pub static QUERY_DISK_RESULT_CACHE_FILES: Lazy<IntGaugeVec> = Lazy::new(|| {
+pub static QUERY_DISK_METRICS_CACHE_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
-            "query_disk_result_cache_files",
-            "Querier disk result cached files. ".to_owned() + HELP_SUFFIX,
+            "query_disk_metrics_cache_used_bytes",
+            "Querier disk metrics result cached bytes. ".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type"],
+        &[],
+    )
+    .expect("Metric created")
+});
+
+// query metrics cache stats
+pub static QUERY_METRICS_CACHE_REQUESTS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_metrics_cache_requests",
+            "Querier metrics cache requests. ".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static QUERY_METRICS_CACHE_HITS: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "query_metrics_cache_hits",
+            "Querier metrics cache hits. ".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
     )
     .expect("Metric created")
 });
@@ -774,6 +799,18 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(QUERY_DISK_CACHE_FILES.clone()))
         .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_DISK_RESULT_CACHE_USED_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_DISK_METRICS_CACHE_USED_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_METRICS_CACHE_REQUESTS.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUERY_METRICS_CACHE_HITS.clone()))
+        .expect("Metric registered");
 
     // query manager
     registry
@@ -867,12 +904,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(MEMORY_USAGE.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(QUERY_DISK_RESULT_CACHE_USED_BYTES.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(QUERY_DISK_RESULT_CACHE_FILES.clone()))
         .expect("Metric registered");
 
     // db stats

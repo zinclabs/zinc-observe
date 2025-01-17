@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Get the md5 hash of a string
-fn hash(input: &str) -> String {
+pub fn hash(input: &str) -> String {
     let digest = md5::compute(input.as_bytes());
     format!("{:x}", digest)
 }

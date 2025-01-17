@@ -14,6 +14,7 @@ on:
 
 env:
   COLUMNS: 150
+  ZO_RESULT_CACHE_ENABLED: true
 
 jobs:
   build:

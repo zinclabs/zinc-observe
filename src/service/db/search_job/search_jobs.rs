@@ -295,6 +295,32 @@ pub async fn check_running_jobs(updated_at: i64) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Delete jobs that are older than the retention period
+pub async fn delete_jobs(updated_at: i64) -> Result<(), errors::Error> {
+    let operator = SetOperator {
+        filter: vec![Filter::new(
+            MetaColumn::CreatedAt,
+            OperatorType::LessThan,
+            Value::i64(updated_at),
+        )],
+        update: vec![(MetaColumn::Status, Value::i64(4))],
+    };
+
+    infra::table::search_job::search_jobs::set(operator.clone()).await?;
+
+    // super cluster, set the job's status
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        super_cluster::queue::search_job_operator(JobOperator::Set(operator))
+            .await
+            .map_err(|e| {
+                errors::Error::Message(format!("super cluster search job set error: {e}"))
+            })?;
+    }
+
+    Ok(())
+}
+
 pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
     infra::table::search_job::search_jobs::clean_deleted_job(job_id).await?;
 

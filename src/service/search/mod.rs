@@ -92,6 +92,7 @@ pub static DATAFUSION_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .thread_name("datafusion_runtime")
         .worker_threads(config::get_config().limit.cpu_num)
+        .thread_stack_size(16 * 1024 * 1024)
         .enable_all()
         .build()
         .unwrap()
@@ -1006,7 +1007,10 @@ pub async fn match_file(
     equal_items: &[(String, String)],
 ) -> bool {
     // fast path
-    if partition_keys.is_empty() || !source.key.contains('=') {
+    if partition_keys.is_empty()
+        || !source.key.contains('=')
+        || stream_type == StreamType::EnrichmentTables
+    {
         return true;
     }
 

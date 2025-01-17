@@ -13,11 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Folder {
     pub folder_id: String,
     pub name: String,
     pub description: String,
+}
+
+/// Indicates the type of data that the folder can contain.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum FolderType {
+    Dashboards,
+    Alerts,
 }
 
 pub const DEFAULT_FOLDER: &str = "default";

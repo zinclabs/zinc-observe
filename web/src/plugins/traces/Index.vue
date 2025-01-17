@@ -372,6 +372,9 @@ export default defineComponent({
                 e.message,
               timeout: 2000,
             });
+          })
+          .finally(()=> {
+            searchObj.loading = false;
           });
       } catch (e) {
         searchObj.loading = false;
@@ -831,6 +834,9 @@ export default defineComponent({
         searchObj.loading = false;
         showErrorNotification("Search request failed");
       }
+      finally{
+        searchObj.loading = false;
+      }
     }
 
     const getTracesMetaData = (traces) => {
@@ -886,7 +892,29 @@ export default defineComponent({
             "traces",
             true
           );
-
+          searchObj.data.datetime.queryRangeRestrictionInHour = -1;
+          if (
+              stream.settings.max_query_range > 0 &&
+              (searchObj.data.datetime.queryRangeRestrictionInHour >
+                stream.settings.max_query_range ||
+                stream.settings.max_query_range == 0 ||
+                searchObj.data.datetime.queryRangeRestrictionInHour == -1) &&
+              searchObj.data.datetime.queryRangeRestrictionInHour != 0
+            ){
+              searchObj.data.datetime.queryRangeRestrictionInHour =
+                stream.settings.max_query_range;
+              searchObj.data.datetime.queryRangeRestrictionMsg = t(
+                "search.queryRangeRestrictionMsg",
+                {
+                  range:
+                    searchObj.data.datetime.queryRangeRestrictionInHour > 1
+                      ? searchObj.data.datetime.queryRangeRestrictionInHour +
+                        " hours"
+                      : searchObj.data.datetime.queryRangeRestrictionInHour +
+                        " hour",
+                },
+              );
+            }
           schema.push(...stream.schema);
           ftsKeys = new Set([...stream.settings.full_text_search_keys]);
 

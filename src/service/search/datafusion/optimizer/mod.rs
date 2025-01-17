@@ -33,6 +33,7 @@ use datafusion::optimizer::{
     unwrap_cast_in_comparison::UnwrapCastInComparison, OptimizerRule,
 };
 use infra::schema::get_stream_setting_fts_fields;
+use limit_join_right_side::LimitJoinRightSide;
 use rewrite_histogram::RewriteHistogram;
 use rewrite_match::RewriteMatch;
 
@@ -41,10 +42,13 @@ use crate::service::search::sql::Sql;
 pub mod add_sort_and_limit;
 pub mod add_timestamp;
 pub mod join_reorder;
+pub mod limit_join_right_side;
 pub mod rewrite_histogram;
 pub mod rewrite_match;
+pub mod utils;
 
 pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send + Sync>> {
+    let cfg = config::get_config();
     let limit = if sql.limit as i32 > config::QUERY_WITH_NO_LIMIT {
         if sql.limit > 0 {
             Some(sql.limit as usize)
@@ -106,6 +110,15 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
         rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
     };
     rules.push(Arc::new(AddTimestampRule::new(start_time, end_time)));
+
+    // should after ExtractEquijoinPredicate, because LimitJoinRightSide will
+    // require the join's on columns
+    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows > 0
+    {
+        rules.push(Arc::new(LimitJoinRightSide::new(
+            cfg.common.feature_join_right_side_max_rows,
+        )));
+    }
     // ************************************
 
     // Filters can't be pushed down past Limits, we should do PushDownFilter after

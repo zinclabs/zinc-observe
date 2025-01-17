@@ -57,6 +57,7 @@ use o2_enterprise::enterprise::{
 use super::{
     file_type::{FileType, GetExt},
     optimizer::join_reorder::JoinReorderRule,
+    planner::extension_planner::OpenobserveQueryPlanner,
     storage::file_list,
     table_provider::{uniontable::NewUnionTable, NewListingTable},
     udf::transform_udf::get_all_transform,
@@ -266,21 +267,19 @@ pub async fn prepare_datafusion_context(
 
     let session_config = create_session_config(sorted_by_time, target_partition)?;
     let runtime_env = Arc::new(create_runtime_env(memory_size).await?);
+    let mut builder = SessionStateBuilder::new()
+        .with_config(session_config)
+        .with_runtime_env(runtime_env)
+        .with_default_features();
     if !optimizer_rules.is_empty() {
-        let state = SessionStateBuilder::new()
-            .with_config(session_config)
-            .with_runtime_env(runtime_env)
-            .with_default_features()
+        builder = builder
             .with_optimizer_rules(optimizer_rules)
-            .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()))
-            .build();
-        Ok(SessionContext::new_with_state(state))
-    } else {
-        Ok(SessionContext::new_with_config_rt(
-            session_config,
-            runtime_env,
-        ))
+            .with_physical_optimizer_rule(Arc::new(JoinReorderRule::new()));
     }
+    if cfg.common.feature_join_match_one_enabled {
+        builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
+    }
+    Ok(SessionContext::new_with_state(builder.build()))
 }
 
 pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {

@@ -62,6 +62,11 @@ async fn get_rand_ingester_addr() -> Result<String, tonic::Status> {
 }
 
 pub(crate) async fn get_cached_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
+    // if channel cache is disabled, create a new channel for each request
+    if get_config().grpc.channel_cache_disabled {
+        return create_channel(grpc_addr).await;
+    }
+
     // cache hit
     let r = CHANNELS.read().await;
     if let Some(channel) = r.get(grpc_addr) {

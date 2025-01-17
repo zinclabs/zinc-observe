@@ -27,7 +27,7 @@ use config::{
         stream::{FileKey, QueryPartitionStrategy, StreamType},
     },
     metrics,
-    utils::{inverted_index::split_token, json},
+    utils::{inverted_index::split_token, json, time::BASE_TIME},
     INDEX_FIELD_NAME_FOR_ALL, QUERY_WITH_NO_LIMIT,
 };
 use datafusion::{
@@ -777,8 +777,17 @@ pub async fn get_file_id_lists(
 ) -> Result<HashMap<TableReference, Vec<FileId>>> {
     let mut file_lists = HashMap::with_capacity(stream_names.len());
     for stream in stream_names {
+        let mut time_range = time_range;
         let name = stream.stream_name();
         let stream_type = stream.get_stream_type(stream_type);
+        // if stream is enrich, rewrite the time_range
+        if let Some(schema) = stream.schema() {
+            if schema == "enrich" || schema == "enrichment_tables" {
+                let start = BASE_TIME.timestamp_micros();
+                let end = chrono::Utc::now().timestamp_micros();
+                time_range = Some((start, end));
+            }
+        }
         // get file list
         let file_id_list =
             crate::service::file_list::query_ids(org_id, stream_type, &name, time_range).await?;

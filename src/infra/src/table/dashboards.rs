@@ -19,19 +19,19 @@ use config::meta::{
         v4::Dashboard as DashboardV4, v5::Dashboard as DashboardV5, Dashboard,
         ListDashboardsParams,
     },
-    folder::Folder,
+    folder::{Folder, FolderType},
 };
 use sea_orm::{
-    prelude::Expr, sea_query::Func, ActiveModelTrait, ActiveValue::NotSet, ColumnTrait,
-    DatabaseConnection, EntityTrait, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
-    TryIntoModel,
+    prelude::Expr, sea_query::Func, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait,
+    IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
 };
 use serde_json::Value as JsonValue;
+use svix_ksuid::KsuidLike;
 
 use super::{
     distinct_values::{self, OriginType},
     entity::{dashboards, folders},
-    folders::FolderType,
+    folders::folder_type_into_i16,
 };
 use crate::{
     db::{connect_to_orm, ORM_CLIENT},
@@ -194,54 +194,52 @@ pub async fn put(
 
     let data = inner_data_as_json(dashboard)?;
 
-    let (folder_m, mut dash_am) =
-        match get_model_from_folder(client, org_id, folder_id, &dashboard_id).await? {
-            None => {
-                // Destination folder does not exist so the dashboard can neither be
-                // created nor updated.
-                Err(errors::PutDashboardError::FolderDoesNotExist)
-            }
-            Some((folder_m, Some(dash_m))) => {
-                // Destination folder exists and dashboard already exists, so
-                // convert the dashboard model to an active model that will be
-                // updated.
-                Ok((folder_m, dash_m.into()))
-            }
-            Some((folder_m, None)) => {
-                // Destination folder exists but dashboard does not exist, so create
-                // a new dashboard active model that will be inserted.
-                let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
-                    created_at_tz.timestamp()
-                } else {
-                    chrono::Utc::now().timestamp()
-                };
+    let model = match get_model_from_folder(client, org_id, folder_id, &dashboard_id).await? {
+        None => {
+            // Destination folder does not exist so the dashboard can neither be
+            // created nor updated.
+            Err(errors::PutDashboardError::FolderDoesNotExist)
+        }
+        Some((folder_m, Some(dash_m))) => {
+            // Destination folder exists and dashboard already exists, so
+            // update the dashboard.
+            let mut dash_am = dash_m.into_active_model();
+            dash_am.folder_id = Set(folder_m.id);
+            dash_am.owner = Set(owner);
+            dash_am.role = Set(role);
+            dash_am.title = Set(title);
+            dash_am.description = Set(description);
+            dash_am.data = Set(data);
+            dash_am.version = Set(version);
+            let model: dashboards::Model = dash_am.update(client).await?.try_into_model()?;
+            Ok(model)
+        }
+        Some((folder_m, None)) => {
+            // Destination folder exists but dashboard does not exist, so create
+            // a new dashboard.
+            let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
+                created_at_tz.timestamp()
+            } else {
+                chrono::Utc::now().timestamp()
+            };
 
-                let dash_am = dashboards::ActiveModel {
-                    id: NotSet, // Set by DB.
-                    dashboard_id: Set(dashboard_id.to_owned()),
-                    folder_id: NotSet,   // Can be updated, so it is set below.
-                    owner: NotSet,       // Can be updated, so it is set below.
-                    role: NotSet,        // Can be updated, so it is set below.
-                    title: NotSet,       // Can be updated, so it is set below.
-                    description: NotSet, // Can be updated, so it is set below.
-                    data: NotSet,        // Can be updated, so it is set below.
-                    version: NotSet,     // Can be updated, so it is set below.
-                    created_at: Set(created_at_unix),
-                };
-                Ok((folder_m, dash_am))
-            }
-        }?;
+            let dash_am = dashboards::ActiveModel {
+                id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
+                dashboard_id: Set(dashboard_id.to_owned()),
+                folder_id: Set(folder_m.id),
+                owner: Set(owner),
+                role: Set(role),
+                title: Set(title),
+                description: Set(description),
+                data: Set(data),
+                version: Set(version),
+                created_at: Set(created_at_unix),
+            };
+            let model: dashboards::Model = dash_am.insert(client).await?.try_into_model()?;
+            Ok(model)
+        }
+    }?;
 
-    // All of the following fields will be set on creation or updated.
-    dash_am.folder_id = Set(folder_m.id);
-    dash_am.owner = Set(owner);
-    dash_am.role = Set(role);
-    dash_am.title = Set(title);
-    dash_am.description = Set(description);
-    dash_am.data = Set(data);
-    dash_am.version = Set(version);
-
-    let model: dashboards::Model = dash_am.save(client).await?.try_into_model()?;
     let dash = model.try_into()?;
     Ok(dash)
 }
@@ -292,7 +290,7 @@ async fn get_model_from_folder(
 ) -> Result<Option<(folders::Model, Option<dashboards::Model>)>, sea_orm::DbErr> {
     let select_folders = folders::Entity::find()
         .filter(folders::Column::Org.eq(org_id))
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()))
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Dashboards)))
         .filter(folders::Column::FolderId.eq(folder_id));
 
     let Some(folder) = select_folders.one(db).await? else {
@@ -334,7 +332,7 @@ async fn list_models(
     let query = dashboards::Entity::find()
         .find_also_related(folders::Entity)
         .filter(folders::Column::Org.eq(params.org_id))
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()));
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Dashboards)));
 
     // Apply the optional folder_id filter.
     let query = if let Some(folder_id) = &params.folder_id {
@@ -380,7 +378,7 @@ async fn list_all_models(
     db: &DatabaseConnection,
 ) -> Result<Vec<(String, dashboards::Model)>, sea_orm::DbErr> {
     let query = folders::Entity::find()
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Dashboards.into()));
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Dashboards)));
 
     // Apply ordering. Confusingly, it is necessary to apply the ordering BEFORE
     // adding a join to the query builder. If we don't do this then Sea ORM will

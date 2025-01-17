@@ -65,6 +65,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         tokio::task::spawn(async move { run_search_jobs(i).await });
     }
     tokio::task::spawn(async move { run_check_running_search_jobs().await });
+    tokio::task::spawn(async move { run_delete_jobs_by_retention().await });
     tokio::task::spawn(async move { run_delete_jobs().await });
 
     Ok(())
@@ -142,6 +143,24 @@ async fn run_check_running_search_jobs() -> Result<(), anyhow::Error> {
 }
 
 #[cfg(feature = "enterprise")]
+async fn run_delete_jobs_by_retention() -> Result<(), anyhow::Error> {
+    let time = get_config().limit.search_job_retention * 24 * 60 * 60;
+    let mut interval = time::interval(time::Duration::from_secs(
+        get_config().limit.search_job_run_timeout as u64,
+    ));
+    interval.tick().await; // trigger the first run
+    loop {
+        interval.tick().await;
+        log::debug!("[SEARCH JOB] Running delete jobs by retention");
+        let now = config::utils::time::now_micros();
+        let updated_at = now - (time * 1_000_000);
+        if let Err(e) = service::db::search_job::search_jobs::delete_jobs(updated_at).await {
+            log::error!("[SEARCH JOB] Error deleting jobs: {e}");
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
 async fn run_delete_jobs() -> Result<(), anyhow::Error> {
     let interval = get_config().limit.search_job_delete_interval;
     let mut interval = time::interval(time::Duration::from_secs(interval as u64));
@@ -162,6 +181,11 @@ async fn run_search_jobs(_id: i64) -> Result<(), anyhow::Error> {
 
 #[cfg(not(feature = "enterprise"))]
 async fn run_check_running_search_jobs() -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn run_delete_jobs_by_retention() -> Result<(), anyhow::Error> {
     Ok(())
 }
 

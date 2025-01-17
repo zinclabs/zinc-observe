@@ -449,7 +449,7 @@ impl From<meta_stream::StreamType> for StreamType {
 impl From<Alert> for meta_alerts::alert::Alert {
     fn from(value: Alert) -> Self {
         Self {
-            id: None,
+            id: value.id,
             name: value.name,
             org_id: value.org_id,
             stream_type: value.stream_type.into(),

@@ -428,7 +428,7 @@ pub struct MetricsQueryResponse {
     #[prost(string, tag = "3")]
     pub result_type: ::prost::alloc::string::String,
     #[prost(message, repeated, tag = "4")]
-    pub result: ::prost::alloc::vec::Vec<Series>,
+    pub series: ::prost::alloc::vec::Vec<Series>,
     #[prost(message, optional, tag = "5")]
     pub scan_stats: ::core::option::Option<ScanStats>,
 }

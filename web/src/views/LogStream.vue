@@ -143,7 +143,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               padding="sm lg"
               color="secondary"
               no-caps
-              icon="refresh"
               :label="t(`logStream.refreshStats`)"
               @click="getLogStream(true)"
             />
@@ -500,15 +499,17 @@ export default defineComponent({
             dismiss();
           })
           .catch((err) => {
-            if(err.response.status != 403){
+            if (err.response.status != 403) {
               $q.notify({
-              type: "negative",
-              message: err.response?.data?.message || "Error while fetching streams.",
-              timeout: 2000,
-            });
+                type: "negative",
+                message:
+                  err.response?.data?.message ||
+                  "Error while fetching streams.",
+                timeout: 2000,
+              });
             }
             loadingState.value = false;
-            dismiss();  
+            dismiss();
           });
       }
 
@@ -587,12 +588,12 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-         if(err.response.status != 403){
-          $q.notify({
-            color: "negative",
-            message: "Error while deleting stream.",
-          });
-         }
+          if (err.response.status != 403) {
+            $q.notify({
+              color: "negative",
+              message: "Error while deleting stream.",
+            });
+          }
         });
     };
     const deleteBatchStream = () => {
@@ -647,11 +648,13 @@ export default defineComponent({
           getLogStream();
         })
         .catch((error) => {
-          if(error.response.status != 403){
+          if (error.response.status != 403) {
             $q.notify({
-            color: "negative",
-            message: error.response?.data?.message || "Error while deleting streams.",
-          });
+              color: "negative",
+              message:
+                error.response?.data?.message ||
+                "Error while deleting streams.",
+            });
           }
         })
         .finally(() => {
@@ -699,8 +702,20 @@ export default defineComponent({
 
         await getStream(stream.name, stream.stream_type, true)
           .then((streamResponse) => {
-            dateTime["from"] = streamResponse.stats.doc_time_min - 60000000;
-            dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
+            if (
+              streamResponse.stats.doc_time_min &&
+              streamResponse.stats.doc_time_max
+            ) {
+              dateTime["from"] = streamResponse.stats.doc_time_min - 60000000;
+              dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
+            } else if (streamResponse.stats.created_at) {
+              // When enrichment table is uploaded, stats will not have doc_time_min and doc_time_max.
+              // Stats will be available asynchronously, so we can use created_at time to get the time range.
+              dateTime["from"] = streamResponse.stats.created_at - 60000000;
+              dateTime["to"] = streamResponse.stats.created_at + 3600000000;
+            } else {
+              dateTime["period"] = "15m";
+            }
           })
           .catch((err) => {
             console.error(err);

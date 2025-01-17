@@ -339,6 +339,7 @@ pub async fn update_stream_settings(
     stream_type: StreamType,
     new_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
+    let cfg = config::get_config();
     match infra::schema::get_settings(org_id, stream_name, stream_type).await {
         Some(mut settings) => {
             if let Some(max_query_range) = new_settings.max_query_range {
@@ -359,6 +360,7 @@ pub async fn update_stream_settings(
                 settings.data_retention = data_retention;
             }
 
+            // check for user defined schema
             if !new_settings.defined_schema_fields.add.is_empty() {
                 settings.defined_schema_fields =
                     if let Some(mut schema_fields) = settings.defined_schema_fields {
@@ -368,31 +370,41 @@ pub async fn update_stream_settings(
                         Some(new_settings.defined_schema_fields.add)
                     }
             }
-
             if !new_settings.defined_schema_fields.remove.is_empty() {
                 if let Some(schema_fields) = settings.defined_schema_fields.as_mut() {
                     schema_fields
                         .retain(|field| !new_settings.defined_schema_fields.remove.contains(field));
                 }
             }
+            if let Some(schema_fields) = settings.defined_schema_fields.as_ref() {
+                if schema_fields.len() > cfg.limit.user_defined_schema_max_fields {
+                    return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                        http::StatusCode::BAD_REQUEST.into(),
+                        format!(
+                            "user defined schema fields count exceeds the limit: {}",
+                            cfg.limit.user_defined_schema_max_fields
+                        ),
+                    )));
+                }
+            }
 
+            // check for bloom filter fields
             if !new_settings.bloom_filter_fields.add.is_empty() {
                 settings
                     .bloom_filter_fields
                     .extend(new_settings.bloom_filter_fields.add);
             }
-
             if !new_settings.bloom_filter_fields.remove.is_empty() {
                 settings
                     .bloom_filter_fields
                     .retain(|field| !new_settings.bloom_filter_fields.remove.contains(field));
             }
 
+            // check for index fields
             if !new_settings.index_fields.add.is_empty() {
                 settings.index_fields.extend(new_settings.index_fields.add);
                 settings.index_updated_at = now_micros();
             }
-
             if !new_settings.index_fields.remove.is_empty() {
                 settings
                     .index_fields
@@ -650,11 +662,6 @@ pub async fn delete_fields(
     stream_type: Option<StreamType>,
     fields: &[String],
 ) -> Result<(), anyhow::Error> {
-    if !config::get_config().common.widening_schema_evolution {
-        return Err(anyhow::anyhow!(
-            "widening schema evolution is disabled, can't delete fields"
-        ));
-    }
     if fields.is_empty() {
         return Ok(());
     }

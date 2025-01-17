@@ -21,7 +21,7 @@ use config::meta::{
         alert::{Alert as MetaAlert, ListAlertsParams},
         QueryCondition as MetaQueryCondition, TriggerCondition as MetaTriggerCondition,
     },
-    folder::Folder as MetaFolder,
+    folder::{Folder as MetaFolder, FolderType},
     stream::StreamType as MetaStreamType,
 };
 use hashbrown::HashMap;
@@ -34,7 +34,7 @@ use svix_ksuid::{Ksuid, KsuidLike};
 
 use super::{
     entity::{alerts, folders},
-    folders::FolderType,
+    folders::folder_type_into_i16,
 };
 use crate::errors::{self, FromStrError, PutAlertError};
 
@@ -268,12 +268,8 @@ pub async fn create<C: TransactionTrait>(
     org_id: &str,
     folder_id: &str,
     alert: MetaAlert,
+    use_given_id: bool,
 ) -> Result<MetaAlert, errors::Error> {
-    // Ensure that no ID is provided.
-    if alert.id.is_some() {
-        return Err(errors::DbError::PutAlert(PutAlertError::CreateAlertSetID).into());
-    };
-
     let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
@@ -284,7 +280,14 @@ pub async fn create<C: TransactionTrait>(
         return Err(errors::DbError::PutAlert(PutAlertError::FolderDoesNotExist).into());
     };
 
-    let id = svix_ksuid::Ksuid::new(None, None).to_string();
+    let id = if use_given_id {
+        alert
+            .id
+            .unwrap_or_else(|| svix_ksuid::Ksuid::new(None, None))
+            .to_string()
+    } else {
+        svix_ksuid::Ksuid::new(None, None).to_string()
+    };
     let stream_type = intermediate::StreamType::from(alert.stream_type).to_string();
     let mut alert_am = alerts::ActiveModel {
         id: Set(id),
@@ -307,10 +310,11 @@ pub async fn create<C: TransactionTrait>(
     let alert_m: alerts::Model = alert_am.insert(&txn).await?.try_into_model()?;
     let alert = alert_m.try_into()?;
     txn.commit().await?;
+    log::debug!("Alert created: {:?}", alert);
     Ok(alert)
 }
 
-/// Creates a new alert in the database. Returns the new alert.
+/// Updates an alert in the database. Returns the new alert.
 pub async fn update<C: TransactionTrait + ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -319,7 +323,7 @@ pub async fn update<C: TransactionTrait + ConnectionTrait>(
 ) -> Result<MetaAlert, errors::Error> {
     // Ensure that ID is provided.
     let Some(alert_id) = alert.id else {
-        return Err(errors::DbError::PutAlert(PutAlertError::CreateAlertSetID).into());
+        return Err(errors::DbError::PutAlert(PutAlertError::UpdateAlertMissingID).into());
     };
 
     let _lock = super::get_lock().await;
@@ -456,7 +460,7 @@ async fn get_model_by_name<C: ConnectionTrait>(
 ) -> Result<Option<(folders::Model, Option<alerts::Model>)>, sea_orm::DbErr> {
     let select_folders = folders::Entity::find()
         .filter(folders::Column::Org.eq(org_id))
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Alerts.into()))
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Alerts)))
         .filter(folders::Column::FolderId.eq(folder_id));
 
     let Some(folder) = select_folders.one(conn).await? else {
@@ -483,7 +487,7 @@ async fn list_models<C: ConnectionTrait>(
 ) -> Result<Vec<(folders::Model, alerts::Model)>, sea_orm::DbErr> {
     let query = alerts::Entity::find()
         .find_also_related(folders::Entity)
-        .filter(folders::Column::Type.eq::<i16>(FolderType::Alerts.into()))
+        .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Alerts)))
         .filter(folders::Column::Org.eq(params.org_id));
 
     // Apply the optional folder_id filter.

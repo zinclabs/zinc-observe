@@ -21,8 +21,11 @@ use datafusion::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion, TreeNodeRewriter, TreeNodeVisitor},
         Result, TableReference,
     },
+    physical_expr::LexOrdering,
     physical_plan::{
-        repartition::RepartitionExec, ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        repartition::RepartitionExec,
+        sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
+        ExecutionPlan, ExecutionPlanProperties, Partitioning,
     },
 };
 use hashbrown::HashMap;
@@ -120,12 +123,30 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                 for child in node.children() {
                     let mut visitor = TableNameVisitor::new();
                     child.visit(&mut visitor)?;
-                    let table_name = visitor.table_name.clone().unwrap();
-                    let remote_scan = Arc::new(RemoteScanExec::new(
-                        child.clone(),
-                        self.remote_scan_nodes.get_remote_node(&table_name),
-                    )?);
-                    new_children.push(remote_scan);
+                    // For sort, we should add a SortPreservingMergeExec
+                    if child.name() == "SortExec" {
+                        let table_name = visitor.table_name.clone().unwrap();
+                        let sort = child.as_any().downcast_ref::<SortExec>().unwrap();
+                        let sort_merge = Arc::new(
+                            SortPreservingMergeExec::new(
+                                LexOrdering::new(sort.expr().to_vec()),
+                                Arc::new(sort.clone()),
+                            )
+                            .with_fetch(sort.fetch()),
+                        );
+                        let remote_scan = Arc::new(RemoteScanExec::new(
+                            sort_merge,
+                            self.remote_scan_nodes.get_remote_node(&table_name),
+                        )?);
+                        new_children.push(remote_scan);
+                    } else {
+                        let table_name = visitor.table_name.clone().unwrap();
+                        let remote_scan = Arc::new(RemoteScanExec::new(
+                            child.clone(),
+                            self.remote_scan_nodes.get_remote_node(&table_name),
+                        )?);
+                        new_children.push(remote_scan);
+                    }
                 }
                 let new_node = node.with_new_children(new_children)?;
                 self.is_changed = true;

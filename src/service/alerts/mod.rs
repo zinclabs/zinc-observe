@@ -154,7 +154,7 @@ impl QueryConditionExt for QueryCondition {
                     query_exemplars: false,
                     no_cache: None,
                 };
-                let resp = match promql::search::search(org_id, &req, "", 0).await {
+                let resp = match promql::search::search("", org_id, &req, "", 0).await {
                     Ok(v) => v,
                     Err(_) => {
                         return Ok((None, end_time));

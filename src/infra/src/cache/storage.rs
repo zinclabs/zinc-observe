@@ -49,7 +49,7 @@ impl CacheFS {
 impl ObjectStore for CacheFS {
     async fn get(&self, location: &Path) -> Result<GetResult> {
         let path = location.to_string();
-        if let Ok(data) = file_data::get_opts("", &path, None, false).await {
+        if let Ok(data) = file_data::get_opts(&path, None, false).await {
             let meta = ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,
@@ -77,7 +77,7 @@ impl ObjectStore for CacheFS {
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         log::warn!("OOPS: please check cache:storage:get_opts: {:?}", location);
         let path = location.to_string();
-        if let Ok(data) = file_data::get_opts("", &path, None, false).await {
+        if let Ok(data) = file_data::get_opts(&path, None, false).await {
             let meta = ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,
@@ -112,13 +112,13 @@ impl ObjectStore for CacheFS {
             return Err(crate::storage::Error::BadRange(location.to_string()).into());
         }
         let path = location.to_string();
-        let data = file_data::get_opts("", &path, Some(range), true).await?;
+        let data = file_data::get_opts(&path, Some(range), true).await?;
         Ok(data)
     }
 
     async fn head(&self, location: &Path) -> Result<ObjectMeta> {
         let path = location.to_string();
-        if let Ok(size) = file_data::get_size_opts("", &path, false).await {
+        if let Ok(size) = file_data::get_size_opts(&path, false).await {
             return Ok(ObjectMeta {
                 location: location.clone(),
                 last_modified: *BASE_TIME,

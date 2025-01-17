@@ -205,7 +205,7 @@ export default defineComponent({
         sortable: false,
       },
     ]);
-    const { getStreams, resetStreamType } = useStreams();
+    const { getStreams, resetStreamType, getStream } = useStreams();
 
     onBeforeMount(() => {
       getLookupTables();
@@ -235,14 +235,15 @@ export default defineComponent({
         .catch((err) => {
           console.log("--", err);
           dismiss();
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             $q.notify({
-            type: "negative",
-            message: err.response?.data?.message || "Error while fetching functions.",
-            timeout: 2000,
-          });
+              type: "negative",
+              message:
+                err.response?.data?.message ||
+                "Error while fetching functions.",
+              timeout: 2000,
+            });
           }
-          
         });
     };
 
@@ -333,7 +334,7 @@ export default defineComponent({
         .delete(
           store.state.selectedOrganization.identifier,
           selectedDelete.value.name,
-          "enrichment_tables"
+          "enrichment_tables",
         )
         .then((res: any) => {
           if (res.data.code == 200) {
@@ -346,11 +347,12 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             $q.notify({
-            color: "negative",
-            message: err.response?.data?.message || "Error while deleting stream.",
-          });
+              color: "negative",
+              message:
+                err.response?.data?.message || "Error while deleting stream.",
+            });
           }
         });
 
@@ -369,17 +371,65 @@ export default defineComponent({
       confirmDelete.value = true;
     };
 
-    const exploreEnrichmentTable = (props: any) => {
+    /**
+     * Get time range for stream explorer, for enrichment tables it will get the time range from the stream data min and max time
+     * @param stream: Stream object
+     */
+    const getTimeRange = async (stream: any) => {
+      const dateTime: { period?: string; from?: number; to?: number } = {};
+
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Redirecting to explorer...",
+        color: "secondary",
+      });
+
+      try {
+        await getStream(stream.name, stream.stream_type, true)
+          .then((streamResponse) => {
+            if (
+              streamResponse.stats.doc_time_min &&
+              streamResponse.stats.doc_time_max
+            ) {
+              dateTime["from"] = streamResponse.stats.doc_time_min - 60000000;
+              dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
+            } else if (streamResponse.stats.created_at) {
+              // When enrichment table is uploaded, stats will not have doc_time_min and doc_time_max.
+              // Stats will be available asynchronously, so we can use created_at time to get the time range.
+              dateTime["from"] = streamResponse.stats.created_at - 60000000;
+              dateTime["to"] = streamResponse.stats.created_at + 3600000000;
+            } else {
+              dateTime["period"] = "15m";
+            }
+          })
+          .catch((err) => {
+            console.error("Error while getting enrichment table: ", err);
+            dateTime["period"] = "15m";
+          })
+          .finally(() => {
+            dismiss();
+          });
+      } catch (err) {
+        console.error("Error while getting enrichment table: ", err);
+        dateTime["period"] = "15m";
+        dismiss();
+      }
+
+      return dateTime;
+    };
+
+    const exploreEnrichmentTable = async (props: any) => {
+      const timestamps = await getTimeRange(props.row);
       router.push({
         name: "logs",
         query: {
           stream_type: props.row.stream_type,
           stream: props.row.name,
-          period: "15m",
           refresh: "0",
           query: "",
           type: "stream_explorer",
           org_identifier: store.state.selectedOrganization.identifier,
+          ...timestamps,
         },
       });
     };
@@ -435,7 +485,7 @@ export default defineComponent({
     selectedOrg(newVal: any, oldVal: any) {
       this.verifyOrganizationStatus(
         this.store.state.organizations,
-        this.router
+        this.router,
       );
       if (
         (newVal != oldVal || this.jsTransforms.value == undefined) &&

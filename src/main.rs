@@ -211,7 +211,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // init enterprise
             #[cfg(feature = "enterprise")]
-            if let Err(e) = o2_enterprise::enterprise::init().await {
+            if let Err(e) = init_enterprise().await {
                 job_init_tx.send(false).ok();
                 panic!("enerprise init failed: {}", e);
             }
@@ -888,5 +888,21 @@ fn enable_tracing() -> Result<(), anyhow::Error> {
             tracer.tracer("tracing-otel-subscriber"),
         ))
         .init();
+    Ok(())
+}
+
+/// Initializes enterprise features.
+#[cfg(feature = "enterprise")]
+async fn init_enterprise() -> Result<(), anyhow::Error> {
+    o2_enterprise::enterprise::search::init().await?;
+
+    if o2_enterprise::enterprise::common::infra::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        log::info!("init super cluster");
+        o2_enterprise::enterprise::super_cluster::kv::init().await?;
+        openobserve::super_cluster_queue::init().await?;
+    }
     Ok(())
 }

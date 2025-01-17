@@ -32,7 +32,6 @@ pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats)>;
 pub struct QueryParams {
     pub trace_id: String,
     pub org_id: String,
-    pub job_id: String,
     pub stream_type: StreamType,
     pub stream_name: String,
     pub time_range: Option<(i64, i64)>,

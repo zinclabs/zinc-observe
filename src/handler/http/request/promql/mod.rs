@@ -26,7 +26,7 @@ use {
 };
 
 use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
     service::{metrics, promql},
 };
 
@@ -141,9 +141,20 @@ pub async fn query_post(
 async fn query(
     org_id: &str,
     req: config::meta::promql::RequestQuery,
-    _in_req: HttpRequest,
+    in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let user_id = _in_req.headers().get("user_id").unwrap();
+    let cfg = config::get_config();
+    let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+        tracing::info_span!(
+            "/api/{org_id}/prometheus/api/v1/query",
+            org_id = org_id.to_string()
+        )
+    } else {
+        tracing::Span::none()
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+
+    let user_id = in_req.headers().get("user_id").unwrap();
     let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
@@ -196,12 +207,9 @@ async fn query(
             Ok(v) => v,
             Err(e) => {
                 log::error!("parse time error: {}", e);
-                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                    status: promql::Status::Error,
-                    data: None,
-                    error_type: Some("bad_data".to_string()),
-                    error: Some(e.to_string()),
-                }));
+                return Ok(HttpResponse::BadRequest().json(
+                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), None),
+                ));
             }
         },
     };
@@ -217,7 +225,7 @@ async fn query(
         no_cache: None,
     };
 
-    search(org_id, &req, user_email, timeout).await
+    search(&trace_id, org_id, &req, user_email, timeout).await
 }
 
 /// prometheus range queries
@@ -389,10 +397,21 @@ pub async fn query_exemplars_post(
 async fn query_range(
     org_id: &str,
     req: config::meta::promql::RequestRangeQuery,
-    _in_req: HttpRequest,
+    in_req: HttpRequest,
     query_exemplars: bool,
 ) -> Result<HttpResponse, Error> {
-    let user_id = _in_req.headers().get("user_id").unwrap();
+    let cfg = config::get_config();
+    let http_span = if cfg.common.tracing_search_enabled || cfg.common.tracing_enabled {
+        tracing::info_span!(
+            "/api/{org_id}/prometheus/api/v1/query_range",
+            org_id = org_id.to_string()
+        )
+    } else {
+        tracing::Span::none()
+    };
+    let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
+
+    let user_id = in_req.headers().get("user_id").unwrap();
     let user_email = user_id.to_str().unwrap();
     #[cfg(feature = "enterprise")]
     {
@@ -404,13 +423,10 @@ async fn query_range(
         let ast = match parser::parse(&req.query.clone().unwrap_or_default()) {
             Ok(v) => v,
             Err(e) => {
-                log::error!("parse promql error: {}", e);
-                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                    status: promql::Status::Error,
-                    data: None,
-                    error_type: Some("bad_data".to_string()),
-                    error: Some(e.to_string()),
-                }));
+                log::error!("[trace_id: {trace_id}] parse promql error: {}", e);
+                return Ok(HttpResponse::BadRequest().json(
+                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                ));
             }
         };
         let mut visitor = promql::name_visitor::MetricNameVisitor::default();
@@ -457,12 +473,9 @@ async fn query_range(
             Ok(v) => v,
             Err(e) => {
                 log::error!("parse time error: {}", e);
-                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                    status: promql::Status::Error,
-                    data: None,
-                    error_type: Some("bad_data".to_string()),
-                    error: Some(e.to_string()),
-                }));
+                return Ok(HttpResponse::BadRequest().json(
+                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                ));
             }
         },
     };
@@ -472,12 +485,9 @@ async fn query_range(
             Ok(v) => v,
             Err(e) => {
                 log::error!("parse time error: {}", e);
-                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                    status: promql::Status::Error,
-                    data: None,
-                    error_type: Some("bad_data".to_string()),
-                    error: Some(e.to_string()),
-                }));
+                return Ok(HttpResponse::BadRequest().json(
+                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                ));
             }
         },
     };
@@ -487,12 +497,9 @@ async fn query_range(
             Ok(v) => (v * 1_000) as i64,
             Err(e) => {
                 log::error!("parse time error: {}", e);
-                return Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                    status: promql::Status::Error,
-                    data: None,
-                    error_type: Some("bad_data".to_string()),
-                    error: Some(e.to_string()),
-                }));
+                return Ok(HttpResponse::BadRequest().json(
+                    promql::ApiFuncResponse::<()>::err_bad_data(e.to_string(), Some(trace_id)),
+                ));
             }
         },
     };
@@ -513,7 +520,7 @@ async fn query_range(
         query_exemplars,
         no_cache: req.no_cache,
     };
-    search(org_id, &req, user_email, timeout).await
+    search(&trace_id, org_id, &req, user_email, timeout).await
 }
 
 /// prometheus query metric metadata
@@ -565,11 +572,12 @@ pub async fn metadata(
 ) -> Result<HttpResponse, Error> {
     Ok(
         match metrics::prom::get_metadata(&org_id, req.into_inner()).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
             Err(err) => {
                 log::error!("get_metadata failed: {err}");
-                HttpResponse::InternalServerError()
-                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+                HttpResponse::InternalServerError().json(
+                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                )
             }
         },
     )
@@ -651,9 +659,8 @@ async fn series(
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
-            );
+            return Ok(HttpResponse::BadRequest()
+                .json(promql::ApiFuncResponse::<()>::err_bad_data(e, None)));
         }
     };
 
@@ -710,11 +717,12 @@ async fn series(
 
     Ok(
         match metrics::prom::get_series(org_id, selector, start, end).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
             Err(err) => {
                 log::error!("get_series failed: {err}");
-                HttpResponse::InternalServerError()
-                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+                HttpResponse::InternalServerError().json(
+                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                )
             }
         },
     )
@@ -799,18 +807,18 @@ async fn labels(
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
-            );
+            return Ok(HttpResponse::BadRequest()
+                .json(promql::ApiFuncResponse::<()>::err_bad_data(e, None)));
         }
     };
     Ok(
         match metrics::prom::get_labels(org_id, selector, start, end).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
             Err(err) => {
                 log::error!("get_labels failed: {err}");
-                HttpResponse::InternalServerError()
-                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+                HttpResponse::InternalServerError().json(
+                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                )
             }
         },
     )
@@ -857,18 +865,18 @@ pub async fn label_values(
     let (selector, start, end) = match validate_metadata_params(matcher, start, end) {
         Ok(v) => v,
         Err(e) => {
-            return Ok(
-                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(e))
-            );
+            return Ok(HttpResponse::BadRequest()
+                .json(promql::ApiFuncResponse::<()>::err_bad_data(e, None)));
         }
     };
     Ok(
         match metrics::prom::get_label_values(&org_id, label_name, selector, start, end).await {
-            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp)),
+            Ok(resp) => HttpResponse::Ok().json(promql::ApiFuncResponse::ok(resp, None)),
             Err(err) => {
                 log::error!("get_label_values failed: {err}");
-                HttpResponse::InternalServerError()
-                    .json(promql::ApiFuncResponse::<()>::err_internal(err.to_string()))
+                HttpResponse::InternalServerError().json(
+                    promql::ApiFuncResponse::<()>::err_internal(err.to_string(), None),
+                )
             }
         },
     )
@@ -976,12 +984,11 @@ fn format_query(_org_id: &str, query: &str, _in_req: HttpRequest) -> Result<Http
     let expr = match promql_parser::parser::parse(query) {
         Ok(expr) => expr,
         Err(err) => {
-            return Ok(
-                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(err))
-            );
+            return Ok(HttpResponse::BadRequest()
+                .json(promql::ApiFuncResponse::<()>::err_bad_data(err, None)));
         }
     };
-    Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(expr.prettify())))
+    Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(expr.prettify(), None)))
 }
 
 fn search_timeout(timeout: Option<String>) -> i64 {
@@ -998,38 +1005,37 @@ fn search_timeout(timeout: Option<String>) -> i64 {
 }
 
 async fn search(
+    trace_id: &str,
     org_id: &str,
     req: &promql::MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
 ) -> Result<HttpResponse, Error> {
-    match promql::search::search(org_id, req, user_email, timeout).await {
-        Ok(data) if !req.query_exemplars => Ok(HttpResponse::Ok().json(promql::QueryResponse {
-            status: promql::Status::Success,
-            data: Some(promql::QueryResult {
-                result_type: data.get_type().to_string(),
-                result: data,
-            }),
-            error_type: None,
-            error: None,
-        })),
-        Ok(data) => Ok(HttpResponse::Ok().json(promql::ExemplarsResponse {
-            status: promql::Status::Success,
-            data: Some(data),
-            error_type: None,
-            error: None,
-        })),
+    match promql::search::search(trace_id, org_id, req, user_email, timeout).await {
+        Ok(data) if !req.query_exemplars => {
+            Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(
+                promql::QueryResult {
+                    result_type: data.get_type().to_string(),
+                    result: data,
+                },
+                Some(trace_id.to_string()),
+            )))
+        }
+        Ok(data) => Ok(HttpResponse::Ok().json(promql::ApiFuncResponse::ok(
+            data,
+            Some(trace_id.to_string()),
+        ))),
         Err(err) => {
             let err = match err {
                 errors::Error::ErrorCode(code) => code.get_error_detail(),
                 _ => err.to_string(),
             };
-            Ok(HttpResponse::BadRequest().json(promql::QueryResponse {
-                status: promql::Status::Error,
-                data: None,
-                error_type: Some("bad_data".to_string()),
-                error: Some(err),
-            }))
+            Ok(
+                HttpResponse::BadRequest().json(promql::ApiFuncResponse::<()>::err_bad_data(
+                    err,
+                    Some(trace_id.to_string()),
+                )),
+            )
         }
     }
 }

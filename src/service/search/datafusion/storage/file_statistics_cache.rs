@@ -109,8 +109,9 @@ impl CacheAccessor<Path, Arc<Statistics>> for FileStatisticsCache {
         let k = self.format_key(k);
         let mut w = self.cacher.lock();
         if w.len() >= self.max_entries {
-            // release 5% of the cache
-            for _ in 0..(self.max_entries / 20) {
+            // release 10% of the cache
+            log::warn!("FileStatisticsCache is full, releasing 10% of the cache");
+            for _ in 0..(self.max_entries / 10) {
                 if let Some(k) = w.pop_front() {
                     self.statistics.remove(&k);
                 } else {

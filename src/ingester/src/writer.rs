@@ -199,6 +199,10 @@ impl Writer {
         }
     }
 
+    pub fn get_key_str(&self) -> String {
+        format!("{}/{}", self.key.org_id, self.key.stream_type)
+    }
+
     // check_ttl is used to check if the memtable has expired
     pub async fn write(&self, schema: Arc<Schema>, mut entry: Entry, fsync: bool) -> Result<()> {
         if entry.data.is_empty() {

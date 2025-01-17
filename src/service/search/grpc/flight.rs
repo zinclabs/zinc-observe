@@ -66,6 +66,7 @@ use crate::service::{
 
 #[tracing::instrument(name = "service:search:grpc:flight:do_get::search", skip_all, fields(org_id = req.query_identifier.org_id))]
 pub async fn search(
+    trace_id: &str,
     req: &FlightSearchRequest,
 ) -> Result<(SessionContext, Arc<dyn ExecutionPlan>, ScanStats), Error> {
     // let start = std::time::Instant::now();
@@ -75,7 +76,7 @@ pub async fn search(
     let stream_type = StreamType::from(req.query_identifier.stream_type.as_str());
     let work_group = req.super_cluster_info.work_group.clone();
 
-    let trace_id = Arc::new(req.query_identifier.trace_id.to_string());
+    let trace_id = Arc::new(trace_id.to_string());
     log::info!("[trace_id {trace_id}] flight->search: start");
 
     // create datafusion context, just used for decode plan, the params can use default
@@ -177,7 +178,6 @@ pub async fn search(
     let query_params = Arc::new(super::QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.clone(),
-        job_id: req.query_identifier.job_id.clone(),
         stream_type,
         stream_name: stream_name.to_string(),
         time_range: Some((req.search_info.start_time, req.search_info.end_time)),

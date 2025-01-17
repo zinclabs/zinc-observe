@@ -352,26 +352,25 @@ async fn write_logs(
 
         // validate record
         if let Some(delta) = schema_evolution.types_delta.as_ref() {
-            let ret_val =
-                if !cfg.common.widening_schema_evolution || !schema_evolution.is_schema_changed {
-                    cast_to_type(&mut record_val, delta.to_owned())
+            let ret_val = if !schema_evolution.is_schema_changed {
+                cast_to_type(&mut record_val, delta.to_owned())
+            } else {
+                let local_delta = delta
+                    .iter()
+                    .filter_map(|x| {
+                        if x.metadata().contains_key("zo_cast") {
+                            Some(x.to_owned())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                if !local_delta.is_empty() {
+                    cast_to_type(&mut record_val, local_delta)
                 } else {
-                    let local_delta = delta
-                        .iter()
-                        .filter_map(|x| {
-                            if x.metadata().contains_key("zo_cast") {
-                                Some(x.to_owned())
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    if !local_delta.is_empty() {
-                        cast_to_type(&mut record_val, local_delta)
-                    } else {
-                        Ok(())
-                    }
-                };
+                    Ok(())
+                }
+            };
             if let Err(e) = ret_val {
                 // update status(fail)
                 match status {

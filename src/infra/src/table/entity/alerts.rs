@@ -8,7 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub org: String,
-    pub folder_id: i64,
+    pub folder_id: String,
     pub name: String,
     pub stream_type: String,
     pub stream_name: String,

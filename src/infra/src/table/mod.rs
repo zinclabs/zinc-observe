@@ -17,7 +17,10 @@ use config::get_config;
 use migration::Migrator;
 use sea_orm_migration::MigratorTrait;
 
-use crate::db::{connect_to_orm, sqlite::CLIENT_RW, ORM_CLIENT, SQLITE_STORE};
+use crate::{
+    db::{connect_to_orm, sqlite::CLIENT_RW, ORM_CLIENT, SQLITE_STORE},
+    dist_lock,
+};
 
 pub mod alerts;
 pub mod dashboards;
@@ -37,8 +40,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
 }
 
 pub async fn migrate() -> Result<(), anyhow::Error> {
+    let locker = dist_lock::lock("/database/migration", 0).await?;
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Migrator::up(client, Some(12)).await?; // hack for failing alerts migration
     Migrator::up(client, None).await?;
+    dist_lock::unlock(&locker).await?;
     Ok(())
 }
 

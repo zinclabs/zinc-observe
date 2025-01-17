@@ -15,11 +15,14 @@
 
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
-use config::meta::{
-    cluster::{IntoArcVec, RoleGroup},
-    search::{ScanStats, SearchEventType},
-    sql::TableReferenceExt,
-    stream::FileKey,
+use config::{
+    meta::{
+        cluster::{IntoArcVec, RoleGroup},
+        search::{ScanStats, SearchEventType},
+        sql::TableReferenceExt,
+        stream::{FileKey, StreamType},
+    },
+    utils::time::BASE_TIME,
 };
 use datafusion::{
     common::{tree_node::TreeNode, TableReference},
@@ -29,6 +32,7 @@ use datafusion::{
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
 use infra::{
     errors::{Error, Result},
+    file_list::FileId,
     schema::get_stream_setting_index_fields,
 };
 use proto::cluster_rpc::{KvItem, SearchQuery};
@@ -63,6 +67,7 @@ use crate::service::search::{
 // 6. execute physical plan to get stream
 #[tracing::instrument(name = "service:search:grpc:flight:follower:search", skip_all)]
 pub async fn search(
+    trace_id: &str,
     flight_request: &FlightSearchRequest,
 ) -> Result<(
     SessionContext,
@@ -73,7 +78,7 @@ pub async fn search(
     let start = std::time::Instant::now();
     let cfg = config::get_config();
     let mut req: Request = (*flight_request).clone().into();
-    let trace_id = req.trace_id.clone();
+    let trace_id = trace_id.to_string();
 
     // create datafusion context, just used for decode plan, the params can use default
     let mut ctx =
@@ -120,13 +125,7 @@ pub async fn search(
     }
 
     // 1. get file id list
-    let file_id_list = crate::service::file_list::query_ids(
-        &req.org_id,
-        stream_type,
-        &stream_name,
-        req.time_range,
-    )
-    .await?;
+    let file_id_list = get_file_id_lists(&req.org_id, stream_type, &stream, req.time_range).await?;
 
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
@@ -245,6 +244,31 @@ pub async fn search(
     log::info!("[trace_id {trace_id}] flight->follower_leader: generate physical plan finish",);
 
     Ok((ctx, physical_plan, defer, scan_stats))
+}
+
+#[tracing::instrument(
+    name = "service:search:super_cluster:follower:get_file_id_lists",
+    skip_all
+)]
+pub async fn get_file_id_lists(
+    org_id: &str,
+    stream_type: StreamType,
+    stream: &TableReference,
+    mut time_range: Option<(i64, i64)>,
+) -> Result<Vec<FileId>> {
+    let stream_name = stream.stream_name();
+    let stream_type = stream.get_stream_type(stream_type);
+    // if stream is enrich, rewrite the time_range
+    if let Some(schema) = stream.schema() {
+        if schema == "enrich" || schema == "enrichment_tables" {
+            let start = BASE_TIME.timestamp_micros();
+            let end = chrono::Utc::now().timestamp_micros();
+            time_range = Some((start, end));
+        }
+    }
+    let file_id_list =
+        crate::service::file_list::query_ids(org_id, stream_type, &stream_name, time_range).await?;
+    Ok(file_id_list)
 }
 
 #[tracing::instrument(

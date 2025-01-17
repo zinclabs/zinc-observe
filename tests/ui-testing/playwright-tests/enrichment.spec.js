@@ -14,7 +14,7 @@ const randomFunctionName = `Pipeline${Math.floor(Math.random() * 1000)}`;
 
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
-  // await page.getByText('Login as internal user').click();
+  //  await page.getByText('Login as internal user').click();
   await page.waitForTimeout(1000);
   await page
     .locator('[data-cy="login-user-id"]')
@@ -157,7 +157,7 @@ test.describe("Enrichment data testcases", () => {
     await pipelinePage.deleteEnrichmentTableByName(fileName)
   });
 
-  test.skip("should upload an enrichment table under functions with VRL", async ({
+  test("should upload an enrichment table under functions with VRL", async ({
     page,
   }) => {
     const pipelinePage = new PipelinePage(page);

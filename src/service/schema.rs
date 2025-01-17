@@ -70,15 +70,6 @@ pub async fn check_for_schema(
     }
     let cfg = get_config();
     let schema = stream_schema_map.get(stream_name).unwrap();
-    if !schema.schema().fields().is_empty() && cfg.common.skip_schema_validation {
-        return Ok((
-            SchemaEvolution {
-                is_schema_changed: false,
-                types_delta: None,
-            },
-            None,
-        ));
-    }
 
     // get infer schema
     let value_iter = record_vals.into_iter();
@@ -309,15 +300,15 @@ async fn handle_diff_schema(
     // 1. allow_user_defined_schemas is enabled
     // 2. log ingestion
     // 3. user defined schema is not already enabled
-    // 4. final schema fields count exceeds udschema_max_fields
+    // 4. final schema fields count exceeds schema_max_fields_to_enable_uds
     // user-defined schema does not include _timestamp or _all columns
     if cfg.common.allow_user_defined_schemas
-        && cfg.limit.udschema_max_fields > 0
+        && cfg.limit.schema_max_fields_to_enable_uds > 0
         && stream_type == StreamType::Logs
         && defined_schema_fields.is_empty()
-        && final_schema.fields().len() > cfg.limit.udschema_max_fields
+        && final_schema.fields().len() > cfg.limit.schema_max_fields_to_enable_uds
     {
-        let mut uds_fields = HashSet::with_capacity(cfg.limit.udschema_max_fields);
+        let mut uds_fields = HashSet::with_capacity(cfg.limit.schema_max_fields_to_enable_uds);
         // add fts fields
         for field in SQL_FULL_TEXT_SEARCH_FIELDS.iter() {
             if final_schema.field_with_name(field).is_ok() {
@@ -331,7 +322,7 @@ async fn handle_diff_schema(
                 continue;
             }
             uds_fields.insert(field_name.to_string());
-            if uds_fields.len() == cfg.limit.udschema_max_fields {
+            if uds_fields.len() == cfg.limit.schema_max_fields_to_enable_uds {
                 break;
             }
         }
@@ -424,6 +415,10 @@ pub fn generate_schema_for_defined_schema_fields(
             new_fields.push(schema.schema().fields()[*f].clone());
         }
     }
+
+    // sort the fields by name to make sure the order is consistent
+    new_fields.sort_by(|a, b| a.name().cmp(b.name()));
+
     SchemaCache::new(Schema::new_with_metadata(
         new_fields,
         schema.schema().metadata().clone(),
@@ -453,9 +448,7 @@ fn get_schema_changes(schema: &SchemaCache, inferred_schema: &Schema) -> (bool, 
                 }
                 let existing_field: Arc<Field> = schema.schema().fields()[*idx].clone();
                 if existing_field.data_type() != item_data_type {
-                    if !get_config().common.widening_schema_evolution {
-                        field_datatype_delta.push(existing_field.as_ref().to_owned());
-                    } else if infra::schema::is_widening_conversion(
+                    if infra::schema::is_widening_conversion(
                         existing_field.data_type(),
                         item_data_type,
                     ) {

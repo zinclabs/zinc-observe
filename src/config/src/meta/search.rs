@@ -276,6 +276,25 @@ impl Response {
         }
     }
 
+    pub fn pagination(&mut self, from: i64, size: i64) {
+        self.from = from;
+        self.size = size;
+        if from >= self.total as i64 {
+            self.hits = Vec::new();
+            self.total = 0;
+            return;
+        }
+
+        self.hits = self
+            .hits
+            .iter()
+            .skip(from as usize)
+            .take(size as usize)
+            .cloned()
+            .collect();
+        // self.total = self.hits.len();
+    }
+
     pub fn add_hit(&mut self, hit: &json::Value) {
         self.hits.push(hit.to_owned());
         self.total += 1;
@@ -1025,6 +1044,13 @@ impl MultiStreamRequest {
         }
         res
     }
+}
+
+// for search job pagination
+#[derive(Debug, Deserialize)]
+pub struct PaginationQuery {
+    pub from: Option<i64>,
+    pub size: Option<i64>,
 }
 
 #[cfg(test)]

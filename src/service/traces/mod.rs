@@ -86,7 +86,11 @@ pub async fn otlp_proto(
     let request = match ExportTraceServiceRequest::decode(body) {
         Ok(v) => v,
         Err(e) => {
-            log::error!("[TRACES:OTLP] Invalid proto: {}", e);
+            log::error!(
+                "[TRACES:OTLP] Invalid proto: org_id: {}, error: {}",
+                org_id,
+                e
+            );
             return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
                 http::StatusCode::BAD_REQUEST.into(),
                 format!("Invalid proto: {}", e),
@@ -104,7 +108,8 @@ pub async fn otlp_proto(
         Ok(v) => Ok(v),
         Err(e) => {
             log::error!(
-                "[TRACES:OTLP] Error while handling grpc trace request: {}",
+                "[TRACES:OTLP] Error while handling grpc trace request: org_id: {}, error: {}",
+                org_id,
                 e
             );
             Err(e)

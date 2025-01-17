@@ -13,31 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
-
-use config::get_config;
 use datafusion::{
     common::{
-        tree_node::{
-            Transformed, TransformedResult, TreeNode, TreeNodeRecursion, TreeNodeRewriter,
-        },
-        DFSchema, Result,
+        tree_node::{Transformed, TreeNode, TreeNodeRecursion},
+        Result,
     },
-    logical_expr::{col, Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan},
+    logical_expr::LogicalPlan,
     optimizer::{optimizer::ApplyOrder, OptimizerConfig, OptimizerRule},
-    prelude::Expr,
-    scalar::ScalarValue,
 };
 
-/// Optimization rule that add sort and limit to table scan
-#[derive(Default, Debug)]
+use super::utils::AddSortAndLimit;
+
+#[derive(Debug)]
 pub struct AddSortAndLimitRule {
     limit: usize,
     offset: usize,
 }
 
 impl AddSortAndLimitRule {
-    #[allow(missing_docs)]
     pub fn new(limit: usize, offset: usize) -> Self {
         Self { limit, offset }
     }
@@ -61,201 +54,9 @@ impl OptimizerRule for AddSortAndLimitRule {
         plan: LogicalPlan,
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
-        if self.limit == 0 {
-            return Ok(Transformed::new(plan, false, TreeNodeRecursion::Stop));
-        }
-
-        let is_complex = plan.exists(|plan| Ok(is_complex_query(plan)))?;
-        let mut is_stop = true;
-        let (mut transformed, schema) = match plan {
-            LogicalPlan::Projection(_) => {
-                is_stop = false;
-                (Transformed::no(plan), None)
-            }
-            LogicalPlan::Limit(mut limit) => match limit.input.as_ref() {
-                LogicalPlan::Sort(_) => (Transformed::no(LogicalPlan::Limit(limit)), None),
-                _ => {
-                    if is_complex {
-                        (Transformed::no(LogicalPlan::Limit(limit)), None)
-                    } else {
-                        // the add sort plan should reflect the limit
-                        let fetch = get_int_from_expr(&limit.fetch);
-                        let skip = get_int_from_expr(&limit.skip);
-                        let (sort, schema) = generate_sort_plan(limit.input.clone(), fetch + skip);
-                        limit.input = Arc::new(sort);
-                        (Transformed::yes(LogicalPlan::Limit(limit)), schema)
-                    }
-                }
-            },
-            LogicalPlan::Sort(sort) => {
-                if sort.fetch.is_some() {
-                    (Transformed::no(LogicalPlan::Sort(sort)), None)
-                } else {
-                    let plan = generate_limit_plan(
-                        Arc::new(LogicalPlan::Sort(sort)),
-                        self.limit,
-                        self.offset,
-                    );
-                    (Transformed::yes(plan), None)
-                }
-            }
-            _ => {
-                if is_complex {
-                    (
-                        Transformed::yes(generate_limit_plan(
-                            Arc::new(plan),
-                            self.limit,
-                            self.offset,
-                        )),
-                        None,
-                    )
-                } else {
-                    let (plan, schema) =
-                        generate_limit_and_sort_plan(Arc::new(plan), self.limit, self.offset);
-                    (Transformed::yes(plan), schema)
-                }
-            }
-        };
-        if is_stop {
-            transformed.tnr = TreeNodeRecursion::Stop;
-        }
-        if let Some(schema) = schema {
-            let plan = transformed.data;
-            let proj = LogicalPlan::Projection(Projection::new_from_schema(Arc::new(plan), schema));
-            transformed.data = proj;
-        }
-        Ok(transformed)
-    }
-}
-
-// check if the plan is a complex query that we can't add sort _timestamp
-fn is_complex_query(plan: &LogicalPlan) -> bool {
-    matches!(
-        plan,
-        LogicalPlan::Aggregate(_)
-            | LogicalPlan::Join(_)
-            | LogicalPlan::Distinct(_)
-            | LogicalPlan::RecursiveQuery(_)
-            | LogicalPlan::SubqueryAlias(_)
-            | LogicalPlan::Subquery(_)
-            | LogicalPlan::Window(_)
-            | LogicalPlan::Union(_)
-    )
-}
-
-fn generate_limit_plan(input: Arc<LogicalPlan>, limit: usize, skip: usize) -> LogicalPlan {
-    LogicalPlan::Limit(Limit {
-        skip: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-            skip as i64,
-        ))))),
-        fetch: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-            limit as i64,
-        ))))),
-        input,
-    })
-}
-
-fn generate_sort_plan(
-    input: Arc<LogicalPlan>,
-    limit: usize,
-) -> (LogicalPlan, Option<Arc<DFSchema>>) {
-    let config = get_config();
-    let timestamp = SortExpr {
-        expr: col(config.common.column_timestamp.clone()),
-        asc: false,
-        nulls_first: false,
-    };
-    let schema = input.schema().clone();
-    if schema
-        .field_with_name(None, config.common.column_timestamp.as_str())
-        .is_err()
-    {
-        let mut input = input.as_ref().clone();
-        input = input
-            .rewrite(&mut ChangeTableScanSchema::new())
-            .data()
-            .unwrap();
-        return (
-            LogicalPlan::Sort(Sort {
-                expr: vec![timestamp],
-                input: Arc::new(input),
-                fetch: Some(limit),
-            }),
-            Some(schema),
-        );
-    }
-    (
-        LogicalPlan::Sort(Sort {
-            expr: vec![timestamp],
-            input,
-            fetch: Some(limit),
-        }),
-        None,
-    )
-}
-
-fn generate_limit_and_sort_plan(
-    input: Arc<LogicalPlan>,
-    limit: usize,
-    skip: usize,
-) -> (LogicalPlan, Option<Arc<DFSchema>>) {
-    let (sort, schema) = generate_sort_plan(input, limit + skip);
-    (
-        LogicalPlan::Limit(Limit {
-            skip: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-                skip as i64,
-            ))))),
-            fetch: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(
-                limit as i64,
-            ))))),
-            input: Arc::new(sort),
-        }),
-        schema,
-    )
-}
-
-fn get_int_from_expr(expr: &Option<Box<Expr>>) -> usize {
-    match expr {
-        Some(expr) => match expr.as_ref() {
-            Expr::Literal(ScalarValue::Int64(Some(value))) => *value as usize,
-            _ => 0,
-        },
-        _ => 0,
-    }
-}
-
-struct ChangeTableScanSchema {}
-
-impl ChangeTableScanSchema {
-    fn new() -> Self {
-        Self {}
-    }
-}
-
-impl TreeNodeRewriter for ChangeTableScanSchema {
-    type Node = LogicalPlan;
-
-    fn f_up(&mut self, node: LogicalPlan) -> Result<Transformed<LogicalPlan>> {
-        let mut transformed = match node {
-            LogicalPlan::TableScan(scan) => {
-                let schema = scan.source.schema();
-                let timestamp_idx =
-                    schema.index_of(get_config().common.column_timestamp.as_str())?;
-                let mut projection = scan.projection.clone().unwrap();
-                projection.push(timestamp_idx);
-                let table_scan = TableScan::try_new(
-                    scan.table_name,
-                    scan.source,
-                    Some(projection),
-                    scan.filters,
-                    scan.fetch,
-                )?;
-                Transformed::yes(LogicalPlan::TableScan(table_scan))
-            }
-            _ => Transformed::no(node),
-        };
-        transformed.tnr = TreeNodeRecursion::Stop;
-        Ok(transformed)
+        let mut plan = plan.rewrite(&mut AddSortAndLimit::new(self.limit, self.offset))?;
+        plan.tnr = TreeNodeRecursion::Stop;
+        Ok(plan)
     }
 }
 

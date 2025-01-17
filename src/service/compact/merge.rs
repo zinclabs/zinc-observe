@@ -253,8 +253,8 @@ pub async fn generate_old_data_job_by_stream(
         return Ok(()); // no need to check old data
     }
 
-    // get old data by hour, `offset - 2 hours` as old data
-    let end_time = offset - hour_micros(2);
+    // get old data by hour, `offset - cfg.compact.old_data_min_hours hours` as old data
+    let end_time = offset - hour_micros(cfg.compact.old_data_min_hours);
     let start_time = end_time
         - Duration::try_days(stream_data_retention_days)
             .unwrap()
@@ -703,7 +703,7 @@ pub async fn merge_files(
     for file in new_file_list.iter() {
         fi += 1;
         log::info!("[COMPACT:{thread_id}:{fi}] merge small file: {}", &file.key);
-        let buf = file_data::get("", &file.key, None).await?;
+        let buf = file_data::get(&file.key, None).await?;
         let schema = read_schema_from_bytes(&buf).await?;
         let schema = schema.as_ref().clone().with_metadata(Default::default());
         let schema_key = schema.hash_key();

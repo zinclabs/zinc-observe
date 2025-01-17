@@ -63,13 +63,11 @@ pub async fn init() -> Result<()> {
 /// Creates a pipeline entry in the table
 #[inline]
 pub async fn put(pipeline: &Pipeline) -> Result<()> {
-    CLIENT.put(pipeline).await
-}
-
-/// Updates a pipeline entry by id
-#[inline]
-pub async fn update(pipeline: &Pipeline) -> Result<()> {
-    CLIENT.update(pipeline).await
+    if CLIENT.get_by_id(&pipeline.id).await.is_ok() {
+        CLIENT.update(pipeline).await
+    } else {
+        CLIENT.put(pipeline).await
+    }
 }
 
 /// Finds the pipeline associated with the StreamParams within an organization

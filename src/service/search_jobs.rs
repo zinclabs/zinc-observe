@@ -368,7 +368,7 @@ pub async fn merge_response(
         }
         let cluster = job.cluster.as_ref().unwrap();
         let path = job.result_path.as_ref().unwrap();
-        let res = get_result(path, cluster).await?;
+        let res = get_result(path, cluster, 0, limit + offset).await?;
         response.push(res);
     }
 
@@ -430,10 +430,16 @@ pub async fn merge_response(
 }
 
 // get the response in this cluster or other cluster
-pub async fn get_result(path: &str, cluster: &str) -> Result<Response, anyhow::Error> {
+pub async fn get_result(
+    path: &str,
+    cluster: &str,
+    from: i64,
+    size: i64,
+) -> Result<Response, anyhow::Error> {
     if *cluster == config::get_cluster_name() {
         let buf = storage::get(path).await?;
-        let res: Response = json::from_slice::<Response>(&buf)?;
+        let mut res: Response = json::from_slice::<Response>(&buf)?;
+        res.pagination(from, size);
         return Ok(res);
     }
 
@@ -467,8 +473,8 @@ pub async fn get_result(path: &str, cluster: &str) -> Result<Response, anyhow::E
         let response = task
             .await
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))??;
-        let response = json::from_slice::<search::Response>(&response.response)?;
-
+        let mut response = json::from_slice::<search::Response>(&response.response)?;
+        response.pagination(from, size);
         return Ok(response);
     }
 

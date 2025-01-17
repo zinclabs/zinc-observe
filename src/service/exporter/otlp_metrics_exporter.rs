@@ -23,8 +23,8 @@ use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequ
 use opentelemetry_sdk::metrics::{
     data::{ResourceMetrics, Temporality},
     exporter::PushMetricsExporter,
-    reader::{AggregationSelector, TemporalitySelector},
-    Aggregation, InstrumentKind,
+    reader::TemporalitySelector,
+    InstrumentKind,
 };
 
 use crate::service::metrics::otlp::handle_otlp_request;
@@ -40,7 +40,6 @@ pub trait MetricsClient: fmt::Debug + Send + Sync + 'static {
 pub struct O2MetricsExporter {
     client: Box<dyn MetricsClient>,
     temporality_selector: Box<dyn TemporalitySelector>,
-    aggregation_selector: Box<dyn AggregationSelector>,
 }
 
 impl Debug for O2MetricsExporter {
@@ -52,12 +51,6 @@ impl Debug for O2MetricsExporter {
 impl TemporalitySelector for O2MetricsExporter {
     fn temporality(&self, kind: InstrumentKind) -> Temporality {
         self.temporality_selector.temporality(kind)
-    }
-}
-
-impl AggregationSelector for O2MetricsExporter {
-    fn aggregation(&self, kind: InstrumentKind) -> Aggregation {
-        self.aggregation_selector.aggregation(kind)
     }
 }
 
@@ -82,12 +75,10 @@ impl O2MetricsExporter {
     pub fn new(
         client: impl MetricsClient,
         temporality_selector: Box<dyn TemporalitySelector>,
-        aggregation_selector: Box<dyn AggregationSelector>,
     ) -> O2MetricsExporter {
         O2MetricsExporter {
             client: Box::new(client),
             temporality_selector,
-            aggregation_selector,
         }
     }
 }

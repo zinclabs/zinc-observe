@@ -28,10 +28,12 @@ use datafusion::{
     error::{DataFusionError, Result},
     prelude::SessionContext,
 };
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
-    schema::{unwrap_partition_time_level, unwrap_stream_settings},
+    schema::{
+        get_stream_setting_index_fields, unwrap_partition_time_level, unwrap_stream_settings,
+    },
 };
 use promql_parser::label::{MatchOp, Matchers};
 use tokio::sync::Semaphore;
@@ -54,15 +56,11 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     filters: &mut [(String, Vec<String>)],
-) -> Result<(SessionContext, Arc<Schema>, ScanStats)> {
+) -> Result<Option<(SessionContext, Arc<Schema>, ScanStats)>> {
     // check if we are allowed to search
     if db::compact::retention::is_deleting_stream(org_id, StreamType::Metrics, stream_name, None) {
         log::error!("stream [{}] is being deleted", stream_name);
-        return Ok((
-            SessionContext::new(),
-            Arc::new(Schema::empty()),
-            ScanStats::default(),
-        ));
+        return Ok(None);
     }
 
     // get latest schema
@@ -76,7 +74,19 @@ pub(crate) async fn create_context(
             ));
         }
     };
-    let stream_settings = unwrap_stream_settings(&schema).unwrap_or_default();
+    if schema.fields().is_empty() {
+        // stream not found
+        return Ok(None);
+    }
+
+    // get index fields
+    let stream_settings = unwrap_stream_settings(&schema);
+    let index_fields = get_stream_setting_index_fields(&stream_settings)
+        .into_iter()
+        .collect::<HashSet<_>>();
+
+    // get partition time level
+    let stream_settings = stream_settings.unwrap_or_default();
     let partition_time_level =
         unwrap_partition_time_level(stream_settings.partition_time_level, stream_type);
 
@@ -105,11 +115,7 @@ pub(crate) async fn create_context(
     )
     .await?;
     if files.is_empty() {
-        return Ok((
-            SessionContext::new(),
-            Arc::new(Schema::empty()),
-            ScanStats::default(),
-        ));
+        return Ok(None);
     }
 
     // calculate scan size
@@ -158,7 +164,6 @@ pub(crate) async fn create_context(
     let query = Arc::new(QueryParams {
         trace_id: trace_id.to_string(),
         org_id: org_id.to_string(),
-        job_id: "".to_string(),
         stream_type: StreamType::Metrics,
         stream_name: stream_name.to_string(),
         time_range: Some(time_range),
@@ -167,7 +172,7 @@ pub(crate) async fn create_context(
     });
 
     // search tantivy index
-    let index_condition = convert_matchers_to_index_condition(&matchers, &schema)?;
+    let index_condition = convert_matchers_to_index_condition(&matchers, &schema, &index_fields)?;
     if !index_condition.conditions.is_empty() && cfg.common.inverted_index_enabled {
         let (idx_took, ..) =
             filter_file_list_by_tantivy_index(query, &mut files, Some(index_condition), None)
@@ -197,7 +202,7 @@ pub(crate) async fn create_context(
         &[],
     )
     .await?;
-    Ok((ctx, schema, scan_stats))
+    Ok(Some((ctx, schema, scan_stats)))
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip(trace_id))]
@@ -337,12 +342,14 @@ async fn cache_parquet_files(
 fn convert_matchers_to_index_condition(
     matchers: &Matchers,
     schema: &Arc<Schema>,
+    index_fields: &HashSet<String>,
 ) -> Result<IndexCondition> {
     let mut index_condition = IndexCondition::default();
     let cfg = get_config();
     for mat in matchers.matchers.iter() {
         if mat.name == cfg.common.column_timestamp
             || mat.name == VALUE_LABEL
+            || !index_fields.contains(&mat.name)
             || schema.field_with_name(&mat.name).is_err()
         {
             continue;

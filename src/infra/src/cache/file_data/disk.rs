@@ -18,6 +18,7 @@ use std::{
     fs,
     ops::Range,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
 use async_recursion::async_recursion;
@@ -79,6 +80,11 @@ static RESULT_FILES_READER: Lazy<Vec<FileData>> = Lazy::new(|| {
 
 pub static QUERY_RESULT_CACHE: Lazy<RwAHashMap<String, Vec<ResultCacheMeta>>> =
     Lazy::new(Default::default);
+
+pub static METRICS_RESULT_CACHE: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
+
+pub static LOADING_FROM_DISK_NUM: Lazy<AtomicUsize> = Lazy::new(|| AtomicUsize::new(0));
+pub static LOADING_FROM_DISK_DONE: Lazy<AtomicBool> = Lazy::new(|| AtomicBool::new(false));
 
 pub struct FileData {
     max_size: usize,
@@ -186,11 +192,12 @@ impl FileData {
                 .with_label_values(&[columns[1], columns[2]])
                 .add(data_size as i64);
         } else if columns[0] == "results" {
-            metrics::QUERY_DISK_RESULT_CACHE_FILES
-                .with_label_values(&[columns[1], columns[2]])
-                .inc();
             metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                 .with_label_values(&[columns[1], columns[2]])
+                .add(data_size as i64);
+        } else if columns[0] == "metrics_results" {
+            metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
+                .with_label_values(&[])
                 .add(data_size as i64);
         };
         Ok(())
@@ -262,11 +269,12 @@ impl FileData {
                     .with_label_values(&[columns[1], columns[2]])
                     .sub(data_size as i64);
             } else if columns[0] == "results" {
-                metrics::QUERY_DISK_RESULT_CACHE_FILES
-                    .with_label_values(&[columns[1], columns[2]])
-                    .dec();
                 metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                     .with_label_values(&[columns[1], columns[2]])
+                    .sub(data_size as i64);
+            } else if columns[0] == "metrics_results" {
+                metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
+                    .with_label_values(&[])
                     .sub(data_size as i64);
             }
             release_size += data_size;
@@ -328,11 +336,12 @@ impl FileData {
                 .with_label_values(&[columns[1], columns[2]])
                 .sub(data_size as i64);
         } else if columns[0] == "results" {
-            metrics::QUERY_DISK_RESULT_CACHE_FILES
-                .with_label_values(&[columns[1], columns[2]])
-                .dec();
             metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                 .with_label_values(&[columns[1], columns[2]])
+                .sub(data_size as i64);
+        } else if columns[0] == "metrics_results" {
+            metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
+                .with_label_values(&[])
                 .sub(data_size as i64);
         }
 
@@ -382,9 +391,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
             log::error!("load disk cache error: {}", e);
         }
         log::info!(
-            "Loading disk cache done, total files: {} ",
-            len(FileType::DATA).await
+            "Loading disk cache done, total files: {}",
+            LOADING_FROM_DISK_NUM.load(Ordering::Relaxed)
         );
+        LOADING_FROM_DISK_DONE.store(true, Ordering::SeqCst);
     });
 
     tokio::task::spawn(async move {
@@ -482,6 +492,7 @@ pub async fn remove(trace_id: &str, file: &str) -> Result<(), anyhow::Error> {
 async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Error> {
     let mut entries = tokio::fs::read_dir(&scan_dir).await?;
     let mut result_cache: HashMap<String, Vec<ResultCacheMeta>> = HashMap::new();
+    let mut metrics_cache: Vec<String> = Vec::new();
     loop {
         match entries.next_entry().await {
             Err(e) => return Err(e.into()),
@@ -530,16 +541,16 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                     }
                     // write into cache
                     let idx = get_bucket_idx(&file_key);
+                    let total = LOADING_FROM_DISK_NUM.fetch_add(1, Ordering::Relaxed);
+                    // print progress
+                    if total % 1000 == 0 {
+                        log::info!("Loading disk cache {}", total);
+                    }
                     if file_key.starts_with("files") {
                         let mut w = FILES[idx].write().await;
                         w.cur_size += data_size;
                         w.data.insert(file_key.clone(), data_size);
-                        let total = w.len();
                         drop(w);
-                        // print progress
-                        if total % 1000 == 0 {
-                            log::info!("Loading disk cache {}", total);
-                        }
                         // metrics
                         let columns = file_key.split('/').collect::<Vec<&str>>();
 
@@ -549,44 +560,41 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
                         metrics::QUERY_DISK_CACHE_USED_BYTES
                             .with_label_values(&[columns[1], columns[2]])
                             .add(data_size as i64);
-                    } else {
+                    } else if file_key.starts_with("results") {
                         let mut w = RESULT_FILES[idx].write().await;
                         w.cur_size += data_size;
                         w.data.insert(file_key.clone(), data_size);
-                        let total = w.len();
                         drop(w);
-                        // print progress
-                        if total % 1000 == 0 {
-                            log::info!("Loading disk cache {}", total);
-                        }
                         // metrics
                         let columns = file_key.split('/').collect::<Vec<&str>>();
 
-                        metrics::QUERY_DISK_RESULT_CACHE_FILES
-                            .with_label_values(&[columns[1], columns[2]])
-                            .inc();
                         metrics::QUERY_DISK_RESULT_CACHE_USED_BYTES
                             .with_label_values(&[columns[1], columns[2]])
                             .add(data_size as i64);
 
                         let columns = file_key.split('/').collect::<Vec<&str>>();
-                        if columns[0] == "results" {
-                            let query_key = format!(
-                                "{}_{}_{}_{}",
-                                columns[1], columns[2], columns[3], columns[4]
-                            );
-                            let meta = columns[5].split('_').collect::<Vec<&str>>();
-                            let is_aggregate = meta[2] == "1";
-                            let is_descending = meta[3] == "1";
-                            result_cache.entry(query_key).or_insert_with(Vec::new).push(
-                                ResultCacheMeta {
-                                    start_time: meta[0].parse().unwrap(),
-                                    end_time: meta[1].parse().unwrap(),
-                                    is_aggregate,
-                                    is_descending,
-                                },
-                            );
-                        };
+                        let query_key = format!(
+                            "{}_{}_{}_{}",
+                            columns[1], columns[2], columns[3], columns[4]
+                        );
+                        let meta = columns[5].split('_').collect::<Vec<&str>>();
+                        let is_aggregate = meta[2] == "1";
+                        let is_descending = meta[3] == "1";
+                        result_cache.entry(query_key).or_insert_with(Vec::new).push(
+                            ResultCacheMeta {
+                                start_time: meta[0].parse().unwrap(),
+                                end_time: meta[1].parse().unwrap(),
+                                is_aggregate,
+                                is_descending,
+                            },
+                        );
+                    } else if file_key.starts_with("metrics_results") {
+                        // metrics
+                        metrics::QUERY_DISK_METRICS_CACHE_USED_BYTES
+                            .with_label_values(&[])
+                            .add(data_size as i64);
+
+                        metrics_cache.push(file_key);
                     }
                 }
             }
@@ -595,6 +603,8 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
 
     // write all data from result_cache to QUERY_RESULT_CACHE
     QUERY_RESULT_CACHE.write().await.extend(result_cache);
+    // write all data from metrics_cache to QUERY_METRICS_CACHE
+    METRICS_RESULT_CACHE.write().await.extend(metrics_cache);
     Ok(())
 }
 

@@ -35,7 +35,7 @@ export default {
       v-for="node in node_types"
       :key="node.io_type"
       class="o2vf_node q-gutter-md q-pb-md"
-      :draggable="node.io_type == 'input' && pipelineObj.hasInputNode ? false : true"
+      :draggable="true"
       @dragstart="onDragStart($event, node)"
     >
       <q-btn

@@ -111,7 +111,6 @@ export default function useDragAndDrop() {
     pipelineObj.isDragging = true;
     pipelineObj.currentSelectedNodeData = null;
 
-
     document.addEventListener("drop", onDragEnd);
   }
 
@@ -148,6 +147,18 @@ export default function useDragAndDrop() {
    * @param {DragEvent} event
    */
   function onDrop(event:any ,offSet:any = {x:0,y:0}) {
+    if (
+      pipelineObj.hasInputNode &&
+      pipelineObj.draggedNode.io_type == "input"
+    ) {
+      $q.notify({
+        message: "Only 1 source node is allowed",
+        color: "negative",
+        position: "bottom",
+        timeout: 2000, 
+    });
+      return;
+    }
 
     const position = screenToFlowCoordinate({
       x: event.clientX + offSet.x,
@@ -515,7 +526,6 @@ export default function useDragAndDrop() {
 
       const ids1 = extractAndSortIds(items1);
       const ids2 = extractAndSortIds(items2);
-      console.log(ids1,ids2)
   
       return JSON.stringify(ids1) === JSON.stringify(ids2);
     };
@@ -553,7 +563,6 @@ export default function useDragAndDrop() {
       pipelineObj.dirtyFlag = true;
     }
     
-    console.log(pipelineObj.currentSelectedPipeline,"edges")
   }
 
   const resetPipelineData = () => {

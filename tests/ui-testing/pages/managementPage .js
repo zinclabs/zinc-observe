@@ -49,46 +49,5 @@ export
 
     async managementURLValidation() {
         await expect(this.page).toHaveURL(/settings/);
-    }
-
-
-    async updateCustomLogoText(text) {
-        await this.submitButton.waitFor({ state: 'visible' });
-        await this.submitButton.click({ force: true });
-        await this.page.waitForResponse(
-            (response) =>
-                response.url().includes("/api/default/settings") && response.status() === 200
-        );
-        await this.page.getByText('Custom Logo Text').click();
-        await this.page.locator('[data-test="settings_ent_logo_custom_text_edit_btn"]').click();
-        await this.page.locator('[data-test="settings_ent_logo_custom_text"]').click();
-        await this.page.locator('[data-test="settings_ent_logo_custom_text"]').fill('logo Autom');
-        await this.customLogoText.click({ force: true });
-        await this.customLogoText.fill(text);
-        await this.page.waitForSelector('[data-test="settings_ent_logo_custom_text_save_btn"]');
-        await this.saveButton.click({ force: true });
-        await this.page.waitForResponse(
-            (response) =>
-                response.url().includes("/api/default/settings/logo/text") && response.status() === 200
-        );
-       
-
-    }
-
-    async uploadLogo(filePath) {
-        const isVisible = await this.deleteLogoButton.isVisible();
-        if (isVisible) {
-            await this.page.waitForSelector('[data-test="setting_ent_custom_logo_img_delete_btn"]');
-            await this.deleteLogoButton.click({ force: true });
-            await this.page.waitForSelector('[data-test="logs-search-bar-confirm-dialog-ok-btn"]');
-            await this.confirmDeleteButton.click({ force: true });
-        }
-        //  await this.fileUploadInput.setInputFiles(filePath);
-        await this.page.setInputFiles('input[ data-test="setting_ent_custom_logo_img_file_upload"]', filePath);
-        await expect(this.page.getByText("Logo updated successfully")).toBeVisible({
-            timeout: 30000,
-        });
-
-
-    }
+    }   
 }

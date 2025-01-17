@@ -161,7 +161,8 @@ def test_e2e_trace_invalid_ids(create_session, base_url):
     org_id = "default"
     
     start_time = int(time.time()*1000000)
-    end_time = start_time+100000000
+    start_time = start_time - 10000000
+    end_time = start_time + 100000000
     start_time_str = "{:d}".format(start_time)
     end_time_str = "{:d}".format(end_time)
     get_query_url = f"{url}api/{org_id}/default/traces/latest?filter=duration >= 0 AND duration <= 100000000&start_time={start_time_str}&end_time={end_time_str}&from=0&size=25"
@@ -182,8 +183,8 @@ def test_e2e_trace_invalid_ids(create_session, base_url):
     resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
 
     assert (
-        resp_post_trace.status_code == 200
-    ), f"Invalid trace span id expected 200, but got {resp_post_trace.status_code}"
+        resp_post_trace.status_code == 400
+    ), f"Invalid span id expected 400, but got {resp_post_trace.status_code}"
 
     trace = valid_trace()
     trace["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["links"] = [
@@ -198,10 +199,10 @@ def test_e2e_trace_invalid_ids(create_session, base_url):
     resp_post_trace = session.post(f"{url}api/{org_id}/v1/traces",json=trace)
 
     assert (
-        resp_post_trace.status_code == 200
-    ), f"Invalid trace span id expected 200, but got {resp_post_trace.status_code}"
+        resp_post_trace.status_code == 400
+    ), f"Invalid trace id expected 400, but got {resp_post_trace.status_code}"
 
     resp_get_trace = session.get(get_query_url)
     new_count = len(resp_get_trace.json()["hits"])
 
-    assert (original_count + 1 == new_count), "Expected count of traces to increase by 1."
+    assert (original_count == new_count), "Expected count of traces to increase by 1."

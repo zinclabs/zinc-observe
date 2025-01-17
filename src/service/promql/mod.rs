@@ -88,58 +88,40 @@ pub struct QueryResult {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct QueryResponse {
-    pub status: Status,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<QueryResult>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExemplarsResponse {
-    pub status: Status,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<value::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
 #[serde(tag = "status", rename_all = "lowercase")]
 pub(crate) enum ApiFuncResponse<T: Serialize> {
     Success {
         data: T,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        trace_id: Option<String>,
     },
     Error {
         #[serde(rename = "errorType")]
         error_type: ApiErrorType,
         error: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        trace_id: Option<String>,
     },
 }
 
 impl<T: Serialize> ApiFuncResponse<T> {
-    pub(crate) fn ok(data: T) -> Self {
-        ApiFuncResponse::Success { data }
+    pub(crate) fn ok(data: T, trace_id: Option<String>) -> Self {
+        ApiFuncResponse::Success { data, trace_id }
     }
 
-    pub(crate) fn err_bad_data(error: impl ToString) -> Self {
+    pub(crate) fn err_bad_data(error: impl ToString, trace_id: Option<String>) -> Self {
         ApiFuncResponse::Error {
             error_type: ApiErrorType::BadData,
             error: error.to_string(),
+            trace_id,
         }
     }
 
-    pub(crate) fn err_internal(error: impl ToString) -> Self {
+    pub(crate) fn err_internal(error: impl ToString, trace_id: Option<String>) -> Self {
         ApiFuncResponse::Error {
             error_type: ApiErrorType::Internal,
             error: error.to_string(),
+            trace_id,
         }
     }
 }
@@ -235,13 +217,13 @@ mod tests {
 
     #[test]
     fn test_api_func_response_serialize() {
-        let ok = ApiFuncResponse::ok("hello".to_owned());
+        let ok = ApiFuncResponse::ok("hello".to_owned(), None);
         assert_eq!(
             serde_json::to_string(&ok).unwrap(),
             r#"{"status":"success","data":"hello"}"#
         );
 
-        let err = ApiFuncResponse::<()>::err_internal("something went wrong".to_owned());
+        let err = ApiFuncResponse::<()>::err_internal("something went wrong".to_owned(), None);
         assert_eq!(
             serde_json::to_string(&err).unwrap(),
             r#"{"status":"error","errorType":"internal","error":"something went wrong"}"#
@@ -249,6 +231,7 @@ mod tests {
 
         let err = ApiFuncResponse::<()>::err_bad_data(
             r#"invalid parameter \"start\": Invalid time value for 'start': cannot parse \"foobar\" to a valid timestamp"#,
+            None,
         );
         expect![[r#"
             {

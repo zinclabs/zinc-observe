@@ -62,7 +62,13 @@ impl OptimizerRule for AddTimestampRule {
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
         match plan {
-            LogicalPlan::TableScan(_) => {
+            LogicalPlan::TableScan(ref scan) => {
+                let table_name = scan.table_name.clone();
+                if let Some(schema) = table_name.schema() {
+                    if schema == "enrich" || schema == "enrichment_tables" {
+                        return Ok(Transformed::no(plan));
+                    }
+                }
                 let filter_plan =
                     LogicalPlan::Filter(Filter::try_new(self.filter.clone(), Arc::new(plan))?);
                 Ok(Transformed::yes(filter_plan))
@@ -230,6 +236,30 @@ mod tests {
         let expected = "Inner Join: left.id = right.id\
         \n  Filter: _timestamp >= Int64(0) AND _timestamp < Int64(5)\
         \n    TableScan: left\
+        \n  Filter: _timestamp >= Int64(0) AND _timestamp < Int64(5)\
+        \n    TableScan: right";
+
+        assert_optimized_plan_equal(plan, expected)
+    }
+
+    #[test]
+    fn test_table_scan_with_join_with_enrich() -> Result<()> {
+        let left_table = create_table_with_name("enrich.left")?;
+        let right_table = create_table_with_name("right")?;
+        let plan = LogicalPlanBuilder::from(left_table)
+            .join(
+                right_table,
+                JoinType::Inner,
+                (
+                    vec![Column::from_qualified_name("enrich.left.id")],
+                    vec![Column::from_qualified_name("right.id")],
+                ),
+                None,
+            )?
+            .build()?;
+
+        let expected = "Inner Join: enrich.left.id = right.id\
+        \n  TableScan: enrich.left\
         \n  Filter: _timestamp >= Int64(0) AND _timestamp < Int64(5)\
         \n    TableScan: right";
 

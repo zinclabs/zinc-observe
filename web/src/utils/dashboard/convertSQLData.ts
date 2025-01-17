@@ -591,7 +591,7 @@ export const convertSQLData = async (
       }
 
       if (!options.series?.length) {
-        throw new Error("No series data available");
+        return;
       }
 
       const yAxisNameGap = getYAxisNameGap();
@@ -1190,7 +1190,11 @@ export const convertSQLData = async (
         panelSchema.type == "h-stacked") &&
         panelSchema.queries[0].fields.breakdown?.length)
     ) {
-      return yAxisKeys.length === 1 ? xAXisKey : `${xAXisKey} (${label})`;
+      return yAxisKeys.length === 1
+        ? xAXisKey
+          ? xAXisKey
+          : label
+        : `${xAXisKey} (${label})`;
     }
 
     return label;
@@ -1214,7 +1218,8 @@ export const convertSQLData = async (
 
           if (
             breakDownKeys.length &&
-            (panelSchema.type === "bar" || panelSchema.type === "h-bar")
+            (panelSchema.type === "bar" || panelSchema.type === "h-bar") &&
+            !panelSchema.config.trellis?.layout
           ) {
             const seriesData = getAxisDataFromKey(yAxis);
             return getSeriesObj(yAxisName, seriesData, seriesConfig);
@@ -1372,9 +1377,9 @@ export const convertSQLData = async (
         updateTrellisConfig();
       } else if (breakDownKeys.length) {
         options.xAxis.forEach((it: any, index: number) => {
-          it.nameGap = 20 * (xAxisKeys.length + breakDownKeys.length) + 5;
+          it.nameGap = 20 * (xAxisKeys.length + breakDownKeys.length) + 20;
           it.axisLabel.margin =
-            18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 5;
+            18 * (xAxisKeys.length + breakDownKeys.length - index - 1) + 25;
           it.axisTick.length =
             20 * (xAxisKeys.length + breakDownKeys.length - index);
         });
@@ -2097,9 +2102,14 @@ export const convertSQLData = async (
         }
       });
 
-      options.xAxis.forEach((it: any) => {
-        it.type = "time";
-      });
+      // Trellis has multiple x axis
+      if (panelSchema.config.trellis?.layout) {
+        options.xAxis.forEach((axis: any) => {
+          axis.type = "time";
+        });
+      } else {
+        options.xAxis[0].type = "time";
+      }
 
       options.xAxis[0].data = [];
 
@@ -2251,7 +2261,16 @@ export const convertSQLData = async (
           ]);
         }
       });
-      options.xAxis[0].type = "time";
+
+      // Trellis has multiple x axis
+      if (panelSchema.config.trellis?.layout) {
+        options.xAxis.forEach((axis: any) => {
+          axis.type = "time";
+        });
+      } else {
+        options.xAxis[0].type = "time";
+      }
+
       options.xAxis[0].data = [];
       options.tooltip.formatter = function (name: any) {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
@@ -2364,7 +2383,7 @@ export const convertSQLData = async (
     // will return null if not exist
     // will return ASC or DESC if exist
     const isYAxisExistInOrderBy = await isGivenFieldInOrderBy(
-      panelSchema?.queries[0]?.query ?? "",
+      metadata?.queries[0]?.query ?? "",
       yAxisKeys[0],
     );
     if (isYAxisExistInOrderBy) {

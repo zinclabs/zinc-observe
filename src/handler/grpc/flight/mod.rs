@@ -85,7 +85,10 @@ impl FlightService for FlightServiceImpl {
             .map_err(|e| Status::internal(e.to_string()))?;
 
         let req: FlightSearchRequest = req.into();
-        let trace_id = req.query_identifier.trace_id.clone();
+        let trace_id = format!(
+            "{}-{}",
+            req.query_identifier.trace_id, req.query_identifier.job_id
+        );
         let is_super_cluster = req.super_cluster_info.is_super_cluster;
 
         log::info!("[trace_id {}] flight->search: do_get", trace_id);
@@ -97,10 +100,7 @@ impl FlightService for FlightServiceImpl {
                 .await;
         }
 
-        #[cfg(feature = "enterprise")]
-        let result = get_ctx_and_physical_plan(&req).await;
-        #[cfg(not(feature = "enterprise"))]
-        let result = get_ctx_and_physical_plan(&req).await;
+        let result = get_ctx_and_physical_plan(&trace_id, &req).await;
 
         #[cfg(feature = "enterprise")]
         if is_super_cluster && !SEARCH_SERVER.is_leader(&trace_id).await {
@@ -321,14 +321,15 @@ type PlanResult = (
 #[cfg(feature = "enterprise")]
 #[tracing::instrument(name = "service:search:grpc:flight::enter", skip_all)]
 async fn get_ctx_and_physical_plan(
+    trace_id: &str,
     req: &FlightSearchRequest,
 ) -> Result<PlanResult, infra::errors::Error> {
     if req.super_cluster_info.is_super_cluster {
         let (ctx, physical_plan, defer, scan_stats) =
-            crate::service::search::super_cluster::follower::search(req).await?;
+            crate::service::search::super_cluster::follower::search(trace_id, req).await?;
         Ok((ctx, physical_plan, Some(defer), scan_stats))
     } else {
-        let (ctx, physical_plan, scan_stats) = grpcFlight::search(req).await?;
+        let (ctx, physical_plan, scan_stats) = grpcFlight::search(trace_id, req).await?;
         Ok((ctx, physical_plan, None, scan_stats))
     }
 }
@@ -336,9 +337,10 @@ async fn get_ctx_and_physical_plan(
 #[cfg(not(feature = "enterprise"))]
 #[tracing::instrument(name = "service:search:grpc:flight::enter", skip_all)]
 async fn get_ctx_and_physical_plan(
+    trace_id: &str,
     req: &FlightSearchRequest,
 ) -> Result<PlanResult, infra::errors::Error> {
-    let (ctx, physical_plan, scan_stats) = grpcFlight::search(req).await?;
+    let (ctx, physical_plan, scan_stats) = grpcFlight::search(trace_id, req).await?;
     Ok((ctx, physical_plan, None, scan_stats))
 }
 

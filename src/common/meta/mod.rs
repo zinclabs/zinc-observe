@@ -19,7 +19,6 @@ pub mod ingestion;
 pub mod maxmind;
 pub mod middleware_data;
 pub mod organization;
-pub mod pipelines;
 pub mod proxy;
 pub mod saved_view;
 pub mod search;

@@ -27,7 +27,7 @@ RUN mv /openobserve/target/x86_64-unknown-linux-gnu/release-prod/openobserve /op
 
 FROM public.ecr.aws/debian/debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
-RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools sqlite3
+RUN apt-get install -y curl htop iftop nload iptraf ncdu tcpdump sysstat procps lsof net-tools sqlite3
 RUN update-ca-certificates
 COPY --from=builder /openobserve/target/release/openobserve /
 COPY --from=builder /lib/x86_64-linux-gnu/liblzma.so.5 /lib/x86_64-linux-gnu/liblzma.so.5

@@ -120,7 +120,7 @@ pub struct RequestQuery {
 }
 
 /// Range query.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RequestRangeQuery {
     /// PromQL expression.
     pub query: Option<String>,

@@ -1486,7 +1486,12 @@ const useLogs = () => {
       // else use organization settings
       const shouldUseWebSocket = isWebSocketEnabled();
 
-      searchObj.communicationMethod = shouldUseWebSocket ? "ws" : "http";
+      const isMultiStreamSearch =
+        searchObj.data.stream.selectedStream.length > 1 &&
+        !searchObj.meta.sqlMode;
+
+      searchObj.communicationMethod =
+        shouldUseWebSocket && !isMultiStreamSearch ? "ws" : "http";
 
       if (searchObj.communicationMethod === "ws") {
         getDataThroughWebSocket(isPagination);
@@ -1715,6 +1720,8 @@ const useLogs = () => {
                     searchObj.data.histogram.errorDetail =
                       "Search query was cancelled";
                   }
+
+                  showCancelSearchNotification();
                   break;
                 }
                 await getHistogramQueryData(searchObj.data.histogramQuery);
@@ -2062,12 +2069,12 @@ const useLogs = () => {
       // ) {
       //   delete queryReq.query.track_total_hits;
       // }
-
       if (searchObj.data.isOperationCancelled) {
         notificationMsg.value = "Search operation is cancelled.";
 
         searchObj.loading = false;
         searchObj.data.isOperationCancelled = false;
+        showCancelSearchNotification();
         return;
       }
 
@@ -2384,6 +2391,8 @@ const useLogs = () => {
           searchObj.data.histogram.errorMsg = "Search query was cancelled";
           searchObj.data.histogram.errorDetail = "Search query was cancelled";
         }
+
+        showCancelSearchNotification();
         return;
       }
 

@@ -77,7 +77,13 @@ impl ObjectStore for FS {
     #[tracing::instrument(name = "datafusion::storage::memory::list", skip_all)]
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'_, Result<ObjectMeta>> {
         let key = prefix.unwrap().to_string();
-        let objects = super::file_list::get(&key).unwrap_or_default();
+        let objects = match super::file_list::get(&key) {
+            Ok(objects) => objects,
+            Err(e) => {
+                log::error!("Error getting file list for memory storage: {}", e);
+                vec![]
+            }
+        };
         let values = objects
             .iter()
             .map(|file| Ok(file.to_owned()))

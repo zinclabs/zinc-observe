@@ -113,6 +113,7 @@ struct ConfigResponse<'a> {
     meta_org: String,
     quick_mode_enabled: bool,
     user_defined_schemas_enabled: bool,
+    user_defined_schema_max_fields: usize,
     all_fields_name: String,
     usage_enabled: bool,
     usage_publish_interval: i64,
@@ -290,6 +291,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         meta_org: cfg.common.usage_org.to_string(),
         quick_mode_enabled: cfg.limit.quick_mode_enabled,
         user_defined_schemas_enabled: cfg.common.allow_user_defined_schemas,
+        user_defined_schema_max_fields: cfg.limit.user_defined_schema_max_fields,
         all_fields_name: cfg.common.column_all.to_string(),
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
@@ -433,7 +435,7 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
 pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
-    use crate::common::meta::user::AuthTokens;
+    use crate::common::meta::user::{AuthTokens, UserRole};
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {
@@ -498,6 +500,18 @@ pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
             let id_token;
             match token_ver {
                 Ok(res) => {
+                    // check for service accounts , do not to allow login
+                    if let Some(db_user) = db::user::get_user_by_email(&res.0.user_email).await {
+                        if db_user
+                            .organizations
+                            .iter()
+                            .any(|org| org.role.eq(&UserRole::ServiceAccount))
+                        {
+                            return Ok(HttpResponse::Unauthorized()
+                                .json("Service accounts are not allowed to login".to_string()));
+                        }
+                    }
+
                     audit_message.user_email = res.0.user_email.clone();
                     id_token = json::to_string(&json::json!({
                         "email": res.0.user_email,

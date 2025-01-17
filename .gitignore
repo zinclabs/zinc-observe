@@ -33,3 +33,17 @@ flamegraph.html
 #web distribution
 /web/dist
 /web/.env
+
+
+/tmp/
+/data/
+/.idea/
+/.vscode
+/.env
+/.env*
+/integration-tests
+/download/
+
+#web distribution
+/web/dist
+/web/.env

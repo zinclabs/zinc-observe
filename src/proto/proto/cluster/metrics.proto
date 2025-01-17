@@ -33,7 +33,7 @@ message MetricsQueryResponse {
     Job                 job = 1;
     int32              took = 2;
     string      result_type = 3; // vector, matrix, scalar, exemplars
-    repeated Series  result = 4;
+    repeated Series  series = 4;
     ScanStats    scan_stats = 5;
 }
 

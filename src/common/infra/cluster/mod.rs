@@ -411,8 +411,9 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
             *entry += 1;
             if *entry >= HEALTH_CHECK_FAILED_TIMES {
                 log::error!(
-                    "[CLUSTER] node {} health check failed 3 times, remove it",
-                    node.name
+                    "[CLUSTER] node {}[{}] health check failed 3 times, remove it",
+                    node.name,
+                    node.http_addr
                 );
                 if node.is_interactive_querier() {
                     remove_node_from_consistent_hash(
@@ -462,6 +463,17 @@ pub async fn get_cached_nodes(cond: fn(&Node) -> bool) -> Option<Vec<Node>> {
             .map(|(_uuid, node)| node.clone())
             .collect(),
     )
+}
+
+#[inline(always)]
+pub async fn get_cached_node_by_name(name: &str) -> Option<Node> {
+    let r = NODES.read().await;
+    if r.is_empty() {
+        return None;
+    }
+    r.iter()
+        .find(|(_uuid, node)| node.name == name)
+        .map(|(_uuid, node)| node.clone())
 }
 
 #[inline(always)]

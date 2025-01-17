@@ -110,6 +110,11 @@ impl Sql {
         // 1. get table name
         let stream_names =
             resolve_stream_names_with_type(&sql).map_err(|e| Error::Message(e.to_string()))?;
+        if stream_names.len() > 1 && stream_names.iter().any(|s| s.schema() == Some("index")) {
+            return Err(Error::Message(
+                "Index stream is not supported in multi-stream query".to_string(),
+            ));
+        }
         let mut total_schemas = HashMap::with_capacity(stream_names.len());
         for stream in stream_names.iter() {
             let stream_name = stream.stream_name();

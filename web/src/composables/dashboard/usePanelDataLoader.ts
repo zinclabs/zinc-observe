@@ -710,6 +710,9 @@ export const usePanelDataLoader = (
     // set loading to false
     state.loading = false;
     state.isOperationCancelled = false;
+
+    // save current state to cache
+    saveCurrentStateToCache();
   };
 
   const handleSearchError = (

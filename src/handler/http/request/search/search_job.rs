@@ -19,7 +19,7 @@ use actix_web::{delete, get, http::StatusCode, post, web, HttpRequest, HttpRespo
 use config::{
     get_config,
     meta::{
-        search::{Request, SearchEventType},
+        search::{Request, Response, SearchEventType},
         sql::resolve_stream_names,
         stream::StreamType,
     },
@@ -213,6 +213,7 @@ pub async fn cancel_job(
 #[get("/{org_id}/search_jobs/{job_id}/result")]
 pub async fn get_job_result(
     path: web::Path<(String, String)>,
+    req: web::Query<config::meta::search::PaginationQuery>,
     in_req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let user_id = in_req
@@ -221,6 +222,9 @@ pub async fn get_job_result(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_string();
+
+    let from = req.from.unwrap_or(0);
+    let size = req.size.unwrap_or(100);
 
     let org_id = path.0.clone();
     let job_id = path.1.clone();
@@ -241,7 +245,7 @@ pub async fn get_job_result(
             model.error_message.unwrap()
         )))
     } else if model.status == 1 && model.partition_num != Some(1) {
-        let response = get_partition_result(&model).await;
+        let response = get_partition_result(&model, from, size).await;
         Ok(response)
     } else if model.result_path.is_none() || model.cluster.is_none() {
         Ok(MetaHttpResponse::not_found(format!(
@@ -250,7 +254,7 @@ pub async fn get_job_result(
     } else {
         let path = model.result_path.clone().unwrap();
         let cluster = model.cluster.clone().unwrap();
-        let response = get_result(&path, &cluster).await;
+        let response = get_result(&path, &cluster, from, size).await;
         if let Err(e) = response {
             return Ok(MetaHttpResponse::internal_error(e));
         }
@@ -376,7 +380,7 @@ async fn cancel_job_inner(
     cancel_query_inner(org_id, &[&job.trace_id]).await
 }
 
-async fn get_partition_result(job: &JobModel) -> HttpResponse {
+async fn get_partition_result(job: &JobModel, from: i64, size: i64) -> HttpResponse {
     let req: Result<Request, serde_json::Error> = json::from_str(&job.payload);
     if let Err(e) = req {
         return MetaHttpResponse::internal_error(e);
@@ -397,7 +401,14 @@ async fn get_partition_result(job: &JobModel) -> HttpResponse {
     if let Err(e) = response {
         return MetaHttpResponse::internal_error(e);
     }
-    HttpResponse::Ok().json(response.unwrap())
+    let response = response.unwrap();
+    apply_pagination(response, from, size)
+}
+
+fn apply_pagination(response: Response, from: i64, size: i64) -> HttpResponse {
+    let mut res = response;
+    res.pagination(from, size);
+    HttpResponse::Ok().json(res)
 }
 
 // check permissions

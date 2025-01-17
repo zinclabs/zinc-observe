@@ -65,7 +65,7 @@ class="indexDetailsContainer" style="height: 100vh">
             >
               <div data-test="schema-stream-title-text">
                 {{ t("alerts.stream_name") }}
-                <span class="title q-pl-xs"> {{ indexData.name }}</span>
+                <span class="title q-pl-xs" > {{ indexData.name }}</span>
               </div>
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -105,16 +105,22 @@ class="indexDetailsContainer" style="height: 100vh">
                 >
               </div>
               <div
-                class="stream-time-container"
+                class="stream-time-container flex justify-between tw-gap-5"
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
                 data-test="schema-stream-title-text"
               >
-                {{ t("logStream.time") }}
-                <span class="title q-pl-xs">
-                  {{ indexData.stats.doc_time_min }}
+              
+
+                <span class="q-px-xs">
+                      Start Time:
+                 <span class="title">{{ indexData.stats.doc_time_min }}</span>
                 </span>
-                <span>to</span>
-                <span class="title">{{ indexData.stats.doc_time_max }}</span>
+                
+                <span class=" q-px-xs">
+                  End Time:
+                  <span class="title">{{ indexData.stats.doc_time_max }}</span>
+                </span>
+
               </div>
             </div>
           </div>
@@ -269,7 +275,11 @@ class="indexDetailsContainer" style="height: 100vh">
                   color="primary"
                   data-test="schema-add-fields-title"
                   @click="openDialog"
-                  class="font-weight-bold"
+                  class="q-my-sm text-bold no-border"
+                  padding="sm md"
+                  no-caps
+                  dense
+                  :disable="isDialogOpen"
                 >
                   Add Field(s)
                 </q-btn>
@@ -278,16 +288,15 @@ class="indexDetailsContainer" style="height: 100vh">
             <div class="q-mb-md" v-if="isDialogOpen">
               <q-card class="add-fields-card">
                 <!-- Header Section -->
-                <q-card-section>
+                <q-card-section class="q-pa-none" style="padding: 8px 16px 6px 16px">
                   <div class="tw-flex tw-justify-between tw-items-center">
                     <div class="text-h6">Add Field(s)</div>
                     <div>
                       <q-btn
                         data-test="add-stream-cancel-btn"
                         icon="close"
-                        class="q-my-sm text-bold q-mr-md"
+                        class=" text-bold q-mr-md"
                         text-color="light-text"
-                        padding="sm md"
                         no-caps
                         dense
                         flat
@@ -299,7 +308,7 @@ class="indexDetailsContainer" style="height: 100vh">
                 <!-- Main Content (Scrollable if necessary) -->
                 <q-card-section
                   class="q-pa-none"
-                  style="flex: 1; overflow-y: auto"
+                  style="flex: 1; overflow-y: auto; padding: 4px 16px 6px 16px"
                 >
                   <StreamFieldsInputs
                     :fields="newSchemaFields"
@@ -975,11 +984,11 @@ export default defineComponent({
 
       indexData.value.stats.doc_time_max = date.formatDate(
         parseInt(streamResponse.stats.doc_time_max) / 1000,
-        "YYYY-MM-DDTHH:mm:ss:SSZ",
+        "YYYY-MM-DD THH:mm:ss:SS Z",
       );
       indexData.value.stats.doc_time_min = date.formatDate(
         parseInt(streamResponse.stats.doc_time_min) / 1000,
-        "YYYY-MM-DDTHH:mm:ss:SSZ",
+        "YYYY-MM-DD THH:mm:ss:SS Z",
       );
 
       indexData.value.defined_schema_fields =

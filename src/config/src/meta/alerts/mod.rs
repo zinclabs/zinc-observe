@@ -19,7 +19,6 @@ use utoipa::ToSchema;
 use crate::{meta::search::SearchEventType, utils::json::Value};
 
 pub mod alert;
-pub mod derived_streams;
 pub mod destinations;
 pub mod templates;
 

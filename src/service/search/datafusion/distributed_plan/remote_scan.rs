@@ -253,6 +253,13 @@ async fn get_remote_batch(
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
 
+    log::info!(
+        "[trace_id {}] flight->search: prepare to request node: {}, is_querier: {}",
+        trace_id,
+        &node.get_grpc_addr(),
+        is_querier,
+    );
+
     let mut stream = client
         .do_get(request)
         .await
@@ -260,6 +267,13 @@ async fn get_remote_batch(
         .into_inner();
 
     let start = std::time::Instant::now();
+
+    log::info!(
+        "[trace_id {}] flight->search: prepare to receive response from node: {}, is_querier: {}",
+        trace_id,
+        &node.get_grpc_addr(),
+        is_querier,
+    );
 
     // the schema should be the first message returned, else client should error
     let flight_data = match stream.message().await {

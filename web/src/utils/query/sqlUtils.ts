@@ -208,18 +208,23 @@ export const isGivenFieldInOrderBy = async (
   sqlQuery: string,
   fieldAlias: string,
 ) => {
-  await importSqlParser();
-  const ast: any = parser.astify(sqlQuery);
+  try {
+    await importSqlParser();
+    const ast: any = parser.astify(sqlQuery);
 
-  if (ast?.orderby) {
-    for (const item of ast.orderby) {
-      if (item?.expr?.column?.expr?.value === fieldAlias) {
-        return item.type; // 'ASC' or 'DESC'
+    if (ast?.orderby) {
+      for (const item of ast.orderby) {
+        if (item?.expr?.column?.expr?.value === fieldAlias) {
+          return item.type; // 'ASC' or 'DESC'
+        }
       }
     }
-  }
 
-  return null;
+    return null;
+  } catch (error) {
+    // Handle the error as needed
+    return null;
+  }
 };
 
 // Function to extract field names, aliases, and aggregation functions

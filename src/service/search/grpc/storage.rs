@@ -164,7 +164,7 @@ pub async fn search(
     let mut files_group: HashMap<usize, Vec<FileKey>> =
         HashMap::with_capacity(schema_versions.len());
     let mut scan_stats = ScanStats::new();
-    if !cfg.common.widening_schema_evolution || schema_versions.len() == 1 {
+    if schema_versions.len() == 1 {
         let files = files.to_vec();
         scan_stats = match file_list::calculate_files_size(&files).await {
             Ok(size) => size,
@@ -288,7 +288,7 @@ pub async fn search(
         let schema = schema.with_metadata(std::collections::HashMap::new());
 
         let session = config::meta::search::Session {
-            id: format!("{}-{}-{ver}", query.trace_id, query.job_id),
+            id: format!("{}-storage-{ver}", query.trace_id),
             storage_type: StorageType::Memory,
             work_group: query.work_group.clone(),
             target_partitions,

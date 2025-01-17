@@ -28,7 +28,7 @@ static SEGMENTS: Lazy<RwLock<HashMap<String, SegmentData>>> = Lazy::new(Default:
 pub fn get(trace_id: &str) -> Result<Vec<ObjectMeta>, anyhow::Error> {
     let data = match FILES.read().get(trace_id) {
         Some(data) => data.clone(),
-        None => return Err(anyhow::anyhow!("trace_id not found")),
+        None => return Err(anyhow::anyhow!("trace_id not found: {}", trace_id)),
     };
     Ok(data)
 }

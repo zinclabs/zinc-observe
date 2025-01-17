@@ -31,6 +31,7 @@ use config::{
     utils::json,
 };
 use infra::db as infra_db;
+use itertools::Itertools;
 
 pub async fn run(drop_table_first: bool) -> Result<(), anyhow::Error> {
     if drop_table_first {
@@ -85,11 +86,16 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
     // load all old pipelines from meta table
     let db = infra_db::get_db().await;
     let db_key = "/pipeline/";
-    let data = db.list(db_key).await?;
-    for (key, val) in data {
+    let data = db
+        .list(db_key)
+        .await?
+        .into_iter()
+        .sorted_by(|a, b| a.0.cmp(&b.0))
+        .collect::<Vec<_>>();
+    for (idx, (key, val)) in data.into_iter().enumerate() {
         let local_key = key.strip_prefix('/').unwrap_or(&key);
         let key_col = local_key.split('/').collect::<Vec<&str>>();
-        let old_pipe: crate::common::meta::pipelines::PipeLine = json::from_slice(&val).unwrap();
+        let old_pipe: legacy_pipeline::PipeLine = json::from_slice(&val).unwrap();
 
         // two scenarios:
         // scenario 1: with DerivedStream info -> scheduled
@@ -109,7 +115,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                 let source_node_data = NodeData::Query(new_derived_stream);
                 let dest_node_data = NodeData::Stream(old_derived_stream.destination);
                 let (pos_x, pos_y): (f32, f32) = (50.0, 50.0);
-                let pos_offset: f32 = 200.0;
+                let pos_offset: f32 = 100.0;
                 let source_node = Node::new(
                     ider::uuid(),
                     source_node_data,
@@ -132,7 +138,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                     .map(|pair| Edge::new(pair[0].id.clone(), pair[1].id.clone()))
                     .collect::<Vec<_>>();
                 let pl_id = ider::uuid();
-                let name = format!("Migrated-{pl_id}");
+                let name = old_pipe.name.clone();
                 let description = "This pipeline was generated from previous found prior to OpenObserve v0.13.1. Please check and confirm before enabling it manually".to_string();
                 let pipeline = Pipeline {
                     id: pl_id,
@@ -147,7 +153,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                 };
                 new_pipeline_by_source.insert(
                     StreamParams::new(
-                        &old_derived_stream.source.org_id,
+                        &format!("{}_{}", old_derived_stream.source.org_id, idx),
                         &old_derived_stream.name,
                         old_derived_stream.source.stream_type,
                     ),
@@ -172,7 +178,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                     "input".to_string(),
                 );
                 let pl_id = ider::uuid();
-                let name = format!("Migrated-{pl_id}");
+                let name = old_pipe.name.clone();
                 let description = "This pipeline was generated from previous found prior to OpenObserve v0.12.2. Please check and confirm before enabling it manually".to_string();
                 Pipeline {
                     id: pl_id,
@@ -224,6 +230,9 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
             }
 
             if let Some(routings) = old_pipe.routing {
+                if routings.is_empty() {
+                    continue;
+                }
                 pos_x += pos_offset;
                 for (dest_stream, routing_conditions) in routings {
                     pos_y += pos_offset;
@@ -259,6 +268,23 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                     new_pipeline.nodes.push(dest_node);
                     pos_y += pos_offset;
                 }
+
+                // add another path src -> src
+                let src_dest_node = Node::new(
+                    ider::uuid(),
+                    NodeData::Stream(StreamParams::new(
+                        key_col[1],
+                        key_col[3],
+                        StreamType::from(key_col[2]),
+                    )),
+                    pos_x,
+                    pos_y,
+                    "output".to_string(),
+                );
+                new_pipeline
+                    .edges
+                    .push(Edge::new(source_node_id.clone(), src_dest_node.id.clone()));
+                new_pipeline.nodes.push(src_dest_node);
             }
         }
     }
@@ -268,7 +294,12 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
         func_params.sort_by(|a, b| a.0.cmp(&b.0));
 
         let (pos_x, pos_y): (f32, f32) = (50.0, 50.0);
-        let pos_offset: f32 = 200.0;
+        let pos_offset: f32 = 100.0;
+        let name = format!(
+            "{}_{}",
+            stream_params.stream_name,
+            func_params.first().unwrap().1.name
+        );
         let new_pipeline = new_pipeline_by_source.entry(stream_params.clone()).or_insert_with(|| {
             let pipeline_source = PipelineSource::Realtime(stream_params.clone());
             let source_node = Node::new(
@@ -278,8 +309,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                 pos_y,
                 "input".to_string(),
             );
-                let pl_id = ider::uuid();
-            let name = format!("Migrated-{pl_id}");
+            let pl_id = ider::uuid();
             let description = "This pipeline was generated based on Function x Stream Associations found prior to OpenObserve v0.12.2. Please check the correctness of the pipeline and enabling manually".to_string();
             Pipeline {
                 id: pl_id,
@@ -361,4 +391,76 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+mod legacy_pipeline {
+
+    use std::collections::HashMap;
+
+    use config::{
+        meta::{
+            alerts::{QueryCondition, TriggerCondition},
+            stream::{RoutingCondition, StreamParams, StreamType},
+        },
+        utils::json::Value,
+    };
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+    pub struct PipeLine {
+        pub name: String,
+        #[serde(default)]
+        pub description: String,
+        #[serde(default)]
+        pub stream_name: String,
+        #[serde(default)]
+        pub stream_type: StreamType,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub routing: Option<HashMap<String, Vec<RoutingCondition>>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub derived_streams: Option<Vec<DerivedStreamMeta>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub meta: Option<HashMap<String, Value>>,
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+    pub struct DerivedStreamMeta {
+        #[serde(default)]
+        pub name: String,
+        #[serde(default)]
+        pub source: StreamParams,
+        #[serde(default)]
+        pub destination: StreamParams,
+        #[serde(default)]
+        pub is_real_time: bool,
+        #[serde(default)]
+        pub query_condition: QueryCondition,
+        #[serde(default)]
+        pub trigger_condition: TriggerCondition, // Frequency type only supports minutes
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub context_attributes: Option<HashMap<String, String>>,
+        #[serde(default)]
+        pub description: String,
+        #[serde(default)]
+        pub enabled: bool,
+        #[serde(default)]
+        pub tz_offset: i32,
+    }
+
+    impl Default for DerivedStreamMeta {
+        fn default() -> Self {
+            Self {
+                name: "".to_string(),
+                source: StreamParams::default(),
+                destination: StreamParams::default(),
+                is_real_time: false,
+                query_condition: QueryCondition::default(),
+                trigger_condition: TriggerCondition::default(),
+                context_attributes: None,
+                description: "".to_string(),
+                enabled: true,
+                tz_offset: 0, // UTC
+            }
+        }
+    }
 }

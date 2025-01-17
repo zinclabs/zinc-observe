@@ -22,6 +22,7 @@ use config::{
     meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
     RwAHashMap, RwHashMap, BLOOM_FILTER_DEFAULT_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    SQL_SECONDARY_INDEX_SEARCH_FIELDS,
 };
 use datafusion::arrow::datatypes::{DataType, Field, FieldRef, Schema, SchemaRef};
 use futures::{StreamExt, TryStreamExt};
@@ -293,6 +294,20 @@ pub fn get_stream_setting_fts_fields(settings: &Option<StreamSettings>) -> Vec<S
     }
 }
 
+pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec<String> {
+    let default_fields = SQL_SECONDARY_INDEX_SEARCH_FIELDS.clone();
+    match settings {
+        Some(settings) => {
+            let mut fields = settings.index_fields.clone();
+            fields.extend(default_fields);
+            fields.sort();
+            fields.dedup();
+            fields
+        }
+        None => default_fields,
+    }
+}
+
 pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>) -> Vec<String> {
     let default_fields = BLOOM_FILTER_DEFAULT_FIELDS.clone();
     match settings {
@@ -304,18 +319,6 @@ pub fn get_stream_setting_bloom_filter_fields(settings: &Option<StreamSettings>)
             fields
         }
         None => default_fields,
-    }
-}
-
-pub fn get_stream_setting_index_fields(settings: &Option<StreamSettings>) -> Vec<String> {
-    match settings {
-        Some(settings) => {
-            let mut fields = settings.index_fields.clone();
-            fields.sort();
-            fields.dedup();
-            fields
-        }
-        None => vec![],
     }
 }
 
@@ -349,6 +352,10 @@ pub async fn merge(
     schema: &Schema,
     min_ts: Option<i64>,
 ) -> Result<Option<(Schema, Vec<Field>)>> {
+    let stream_name = stream_name.trim();
+    if stream_name.is_empty() {
+        return Ok(None);
+    }
     let start_dt = min_ts;
     let key = mk_key(org_id, stream_type, stream_name);
     let inferred_schema = schema.clone();
@@ -462,6 +469,10 @@ pub async fn update_setting(
     stream_type: StreamType,
     metadata: std::collections::HashMap<String, String>,
 ) -> Result<()> {
+    let stream_name = stream_name.trim();
+    if stream_name.is_empty() {
+        return Ok(());
+    }
     let key = mk_key(org_id, stream_type, stream_name);
     let db = infra_db::get_db().await;
     db.get_for_update(
@@ -639,9 +650,7 @@ pub fn get_merge_schema_changes(
             Some(idx) => {
                 let existing_field = &merged_fields[*idx];
                 if existing_field.data_type() != item_data_type {
-                    if !get_config().common.widening_schema_evolution {
-                        field_datatype_delta.push(existing_field.as_ref().clone());
-                    } else if is_widening_conversion(existing_field.data_type(), item_data_type) {
+                    if is_widening_conversion(existing_field.data_type(), item_data_type) {
                         is_schema_changed = true;
                         merged_fields[*idx] = item;
                         field_datatype_delta.push((**item).clone());
@@ -658,14 +667,12 @@ pub fn get_merge_schema_changes(
     if !is_schema_changed {
         (false, field_datatype_delta, vec![])
     } else {
-        (
-            true,
-            field_datatype_delta,
-            merged_fields
-                .into_iter()
-                .map(|f| f.as_ref().clone())
-                .collect::<Vec<_>>(),
-        )
+        let mut merged_fields = merged_fields
+            .into_iter()
+            .map(|f| f.as_ref().clone())
+            .collect::<Vec<_>>();
+        merged_fields.sort_by(|a, b| a.name().cmp(b.name()));
+        (true, field_datatype_delta, merged_fields)
     }
 }
 

@@ -13,15 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::Ordering, sync::Arc, time::Duration};
+use std::{cmp::Ordering, fmt, sync::Arc, time::Duration};
 
 use config::{meta::promql::NAME_LABEL, utils::json, FxIndexMap};
 use hashbrown::HashSet;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{
+    de::{Deserializer, SeqAccess, Visitor},
     ser::{SerializeSeq, SerializeStruct, Serializer},
-    Serialize,
+    Deserialize, Serialize,
 };
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
@@ -177,6 +178,48 @@ impl Serialize for Sample {
     }
 }
 
+impl<'de> Deserialize<'de> for Sample {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct SampleVisitor;
+
+        impl<'de> Visitor<'de> for SampleVisitor {
+            type Value = Sample;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a sequence of [timestamp, value]")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<Sample, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                // Get timestamp (in seconds)
+                let timestamp: f64 = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
+
+                // Get value as string
+                let value_str: String = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
+
+                // Parse value string to f64
+                let value = value_str.parse::<f64>().map_err(serde::de::Error::custom)?;
+
+                // Convert timestamp from seconds to microseconds
+                let timestamp = (timestamp * 1_000_000.0) as i64;
+
+                Ok(Sample { timestamp, value })
+            }
+        }
+
+        deserializer.deserialize_seq(SampleVisitor)
+    }
+}
+
 impl Sample {
     pub(crate) fn new(timestamp: i64, value: f64) -> Self {
         Self { timestamp, value }
@@ -210,6 +253,71 @@ impl Serialize for Exemplar {
         seq.serialize_field("value", &self.value.to_string())?;
         seq.serialize_field("labels", &labels_map)?;
         seq.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Exemplar {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ExemplarVisitor;
+
+        impl<'de> Visitor<'de> for ExemplarVisitor {
+            type Value = Exemplar;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct Exemplar")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Exemplar, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut timestamp = None;
+                let mut value = None;
+                let mut labels = Vec::new();
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "timestamp" => {
+                            let ts = map.next_value::<i64>()?;
+                            timestamp = Some(ts * 1_000_000); // Convert seconds to microseconds
+                        }
+                        "value" => {
+                            let val_str = map.next_value::<String>()?;
+                            value = Some(val_str.parse::<f64>().map_err(serde::de::Error::custom)?);
+                        }
+                        "labels" => {
+                            let label_map = map.next_value::<FxIndexMap<String, String>>()?;
+                            labels = label_map
+                                .into_iter()
+                                .map(|(name, value)| Arc::new(Label::new(name, value)))
+                                .collect();
+                        }
+                        _ => {
+                            let _ = map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                let timestamp =
+                    timestamp.ok_or_else(|| serde::de::Error::missing_field("timestamp"))?;
+                let value = value.ok_or_else(|| serde::de::Error::missing_field("value"))?;
+
+                Ok(Exemplar {
+                    timestamp,
+                    value,
+                    labels,
+                })
+            }
+        }
+
+        deserializer.deserialize_struct(
+            "exemplars",
+            &["timestamp", "value", "labels"],
+            ExemplarVisitor,
+        )
     }
 }
 
@@ -333,6 +441,65 @@ impl Serialize for RangeValue {
             seq.serialize_field("exemplars", &self.exemplars.as_ref().unwrap())?;
             seq.end()
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for RangeValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct RangeValueVisitor;
+
+        impl<'de> Visitor<'de> for RangeValueVisitor {
+            type Value = RangeValue;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a map with metric/seriesLabels and values/exemplars fields")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<RangeValue, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut labels_map: Option<FxIndexMap<String, String>> = None;
+                let mut samples: Option<Vec<Sample>> = None;
+                let mut exemplars: Option<Vec<Exemplar>> = None;
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "metric" | "seriesLabels" => {
+                            labels_map = Some(map.next_value()?);
+                        }
+                        "values" => {
+                            samples = Some(map.next_value()?);
+                        }
+                        "exemplars" => {
+                            exemplars = Some(map.next_value()?);
+                        }
+                        _ => {
+                            let _ = map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+
+                let labels_map =
+                    labels_map.ok_or_else(|| serde::de::Error::missing_field("metric"))?;
+                let labels = labels_map
+                    .into_iter()
+                    .map(|(name, value)| Arc::new(Label { name, value }))
+                    .collect();
+
+                Ok(RangeValue {
+                    labels,
+                    samples: samples.unwrap_or_default(),
+                    exemplars,
+                    time_window: None,
+                })
+            }
+        }
+
+        deserializer.deserialize_map(RangeValueVisitor)
     }
 }
 
@@ -627,6 +794,18 @@ impl Value {
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Signature([u8; 32]);
+
+impl PartialOrd for Signature {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Signature {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
 
 impl From<Signature> for String {
     fn from(sig: Signature) -> Self {

@@ -65,17 +65,7 @@ async fn run_download_files() {
             get_o2_config().common.mmdb_enterprise_file_name
         );
 
-        if Lazy::get(&CLIENT_INITIALIZED).is_none() {
-            update_global_maxmind_client(&fname).await;
-            log::info!("Maxmind client initialized");
-            Lazy::force(&MMDB_INIT_NOTIFIER).notify_one();
-        } else {
-            log::info!("New enterprise file found, updating client");
-            update_global_maxmind_client(&fname).await;
-        }
-
-        Lazy::force(&CLIENT_INITIALIZED);
-        return;
+        update_maxmind_table(&fname).await;
     }
 
     let city_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
@@ -112,19 +102,21 @@ async fn run_download_files() {
     }
 
     if Lazy::get(&CLIENT_INITIALIZED).is_none() {
-        update_global_maxmind_client(&asn_fname).await;
-        update_global_maxmind_client(&city_fname).await;
+        update_maxmind_table(&asn_fname).await;
+        update_maxmind_table(&city_fname).await;
+        update_maxmind_client().await;
         log::info!("Maxmind client initialized");
         Lazy::force(&MMDB_INIT_NOTIFIER).notify_one();
     } else {
         if download_asn_files {
             log::info!("New asn file found, updating client");
-            update_global_maxmind_client(&asn_fname).await;
+            update_maxmind_table(&asn_fname).await;
         }
 
         if download_city_files {
             log::info!("New city file found, updating client");
-            update_global_maxmind_client(&city_fname).await;
+            update_maxmind_table(&city_fname).await;
+            update_maxmind_client().await;
         }
     }
 
@@ -133,16 +125,37 @@ async fn run_download_files() {
     Lazy::force(&CLIENT_INITIALIZED);
 }
 
-/// Update the global maxdb client object
-pub async fn update_global_maxmind_client(fname: &str) {
-    match MaxmindClient::new_with_path(fname) {
+/// Update the maxmind client
+async fn update_maxmind_client() {
+    let cfg = config::get_config();
+    let city_fname = format!("{}{}", &cfg.common.mmdb_data_dir, MMDB_CITY_FILE_NAME);
+    #[cfg(feature = "enterprise")]
+    let city_fname = if get_o2_config().common.enable_enterprise_mmdb {
+        format!(
+            "{}{}",
+            &cfg.common.mmdb_data_dir,
+            get_o2_config().common.mmdb_enterprise_file_name
+        )
+    } else {
+        city_fname
+    };
+    match MaxmindClient::new_with_path(&city_fname) {
         Ok(maxminddb_client) => {
-            // Acquire the lock only when updating the shared state
-            {
-                let mut client = MAXMIND_DB_CLIENT.write().await;
-                *client = Some(maxminddb_client);
-            } // Lock is released here
+            let mut client = MAXMIND_DB_CLIENT.write().await;
+            *client = Some(maxminddb_client);
+        }
+        Err(e) => log::warn!(
+            "Failed to update maxmind client with path: {}, {}",
+            city_fname,
+            e.to_string()
+        ),
+    }
+}
 
+/// Update the maxmind table
+async fn update_maxmind_table(fname: &str) {
+    match MaxmindClient::new_with_path(fname) {
+        Ok(_) => {
             #[cfg(feature = "enterprise")]
             if get_o2_config().common.enable_enterprise_mmdb {
                 let mut geoip = crate::common::infra::config::GEOIP_ENT_TABLE.write();
@@ -152,19 +165,18 @@ pub async fn update_global_maxmind_client(fname: &str) {
                     ))
                     .unwrap(),
                 );
-                return;
             }
 
             if fname.ends_with(MMDB_CITY_FILE_NAME) {
                 let mut geoip_city = GEOIP_CITY_TABLE.write();
                 *geoip_city = Some(Geoip::new(GeoipConfig::new(MMDB_CITY_FILE_NAME)).unwrap());
-            } else {
+            } else if fname.ends_with(MMDB_ASN_FILE_NAME) {
                 let mut geoip_asn = GEOIP_ASN_TABLE.write();
                 *geoip_asn = Some(Geoip::new(GeoipConfig::new(MMDB_ASN_FILE_NAME)).unwrap());
-            }
+            };
         }
         Err(e) => log::warn!(
-            "Failed to create MaxmindClient with path: {}, {}",
+            "Failed to update maxmind table with path: {}, {}",
             fname,
             e.to_string()
         ),

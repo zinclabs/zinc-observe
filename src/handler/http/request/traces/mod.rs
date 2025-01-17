@@ -226,11 +226,13 @@ pub async fn get_latest_traces(
         StreamType::Traces,
     )
     .await;
+    let mut range_error = String::new();
     if max_query_range > 0 && (end_time - start_time) > max_query_range * 3600 * 1_000_000 {
-        return Ok(MetaHttpResponse::bad_request(format!(
-            "Query range restriction over {} hours",
+        start_time = end_time - max_query_range * 3600 * 1_000_000;
+        range_error = format!(
+            "Query duration is modified due to query range restriction of {} hours",
             max_query_range
-        )));
+        );
     }
 
     let timeout = query
@@ -523,6 +525,9 @@ pub async fn get_latest_traces(
     resp.insert("size", json::Value::from(size));
     resp.insert("hits", json::to_value(traces_data).unwrap());
     resp.insert("trace_id", json::Value::from(trace_id));
+    if !range_error.is_empty() {
+        resp.insert("function_error", json::Value::String(range_error));
+    }
     Ok(HttpResponse::Ok().json(resp))
 }
 
