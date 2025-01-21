@@ -75,6 +75,7 @@ import searchService from "@/services/search";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
+import { isJSDocReturnTag } from "typescript";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -1071,12 +1072,50 @@ const useLogs = () => {
     }
   }
 
-  const isLimitQuery = (parsedSQL: any = null) => {
-    return parsedSQL?.limit && parsedSQL?.limit.value?.length > 0;
+  /**
+   * Method to check if the parsed SQL has limit
+   * @param parsedSQL : Parsed SQL
+   * @returns boolean
+   */
+  const isLimitQuery = (parsedSQL: any = null): boolean => {
+    let hasLimit = false;
+
+    // getLimitValue depends on isLimitQuery
+    // so if you make any changes here, make sure to update getLimitValue as well
+
+    if (parsedSQL?.limit && parsedSQL?.limit.value?.length > 0) {
+      hasLimit = true;
+    }
+
+    if (parsedSQL?._next?.limit && parsedSQL?._next?.limit?.value?.length > 0) {
+      hasLimit = true;
+    }
+
+    return hasLimit;
+  };
+
+  /**
+   * Method to get limit value from parsed SQL
+   * @param parsedSQL : Parsed SQL
+   * @returns number
+   */
+  const getLimitValue = (parsedSQL: any): number => {
+    if (parsedSQL?.limit && parsedSQL?.limit.value?.length > 0) {
+      return parsedSQL.limit.value[0].value;
+    }
+
+    if (parsedSQL?._next?.limit && parsedSQL?._next?.limit?.value?.length > 0) {
+      return parsedSQL._next.limit.value[0].value;
+    }
+
+    return 0;
   };
 
   const isDistinctQuery = (parsedSQL: any = null) => {
-    return parsedSQL?.distinct?.type === "DISTINCT";
+    return (
+      parsedSQL?.distinct?.type === "DISTINCT" ||
+      parsedSQL?._next?.distinct?.type === "DISTINCT"
+    );
   };
 
   const getQueryPartitions = async (queryReq: any) => {
@@ -1132,7 +1171,7 @@ const useLogs = () => {
           }
         }
 
-        if (parsedSQL != undefined && hasAggregation(parsedSQL?.columns)) {
+        if (parsedSQL != undefined && hasAggregation(parsedSQL)) {
           searchObj.data.queryResults.partitionDetail = {
             partitions: [],
             partitionTotal: [],
@@ -1744,7 +1783,7 @@ const useLogs = () => {
         } else if (searchObj.meta.sqlMode && isDistinctQuery(parsedSQL)) {
           let aggFlag = false;
           if (parsedSQL) {
-            aggFlag = hasAggregation(parsedSQL?.columns);
+            aggFlag = hasAggregation(parsedSQL);
           }
           if (
             queryReq.query.from == 0 &&
@@ -1764,7 +1803,7 @@ const useLogs = () => {
         } else {
           let aggFlag = false;
           if (parsedSQL) {
-            aggFlag = hasAggregation(parsedSQL?.columns);
+            aggFlag = hasAggregation(parsedSQL);
           }
           if (
             queryReq.query.from == 0 &&
@@ -1802,6 +1841,7 @@ const useLogs = () => {
       searchObjDebug["queryDataEndTime"] = performance.now();
     } catch (e: any) {
       searchObj.loading = false;
+      console.log("Error while getting query data", e);
       showErrorNotification(
         notificationMsg.value || "Error occurred during the search operation.",
       );
@@ -1883,7 +1923,14 @@ const useLogs = () => {
     }
   }
 
-  function hasAggregation(columns: any) {
+  function hasAggregation(parsedSql: any) {
+    const columns = [];
+    columns.push(...parsedSql.columns);
+    parsedSql.with.forEach((item: any) => {
+      if (item?.stmt?.columns?.length)
+        columns.push(...(item?.stmt?.columns || []));
+    });
+
     if (columns) {
       for (const column of columns) {
         if (column.expr && column.expr.type === "aggr_func") {
@@ -2083,12 +2130,12 @@ const useLogs = () => {
       if (searchObj.meta.sqlMode == true) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
         // issue #5432
-        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+        if (hasAggregation(parsedSQL) || parsedSQL.groupby != null) {
           queryReq.query.size = -1;
         }
 
         if (isLimitQuery(parsedSQL)) {
-          queryReq.query.size = parsedSQL.limit.value[0].value;
+          queryReq.query.size = getLimitValue(parsedSQL);
           searchObj.meta.resultGrid.showPagination = false;
           //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
 
@@ -2176,10 +2223,7 @@ const useLogs = () => {
           searchAggData.total = 0;
           searchAggData.hasAggregation = false;
           if (searchObj.meta.sqlMode == true) {
-            if (
-              hasAggregation(parsedSQL?.columns) ||
-              parsedSQL.groupby != null
-            ) {
+            if (hasAggregation(parsedSQL) || parsedSQL.groupby != null) {
               searchAggData.total = res.data.total;
               searchAggData.hasAggregation = true;
               searchObj.meta.resultGrid.showPagination = false;
@@ -3396,7 +3440,7 @@ const useLogs = () => {
 
       const parsedSQL: any = fnParsedSQL();
       if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
-        hasAggregationFlag = hasAggregation(parsedSQL.columns);
+        hasAggregationFlag = hasAggregation(parsedSQL);
       }
 
       if (
@@ -4295,6 +4339,29 @@ const useLogs = () => {
 
       const newSelectedStreams: string[] = [];
 
+      const streams = new Set(
+        searchObj.data.stream.streamLists.map((stream: any) => stream.value),
+      );
+
+      if (parsedSQL?.with?.length) {
+        parsedSQL?.with?.forEach((withClause: any) => {
+          withClause.stmt.from.forEach((stream: any) => {
+            // Check if 'expr' and 'ast' exist, then access 'from' to get the table
+            if (stream.expr?.ast?.from) {
+              stream.expr.ast.from.forEach((subStream: any) => {
+                if (subStream.table != undefined && streams.has(stream.table)) {
+                  newSelectedStreams.push(subStream.table);
+                }
+              });
+            }
+            // Otherwise, return the table name directly
+            if (stream.table != undefined && streams.has(stream.table)) {
+              newSelectedStreams.push(stream.table);
+            }
+          });
+        });
+      }
+
       //for simple query get the table name from the parsedSQL object
       // this will handle joins as well
       if (parsedSQL?.from) {
@@ -4302,13 +4369,13 @@ const useLogs = () => {
           // Check if 'expr' and 'ast' exist, then access 'from' to get the table
           if (stream.expr?.ast?.from) {
             stream.expr.ast.from.forEach((subStream: any) => {
-              if (subStream.table != undefined) {
+              if (subStream.table != undefined && streams.has(stream.table)) {
                 newSelectedStreams.push(subStream.table);
               }
             });
           }
           // Otherwise, return the table name directly
-          if (stream.table != undefined) {
+          if (stream.table != undefined && streams.has(stream.table)) {
             newSelectedStreams.push(stream.table);
           }
         });
@@ -4320,9 +4387,10 @@ const useLogs = () => {
         while (nextTable) {
           // Map through each "from" array in the _next object, as it can contain multiple tables
           if (nextTable.from) {
-            nextTable.from.forEach((stream: { table: string }) =>
-              newSelectedStreams.push(stream.table),
-            );
+            nextTable.from.forEach((stream: { table: string }) => {
+              if (streams.has(stream.table))
+                newSelectedStreams.push(stream.table);
+            });
           }
           nextTable = nextTable._next;
         }
@@ -4584,12 +4652,12 @@ const useLogs = () => {
       if (searchObj.meta.sqlMode == true) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
         // issue #5432
-        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+        if (hasAggregation(parsedSQL) || parsedSQL.groupby != null) {
           queryReq.query.size = -1;
         }
 
         if (isLimitQuery(parsedSQL)) {
-          queryReq.query.size = parsedSQL.limit.value[0].value;
+          queryReq.query.size = getLimitValue(parsedSQL);
           searchObj.meta.resultGrid.showPagination = false;
           //searchObj.meta.resultGrid.rowsPerPage = queryReq.query.size;
 
@@ -4778,7 +4846,7 @@ const useLogs = () => {
       }
 
       if (searchObj.meta.sqlMode) {
-        if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
+        if (hasAggregation(parsedSQL) || parsedSQL.groupby != null) {
           searchAggData.total =
             searchAggData.total + response.content?.results?.total;
           searchAggData.hasAggregation = true;
@@ -5043,7 +5111,7 @@ const useLogs = () => {
     } else if (searchObj.meta.sqlMode && isDistinctQuery(parsedSQL)) {
       let aggFlag = false;
       if (parsedSQL) {
-        aggFlag = hasAggregation(parsedSQL?.columns);
+        aggFlag = hasAggregation(parsedSQL);
       }
       if (
         queryReq.query.from == 0 &&
@@ -5062,7 +5130,7 @@ const useLogs = () => {
     } else {
       let aggFlag = false;
       if (parsedSQL) {
-        aggFlag = hasAggregation(parsedSQL?.columns);
+        aggFlag = hasAggregation(parsedSQL);
       }
       if (
         queryReq.query.from == 0 &&

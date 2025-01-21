@@ -349,26 +349,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="q-pl-sm">
                 <q-btn
-                data-test="create-destination-btn"
-                icon="refresh"
-                title="Refresh latest Destinations"
-                class="text-bold no-border"
-                no-caps
-                flat
-                dense
-                @click="$emit('refresh:destinations')"
-              />
+                  data-test="create-destination-btn"
+                  icon="refresh"
+                  title="Refresh latest Destinations"
+                  class="text-bold no-border"
+                  no-caps
+                  flat
+                  dense
+                  @click="$emit('refresh:destinations')"
+                />
               </div>
               <div class="q-pl-sm">
                 <q-btn
-                data-test="create-destination-btn"
-                label="Create Destination"
-                class="text-bold no-border"
-                color="secondary"
-                no-caps
-                @click="routeToCreateDestination"
-
-              />
+                  data-test="create-destination-btn"
+                  label="Create Destination"
+                  class="text-bold no-border"
+                  color="secondary"
+                  no-caps
+                  @click="routeToCreateDestination"
+                />
               </div>
             </div>
 
@@ -746,11 +745,14 @@ export default defineComponent({
     watch(
       () => props.destinations.length, // Watch for length changes
       (newLength, oldLength) => {
-        formData.value.destinations  = formData.value.destinations.filter((destination : any) => {
-          return props.destinations.some((dest:any) => {
-            return dest.name === destination});
-        });
-      }
+        formData.value.destinations = formData.value.destinations.filter(
+          (destination: any) => {
+            return props.destinations.some((dest: any) => {
+              return dest.name === destination;
+            });
+          },
+        );
+      },
     );
 
     watch(
@@ -993,15 +995,38 @@ export default defineComponent({
       try {
         // As default is a reserved keyword in sql-parser, we are replacing it with default1
         const regex = /\bdefault\b/g;
-        const columns = parser.astify(
-          sqlQuery.replace(regex, "default1"),
-        ).columns;
+        const columns = [];
+        const withColumns = [];
+
+        const parsedSql = parser.astify(sqlQuery.replace(regex, "default1"))[0];
+
+        columns.push(...parsedSql.columns);
+
+        parsedSql.with.forEach((item) => {
+          if (item?.stmt?.columns?.length) {
+            withColumns.push(...(item?.stmt?.columns || []));
+          }
+        });
+
+        // Check for SELECT * in the main SELECT (not in CTEs)
         for (const column of columns) {
           if (column.expr.column === "*") {
-            sqlQueryErrorMsg.value = "Selecting all columns is not allowed";
+            sqlQueryErrorMsg.value =
+              "'SELECT *' is not allowed in the main query.";
             return false;
           }
         }
+
+        // Allow SELECT * in CTEs, but check if it's used inappropriately elsewhere
+        for (const column of withColumns) {
+          if (column.expr.column === "*") {
+            // You can add additional logic here if needed
+            // Check if the table mentioned is not a cte table
+            // Create a list of log streams
+            // Create a list of CTE tables
+          }
+        }
+
         return true;
       } catch (error) {
         // In catch block we are returning true, as we just wanted to validate if user have added * in the query to select all columns
@@ -1228,12 +1253,12 @@ export default defineComponent({
 
     const routeToCreateDestination = () => {
       const url = router.resolve({
-          name: "alertDestinations",
-          query: {
-            action: "add",
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }).href;
+        name: "alertDestinations",
+        query: {
+          action: "add",
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      }).href;
       window.open(url, "_blank");
     };
 
@@ -1487,14 +1512,13 @@ export default defineComponent({
             })
             .catch((err: any) => {
               dismiss();
-              if(err.response?.status != 403){
+              if (err.response?.status != 403) {
                 this.q.notify({
-                type: "negative",
-                message:
-                  err.response?.data?.error || err.response?.data?.message,
+                  type: "negative",
+                  message:
+                    err.response?.data?.error || err.response?.data?.message,
                 });
               }
-              
             });
           segment.track("Button Click", {
             button: "Update Alert",
@@ -1526,14 +1550,13 @@ export default defineComponent({
             })
             .catch((err: any) => {
               dismiss();
-              if(err.response?.status != 403){
+              if (err.response?.status != 403) {
                 this.q.notify({
-                type: "negative",
-                message:
-                  err.response?.data?.error || err.response?.data?.message,
+                  type: "negative",
+                  message:
+                    err.response?.data?.error || err.response?.data?.message,
                 });
               }
-              
             });
           segment.track("Button Click", {
             button: "Save Alert",
