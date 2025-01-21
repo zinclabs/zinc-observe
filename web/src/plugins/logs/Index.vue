@@ -1078,6 +1078,10 @@ export default defineComponent({
     ) => {
       //implement setQuery function using node-sql-parser
       //isFieldExistInSQL is used to check if the field is already present in the query or not.
+      if (searchObj.meta.sqlMode) {
+        return;
+      }
+
       let parsedSQL = fnParsedSQL();
       parsedSQL = processInterestingFiledInSQLQuery(
         parsedSQL,
@@ -1183,20 +1187,20 @@ export default defineComponent({
 
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
-        let field_list: string = "*";
-        if (searchObj.data.stream.interestingFieldList.length > 0) {
-          field_list = searchObj.data.stream.interestingFieldList.join(",");
-        }
-        if (searchObj.meta.sqlMode == true) {
-          searchObj.data.query = searchObj.data.query.replace(
-            /SELECT\s+(.*?)\s+FROM/gi,
-            (match, fields) => {
-              return `SELECT ${field_list} FROM`;
-            },
-          );
-          setQuery(searchObj.meta.quickMode);
-          updateUrlQueryParams();
-        }
+        // let field_list: string = "*";
+        // if (searchObj.data.stream.interestingFieldList.length > 0) {
+        //   field_list = searchObj.data.stream.interestingFieldList.join(",");
+        // }
+        // if (searchObj.meta.sqlMode == true) {
+        //   searchObj.data.query = searchObj.data.query.replace(
+        //     /SELECT\s+(.*?)\s+FROM/gi,
+        //     (match, fields) => {
+        //       return `SELECT ${field_list} FROM`;
+        //     },
+        //   );
+        //   setQuery(searchObj.meta.quickMode);
+        //   updateUrlQueryParams();
+        // }
       }
     };
 

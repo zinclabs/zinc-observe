@@ -180,7 +180,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div class="field_overlay">
                   <q-btn
+                    v-if="!searchObj.meta.sqlMode && props.row.isSchemaField"
+                    :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
+                    :icon="outlinedContentCopy"
+                    style="margin-right: 0.375rem"
+                    size="0.4rem"
+                    class="q-mr-sm"
+                    @click.stop="copyContent(`${props.row.name}`)"
+                    round
+                  />
+                  <q-btn
                     v-if="
+                      !searchObj.meta.sqlMode &&
                       props.row.isSchemaField &&
                       props.row.name != store.state.zoConfig.timestamp_column
                     "
@@ -295,7 +306,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div class="field_overlay">
                       <q-btn
-                        v-if="props.row.isSchemaField"
+                        v-if="searchObj.meta.sqlMode && props.row.isSchemaField"
+                        :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
+                        :icon="outlinedContentCopy"
+                        style="margin-right: 0.375rem"
+                        size="0.4rem"
+                        class="q-mr-sm"
+                        @click.stop="copyContent(`${props.row.name}`)"
+                        round
+                      />
+                      <q-btn
+                        v-if="
+                          !searchObj.meta.sqlMode && props.row.isSchemaField
+                        "
                         :data-test="`log-search-index-list-filter-${props.row.name}-field-btn`"
                         :icon="outlinedAdd"
                         style="margin-right: 0.375rem"
@@ -495,8 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
           <q-tr v-if="searchObj.loadingStream == true">
-            <q-td colspan="100%"
-class="text-bold" style="opacity: 0.7">
+            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
               <div class="text-subtitle2 text-weight-bold">
                 <q-spinner-hourglass size="20px" />
                 {{ t("confirmDialog.loading") }}
@@ -649,7 +671,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import { copyToClipboard, useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
 import {
@@ -664,6 +686,7 @@ import {
   outlinedAdd,
   outlinedVisibility,
   outlinedVisibilityOff,
+  outlinedContentCopy,
 } from "@quasar/extras/material-icons-outlined";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -1184,6 +1207,16 @@ export default defineComponent({
       );
     };
 
+    const copyContent = (fieldName: string) => {
+      copyToClipboard(fieldName);
+      $q.notify({
+        message: "Copied to clipboard",
+        color: "positive",
+        position: "top",
+        timeout: 1000,
+      });
+    };
+
     return {
       t,
       store,
@@ -1253,6 +1286,9 @@ export default defineComponent({
       }),
       formatLargeNumber,
       sortedStreamFields,
+      outlinedContentCopy,
+      copyToClipboard,
+      copyContent,
     };
   },
 });

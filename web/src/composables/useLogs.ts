@@ -75,6 +75,7 @@ import searchService from "@/services/search";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
+import { f } from "msw/lib/core/HttpResponse-DE19n76Q";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -1653,14 +1654,15 @@ const useLogs = () => {
         searchObjDebug["paginatedDatawithAPIEndTime"] = performance.now();
         const parsedSQL: any = fnParsedSQL();
 
+        const loadHistogramInSqlMode = true;
+
         if (
           (searchObj.data.queryResults.aggs == undefined &&
             searchObj.meta.refreshHistogram == true &&
             searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.data.stream.selectedStream.length <= 1 &&
-            (!searchObj.meta.sqlMode ||
-              isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
+            loadHistogramInSqlMode) ||
           (searchObj.loadingHistogram == false &&
             searchObj.meta.showHistogram == true &&
             searchObj.meta.sqlMode == false &&
@@ -3947,29 +3949,15 @@ const useLogs = () => {
   const onStreamChange = async (queryStr: string) => {
     try {
       searchObj.loadingStream = true;
-      searchObj.data.queryResults = {
-        hits: [],
-      };
-      searchObj.data.stream.selectedStreamFields = [];
 
-      let unionquery = "";
-      const streams = searchObj.data.stream.selectedStream;
-
-      streams.forEach((stream: string, index: number) => {
-        // Add UNION for all but the first SELECT statement
-        if (index > 0) {
-          unionquery += " UNION ";
-        }
-        unionquery += `SELECT [FIELD_LIST] FROM "${stream}"`;
-      });
-
-      let query = searchObj.meta.sqlMode
-        ? queryStr != ""
-          ? queryStr
-          : unionquery
-        : "";
+      if (!searchObj.meta.sqlMode) {
+        searchObj.data.queryResults = {
+          hits: [],
+        };
+      }
 
       searchObj.data.stream.selectedStreamFields = [];
+
       for (const stream of searchObj.data.stream.selectedStream) {
         const streamData: any = await getStream(
           stream,
@@ -4008,32 +3996,19 @@ const useLogs = () => {
         }
       }
 
-      // if (queryStr == "") {
-      if (
-        searchObj.data.stream.interestingFieldList.length > 0 &&
-        searchObj.meta.quickMode
-      ) {
-        query = query.replace(
-          /\[FIELD_LIST\]/g,
-          searchObj.data.stream.interestingFieldList.join(","),
-        );
-      } else {
-        query = query.replace(/\[FIELD_LIST\]/g, "*");
+      if (!searchObj.meta.sqlMode) {
+        searchObj.data.tempFunctionContent = "";
       }
-      // }
 
-      searchObj.data.editorValue = query;
-      searchObj.data.query = query;
-      searchObj.data.tempFunctionContent = "";
       searchObj.meta.searchApplied = false;
 
       if (searchObj.data.stream.selectedStream.length > 1) {
         searchObj.meta.showHistogram = false;
       }
 
-      if (store.state.zoConfig.query_on_stream_selection == false) {
+      if (!store.state.zoConfig.query_on_stream_selection) {
         handleQueryData();
-      } else {
+      } else if (!searchObj.meta.sqlMode) {
         searchObj.data.stream.selectedStreamFields = [];
         searchObj.data.queryResults = {
           hits: [],
@@ -4051,6 +4026,9 @@ const useLogs = () => {
           errorMsg: "",
           errorDetail: "",
         };
+        extractFields();
+        searchObj.loadingStream = false;
+      } else {
         extractFields();
         searchObj.loadingStream = false;
       }
@@ -4996,13 +4974,13 @@ const useLogs = () => {
 
   const processHistogramRequest = async (queryReq: SearchRequestPayload) => {
     const parsedSQL: any = fnParsedSQL();
+    const loadHistogramInSqlMode = true;
 
     const shouldShowHistogram =
       (isHistogramDataMissing(searchObj) &&
         isHistogramEnabled(searchObj) &&
         isSingleStreamSelected(searchObj) &&
-        (!searchObj.meta.sqlMode ||
-          isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
+        loadHistogramInSqlMode) ||
       (isHistogramEnabled(searchObj) &&
         isSingleStreamSelected(searchObj) &&
         !searchObj.meta.sqlMode);
