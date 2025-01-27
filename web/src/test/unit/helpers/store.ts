@@ -34,6 +34,7 @@ const store = createStore({
       build_date: "2023-03-11T03:55:28Z",
       default_fts_keys: ["log", "message", "msg", "content", "data"],
       show_stream_stats_doc_num: true,
+      data_retention_days: true,
       default_functions: [
         {
           name: "match_all_raw",
