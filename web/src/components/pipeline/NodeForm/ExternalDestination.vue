@@ -70,6 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @submit="
               createNewDestination ? createDestination() : saveDestination()
             "
+            class="col-12"
           >
           <div class="col-12 q-py-xs">
             <q-input
