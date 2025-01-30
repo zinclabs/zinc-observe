@@ -103,6 +103,12 @@ const getDefaultDashboardPanelData: any = () => ({
     },
     htmlContent: "",
     markdownContent: "",
+    customChartContent: `
+              function customChartTransformer(data) {
+                  return data;
+              }
+              `,
+    customChartResult: {},
     queryType: "sql",
     queries: [
       {
@@ -150,6 +156,7 @@ const getDefaultDashboardPanelData: any = () => ({
     isConfigPanelOpen: false,
     currentQueryIndex: 0,
     vrlFunctionToggle: false,
+    showFieldList: true,
   },
   meta: {
     parsedQuery: "",

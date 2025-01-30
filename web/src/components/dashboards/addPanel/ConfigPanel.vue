@@ -15,7 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="padding-bottom: 30px">
+  <div
+    v-if="dashboardPanelData.data.type == 'custom_chart'"
+    style="padding-bottom: 30px">
+    <div class="" style="max-width: 300px">
+      <div class="q-mb-sm" style="font-weight: 600">
+        {{ t("dashboard.description") }}
+      </div>
+      <q-input
+        outlined
+        v-model="dashboardPanelData.data.description"
+        filled
+        autogrow
+        class="showLabelOnTop"
+        data-test="dashboard-config-description"
+      />
+    </div>
+  </div>
+  <div v-else style="padding-bottom: 30px">
     <div class="" style="max-width: 300px">
       <div class="q-mb-sm" style="font-weight: 600">
         {{ t("dashboard.description") }}

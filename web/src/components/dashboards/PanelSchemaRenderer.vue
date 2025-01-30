@@ -71,6 +71,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="col"
           />
         </div>
+        <div
+          v-else-if="panelSchema.type == 'custom_chart'"
+          class="col column"
+          style="width: 100%; height: 100%; flex: 1"
+        >
+          <CustomChartRenderer
+            :data="panelSchema.customChartResult"
+            style="width: 100%; height: 100%"
+            class="col"
+          />
+        </div>
         <ChartRenderer
           v-else
           :data="
@@ -215,6 +226,13 @@ const MarkdownRenderer = defineAsyncComponent(() => {
   return import("./panels/MarkdownRenderer.vue");
 });
 
+const AddAnnotation = defineAsyncComponent(() => {
+  return import("./addPanel/AddAnnotation.vue");
+});
+const CustomChartRenderer = defineAsyncComponent(() => {
+  return import("./panels/CustomChartRenderer.vue");
+});
+
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
@@ -224,6 +242,8 @@ export default defineComponent({
     MapsRenderer,
     HTMLRenderer,
     MarkdownRenderer,
+    AddAnnotation,
+    CustomChartRenderer,
   },
   props: {
     selectedTimeObj: {

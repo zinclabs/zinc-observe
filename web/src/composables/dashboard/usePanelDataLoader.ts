@@ -783,6 +783,7 @@ export const usePanelDataLoader = (
 
   const loadData = async () => {
     try {
+      console.log('here it is loading')
       log("loadData: entering...");
 
       // Check and abort the previous call if necessary
@@ -1215,6 +1216,7 @@ export const usePanelDataLoader = (
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
     () => [panelSchema?.value, selectedTimeObj?.value, forceLoad?.value],
     async () => {
+      console.log('PanelSchema/Time Wather: called');
       log("PanelSchema/Time Wather: called");
       loadData(); // Loading the data
     },
@@ -1501,7 +1503,6 @@ export const usePanelDataLoader = (
       // if (!panelSchema.value.queries?.length) {
       //   return;
       // }
-
       log("Variables Watcher: starting...");
 
       const newDependentVariablesData = getDependentVariablesData();
