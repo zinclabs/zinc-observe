@@ -241,7 +241,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ].customQuery &&
                         props.pageIndex >= customQueryFieldsLength) ||
                       dashboardPanelData.data.type == 'geomap' ||
-                      dashboardPanelData.data.type == 'maps'
+                      dashboardPanelData.data.type == 'maps' ||
+                      dashboardPanelData.data.type == 'custom_chart'
                     )
                   "
                 >

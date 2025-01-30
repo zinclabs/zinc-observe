@@ -191,6 +191,11 @@ export default defineComponent({
         title: "Sankey",
         id: "sankey",
       },
+      {
+        image: "img:" + getImageURL("images/dashboard/charts/chart.png"),
+        title: "Custom Chart",
+        id: "custom_chart",
+      },
     ]);
 
     const dashboardPanelDataPageKey = inject(

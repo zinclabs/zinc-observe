@@ -44,7 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-panel-tutorial-btn"
         ></q-btn>
         <q-btn
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+          v-if="
+            !['html', 'markdown', 'custom_chart'].includes(
+              dashboardPanelData.data.type,
+            )
+          "
           outline
           padding="sm"
           class="q-mr-sm"
@@ -84,7 +88,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="savePanelData.isLoading.value"
         />
         <template
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+          v-if="
+            !['html', 'markdown'].includes(
+              dashboardPanelData.data.type,
+            )
+          "
         >
           <q-btn
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
@@ -128,7 +136,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <q-separator vertical />
       <!-- for query related chart only -->
       <div
-        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+        v-if="
+          !['html', 'markdown', 'custom_chart'].includes(
+            dashboardPanelData.data.type,
+          )
+        "
         class="col"
         style="width: 100%; height: 100%"
       >
@@ -330,6 +342,130 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <DashboardErrorsComponent :errors="errorData" class="col-auto" />
       </div>
+      <div
+        v-if="dashboardPanelData.data.type == 'custom_chart'"
+        class="col column"
+        style="height: calc(100vh - 99px); overflow-y: auto"
+      >
+        <q-splitter
+          v-model="dashboardPanelData.layout.splitter"
+          @update:model-value="layoutSplitterUpdated"
+          style="width: 100%; height: 100%"
+        >
+          <template #before>
+            <div
+              class="col scroll"
+              style="height: calc(100vh - 99px); overflow-y: auto"
+            >
+              <div
+                v-if="dashboardPanelData.layout.showFieldList"
+                class="column"
+                style="height: 100%"
+              >
+                <div class="col-auto q-pa-sm">
+                  <span class="text-weight-bold">{{ t("panel.fields") }}</span>
+                </div>
+                <div class="col" style="width: 100%">
+                  <!-- <GetFields :editMode="editMode" /> -->
+                  <FieldList :editMode="editMode" />
+                </div>
+              </div>
+            </div>
+          </template>
+          <template #separator>
+            <div class="splitter-vertical splitter-enabled"></div>
+            <q-btn
+              color="primary"
+              size="12px"
+              :icon="
+                dashboardPanelData.layout.showFieldList
+                  ? 'chevron_left'
+                  : 'chevron_right'
+              "
+              dense
+              round
+              style="top: 14px; z-index: 100"
+              :style="{
+                right: dashboardPanelData.layout.showFieldList
+                  ? '-20px'
+                  : '-0px',
+                left: dashboardPanelData.layout.showFieldList ? '5px' : '12px',
+              }"
+              @click="collapseFieldList"
+            />
+          </template>
+          <template #after>
+            <div
+              class="row"
+              style="height: calc(100vh - 99px); overflow-y: auto"
+            >
+              <div class="col" style="height: 100%">
+                <q-splitter
+                  class="query-editor-splitter"
+                  v-model="dashboardPanelData.layout.querySplitter"
+                  horizontal
+                  @update:model-value="querySplitterUpdated"
+                  reverse
+                  unit="px"
+                  :limits="
+                    !dashboardPanelData.layout.showQueryBar
+                      ? [43, 400]
+                      : [140, 400]
+                  "
+                  :disable="!dashboardPanelData.layout.showQueryBar"
+                  style="height: 100%"
+                >
+                  <template #before>
+                    <div
+                      class="layout-panel-container col"
+                      style="height: 100%"
+                    >
+                      <CustomChartEditor
+                        v-model="dashboardPanelData.data.customChartContent"
+                        style="width: 100%; height: 100%"
+                        class="col"
+                      />
+
+                      <DashboardErrorsComponent
+                        :errors="errorData"
+                        class="col-auto"
+                        style="flex-shrink: 0"
+                      />
+                    </div>
+                  </template>
+                  <template #separator>
+                    <div
+                      class="splitter"
+                      :class="
+                        dashboardPanelData.layout.showQueryBar
+                          ? 'splitter-enabled'
+                          : ''
+                      "
+                    ></div>
+                  </template>
+                  <template #after>
+                    <div style="height: 100%; width: 100%" class="row column">
+                      <DashboardQueryEditor />
+                    </div>
+                  </template>
+                </q-splitter>
+              </div>
+              <q-separator vertical />
+              <div class="col-auto">
+                <PanelSidebar
+                  :title="t('dashboard.configLabel')"
+                  v-model="dashboardPanelData.layout.isConfigPanelOpen"
+                >
+                  <ConfigPanel
+                    :dashboardPanelData="dashboardPanelData"
+                    :variablesData="updatedVariablesData"
+                  />
+                </PanelSidebar>
+              </div>
+            </div>
+          </template>
+        </q-splitter>
+      </div>
     </div>
   </div>
 </template>
@@ -390,6 +526,9 @@ const CustomHTMLEditor = defineAsyncComponent(() => {
 const CustomMarkdownEditor = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
 });
+const CustomChartEditor = defineAsyncComponent(() => {
+  return import("@/components/dashboards/addPanel/CustomChartEditor.vue");
+});
 
 export default defineComponent({
   name: "AddPanel",
@@ -412,6 +551,7 @@ export default defineComponent({
     QueryInspector,
     CustomHTMLEditor,
     CustomMarkdownEditor,
+    CustomChartEditor,
   },
   setup(props) {
     provide("dashboardPanelDataPageKey", "dashboard");
@@ -774,6 +914,9 @@ export default defineComponent({
         // allow to fire query
         // return;
       }
+      if (dashboardPanelData.data.type === "custom_chart") {
+        runJavaScriptCode();
+      }
 
       // Also update variables data
       Object.assign(
@@ -1019,6 +1162,9 @@ export default defineComponent({
 
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"));
+      if (!dashboardPanelData.layout.showFieldList) {
+        dashboardPanelData.layout.splitter = 0;
+      }
     };
 
     const expandedSplitterHeight = ref(null);
@@ -1311,6 +1457,106 @@ export default defineComponent({
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
+    const collapseFieldList = () => {
+      if (dashboardPanelData.layout.showFieldList) {
+        dashboardPanelData.layout.splitter = 0;
+        dashboardPanelData.layout.showFieldList = false;
+      } else {
+        dashboardPanelData.layout.splitter = 20;
+        dashboardPanelData.layout.showFieldList = true;
+      }
+    };
+    const runJavaScriptCode = () => {
+  try {
+    console.log(dashboardPanelData.data, 'data from custom chart');
+    
+    // Retrieve the user function code from the editor
+    const userFunctionCode = dashboardPanelData.data.customChartContent.trim();
+
+    // Remove comments from the user code
+    const cleanedCode = userFunctionCode.replace(/\/\*[\s\S]*?\*\/|\/\/.*|--.*/g, '').trim();
+
+    // Use a regular expression to extract the function name or arrow function
+    const functionNameMatch = cleanedCode.match(/function\s+([a-zA-Z0-9_$]+)\s*\(|([a-zA-Z0-9_$]+)\s*=\s*\(\s*.*\)\s*=>/);
+    
+    if (!functionNameMatch) {
+      throw new Error('The provided code must define a function.');
+    }
+
+    // Determine the function name based on the match
+    const functionName = functionNameMatch[1] || functionNameMatch[2];
+
+    // Wrap the user's code in a Function constructor
+    const userFunction = new Function(
+      "data",
+      `${cleanedCode}; return ${functionName}(data);`
+    );
+
+    // Runtime data to be passed into the user's function
+    const runtimeData = {
+      option: {
+        graphic: {
+          elements: [
+            {
+              type: "text",
+              left: "center",
+              top: "center",
+              style: {
+                text: "Apache ECharts",
+                fontSize: 80,
+                fontWeight: "bold",
+                lineDash: [0, 200],
+                lineDashOffset: 0,
+                fill: "transparent",
+                stroke: "#000",
+                lineWidth: 1,
+              },
+              keyframeAnimation: {
+                duration: 3000,
+                loop: true,
+                keyframes: [
+                  {
+                    percent: 0.7,
+                    style: {
+                      fill: "transparent",
+                      lineDashOffset: 200,
+                      lineDash: [200, 0],
+                    },
+                  },
+                  {
+                    percent: 0.8,
+                    style: {
+                      fill: "transparent",
+                    },
+                  },
+                  {
+                    percent: 1,
+                    style: {
+                      fill: "black",
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    // Execute the function
+    const result = userFunction(runtimeData);
+
+    // Use the result (if any) from the user's function
+    dashboardPanelData.data.customChartResult = result;
+  } catch (error) {
+    // Handle any errors gracefully
+    console.error("Error executing user code:", error.message);
+    console.error("Code causing error:", cleanedCode);
+  }
+};
+
+
+
     // [END] cancel running queries
     return {
       t,
@@ -1353,6 +1599,7 @@ export default defineComponent({
       cancelAddPanelQuery,
       disable,
       config,
+      collapseFieldList,
     };
   },
   methods: {
