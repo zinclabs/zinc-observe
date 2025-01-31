@@ -88,11 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="savePanelData.isLoading.value"
         />
         <template
-          v-if="
-            !['html', 'markdown'].includes(
-              dashboardPanelData.data.type,
-            )
-          "
+          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
         >
           <q-btn
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
@@ -422,8 +418,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <CustomChartEditor
                         v-model="dashboardPanelData.data.customChartContent"
-                        style="width: 100%; height: 100%"
-                        class="col"
+                        style="width: 50%; height: 100%"
+                      />
+
+                      <PanelSchemaRenderer
+                        v-if="chartData"
+                        @metadata-update="metaDataValue"
+                        :key="dashboardPanelData.data.type"
+                        :panelSchema="chartData"
+                        :dashboard-id="queryParams?.dashboard"
+                        :folder-id="queryParams?.folder"
+                        :selectedTimeObj="dashboardPanelData.meta.dateTime"
+                        :variablesData="updatedVariablesData"
+                        :width="6"
+                        @error="handleChartApiError"
+                        @updated:data-zoom="onDataZoom"
+                        @updated:vrlFunctionFieldList="
+                          updateVrlFunctionFieldList
+                        "
+                        @last-triggered-at-update="handleLastTriggeredAtUpdate"
+                        searchType="Dashboards"
+                        style="width: 50%; height: 100%"
                       />
 
                       <DashboardErrorsComponent
@@ -908,28 +923,37 @@ export default defineComponent({
     );
 
     const runQuery = () => {
-      // console.time("runQuery");
-      if (!isValid(true, true)) {
-        // do not return if query is not valid
+      try {
+        // console.time("runQuery");
+        if (!isValid(true, true)) {
+          // do not return if query is not valid
         // allow to fire query
         // return;
-      }
-      if (dashboardPanelData.data.type === "custom_chart") {
-        runJavaScriptCode();
-      }
+        }
+        if (dashboardPanelData.data.type === "custom_chart") {
+          runJavaScriptCode();
+        }
 
-      // Also update variables data
-      Object.assign(
-        updatedVariablesData,
-        JSON.parse(JSON.stringify(variablesData)),
-      );
+        console.log("runQuery", dashboardPanelData.data);
 
-      // copy the data object excluding the reactivity
-      chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-      // refresh the date time based on current time if relative date is selected
-      dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-      updateDateTime(selectedDate.value);
-      // console.timeEnd("runQuery");
+        // Also update variables data
+        Object.assign(
+          updatedVariablesData,
+          JSON.parse(JSON.stringify(variablesData)),
+        );
+
+        // copy the data object excluding the reactivity
+        chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
+
+        console.log(chartData.value);
+
+        // refresh the date time based on current time if relative date is selected
+        dateTimePickerRef.value && dateTimePickerRef.value.refresh();
+        updateDateTime(selectedDate.value);
+        // console.timeEnd("runQuery");
+      } catch (err) {
+        console.log(err);
+      }
     };
 
     const getQueryParamsForDuration = (data: any) => {
@@ -1467,95 +1491,98 @@ export default defineComponent({
       }
     };
     const runJavaScriptCode = () => {
-  try {
-    console.log(dashboardPanelData.data, 'data from custom chart');
-    
-    // Retrieve the user function code from the editor
-    const userFunctionCode = dashboardPanelData.data.customChartContent.trim();
+      try {
+        console.log(dashboardPanelData.data, "data from custom chart");
 
-    // Remove comments from the user code
-    const cleanedCode = userFunctionCode.replace(/\/\*[\s\S]*?\*\/|\/\/.*|--.*/g, '').trim();
+        // Retrieve the user function code from the editor
+        const userFunctionCode =
+          dashboardPanelData.data.customChartContent.trim();
 
-    // Use a regular expression to extract the function name or arrow function
-    const functionNameMatch = cleanedCode.match(/function\s+([a-zA-Z0-9_$]+)\s*\(|([a-zA-Z0-9_$]+)\s*=\s*\(\s*.*\)\s*=>/);
-    
-    if (!functionNameMatch) {
-      throw new Error('The provided code must define a function.');
-    }
+        // Remove comments from the user code
+        const cleanedCode = userFunctionCode
+          .replace(/\/\*[\s\S]*?\*\/|\/\/.*|--.*/g, "")
+          .trim();
 
-    // Determine the function name based on the match
-    const functionName = functionNameMatch[1] || functionNameMatch[2];
+        // Use a regular expression to extract the function name or arrow function
+        const functionNameMatch = cleanedCode.match(
+          /function\s+([a-zA-Z0-9_$]+)\s*\(|([a-zA-Z0-9_$]+)\s*=\s*\(\s*.*\)\s*=>/,
+        );
 
-    // Wrap the user's code in a Function constructor
-    const userFunction = new Function(
-      "data",
-      `${cleanedCode}; return ${functionName}(data);`
-    );
+        if (!functionNameMatch) {
+          throw new Error("The provided code must define a function.");
+        }
 
-    // Runtime data to be passed into the user's function
-    const runtimeData = {
-      option: {
-        graphic: {
-          elements: [
-            {
-              type: "text",
-              left: "center",
-              top: "center",
-              style: {
-                text: "Apache ECharts",
-                fontSize: 80,
-                fontWeight: "bold",
-                lineDash: [0, 200],
-                lineDashOffset: 0,
-                fill: "transparent",
-                stroke: "#000",
-                lineWidth: 1,
-              },
-              keyframeAnimation: {
-                duration: 3000,
-                loop: true,
-                keyframes: [
-                  {
-                    percent: 0.7,
-                    style: {
-                      fill: "transparent",
-                      lineDashOffset: 200,
-                      lineDash: [200, 0],
-                    },
+        // Determine the function name based on the match
+        const functionName = functionNameMatch[1] || functionNameMatch[2];
+
+        // Wrap the user's code in a Function constructor
+        const userFunction = new Function(
+          "data",
+          `${cleanedCode}; return ${functionName}(data);`,
+        );
+
+        // Runtime data to be passed into the user's function
+        const runtimeData = {
+          option: {
+            graphic: {
+              elements: [
+                {
+                  type: "text",
+                  left: "center",
+                  top: "center",
+                  style: {
+                    text: "Apache ECharts",
+                    fontSize: 80,
+                    fontWeight: "bold",
+                    lineDash: [0, 200],
+                    lineDashOffset: 0,
+                    fill: "transparent",
+                    stroke: "#000",
+                    lineWidth: 1,
                   },
-                  {
-                    percent: 0.8,
-                    style: {
-                      fill: "transparent",
-                    },
+                  keyframeAnimation: {
+                    duration: 3000,
+                    loop: true,
+                    keyframes: [
+                      {
+                        percent: 0.7,
+                        style: {
+                          fill: "transparent",
+                          lineDashOffset: 200,
+                          lineDash: [200, 0],
+                        },
+                      },
+                      {
+                        percent: 0.8,
+                        style: {
+                          fill: "transparent",
+                        },
+                      },
+                      {
+                        percent: 1,
+                        style: {
+                          fill: "black",
+                        },
+                      },
+                    ],
                   },
-                  {
-                    percent: 1,
-                    style: {
-                      fill: "black",
-                    },
-                  },
-                ],
-              },
+                },
+              ],
             },
-          ],
-        },
-      },
+          },
+        };
+
+        // Execute the function
+        const result = userFunction(runtimeData);
+
+        // Use the result (if any) from the user's function
+        dashboardPanelData.data.customChartResult = result;
+      } catch (error) {
+        // Handle any errors gracefully
+        console.error("Error executing user code:", error.message);
+        console.error("Code causing error:", cleanedCode);
+      }
     };
-
-    // Execute the function
-    const result = userFunction(runtimeData);
-
-    // Use the result (if any) from the user's function
-    dashboardPanelData.data.customChartResult = result;
-  } catch (error) {
-    // Handle any errors gracefully
-    console.error("Error executing user code:", error.message);
-    console.error("Code causing error:", cleanedCode);
-  }
-};
-
-
 
     // [END] cancel running queries
     return {
