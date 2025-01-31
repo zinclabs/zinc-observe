@@ -90,6 +90,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
           <div v-if="selectedNodeType == 'output'" style="font-size: 14px;" class="note-message" >
+            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> select an existing stream from the list or enter the name to create a new one</span>
+
           <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
             </div>
         </div>
