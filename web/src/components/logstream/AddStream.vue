@@ -142,7 +142,7 @@ const streamTypes = [
   { label: "Traces", value: "traces" },
 ];
 
-const emits = defineEmits(["streamAdded", "close","added:stream-aded"]);
+const emits = defineEmits(["streamAdded", "close","added:stream-added"]);
 const props = defineProps<{
   isInPipeline: boolean;
 }>();
@@ -234,7 +234,7 @@ const saveStream = async () => {
           addStream(streamRes.data);
           emits("streamAdded");
           emits("close");
-          emits("added:stream-aded", streamInputs.value);
+          emits("added:stream-added", streamInputs.value);
         });
     })
     .catch((err) => {
