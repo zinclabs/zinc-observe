@@ -140,7 +140,6 @@ const streamTypes = [
   { label: "Logs", value: "logs" },
   { label: "Metrics", value: "metrics" },
   { label: "Traces", value: "traces" },
-  { label: "Enrichment_Tables", value: "enrichment_tables" },
 ];
 
 const emits = defineEmits(["streamAdded", "close","added:stream-aded"]);
@@ -235,6 +234,7 @@ const saveStream = async () => {
           addStream(streamRes.data);
           emits("streamAdded");
           emits("close");
+          emits("added:stream-aded", streamInputs.value);
         });
     })
     .catch((err) => {
@@ -247,7 +247,6 @@ const saveStream = async () => {
       }
     });
 
-    emits("added:stream-aded", streamInputs.value);
 };
 
 const getStreamPayload = () => {
