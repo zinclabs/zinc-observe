@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else class="pipeline-add-stream ">
         <AddStream
         ref="addStreamRef"
-        @added:stream-aded="getLogStream"
+        @added:stream-added="getLogStream"
         :is-in-pipeline = "true"
          />
       </div>
@@ -226,7 +226,7 @@ watch(() => dynamic_stream_name.value,
 ()=>{
   if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== "" && selectedNodeType.value === 'output'){
     //this regex will check if the value is in the format of { stream_name } or { stream_name }_postfix or prefix_{ stream_name }_postfix or just stream_name 
-    const regex = /^([a-zA-Z0-9_]+|\{[a-zA-Z0-9_]+\})$/;
+    const regex = /^([a-zA-Z][a-zA-Z0-9_]{0,63}|\{[a-zA-Z][a-zA-Z0-9_]{0,63}\})$/;
     if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {
       // dynamic_stream_name.value.value = dynamic_stream_name.value.value.replace(/_/g, '-');
         saveDynamicStream();
