@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="add-stream-input-stream-routing-section"
     class=" full-height"
-    style="width: 40vw;"
+    :style="{
+      width: selectedNodeType == 'output' ? '40vw' : '',
+    }"
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
     <div class="stream-routing-title q-pb-sm q-pl-md">
@@ -27,6 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <q-separator />
 
     <div   class="stream-routing-container full-width q-pa-md">
+      <q-toggle
+      v-if="selectedNodeType == 'input'"
+        data-test="create-stream-toggle"
+        class="q-mb-sm"
+        :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
+        v-model="createNewStream"
+      />
 
       <q-form   @submit="saveStream">
 
@@ -130,6 +139,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
+      <div v-else class="pipeline-add-stream ">
+        <AddStream
+        ref="addStreamRef"
+        @added:stream-aded="getLogStream"
+        :is-in-pipeline = "true"
+         />
+      </div>
       </q-form>
     </div>
 
@@ -151,6 +167,8 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import pipelineService from "@/services/pipelines";
+
+import AddStream from "@/components/logstream/AddStream.vue";
 
 import { useQuasar } from "quasar";
 
@@ -285,7 +303,7 @@ const filteredStreamTypes = computed(() => {
     });
 
 const getLogStream = (data: any) =>{
-
+  
   data.name = data.name.replace(/-/g, '_');
 
   stream_name.value = {label: data.name, value: data.name, isDisable: false};
