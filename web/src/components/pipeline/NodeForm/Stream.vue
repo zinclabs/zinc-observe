@@ -210,13 +210,17 @@ onMounted(async () => {
   await getStreamList();
 });
 
-watch(stream_type, (newValue:any) => {
-  if(newValue){
-    stream_name.value = {label: "", value: "", isDisable: false};
-    
+watch(
+  [stream_type, createNewStream],
+  ([newStreamType, newCreateNewStream], [oldStreamType, oldCreateNewStream]) => {
+    if (newStreamType && newCreateNewStream == oldCreateNewStream) {
+      // Only reset if createNewStream has changed
+      stream_name.value = { label: "", value: "", isDisable: false };
+    }
+    getStreamList();
   }
-  getStreamList();
-});
+);
+
 
 watch(() => dynamic_stream_name.value,
 ()=>{
@@ -302,7 +306,7 @@ const filteredStreamTypes = computed(() => {
       return selectedNodeType.value === 'output' ? outputStreamTypes : streamTypes;
     });
 
-const getLogStream = (data: any) =>{
+const getLogStream = async(data: any) =>{
   
   data.name = data.name.replace(/-/g, '_');
 
@@ -312,6 +316,7 @@ const getLogStream = (data: any) =>{
     createNewStream.value = false;
     return;
   }
+
 }
 
 
