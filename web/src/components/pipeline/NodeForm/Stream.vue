@@ -90,9 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           </div>
           <div v-if="selectedNodeType == 'output'" style="font-size: 14px;" class="note-message" >
-            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> select an existing stream from the list or enter the name to create a new one</span>
+            <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Select an existing stream from the list or enter the name to create a new one</span>
 
-          <span class="tw-flex tw-items-center"> <q-icon name="info" class="q-pr-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
+          <span class="tw-flex"> <q-icon name="info" class="q-pr-xs q-pt-xs"</q-icon> Use curly braces '{}' to configure stream name dynamically. e.g. static_text_{fieldname}_postfix. Static text before/after {} is optional</span>
             </div>
         </div>
 
@@ -206,6 +206,7 @@ watch(() => dynamic_stream_name.value,
     //this regex will check if the value is in the format of { stream_name } or { stream_name }_postfix or prefix_{ stream_name }_postfix or just stream_name 
     const regex = /^([a-zA-Z0-9_]+|\{[a-zA-Z0-9_]+\})$/;
     if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {
+      // dynamic_stream_name.value.value = dynamic_stream_name.value.value.replace(/_/g, '-');
         saveDynamicStream();
       }
    
