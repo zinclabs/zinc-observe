@@ -28,13 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div   class="stream-routing-container full-width q-pa-md">
 
-      <q-toggle
-      v-if="selectedNodeType == 'output'"
-        data-test="create-stream-toggle"
-        class="q-mb-sm"
-        :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
-        v-model="createNewStream"
-      />
       <q-form   @submit="saveStream">
 
       <div v-if="!createNewStream">
@@ -135,13 +128,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div v-else class="pipeline-add-stream ">
-        <AddStream
-        ref="addStreamRef"
-        @added:stream-aded="getLogStream"
-        :is-in-pipeline = "true"
-         />
-      </div>
       </q-form>
     </div>
 
@@ -163,7 +149,6 @@ import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import useStreams from "@/composables/useStreams";
 import pipelineService from "@/services/pipelines";
-import AddStream from "@/components/logstream/AddStream.vue";
 
 import { useQuasar } from "quasar";
 
@@ -183,7 +168,6 @@ const { addNode, pipelineObj , deletePipelineNode} = useDragAndDrop();
 const { getStreams } = useStreams();
 
 const filteredStreams: Ref<string[]> = ref([]);
-const addStreamRef = ref(null);
 const createNewStream = ref(false);
 const isUpdating = ref(false);
 const isFetchingStreams = ref(false);
@@ -192,8 +176,7 @@ const schemaList = ref([]);
 const streams: any = ref({});
 const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
-//for testing purpose but remove metrics and traces as discuessedf
-const outputStreamTypes = ["logs", "metrics", "traces"];
+const outputStreamTypes = ["logs", "metrics", "traces","enrichment_tables"];
 const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 const dynamic_stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 
@@ -218,9 +201,9 @@ watch(stream_type, (newValue:any) => {
 watch(() => dynamic_stream_name.value,
 ()=>{
   if(  dynamic_stream_name.value !== null && dynamic_stream_name.value !== "" && selectedNodeType.value === 'output'){
-    const regex = /^[a-zA-Z0-9_]*\{[a-zA-Z0-9_]+\}[a-zA-Z0-9_]*$/;
-    // Check if there is any value between {{ stream_name }}
-      if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {
+    //this regex will check if the value is in the format of { stream_name } or { stream_name }_postfix or prefix_{ stream_name }_postfix or just stream_name 
+    const regex = /^([a-zA-Z0-9_]+|\{[a-zA-Z0-9_]+\})$/;
+    if ( typeof dynamic_stream_name.value == 'object' &&  dynamic_stream_name.value.hasOwnProperty('value') && regex.test(dynamic_stream_name.value.value)) {
         saveDynamicStream();
       }
    
