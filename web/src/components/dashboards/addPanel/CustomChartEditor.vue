@@ -59,12 +59,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-markdown-editor-drag-indicator"
           />
         </template>
-        <template v-if="javascriptCodeContent" #after>
+        <!-- <template v-if="javascriptCodeContent" #after>
           <CustomChartRenderer
             :key="dashboardPanelData.data.customChartResult"
             :data="dashboardPanelData.data.customChartResult"
           />
-        </template>
+        </template> -->
       </q-splitter>
     </div>
   </div>

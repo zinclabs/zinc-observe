@@ -107,16 +107,18 @@ export default defineComponent({
 
       // Initialize chart
       chart = echarts.init(chartRef.value, undefined, {
-        renderer: props.renderType,
+        renderer: "canvas",
       });
 
       // Apply option from props
-      chart.setOption(props.data.option);
+      chart.setOption(props?.data?.option ?? {});
 
       // Add event listeners for generic interactions
       chart.on("mousemove", (params) => emit("mousemove", params));
       chart.on("mouseout", () => emit("mouseout"));
-      chart.on("legendselectchanged", (params) => emit("legendChanged", params));
+      chart.on("legendselectchanged", (params) =>
+        emit("legendChanged", params),
+      );
     };
 
     const handleResize = async () => {
@@ -144,7 +146,7 @@ export default defineComponent({
       async () => {
         await initChart(); // Re-initialize chart when option change
       },
-      { deep: true }
+      { deep: true },
     );
 
     onUnmounted(() => {
