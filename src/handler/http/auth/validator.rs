@@ -227,6 +227,21 @@ pub async fn validate_credentials(
         });
     }
 
+    if !INGESTION_EP.iter().any(|s| path_columns.contains(s))
+        && user.password.eq(&user_password)
+        && crate::service::users::is_user_locked(user_id).await
+    {
+        return Ok(TokenValidationResponse {
+            is_valid: false,
+            user_email: "".to_string(),
+            is_internal_user: false,
+            user_role: None,
+            user_name: "".to_string(),
+            family_name: "".to_string(),
+            given_name: "".to_string(),
+        });
+    }
+
     if (path_columns.len() == 1 || INGESTION_EP.iter().any(|s| path_columns.contains(s)))
         && user.token.eq(&user_password)
     {

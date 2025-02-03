@@ -16,7 +16,11 @@
 use std::io::Error;
 
 use actix_web::{http, HttpResponse};
-use config::{get_config, ider, utils::rand::generate_random_string};
+use config::{
+    get_config, ider,
+    utils::{json, rand::generate_random_string},
+    USER_LOCK_KEY,
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
     common::infra::config::get_config as get_o2_config,
@@ -31,12 +35,13 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             organization::DEFAULT_ORG,
             user::{
-                DBUser, UpdateUser, User, UserList, UserOrg, UserRequest, UserResponse, UserRole,
+                DBUser, FailedLogin, UpdateUser, User, UserList, UserOrg, UserRequest,
+                UserResponse, UserRole,
             },
         },
         utils::auth::{get_hash, get_role, is_root_user},
     },
-    service::db,
+    service::{db, kv},
 };
 
 pub async fn post_user(
@@ -798,6 +803,168 @@ pub(crate) async fn create_root_user(org_id: &str, usr_req: UserRequest) -> Resu
     );
     db::user::set(&user).await.unwrap();
     Ok(())
+}
+
+pub async fn get_unlock_link(email_id: &str) -> Result<HttpResponse, Error> {
+    if let Ok(user) = db::user::get_db_user(email_id).await {
+        let mut failed_login = get_failed_login(email_id).await;
+        if user.is_external || failed_login.attempts < get_config().auth.wrong_password_attempts {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::NOT_FOUND.into(),
+                "Bad Request".to_string(),
+            )));
+        }
+        let cfg = get_config();
+        let csrf = match failed_login.csrf {
+            Some(csrf) => csrf,
+            None => {
+                let csrf = crate::common::utils::auth::generate_csrf_token(email_id);
+                let csrf_key = get_user_csrf_key();
+                kv::set(&csrf_key, &csrf, email_id.to_string().into())
+                    .await
+                    .unwrap();
+                csrf
+            }
+        };
+
+        let url = format!(
+            "{}{}/config/users/{}/unlock",
+            cfg.common.web_url, cfg.common.base_uri, &csrf
+        );
+        failed_login.csrf = Some(csrf);
+
+        let lock_key = get_user_lock_key();
+
+        crate::service::kv::set(
+            &lock_key,
+            email_id,
+            json::to_vec(&failed_login).unwrap().into(),
+        )
+        .await
+        .unwrap();
+
+        let msg = format!(
+            "<p>Hi {},</p><p>Click below link to unlock your OpenObserve account:</p><a href=\"{}\">Unlock Account</a>",
+            email_id,
+            url.as_str()
+        );
+
+        let subject = "Unlock instructions for your OpenObserve account";
+
+        let dest = config::meta::alerts::destinations::DestinationWithTemplate {
+            emails: vec![email_id.to_string()],
+            ..Default::default()
+        };
+
+        let _ = super::alerts::alert::send_email_notification(subject, &dest, msg).await;
+        Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+            http::StatusCode::OK.into(),
+            "Email with unlock instructions sent successfully".to_string(),
+        )))
+    } else {
+        Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+            http::StatusCode::NOT_FOUND.into(),
+            "Bad Request".to_string(),
+        )))
+    }
+}
+
+pub async fn unlock_user(csrf: &str) -> Result<HttpResponse, Error> {
+    let csrf_key = get_user_csrf_key();
+    let user_email = match kv::get(&csrf_key, csrf).await {
+        Ok(v) => match String::from_utf8(v.to_vec()) {
+            Ok(val) => val,
+            Err(_) => {
+                return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                    http::StatusCode::NOT_FOUND.into(),
+                    "Bad Request".to_string(),
+                )));
+            }
+        },
+        Err(_) => {
+            return Ok(HttpResponse::BadRequest().json(MetaHttpResponse::error(
+                http::StatusCode::NOT_FOUND.into(),
+                "Bad Request".to_string(),
+            )))
+        }
+    };
+
+    clear_failed_login_count(&user_email).await;
+
+    let _ = kv::delete(&csrf_key, csrf).await;
+
+    Ok(HttpResponse::Ok().json(MetaHttpResponse::message(
+        http::StatusCode::OK.into(),
+        "User unlocked".to_string(),
+    )))
+}
+
+pub async fn is_user_locked(user_email: &str) -> bool {
+    let lock_key = get_user_lock_key();
+    let exhausted_attempts = match crate::service::kv::get(&lock_key, user_email).await {
+        Ok(val) => {
+            let failed_login: FailedLogin = json::from_slice(&val).unwrap_or_default();
+            failed_login.attempts
+        }
+        Err(_) => 0,
+    };
+    exhausted_attempts >= get_config().auth.wrong_password_attempts
+}
+
+pub async fn clear_failed_login_count(user_email: &str) {
+    let lock_key = get_user_lock_key();
+    let _ = crate::service::kv::delete(&lock_key, user_email).await;
+}
+
+async fn get_failed_login(user_email: &str) -> FailedLogin {
+    let lock_key = get_user_lock_key();
+    if let Ok(val) = crate::service::kv::get(&lock_key, user_email).await {
+        let failed_login: FailedLogin = json::from_slice(&val).unwrap();
+        println!("Failed login: {:?}", failed_login);
+        failed_login
+    } else {
+        FailedLogin::default()
+    }
+}
+
+pub async fn handle_failed_login(user_email: &str) -> Option<String> {
+    if get_config().auth.wrong_pass_lock_users
+        || is_root_user(user_email) && db::user::get_db_user(user_email).await.is_ok()
+    {
+        let lock_key = get_user_lock_key();
+        let exhausted_attempts = match crate::service::kv::get(&lock_key, user_email).await {
+            Ok(val) => {
+                let failed_login: FailedLogin = json::from_slice(&val).unwrap_or_default();
+                failed_login.attempts
+            }
+            Err(_) => 0,
+        };
+
+        if exhausted_attempts >= get_config().auth.wrong_password_attempts {
+            return Some("User blocked after max login attempts, please contact admin".to_string());
+        } else {
+            let failed_login: FailedLogin = FailedLogin {
+                attempts: exhausted_attempts + 1,
+                ..Default::default()
+            };
+            crate::service::kv::set(
+                &lock_key,
+                user_email,
+                json::to_vec(&failed_login).unwrap().into(),
+            )
+            .await
+            .unwrap();
+        };
+    }
+    None
+}
+
+fn get_user_lock_key() -> String {
+    format!("{}_attempts", USER_LOCK_KEY)
+}
+
+fn get_user_csrf_key() -> String {
+    format!("{}_csrf", USER_LOCK_KEY)
 }
 
 #[cfg(test)]

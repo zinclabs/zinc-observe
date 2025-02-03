@@ -895,7 +895,7 @@ async fn send_http_notification(
     Ok(format!("sent status: {}, body: {}", resp_status, resp_body))
 }
 
-async fn send_email_notification(
+pub(crate) async fn send_email_notification(
     email_subject: &str,
     dest: &DestinationWithTemplate,
     msg: String,

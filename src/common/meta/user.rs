@@ -311,6 +311,12 @@ pub struct SignInResponse {
     pub message: String,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+pub struct FailedLogin {
+    pub attempts: u16,
+    pub csrf: Option<String>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct TokenValidationResponse {
     pub is_valid: bool,

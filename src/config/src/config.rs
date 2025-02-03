@@ -78,6 +78,8 @@ pub const REQUIRED_DB_CONNECTIONS: u32 = 4;
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ID_COL_NAME: &str = "_o2_id";
 
+pub const USER_LOCK_KEY: &str = "user_lock";
+
 const _DEFAULT_SQL_FULL_TEXT_SEARCH_FIELDS: [&str; 7] =
     ["log", "message", "msg", "content", "data", "body", "json"];
 pub static SQL_FULL_TEXT_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
@@ -479,6 +481,18 @@ pub struct Auth {
     pub ext_auth_salt: String,
     #[env_config(name = "O2_SCRIPT_SERVER_TOKEN")]
     pub script_server_token: String,
+    #[env_config(
+        name = "ZO_WRONG_PASSWORD_LOCK_NATIVE_USERS",
+        default = true,
+        help = "Lock native users after wrong password attempts , root user will be locked after maximum attempts"
+    )]
+    pub wrong_pass_lock_users: bool,
+    #[env_config(
+        name = "ZO_WRONG_PASSWORD_ATTEMPTS",
+        default = 3,
+        help = "maximum attempts to enter wrong password"
+    )]
+    pub wrong_password_attempts: u16,
 }
 
 #[derive(EnvConfig)]

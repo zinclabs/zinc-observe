@@ -77,7 +77,8 @@
     "cancelMessage": "Are you sure you want to cancel the changes?",
     "back": "Back",
     "save": "Save",
-    "update": "Update"
+    "update": "Update",
+    "submit": "Submit"
   },
   "search": {
     "metrics": "Metrics",
@@ -237,7 +238,9 @@
     "cnfpassword": "Confirm Password",
     "singnInWithGoogle": "Continue with Google",
     "email": "Email",
-    "login": "Login"
+    "login": "Login",
+    "unlockAccount": "Unlock Your Account",
+    "resetLockedAccount": "Reset Locked Account"
   },
   "user": {
     "header": "Organization Member",
@@ -446,8 +449,8 @@
     "storeOriginalData": "Store Original Data",
     "approxPartition": "Use Stream Stats for Partitioning",
     "indexSize": "Index Size",
-    "extendedStartDate":"Start Date",
-    "extendedEndDate":"End Date"
+    "extendedStartDate": "Start Date",
+    "extendedEndDate": "End Date"
   },
   "pipeline": {
     "header": "Pipelines",
@@ -951,7 +954,7 @@
     "skip_tls_verify": "Skip TLS Verify"
   },
   "pipeline_destinations": {
-    "header":"Pipeline Destinations"
+    "header": "Pipeline Destinations"
   },
   "metrics": {
     "searchMetric": "Search for a Metric",

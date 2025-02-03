@@ -25,6 +25,10 @@ const auth = {
     const res = await http().get("/config/dex_login");
     return res.data;
   },
+  unlock_account: async (email_id: string) => {
+    const res = await http().get(`config/users/${email_id}/unlock/link`);
+    return res.data;
+  },
 };
 
 export default auth;

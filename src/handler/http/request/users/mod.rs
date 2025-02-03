@@ -237,6 +237,18 @@ pub async fn delete(
     users::remove_user_from_org(&org_id, &email_id, &initiator_id).await
 }
 
+#[get("/users/{email_id}/unlock/link")]
+pub async fn get_unlock_link(path: web::Path<String>) -> Result<HttpResponse, Error> {
+    let email_id = path.into_inner();
+    users::get_unlock_link(&email_id).await
+}
+
+#[get("/users/{csrf}/unlock")]
+pub async fn unlock_user(path: web::Path<String>) -> Result<HttpResponse, Error> {
+    let csrf = path.into_inner();
+    users::unlock_user(&csrf).await
+}
+
 /// AuthenticateUser
 #[utoipa::path(
     context_path = "/auth",
@@ -294,16 +306,16 @@ pub async fn authentication(
                         SignInUser { name, password }
                     } else {
                         audit_unauthorized_error(audit_message).await;
-                        return unauthorized_error(resp);
+                        return unauthorized_error(resp, None).await;
                     }
                 } else {
                     audit_unauthorized_error(audit_message).await;
-                    return unauthorized_error(resp);
+                    return unauthorized_error(resp, None).await;
                 }
             }
             #[cfg(not(feature = "enterprise"))]
             {
-                return unauthorized_error(resp);
+                return unauthorized_error(resp, None).await;
             }
         }
     };
@@ -319,10 +331,13 @@ pub async fn authentication(
             && !crate::common::utils::auth::is_root_user(&auth.name)
         {
             audit_unauthorized_error(audit_message).await;
-            return unauthorized_error(resp);
+            return unauthorized_error(resp, Some(&auth.name)).await;
         }
     }
 
+    if users::is_user_locked(&auth.name).await {
+        return unauthorized_error(resp, Some(&auth.name)).await;
+    }
     match crate::handler::http::auth::validator::validate_user(&auth.name, &auth.password).await {
         Ok(v) => {
             if v.is_valid {
@@ -330,17 +345,20 @@ pub async fn authentication(
             } else {
                 #[cfg(feature = "enterprise")]
                 audit_unauthorized_error(audit_message).await;
-                return unauthorized_error(resp);
+                return unauthorized_error(resp, Some(&auth.name)).await;
             }
         }
         Err(_e) => {
             #[cfg(feature = "enterprise")]
             audit_unauthorized_error(audit_message).await;
-            return unauthorized_error(resp);
+            return unauthorized_error(resp, Some(&auth.name)).await;
         }
     };
     if resp.status {
         let cfg = get_config();
+
+        // clear the failed login count
+        users::clear_failed_login_count(&auth.name).await;
 
         let access_token = format!(
             "Basic {}",
@@ -372,7 +390,7 @@ pub async fn authentication(
     } else {
         #[cfg(feature = "enterprise")]
         audit_unauthorized_error(audit_message).await;
-        unauthorized_error(resp)
+        unauthorized_error(resp, Some(&auth.name)).await
     }
 }
 
@@ -475,13 +493,13 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                             req_ts = ts.timestamp();
                         } else {
                             audit_unauthorized_error(audit_message).await;
-                            return unauthorized_error(resp);
+                            return unauthorized_error(resp, None).await;
                         }
                         request_time = Some(req_time_str);
                     }
                     None => {
                         audit_unauthorized_error(audit_message).await;
-                        return unauthorized_error(resp);
+                        return unauthorized_error(resp, None).await;
                     }
                 };
 
@@ -491,12 +509,12 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     }
                     None => {
                         audit_unauthorized_error(audit_message).await;
-                        return unauthorized_error(resp);
+                        return unauthorized_error(resp, None).await;
                     }
                 };
                 if Utc::now().timestamp() - req_ts > expires_in {
                     audit_unauthorized_error(audit_message).await;
-                    return unauthorized_error(resp);
+                    return unauthorized_error(resp, None).await;
                 }
                 format!("q_auth {}", s)
             } else if let Some(auth_header) = _req.headers().get("Authorization") {
@@ -505,12 +523,12 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                     Ok(auth_header_str) => auth_header_str.to_string(),
                     Err(_) => {
                         audit_unauthorized_error(audit_message).await;
-                        return unauthorized_error(resp);
+                        return unauthorized_error(resp, None).await;
                     }
                 }
             } else {
                 audit_unauthorized_error(audit_message).await;
-                return unauthorized_error(resp);
+                return unauthorized_error(resp, None).await;
             };
 
             use o2_enterprise::enterprise::dex::service::auth::get_user_from_token;
@@ -541,17 +559,17 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                             (name, password)
                         } else {
                             audit_unauthorized_error(audit_message).await;
-                            return unauthorized_error(resp);
+                            return unauthorized_error(resp, Some(&name)).await;
                         }
                     }
                     Err(_) => {
                         audit_unauthorized_error(audit_message).await;
-                        return unauthorized_error(resp);
+                        return unauthorized_error(resp, Some(&name)).await;
                     }
                 }
             } else {
                 audit_unauthorized_error(audit_message).await;
-                return unauthorized_error(resp);
+                return unauthorized_error(resp, None).await;
             };
             (name, password)
         };
@@ -613,7 +631,7 @@ pub async fn get_auth(_req: HttpRequest) -> Result<HttpResponse, Error> {
                 .json(resp))
         } else {
             audit_unauthorized_error(audit_message).await;
-            unauthorized_error(resp)
+            unauthorized_error(resp, Some(&name)).await
         }
     }
 
@@ -659,9 +677,21 @@ pub async fn list_roles(_org_id: web::Path<String>) -> Result<HttpResponse, Erro
     Ok(HttpResponse::Ok().json(roles))
 }
 
-fn unauthorized_error(mut resp: SignInResponse) -> Result<HttpResponse, Error> {
+async fn unauthorized_error(
+    mut resp: SignInResponse,
+    user_email: Option<&str>,
+) -> Result<HttpResponse, Error> {
     resp.status = false;
     resp.message = "Invalid credentials".to_string();
+
+    if let Some(user) = user_email {
+        let error = users::handle_failed_login(user).await.unwrap_or_default();
+        if !error.is_empty() {
+            resp.message = error;
+            return Ok(HttpResponse::Locked().json(resp));
+        }
+    };
+
     Ok(HttpResponse::Unauthorized().json(resp))
 }
 
