@@ -22,6 +22,7 @@ import { convertTableData } from "@/utils/dashboard/convertTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
+import { runJavaScriptCode } from "./convertCustomChartData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -40,6 +41,7 @@ export const convertPanelData = async (
   chartPanelStyle: any,
   annotations: any,
 ) => {
+  console.log(data,'data passed')
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
   switch (panelSchema.type) {
@@ -118,6 +120,12 @@ export const convertPanelData = async (
       return {
         chartType: panelSchema.type,
         ...convertSankeyData(panelSchema, data),
+      };
+    }
+    case "custom_chart": {
+      return {
+        chartType: panelSchema.type,
+        ...runJavaScriptCode(panelSchema, data),
       };
     }
     default: {
