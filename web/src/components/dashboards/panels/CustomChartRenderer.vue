@@ -75,12 +75,12 @@ echarts.use([
 ]);
 
 export default defineComponent({
-  name: "ChartRenderer",
+  name: "CustomChartRenderer",
   props: {
     data: {
       required: true,
       type: Object,
-      default: () => ({ option: {} }),
+      default: () => ({}),
     },
     renderType: {
       type: String,
@@ -111,7 +111,7 @@ export default defineComponent({
       });
 
       // Apply option from props
-      chart.setOption(props?.data?.option ?? {});
+      chart.setOption(props?.data ?? {});
 
       // Add event listeners for generic interactions
       chart.on("mousemove", (params) => emit("mousemove", params));
@@ -142,7 +142,7 @@ export default defineComponent({
       window.addEventListener("resize", handleResize);
     });
     watch(
-      () => props.data.option,
+      () => props.data,
       async () => {
         await initChart(); // Re-initialize chart when option change
       },

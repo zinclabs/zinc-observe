@@ -20,13 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     style="width: 100%; height: 100%; overflow: auto"
   >
     <div style="width: 100%; height: 100%">
-      <q-splitter
-        v-model="splitterModel"
-        style="width: 100%; height: 100% !important"
-        @update:modelValue="layoutSplitterUpdated"
-        data-test="dashboard-markdown-editor-splitter"
-      >
-        <template #before>
           <div class="col" style="height: 100%">
             <QueryEditor
               v-model:query="javascriptCodeContent"
@@ -47,25 +40,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             />
           </div>
-        </template>
-        <template #separator>
-          <div class="splitter-vertical splitter-enabled"></div>
-          <q-avatar
-            color="primary"
-            text-color="white"
-            size="20px"
-            icon="drag_indicator"
-            style="top: 10px; left: 3.5px"
-            data-test="dashboard-markdown-editor-drag-indicator"
-          />
-        </template>
-        <!-- <template v-if="javascriptCodeContent" #after>
-          <CustomChartRenderer
-            :key="dashboardPanelData.data.customChartResult"
-            :data="dashboardPanelData.data.customChartResult"
-          />
-        </template> -->
-      </q-splitter>
     </div>
   </div>
 </template>
@@ -100,25 +74,27 @@ export default defineComponent({
   props: {
     modelValue: {
       type: String,
-      default: "",
-    },
-  },
-  setup(props, { emit }): any {
-    const javascriptCodeContent = ref(`\
+      default: `\
   -- To know more about ECharts format, visit: https://echarts.apache.org/examples/en/editor.html?c=line-simple
 
-  -- Define your function below. It should take 'data' as an argument and return the data with an 'option' property.
+  -- Define your function below. It should return the 'option' property.
   -- Example:
 
   function customChartTransformer(data) {
-      -- Modify the data as needed
-      return data;
+      const option = {
+        -- Define your ECharts 'option' here
+      };
+
+      -- Return only the 'option', not the 'data'
+      return option;
   }
 
   -- Note: You can rename 'customChartTransformer' to any function name you prefer.
-  `);
-
-
+  `,
+    },
+  },
+  setup(props, { emit }): any {
+    const javascriptCodeContent = ref(props.modelValue);
     const splitterModel = ref(50);
     const dataToBeRendered = ref({});
     const store = useStore();
@@ -133,7 +109,6 @@ export default defineComponent({
 
         javascriptCodeContent.value = newVal;
 
-        console.log(newVal,'new valll')
         // Emit the updated value
         emit("update:modelValue", newVal);
       } catch (error) {
