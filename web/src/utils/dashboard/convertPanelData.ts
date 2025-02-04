@@ -126,6 +126,7 @@ export const convertPanelData = async (
 
       // Ensure result is an object
       const safeResult = result && typeof result === "object" ? result : {};
+      console.log(safeResult,'safe result')
       return {
         chartType: panelSchema.type,
         ...safeResult,

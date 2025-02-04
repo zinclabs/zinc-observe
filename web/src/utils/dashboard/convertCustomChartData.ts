@@ -78,8 +78,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
       }, 1000);
 
       if (event.data.type === "success") {
-        panelSchema.customChartResult = JSON.parse(event.data.result);
-        resolve(panelSchema.customChartResult);
+        resolve(JSON.parse(event.data.result));
       } else if (event.data.type === "error") {
         console.error("Error executing code", event.data.message);
         reject(new Error(event.data.message));

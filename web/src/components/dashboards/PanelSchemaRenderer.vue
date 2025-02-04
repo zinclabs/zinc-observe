@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
-            :data="panelSchema.customChartResult"
+            :data="panelData"
             style="width: 100%; height: 100%"
             class="col"
           />
