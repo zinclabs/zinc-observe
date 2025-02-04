@@ -40,7 +40,6 @@ export const convertPanelData = async (
   metadata: any,
   chartPanelStyle: any,
 ) => {
-  console.log(data,'data passed')
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
   switch (panelSchema.type) {
@@ -120,9 +119,10 @@ export const convertPanelData = async (
       };
     }
     case "custom_chart": {
+      const result = await runJavaScriptCode(panelSchema, data);
       return {
         chartType: panelSchema.type,
-        ...runJavaScriptCode(panelSchema, data),
+        ...result,
       };
     }
     default: {

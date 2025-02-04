@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="chart-renderer"
     ref="chartRef"
-    id="chart1"
+    id="chart"
     @mouseover="handleMouseOver"
     @mouseleave="handleMouseLeave"
     style="height: 100%; width: 100%"

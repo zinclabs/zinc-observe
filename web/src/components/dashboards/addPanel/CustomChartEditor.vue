@@ -30,7 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="javascript-query-editor"
               style="padding-left: 20px;"
               :style="{
-  
                 backgroundColor:
                   store.state.theme == 'dark'
                     ? '#1e1e1e'
@@ -75,21 +74,14 @@ export default defineComponent({
     modelValue: {
       type: String,
       default: `\
-  -- To know more about ECharts format, visit: https://echarts.apache.org/examples/en/editor.html?c=line-simple
+          -- To know more about ECharts format, visit: https://echarts.apache.org/examples/en/editor.html?c=line-simple
 
-  -- Define your function below. It should return the 'option' property.
-  -- Example:
+          -- Define your ECharts 'option' here. The 'data' variable is available for use,
+          -- which contains the data you need to customize your chart.
 
-  function customChartTransformer(data) {
-      const option = {
-        -- Define your ECharts 'option' here
-      };
-
-      -- Return only the 'option', not the 'data'
-      return option;
-  }
-
-  -- Note: You can rename 'customChartTransformer' to any function name you prefer.
+          const option = {
+            -- Use 'data' to dynamically set properties based on the input data
+          };
   `,
     },
   },
