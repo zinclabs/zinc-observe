@@ -123,9 +123,12 @@ export const convertPanelData = async (
     }
     case "custom_chart": {
       const result = await runJavaScriptCode(panelSchema, data);
+
+      // Ensure result is an object
+      const safeResult = result && typeof result === "object" ? result : {};
       return {
         chartType: panelSchema.type,
-        ...result,
+        ...safeResult,
       };
     }
     default: {

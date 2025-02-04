@@ -21,7 +21,7 @@
  * @param {any} store - the store object
  * @return {Object} - the options object for rendering the chart
  */
-export const runJavaScriptCode = (panelSchema, searchQueryData) => {
+export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
   return new Promise((resolve, reject) => {
     console.log("Creating iframe for JS execution");
 

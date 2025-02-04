@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   ></div>
 </template>
 
-<script lang="ts">
+<script >
 import {
   defineComponent,
   ref,
@@ -48,13 +48,6 @@ import {
   LegendComponent,
   DataZoomComponent,
 } from "echarts/components";
-import {
-  BarChart,
-  LineChart,
-  PieChart,
-  ScatterChart,
-  HeatmapChart,
-} from "echarts/charts";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 
 // Register necessary components
@@ -65,11 +58,6 @@ echarts.use([
   ToolboxComponent,
   LegendComponent,
   DataZoomComponent,
-  BarChart,
-  LineChart,
-  PieChart,
-  ScatterChart,
-  HeatmapChart,
   CanvasRenderer,
   SVGRenderer,
 ]);
@@ -93,7 +81,7 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const chartRef = ref(null);
-    let chart: echarts.ECharts | null = null;
+    let chart = null;
 
     const hoveredSeriesState = inject("hoveredSeriesState", null);
 
