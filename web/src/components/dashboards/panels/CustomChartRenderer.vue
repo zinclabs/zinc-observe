@@ -38,6 +38,7 @@ import {
   inject,
 } from "vue";
 import * as echarts from "echarts";
+import "echarts-gl";
 
 // Import all components and renderers once for generic usage
 import {
