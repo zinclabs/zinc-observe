@@ -23,6 +23,7 @@
     "type-check": "vue-tsc --noEmit -p tsconfig.vitest.json --composite false",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
   },
+
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
     "@joakimono/echarts-extension-leaflet": "^1.0.2",
@@ -42,6 +43,7 @@
     "date-fns-tz": "^3.1.3",
     "dompurify": "^3.1.6",
     "echarts": "^5.5.1",
+    "echarts-gl": "^2.0.9",
     "flag-icons": "^7.2.3",
     "js-cookie": "^3.0.5",
     "leaflet": "^1.9.4",
