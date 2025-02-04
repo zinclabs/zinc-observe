@@ -21,44 +21,84 @@
  * @param {any} store - the store object
  * @return {Object} - the options object for rendering the chart
  */
-export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
-  try {
-    // Retrieve the user function code from the editor
-    const userFunctionCode = panelSchema.customChartContent.trim();
+export const runJavaScriptCode = (panelSchema, searchQueryData) => {
+  return new Promise((resolve, reject) => {
+    console.log("Creating iframe for JS execution");
 
-    // Remove comments from the user code
-    const cleanedCode = userFunctionCode
-      .replace(/\/\*[\s\S]*?\*\/|\/\/.*|--.*/g, "")
-      .trim();
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    iframe.setAttribute("sandbox", "allow-scripts");
+    document.body.appendChild(iframe);
 
-    // Use a regular expression to extract the function name or arrow function
-    const functionNameMatch = cleanedCode.match(
-      /function\s+([a-zA-Z0-9_$]+)\s*\(|([a-zA-Z0-9_$]+)\s*=\s*\(\s*.*\)\s*=>/,
-    );
+    const scriptContent = `
+      <script>
+        console.log("[Iframe] Script execution started.");
+        window.onerror = function(message) {
+          console.log("[Iframe] Error occurred", message);
+          parent.postMessage({ type: 'error', message: message.toString() }, '*');
+        };
 
-    if (!functionNameMatch) {
-      throw new Error("The provided code must define a function.");
-    }
+        window.addEventListener('message', (event) => {
+          if (event.data.type === 'execute') {
+            try {
+              const userCode = event.data.code.trim();
+              const data = JSON.parse(event.data.data);
 
-    // Determine the function name based on the match
-    const functionName = functionNameMatch[1] || functionNameMatch[2];
+              console.log("[Iframe] Executing user code:", userCode);
+              // Remove potential harmful patterns
+              const cleanedCode = userCode.replace(/\\/\\*[\\s\\S]*?\\*\\/|\\/\\/.*|--.*/g, '').trim();
 
-    // Wrap the user's code in a Function constructor
-    const userFunction = new Function(
-      "data",
-      `${cleanedCode}; return ${functionName}(data);`,
-    );
+              // Execute code directly and expect option to be defined
+              const userFunction = new Function('data', cleanedCode + '; return option;');
+              const result = userFunction(data);
 
-    // Execute the function
-    const result = userFunction(searchQueryData);
-    console.log(result,'result')
+              console.log("[Iframe] Execution successful. Result:", result);
+              parent.postMessage({ type: 'success', result: JSON.stringify(result) }, '*');
+            } catch (error) {
+              console.error("[Iframe] Error executing code:", error.message);
+              parent.postMessage({ type: 'error', message: error.message }, '*');
+            }
+          }
+        });
 
-    // Use the result (if any) from the user's function
-    panelSchema.customChartResult = result;
-    return result;
-  } catch (error) {
-    // Handle any errors gracefully
-    console.error("Error executing user code:", error.message);
-    console.error("Code causing error:", cleanedCode);
-  }
+        console.log("[Iframe] Ready");
+      </script>
+    `;
+
+    iframe.srcdoc = scriptContent;
+
+    window.addEventListener("message", function handler(event) {
+      if (event.source !== iframe.contentWindow) return;
+
+      console.log("Message received from iframe", event.data);
+
+      window.removeEventListener("message", handler);
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+
+      if (event.data.type === "success") {
+        panelSchema.customChartResult = JSON.parse(event.data.result);
+        resolve(panelSchema.customChartResult);
+      } else if (event.data.type === "error") {
+        console.error("Error executing code", event.data.message);
+        reject(new Error(event.data.message));
+      }
+    });
+
+    iframe.onload = () => {
+      console.log("Iframe loaded, sending message...");
+
+      iframe?.contentWindow?.postMessage(
+        {
+          type: "execute",
+          code: panelSchema.customChartContent,
+          data: JSON.stringify(searchQueryData),
+        },
+        "*"
+      );
+    };
+  });
 };
+
+

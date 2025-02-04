@@ -104,11 +104,8 @@ const getDefaultDashboardPanelData: any = () => ({
     },
     htmlContent: "",
     markdownContent: "",
-    customChartContent: `
-              function customChartTransformer(data) {
-                  return data;
-              }
-              `,
+    customChartContent: `\ -- To know more about ECharts format, visit: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n -- Define your ECharts 'option' here. The 'data' variable is available for use, \n-- which contains the data you need to customize your chart. \n \t option = {  \n \n  \t \t \t };
+  `,
     customChartResult: {},
     queryType: "sql",
     queries: [
