@@ -124,10 +124,6 @@ export default defineComponent({
 
       const convertedData = convertStringToFunction(props.data);
 
-      delete convertedData.chartType
-
-      console.log(convertedData,'converted data')
-
       // Now, set the option with the executed functions
       chart.setOption(convertedData);
 
