@@ -38,7 +38,6 @@ import {
   inject,
 } from "vue";
 import * as echarts from "echarts";
-import "echarts-gl";
 
 // Import all components and renderers once for generic usage
 import {
@@ -110,6 +109,9 @@ export default defineComponent({
 
     const initChart = async () => {
       if (!chartRef.value) return;
+
+      const echartsGL = await import('echarts-gl');
+
 
       // Destroy the existing chart instance if any
       if (chart) {
