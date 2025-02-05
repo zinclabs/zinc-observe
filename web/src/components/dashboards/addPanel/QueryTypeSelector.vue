@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="q-py-sm">
     <div class="row button-group">
-      <div>
+      <div v-if="dashboardPanelData.data.type != 'custom_chart'">
         <button
           data-test="dashboard-auto"
           :class="selectedButtonType === 'auto' ? 'selected' : ''"
@@ -123,9 +123,13 @@ export default defineComponent({
 
     const initializeSelectedButtonType = async () => {
       // set a variable to ignore updates for selectedButtonType
-      ignoreSelectedButtonTypeUpdate.value = true;
 
-      if (
+      ignoreSelectedButtonTypeUpdate.value = true;
+      if (dashboardPanelData.data.type == "custom_chart") {
+        selectedButtonType.value = "custom-sql";
+        ignoreSelectedButtonTypeUpdate.value = false;
+        return;
+      } else if (
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery == false &&
