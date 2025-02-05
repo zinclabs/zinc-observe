@@ -970,6 +970,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
         break;
+      case "custom_chart":
+        dashboardPanelData.data.queries = getDefaultQueries();
+        dashboardPanelData.data.htmlContent = "";
+        dashboardPanelData.data.markdownContent = "";
+        dashboardPanelData.data.queryType = "";
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ].config.time_shift = [];
+        break;
       case "maps":
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
