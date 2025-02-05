@@ -85,6 +85,28 @@ export default defineComponent({
     let chart = null;
 
     const hoveredSeriesState = inject("hoveredSeriesState", null);
+    const convertStringToFunction = (obj) => {
+            if (typeof obj === 'string' && obj.startsWith('function')) {
+              // Convert string back to function using eval
+              return eval(`(${obj})`);  // Wrap the string in parentheses to avoid syntax issues
+            }
+
+            if (Array.isArray(obj)) {
+              return obj.map(item => convertStringToFunction(item));  // Recursively handle arrays
+            }
+
+            if (typeof obj === 'object' && obj !== null) {
+              const result = {};
+              for (const key in obj) {
+                if (obj.hasOwnProperty(key)) {
+                  result[key] = convertStringToFunction(obj[key]);  // Recursively handle object properties
+                }
+              }
+              return result;
+            }
+
+            return obj;  // If it's not a function string or an object, return it as is
+          };
 
     const initChart = async () => {
       if (!chartRef.value) return;
@@ -99,8 +121,15 @@ export default defineComponent({
         renderer: "canvas",
       });
 
-      // Apply option from props
-      chart.setOption(props?.data ?? {});
+
+      const convertedData = convertStringToFunction(props.data);
+
+      delete convertedData.chartType
+
+      console.log(convertedData,'converted data')
+
+      // Now, set the option with the executed functions
+      chart.setOption(convertedData);
 
       // Add event listeners for generic interactions
       chart.on("mousemove", (params) => emit("mousemove", params));
