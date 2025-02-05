@@ -286,7 +286,7 @@ export default defineComponent({
           "editor.background": "#fafafa",
           "editorCursor.foreground": "#000000",
           "editor.lineHighlightBackground": "#FFFFFF",
-          "editorLineNumber.foreground": "#ececec",
+          "editorLineNumber.foreground": "#000000",
           "editor.border": "#ececec",
         },
       });

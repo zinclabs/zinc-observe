@@ -27,14 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:query="onEditorValueChange"
               data-test="dashboard-markdown-editor-query-editor"
               language="javascript"
-              class="javascript-query-editor"
+              class="javascript-query-editor "
               style="padding-left: 20px;"
               :style="{
                 backgroundColor:
                   store.state.theme == 'dark'
                     ? '#1e1e1e'
                     : '#fafafa',
-
               }"
 
             />
@@ -73,16 +72,8 @@ export default defineComponent({
   props: {
     modelValue: {
       type: String,
-      default: `\
-          -- To know more about ECharts format, visit: https://echarts.apache.org/examples/en/editor.html?c=line-simple
-
-          -- Define your ECharts 'option' here. The 'data' variable is available for use,
-          -- which contains the data you need to customize your chart.
-
-          const option = {
-            -- Use 'data' to dynamically set properties based on the input data
-          };
-  `,
+      default: `\ -- To know more about ECharts , \n -- visit: https://echarts.apache.org/examples/en/index.html \n -- Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n -- Define your ECharts 'option' here. The 'data' variable is available for use \n -- Example Usage: data[0].map((val)=>val.x_axis). \n \t option = {  \n \n  \t \t \t };
+  `
     },
   },
   setup(props, { emit }): any {
@@ -98,18 +89,12 @@ export default defineComponent({
 
     const onEditorValueChange = (newVal: any) => {
       try {
-
         javascriptCodeContent.value = newVal;
-
-        // Emit the updated value
         emit("update:modelValue", newVal);
       } catch (error) {
         console.error("Error processing newVal:", error);
       }
     };
-
-
-
 
 
     return {
