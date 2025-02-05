@@ -43,6 +43,28 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
             try {
               const userCode = event.data.code.trim();
               const data = JSON.parse(event.data.data);
+              const convertFunctionsToString = (obj) => {
+                if (typeof obj === 'function') {
+                  return obj.toString();  // Convert function to string
+                }
+
+                if (Array.isArray(obj)) {
+                  return obj.map(item => convertFunctionsToString(item));  // Recursively convert array elements
+                }
+
+                if (typeof obj === 'object' && obj !== null) {
+                  const result = {};
+                  for (const key in obj) {
+                    if (obj.hasOwnProperty(key)) {
+                      result[key] = convertFunctionsToString(obj[key]);  // Recursively convert object properties
+                    }
+                  }
+                  return result;
+                }
+
+                return obj;  // If it's neither a function nor an object/array, return it as is
+              };
+
 
               console.log("[Iframe] Executing user code:", userCode);
               // Remove potential harmful patterns
@@ -50,10 +72,11 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
 
               // Execute code directly and expect option to be defined
               const userFunction = new Function('data', cleanedCode + '; return option;');
-              const result = userFunction(data);
 
+              const result = userFunction(data);
               console.log("[Iframe] Execution successful. Result:", result);
-              parent.postMessage({ type: 'success', result: JSON.stringify(result) }, '*');
+              const convertedData = convertFunctionsToString(result);
+              parent.postMessage({ type: 'success', result: JSON.stringify(convertedData) }, '*');
             } catch (error) {
               console.error("[Iframe] Error executing code:", error.message);
               parent.postMessage({ type: 'error', message: error.message }, '*');
