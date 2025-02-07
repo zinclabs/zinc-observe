@@ -15,92 +15,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="scheduled-alerts">
-    <div
-      v-if="!disableQueryTypeSelection"
-      class="scheduled-pipeline-tabs q-mb-lg"
-    >
-      <q-tabs
-        data-test="scheduled-pipeline-tabs"
-        v-model="tab"
-        no-caps
-        outside-arrows
-        size="sm"
-        mobile-arrows
-        class="bg-white text-primary"
-        @update:model-value="updateTab"
-      >
-        <q-tab
-          data-test="scheduled-pipeline-custom-tab"
-          name="custom"
-          :label="t('alerts.quick')"
-        />
-        <q-tab
-          data-test="scheduled-pipeline-sql-tab"
-          name="sql"
-          :label="t('alerts.sql')"
-        />
-        <q-tab
-          data-test="scheduled-pipeline-metrics-tab"
-          v-if="alertData.stream_type === 'metrics'"
-          name="promql"
-          :label="t('alerts.promql')"
-        />
-      </q-tabs>
-    </div>
-    <template v-if="tab === 'custom'">
-      <fields-input
-        class="q-mt-md"
-        :stream-fields="columns"
-        :fields="conditions"
-        @add="addField"
-        @remove="removeField"
-        @input:update="(name, field) => emits('input:update', name, field)"
-      />
-    </template>
-    <template v-else>
-      <div class="flex tw-justify-between items-center">
-        <div class="text-bold q-mr-sm q-my-sm">
-          {{ tab === "promql" ? "Promql" : "SQL" }}
-        </div>
-        <q-toggle
-          v-if="!disableVrlFunction"
-          data-test="logs-search-bar-show-query-toggle-btn"
-          v-model="isVrlFunctionEnabled"
-          :icon="'img:' + getImageURL('images/common/function.svg')"
-          title="Toggle Function Editor"
-          class="q-pl-xs"
-          size="30px"
-          :disable="tab === 'promql'"
-        />
-      </div>
+  <div class="scheduled-pipelines tw-flex">
 
-      <query-editor
-        data-test="scheduled-pipeline-sql-editor"
-        ref="queryEditorRef"
-        editor-id="alerts-query-editor"
-        class="monaco-editor"
-        v-model:query="query"
-        :class="query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''"
-        @update:query="updateQueryValue"
-        @focus="queryEditorPlaceholderFlag = false"
-        @blur="onBlurQueryEditor"
-      />
-      <div class="text-negative q-mb-xs" style="height: 21px">
-        <span v-show="!isValidSqlQuery"> Invalid SQL Query</span>
-      </div>
-    </template>
-
-    <div class="q-mt-sm">
+    <div style="flex: 3.5" class="flex justify-between">
+      <div >
+        <q-select
+          v-model="stream_type"
+          :options="streamTypes"
+          :label="t('alerts.streamType') + ' *'"
+          :popup-content-style="{ textTransform: 'lowercase' }"
+          color="input-border"
+          bg-color="input-bg"
+          class="showLabelOnTop no-case"
+          stack-label
+          outlined
+          filled
+          dense
+          :rules="[(val: any) => !!val || 'Field is required!']"
+          style="width: 100%; "
+          @update:model-value="updateStreamType"
+          />
       <div
         v-if="
           alertData.stream_type === 'metrics' &&
           tab === 'promql' &&
           promqlCondition
         "
-        class="flex justify-start items-center text-bold q-mb-lg o2-input"
+        class="flex justify-start items-center text-bold q-mb-sm o2-input"
       >
-        <div style="width: 190px">Trigger if the value is</div>
+        <div style="width: 130px">Trigger
+          <q-icon
+            :name="outlinedInfo"
+            size="17px"
+            class="q-ml-xs cursor-pointer"
+            :class="
+              store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'
+            "
+          >
+            <q-tooltip
+              anchor="center right"
+              self="center left"
+              max-width="300px"
+            >
+              <span style="font-size: 14px"
+                >Based upon the condition of trigger the pipeline will get trigger <br />
+                e.g. if the trigger value is >100 and the query returns a value of
+                101 then the pipeline will trigger.</span
+              >
+            </q-tooltip>
+          </q-icon>
+        </div>
         <div class="flex justify-start items-center">
           <div data-test="scheduled-pipeline-promlq-condition-operator-select">
             <q-select
@@ -438,7 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           data-test="scheduled-pipeline-cron-toggle-title"
           class="text-bold flex items-center"
-          style="width: 190px"
+          style="width: 130px"
         >
           {{ t("alerts.crontitle") + " *" }}
           <q-icon
@@ -464,7 +428,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center q-mr-sm" style="width: fit-content">
             <div
               data-test="scheduled-pipeline-cron-input"
-              style="width: 87px; margin-left: 0 !important"
               class="silence-notification-input"
             >
               <q-toggle
@@ -478,11 +441,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="flex items-center q-mr-sm">
+      <div class="flex items-center justify-start q-mr-sm">
         <div
           data-test="scheduled-pipeline-frequency-title"
-          class="text-bold flex items-center"
-          style="width: 190px"
+          class="text-bold flex items-center q-mr-xs"
+          :style="{
+            width: triggerData.frequency_type == 'minutes' ? '130px' : '100px',
+          }"
         >
           {{ t("alerts.frequency") + " *" }}
           <q-icon
@@ -545,13 +510,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-icon>
           </template>
         </div>
-        <div style="min-height: 84px">
+        <div style="max-height: 50px;" class="q-mb-sm">
           <div class="flex items-center q-mr-sm" style="width: fit-content">
             <div
               data-test="scheduled-pipeline-frequency-input"
               :style="
                 triggerData.frequency_type == 'minutes'
-                  ? 'width: 87px; margin-left: 0 !important'
+                  ? 'width: 87px; margin-left: 0 !important;margin-top: 10px'
                   : 'width: fit-content !important'
               "
               class="silence-notification-input"
@@ -567,14 +532,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="background: none"
                 @update:model-value="updateFrequency"
               />
-              <div v-else class="tw-flex tw-items-center o2-input">
+              <div v-else  class="tw-flex tw-items-center o2-input">
                 <q-input
                   data-test="scheduled-pipeline-cron-input-field"
                   v-model="triggerData.cron"
                   dense
                   filled
                   :label="t('reports.cronExpression') + ' *'"
-                  style="background: none; width: 180px"
+                  style="background: none; width: 130px;"
                   class="showLabelOnTop"
                   stack-label
                   outlined
@@ -605,7 +570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="timezone-select showLabelOnTop q-ml-sm"
                   stack-label
                   outlined
-                  style="width: 220px"
+                  style="width: 200px"
                 />
               </div>
             </div>
@@ -613,10 +578,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="triggerData.frequency_type == 'minutes'"
               data-test="scheduled-pipeline-frequency-unit"
               style="
-                min-width: 90px;
                 margin-left: 0 !important;
                 height: 40px;
                 font-weight: normal;
+                margin-top: 10px;
+                width: 87px
               "
               :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
               class="flex justify-center items-center"
@@ -640,11 +606,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div class="flex items-center q-mr-sm">
+      <div class="flex  items-center q-mr-sm q-mt-lg">
         <div
           data-test="scheduled-pipeline-period-title"
           class="text-bold flex items-center q-pb-sm"
-          style="width: 190px"
+          style="width: 130px"
         >
           {{ t("alerts.period") + " *" }}
           <q-icon
@@ -705,7 +671,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.minutes") }}
             </div>
           </div>
-          <div
+
+        </div>
+        <div
             data-test="scheduled-pipeline-period-error-text"
             v-if="!Number(triggerData.period)"
             class="text-red-8 q-pt-xs"
@@ -717,14 +685,114 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="scheduled-pipeline-period-warning-text"
             v-else
             class="text-primary q-pt-xs"
-            style="font-size: 12px; line-height: 12px; padding: 8px 0px"
+            style="font-size: 12px; line-height: 12px; padding: 2px 0px"
           >
             Note: The period should be the same as frequency.
           </div>
+  
+      </div>
+      </div>
+
+        <div
+          class="flex justify-start items-end q-mt-lg q-pb-lg full-width"
+          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        >
+          <q-btn
+            data-test="stream-routing-query-cancel-btn"
+            class="text-bold"
+            :label="t('alerts.cancel')"
+            text-color="light-text"
+            padding="sm md"
+            no-caps
+            @click="$emit('cancel:form')"
+          />
+          <q-btn
+            data-test="stream-routing-query-save-btn"
+            :label="t('alerts.save')"
+            class="text-bold no-border q-ml-md"
+            color="secondary"
+            padding="sm xl"
+            no-caps
+            type="submit"
+            @click="$emit('submit:form')"
+          />
+          <q-btn
+            v-if="pipelineObj.isEditNode"
+            data-test="stream-routing-query-delete-btn"
+            :label="t('pipeline.deleteNode')"
+            class="text-bold no-border q-ml-md"
+            color="negative"
+            padding="sm xl"
+            no-caps
+            @click="$emit('delete:node')"
+          />
         </div>
+
+      
+    </div>
+    <div style="flex: 6.5" class="q-ml-md q-pl-lg">
+      <div
+          class="scheduled-pipeline-tabs "  
+        >
+      <q-tabs
+        data-test="scheduled-pipeline-tabs"
+        v-model="tab"
+        no-caps
+        outside-arrows
+        size="sm"
+        mobile-arrows
+        class="bg-white text-primary"
+        @update:model-value="updateTab"
+        :disable="alertData.stream_type != 'metrics'"
+      >
+        <q-tab
+          data-test="scheduled-pipeline-sql-tab"
+          name="sql"
+          :label="t('alerts.sql')"
+        />
+        <q-tab
+          data-test="scheduled-pipeline-metrics-tab"
+          name="promql"
+          :disable="alertData.stream_type !== 'metrics'"
+          :label="t('alerts.promql')"
+        >
+          <q-tooltip v-if="alertData.stream_type !== 'metrics'">
+            Promql is only available for metrics stream type
+          </q-tooltip>
+        </q-tab>
+      </q-tabs>
+    </div>
+    <div class="full-width" >
+      <div>
+        <div class="text-bold q-mr-sm q-my-sm">
+          {{ tab === "promql" ? "Promql" : "SQL" }}
+        </div>
+
+      </div>
+      <div class="query-editor-container">
+        <query-editor
+        data-test="scheduled-pipeline-sql-editor"
+        ref="pipelineEditorRef"
+        editor-id="pipeline-query-editor"
+        class="monaco-editor"
+        v-model:query="query"
+        :class="query == '' && queryEditorPlaceholderFlag ? 'empty-query' : ''"
+        @update:query="updateQueryValue"
+        @focus="queryEditorPlaceholderFlag = false"
+        @blur="onBlurQueryEditor"
+      />
+      </div>
+
+
+      <div class="text-negative q-mb-xs" style="height: 21px">
+        <span v-show="!isValidSqlQuery"> Invalid SQL Query</span>
       </div>
     </div>
+    </div>
+
+    
   </div>
+  
 </template>
 
 <script setup lang="ts">
@@ -754,6 +822,7 @@ import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { useQuasar } from "quasar";
 import cronParser from "cron-parser";
+import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -777,6 +846,7 @@ const props = defineProps([
   "disableVrlFunction",
   "disableQueryTypeSelection",
   "showTimezoneWarning",
+  "streamType"
 ]);
 
 const emits = defineEmits([
@@ -794,7 +864,13 @@ const emits = defineEmits([
   "update:showVrlFunction",
   "validate-sql",
   "update:frequency",
+  "update:stream_type",
+  "submit:form",
+  "cancel:form",
+  "delete:node",
 ]);
+const {  pipelineObj } = useDragAndDrop();
+
 
 const { t } = useI18n();
 
@@ -805,6 +881,7 @@ const query = ref(props.sql);
 const promqlQuery = ref(props.promql);
 
 const tab = ref(props.query_type || "custom");
+const stream_type = ref(props.streamType || "logs");
 
 const q = useQuasar();
 
@@ -813,6 +890,7 @@ const store = useStore();
 const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
+const  pipelineEditorRef = ref(null);
 
 const filteredTimezone: any = ref([]);
 
@@ -856,6 +934,8 @@ const currentTimezone =
   useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const browserTimezone = ref(currentTimezone);
+const streamTypes = ["logs", "metrics", "traces"];
+
 
 // @ts-ignore
 let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
@@ -899,6 +979,12 @@ const updateQueryValue = (value: string) => {
 const updateTrigger = () => {
   emits("update:trigger", triggerData.value);
   emits("input:update", "period", triggerData.value);
+};
+const updateStreamType = () => {
+  if (stream_type.value != "metrics") {
+    tab.value = "sql";
+  }
+  emits("update:stream_type", stream_type.value);
 };
 
 const updateFrequency = async () => {
@@ -1225,6 +1311,8 @@ const validateFrequency = () => {
 defineExpose({
   tab,
   validateInputs,
+  pipelineEditorRef,
+  pipelineObj,
 });
 </script>
 
@@ -1252,14 +1340,14 @@ defineExpose({
     min-height: 28px;
   }
 }
-.scheduled-alerts {
+.scheduled-pipelines {
   .monaco-editor {
-    width: 100% !important;
-    min-width: 500px !important;
-    min-height: calc(100vh - 500px) !important;
+    width: 100%;
+    height: calc(100vh - 180px);
+  }
+  .query-editor-container {
+    width: 96% !important;
     border: 1px solid $border-color;
-    resize: vertical;
-    overflow: auto;
   }
 
   .q-btn {

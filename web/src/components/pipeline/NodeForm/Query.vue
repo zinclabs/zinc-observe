@@ -16,37 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="add-stream-query-routing-section"
-    class="full-width stream-routing-section"
+    data-test="add-stream-query-routing-section "
+    class="full-width stream-routing-section "
     :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
   >
+  <div class="flex justify-between q-px-md q-pr-xl">
     <div class="stream-routing-title q-pb-sm q-pl-md">
       {{ t("pipeline.query") }}
     </div>
+
+  </div>
+
     <q-separator />
 
     <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
       <q-form ref="queryFormRef" @submit="saveQueryData">
-        <div>
-          <q-select
-            v-model="streamRoute.stream_type"
-            :options="streamTypes"
-            :label="t('alerts.streamType') + ' *'"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop no-case"
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="width: 400px"
-          />
+        <div class="full-width">
           <scheduled-pipeline
-            ref="scheduledAlertRef"
+            ref="scheduledPipelineRef"
             :columns="filteredColumns"
             :conditions="[]"
             :alertData="streamRoute"
@@ -58,45 +45,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:sql="streamRoute.query_condition.sql"
             v-model:query_type="streamRoute.query_condition.type"
             v-model:aggregation="streamRoute.query_condition.aggregation"
+            v-model:stream_type="streamRoute.stream_type"
             v-model:isAggregationEnabled="isAggregationEnabled"
             @validate-sql="validateSqlQuery"
+            @submit:form="saveQueryData"
+            @cancel:form="openCancelDialog"
+            @delete:node="openDeleteDialog"
+            
             class="q-mt-sm"
           />
         </div>
 
-        <div
-          class="flex justify-start full-width"
-          :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-        >
-          <q-btn
-            data-test="stream-routing-query-cancel-btn"
-            class="text-bold"
-            :label="t('alerts.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            no-caps
-            @click="openCancelDialog"
-          />
-          <q-btn
-            data-test="stream-routing-query-save-btn"
-            :label="t('alerts.save')"
-            class="text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
-            no-caps
-            type="submit"
-          />
-          <q-btn
-            v-if="pipelineObj.isEditNode"
-            data-test="stream-routing-query-delete-btn"
-            :label="t('pipeline.deleteNode')"
-            class="text-bold no-border q-ml-md"
-            color="negative"
-            padding="sm xl"
-            no-caps
-            @click="openDeleteDialog"
-          />
-        </div>
+ 
       </q-form>
     </div>
   </div>
@@ -206,7 +166,7 @@ const isValidSqlQuery = ref(true);
 
 const validateSqlQueryPromise = ref<Promise<unknown>>();
 
-const scheduledAlertRef = ref<any>(null);
+const scheduledPipelineRef = ref<any>(null);
 
 const filteredStreams: Ref<any[]> = ref([]);
 
@@ -363,7 +323,7 @@ const openCancelDialog = () => {
 
 // TODO OK : Add check for duplicate routing name
 const saveQueryData = async () => {
-  if (!scheduledAlertRef.value.validateInputs()) {
+  if (!scheduledPipelineRef.value.validateInputs()) {
     return false;
   }
 
@@ -507,12 +467,14 @@ const validateSqlQuery = () => {
   padding-top: 16px;
 }
 .stream-routing-container {
-  width: 720px;
+  width: 100%;
   border-radius: 8px;
   /* box-shadow: 0px 0px 10px 0px #d2d1d1; */
 }
 
 .stream-routing-section {
   min-height: 100%;
+  width: 97vw !important;
+  padding-left: 1rem;
 }
 </style>
