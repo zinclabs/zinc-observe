@@ -960,7 +960,6 @@ export default defineComponent({
         //   runJavaScriptCode();
         // }
 
-        console.log("runQuery", dashboardPanelData.data);
 
         // Also update variables data
         Object.assign(
@@ -971,7 +970,6 @@ export default defineComponent({
         // copy the data object excluding the reactivity
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
 
-        console.log(chartData.value);
 
         // refresh the date time based on current time if relative date is selected
         dateTimePickerRef.value && dateTimePickerRef.value.refresh();
