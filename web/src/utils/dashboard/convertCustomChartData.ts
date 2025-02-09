@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import router from "src/router";
+
 /**
  * Converts SQL data into a format suitable for rendering a chart.
  *
@@ -28,9 +30,12 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     iframe.style.display = "none";
     iframe.setAttribute("sandbox", "allow-scripts");
     document.body.appendChild(iframe);
-
+    let staticEchartsRef = '/web/src/assets/dashboard/echarts.min.js';
+    if(!window.location.pathname.includes('web')){
+      staticEchartsRef = '/src/assets/dashboard/echarts.min.js';
+    }
     const scriptContent = `
-      <script src="/web/src/assets/dashboard/echarts.min.js"></script>
+      <script src="${staticEchartsRef}"></script>
       <script>
         window.onerror = function(message) {
           parent.postMessage({ type: 'error', message: message.toString() }, '*');
@@ -84,7 +89,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     `;
 
     iframe.srcdoc = scriptContent;
-
     window.addEventListener("message", function handler(event) {
       if (event.source !== iframe.contentWindow) return;
 
