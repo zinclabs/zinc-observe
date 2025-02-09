@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-markdown-editor-query-editor"
               language="javascript"
               class="javascript-query-editor "
-              style="padding-left: 20px;"
+              style="padding-left: 20px; height: 100% !important;"
               :style="{
                 backgroundColor:
                   store.state.theme == 'dark'
