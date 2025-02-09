@@ -30,6 +30,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     document.body.appendChild(iframe);
 
     const scriptContent = `
+      <script src="/web/src/assets/dashboard/echarts.min.js"></script>
       <script>
         window.onerror = function(message) {
           parent.postMessage({ type: 'error', message: message.toString() }, '*');
@@ -67,9 +68,9 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
               const cleanedCode = userCode.replace(/\\/\\*[\\s\\S]*?\\*\\/|\\/\\/.*|--.*/g, '').trim();
 
               // Execute code directly and expect option to be defined
-              const userFunction = new Function('data', cleanedCode + '; return option;');
+              const userFunction = new Function('data', 'echarts', userCode + '; return option;');
 
-              const result = userFunction(data);
+              const result = userFunction(data, echarts);
               const convertedData = convertFunctionsToString(result);
               parent.postMessage({ type: 'success', result: JSON.stringify(convertedData) }, '*');
             } catch (error) {
