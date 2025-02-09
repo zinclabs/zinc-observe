@@ -572,6 +572,7 @@ export default defineComponent({
 
           emit("updated:vrlFunctionFieldList", responseFields);
         }
+        if(panelData.value.chartType == 'custom_chart') errorDetail.value = '';
 
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
         if (!errorDetail.value && validatePanelData?.value?.length === 0) {
