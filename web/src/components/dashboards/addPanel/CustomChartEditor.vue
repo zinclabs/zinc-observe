@@ -47,7 +47,7 @@ import { defineAsyncComponent, defineComponent, onMounted, ref, watch } from "vu
 import MarkdownRenderer from "../panels/MarkdownRenderer.vue";
 
 import DashboardQueryEditor from "./DashboardQueryEditor.vue";
-import QueryEditor from "../QueryEditor.vue";
+import QueryEditor from "@/components/QueryEditor.vue";
 import ChartRenderer from "../panels/ChartRenderer.vue";
 import CustomChartRenderer from "../panels/CustomChartRenderer.vue";
 import { useStore } from "vuex";
@@ -72,8 +72,7 @@ export default defineComponent({
   props: {
     modelValue: {
       type: String,
-      default: `\ -- To know more about ECharts , \n -- visit: https://echarts.apache.org/examples/en/index.html \n -- Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n -- Define your ECharts 'option' here. The 'data' variable is available for use \n -- Example Usage: data[0].map((val)=>val.x_axis). \n \t option = {  \n \n  \t \t \t };
-  `
+      default: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. The 'data' variable is available for use \n// Example Usage: data[0].map((val)=>val.x_axis). \n \t option = {  \n \n  \t \t \t }; `
     },
   },
   setup(props, { emit }): any {

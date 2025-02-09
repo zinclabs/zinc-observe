@@ -275,6 +275,11 @@ export default defineComponent({
           "monaco-editor/esm/vs/basic-languages/python/python.contribution.js"
         );
       }
+      if (props.language === "javascript") {
+        await import(
+          "monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js"
+        );
+      }
 
       setupEditor();
     });
@@ -298,7 +303,7 @@ export default defineComponent({
     });
 
     const enableCodeFolding = computed(() => {
-      return ["json", "html"].includes(props.language);
+      return ["json", "html","javascript"].includes(props.language);
     });
 
     // update readonly when prop value changes

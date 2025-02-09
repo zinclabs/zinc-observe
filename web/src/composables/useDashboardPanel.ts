@@ -104,7 +104,7 @@ const getDefaultDashboardPanelData: any = () => ({
     },
     htmlContent: "",
     markdownContent: "",
-    customChartContent: `\ -- To know more about ECharts , \n -- visit: https://echarts.apache.org/examples/en/index.html \n -- Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n -- Define your ECharts 'option' here. The 'data' variable is available for use \n -- Example Usage: data[0].map((val)=>val.x_axis). \n \t option = {  \n \n  \t \t \t };
+    customChartContent: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. The 'data' variable is available for use \n// Example Usage: data[0].map((val)=>val.x_axis). \n \t option = {  \n \n  \t \t \t };
   `,
     customChartResult: {},
     queryType: "sql",
@@ -193,8 +193,7 @@ const dashboardPanelDataObj: any = {
 };
 
 const getDefaultCustomChartText = () => {
-  return `\ -- To know more about ECharts , \n -- visit: https://echarts.apache.org/examples/en/index.html \n -- Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n -- Define your ECharts 'option' here. The 'data' variable is available for use \n -- Example Usage: data[0].map((val)=>val.x_axis). \n \t option = {  \n \n  \t \t \t };
-  `
+  return `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. The 'data' variable is available for use \n// Example Usage: data[0].map((val)=>val.x_axis). \n \t option = {  \n \n  \t \t \t };`
 }
 
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
