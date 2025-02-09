@@ -23,7 +23,6 @@
  */
 export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
   return new Promise((resolve, reject) => {
-    console.log("Creating iframe for JS execution");
 
     const iframe = document.createElement("iframe");
     iframe.style.display = "none";
@@ -32,9 +31,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
 
     const scriptContent = `
       <script>
-        console.log("[Iframe] Script execution started.");
         window.onerror = function(message) {
-          console.log("[Iframe] Error occurred", message);
           parent.postMessage({ type: 'error', message: message.toString() }, '*');
         };
 
@@ -66,7 +63,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
               };
 
 
-              console.log("[Iframe] Executing user code:", userCode);
               // Remove potential harmful patterns
               const cleanedCode = userCode.replace(/\\/\\*[\\s\\S]*?\\*\\/|\\/\\/.*|--.*/g, '').trim();
 
@@ -74,7 +70,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
               const userFunction = new Function('data', cleanedCode + '; return option;');
 
               const result = userFunction(data);
-              console.log("[Iframe] Execution successful. Result:", result);
               const convertedData = convertFunctionsToString(result);
               parent.postMessage({ type: 'success', result: JSON.stringify(convertedData) }, '*');
             } catch (error) {
@@ -84,7 +79,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
           }
         });
 
-        console.log("[Iframe] Ready");
       </script>
     `;
 
@@ -93,7 +87,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     window.addEventListener("message", function handler(event) {
       if (event.source !== iframe.contentWindow) return;
 
-      console.log("Message received from iframe", event.data);
 
       window.removeEventListener("message", handler);
       setTimeout(() => {
@@ -109,7 +102,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     });
 
     iframe.onload = () => {
-      console.log("Iframe loaded, sending message...");
 
       iframe?.contentWindow?.postMessage(
         {
