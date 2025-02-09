@@ -41,7 +41,7 @@ lto = "thin"
 
 [profile.release-profiling]
 inherits = "release"
-debug = true
+debug = 1
 strip = false
 codegen-units = 4
 
