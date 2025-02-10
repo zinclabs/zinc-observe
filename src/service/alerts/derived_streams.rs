@@ -82,7 +82,7 @@ pub async fn save(
                 .query_condition
                 .promql
                 .as_ref()
-                .map_or(false, |promql| promql.is_empty())
+                .is_some_and(|promql| promql.is_empty())
                 || derived_stream.query_condition.promql_condition.is_none()
             {
                 return Err(anyhow::anyhow!(
@@ -118,7 +118,7 @@ pub async fn save(
     };
 
     // Save the trigger to db
-    let next_run_at = Utc::now().timestamp_micros();
+    let next_run_at = calculate_next_run(&derived_stream)?;
     let trigger = db::scheduler::Trigger {
         org: derived_stream.org_id.to_string(),
         module: db::scheduler::TriggerModule::DerivedStream,
@@ -191,4 +191,19 @@ impl DerivedStreamExt for DerivedStream {
             )
             .await
     }
+}
+
+pub(super) fn calculate_next_run(derived_stream: &DerivedStream) -> Result<i64, anyhow::Error> {
+    let delay_minutes = derived_stream.delay.unwrap_or_default();
+    if delay_minutes < 0 {
+        return Err(anyhow::anyhow!("Invalid delay value"));
+    }
+
+    let delay = chrono::Duration::try_minutes(delay_minutes as i64)
+        .ok_or(anyhow::anyhow!("Failed to create duration from the Delay"))?;
+
+    Ok(chrono::Utc::now()
+        .checked_add_signed(delay)
+        .ok_or(anyhow::anyhow!("DateTime arithmetic overflow"))?
+        .timestamp_micros())
 }

@@ -107,6 +107,7 @@ async fn migrate_pipelines() -> Result<(), anyhow::Error> {
                     query_condition: old_derived_stream.query_condition,
                     trigger_condition: old_derived_stream.trigger_condition,
                     tz_offset: old_derived_stream.tz_offset,
+                    delay: None,
                 };
 
                 let pipeline_source = PipelineSource::Scheduled(new_derived_stream.clone());

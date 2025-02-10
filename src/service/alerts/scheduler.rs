@@ -41,7 +41,7 @@ use proto::cluster_rpc;
 use crate::service::{
     alerts::{
         alert::{get_alert_start_end_time, get_row_column_map, AlertExt},
-        derived_streams::DerivedStreamExt,
+        derived_streams::{calculate_next_run, DerivedStreamExt},
     },
     dashboards::reports::SendReport,
     db::{self, scheduler::ScheduledTriggerData},
@@ -831,30 +831,39 @@ async fn handle_derived_stream_triggers(
 
     // in case the range [start_time, end_time] is greater than querying period, it needs to
     // evaluate and ingest 1 period at a time.
-    let now = Utc::now().timestamp_micros();
+    let delay = Duration::try_minutes(derived_stream.delay.unwrap_or_default() as i64).unwrap();
+    let now_with_delay = Utc::now()
+        .checked_sub_signed(delay)
+        .unwrap()
+        .timestamp_micros();
+    // let now = Utc::now().timestamp_micros();
     let period_num_microseconds = Duration::try_minutes(derived_stream.trigger_condition.period)
         .unwrap()
         .num_microseconds()
         .unwrap();
     let (mut start, mut end) = if let Some(t0) = start_time {
-        (Some(t0), std::cmp::min(now, t0 + period_num_microseconds))
+        (
+            Some(t0),
+            std::cmp::min(now_with_delay, t0 + period_num_microseconds),
+        )
     } else {
-        (None, now)
+        (None, now_with_delay)
     };
 
+    let next_run_at = calculate_next_run(&derived_stream)?;
     let mut new_trigger = db::scheduler::Trigger {
-        next_run_at: Utc::now().timestamp_micros(),
+        next_run_at,
         is_silenced: false,
         status: db::scheduler::TriggerStatus::Waiting,
         ..trigger.clone()
     };
 
-    while end <= now {
+    while end <= now_with_delay {
         log::debug!(
             "DerivedStream: querying for time range: start_time {}, end_time {}. Final end_time is {}",
             start.unwrap_or_default(),
             end,
-            now
+            now_with_delay
         );
 
         let mut trigger_data_stream = TriggerData {
@@ -914,10 +923,10 @@ async fn handle_derived_stream_triggers(
                 // incr trigger retry count
                 new_trigger.retries += 1;
                 // set end to now to exit the loop below
-                end = now + 1;
+                end = now_with_delay + 1;
             }
             Ok((ret, next)) => {
-                let is_satisfied = ret.as_ref().map_or(false, |ret| !ret.is_empty());
+                let is_satisfied = ret.as_ref().is_some_and(|ret| !ret.is_empty());
 
                 // ingest evaluation result into destination
                 if is_satisfied {
@@ -1043,7 +1052,7 @@ async fn handle_derived_stream_triggers(
                         .await;
 
                         // set end to now to exit the loop below but not moving time range forward
-                        end = now + 1;
+                        end = now_with_delay + 1;
                     } else {
                         // SUCCESS: move the time range forward by frequency and continue
                         start = Some(next);
@@ -1065,7 +1074,7 @@ async fn handle_derived_stream_triggers(
         };
 
         // configure next run time before exiting the loop
-        if end > now {
+        if end > now_with_delay {
             // Store the last used derived stream period end time
             if let Some(start_time) = start {
                 new_trigger.data = json::to_string(&ScheduledTriggerData {
@@ -1082,6 +1091,8 @@ async fn handle_derived_stream_triggers(
                 new_trigger.next_run_at = schedule
                     .upcoming(tz_offset)
                     .next()
+                    .unwrap()
+                    .checked_add_signed(delay)
                     .unwrap()
                     .timestamp_micros();
             } else {

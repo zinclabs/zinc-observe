@@ -50,6 +50,8 @@ pub struct DerivedStream {
     /// The negative secs means the Western Hemisphere
     #[serde(default)]
     pub tz_offset: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delay: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
