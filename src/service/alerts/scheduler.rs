@@ -836,7 +836,6 @@ async fn handle_derived_stream_triggers(
         .checked_sub_signed(delay)
         .unwrap()
         .timestamp_micros();
-    // let now = Utc::now().timestamp_micros();
     let period_num_microseconds = Duration::try_minutes(derived_stream.trigger_condition.period)
         .unwrap()
         .num_microseconds()
@@ -849,6 +848,14 @@ async fn handle_derived_stream_triggers(
     } else {
         (None, now_with_delay)
     };
+
+    log::debug!(
+        "Current time: {}, start: {:?}, end: {}, final: {}",
+        Utc::now().timestamp_micros(),
+        start,
+        end,
+        now_with_delay
+    );
 
     let next_run_at = calculate_next_run(&derived_stream)?;
     let mut new_trigger = db::scheduler::Trigger {
