@@ -201,8 +201,8 @@ const dashboardPanelDataObj: any = {
 
 const getDefaultCustomChartText = () => {
   return `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
-  `
-}
+  `;
+};
 
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
@@ -937,7 +937,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].config.time_shift = [];
@@ -986,7 +987,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
         break;
       case "table":
       case "pie":
@@ -1031,7 +1033,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
 
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -1056,7 +1059,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         ].fields.breakdown = [];
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
 
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.source = null;
@@ -1073,7 +1077,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       case "html":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
         dashboardPanelData.data.queryType = "";
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -1082,7 +1087,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       case "markdown":
         dashboardPanelData.data.queries = getDefaultQueries();
         dashboardPanelData.data.htmlContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
 
         dashboardPanelData.data.queryType = "";
         dashboardPanelData.data.queries[
@@ -1142,7 +1148,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         };
         dashboardPanelData.data.htmlContent = "";
         dashboardPanelData.data.markdownContent = "";
-        dashboardPanelData.data.customChartContent = getDefaultCustomChartText();
+        dashboardPanelData.data.customChartContent =
+          getDefaultCustomChartText();
         dashboardPanelData.data.queries?.forEach((query: any) => {
           query.fields.latitude = null;
           query.fields.longitude = null;
@@ -2200,10 +2207,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return "";
   };
 
-  const sqlchart = () => {
+  const sqlchart = async () => {
     console.log(
       "sqlchart",
-      dashboardPanelData,
       buildSQLQueryWithParser(
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
@@ -2232,178 +2238,187 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       return "";
     }
 
-    // STEP 2: Now, continue if we have at least 1 field selected
-    // merge the fields list
-    let query = "SELECT ";
-    const fields = [
-      ...dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.x,
-      ...dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.y,
-      ...(dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields?.breakdown
-        ? [
-            ...dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.breakdown,
-          ]
-        : []),
-      ...(dashboardPanelData.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields?.z
-        ? [
-            ...dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.z,
-          ]
-        : []),
-    ]
-      .flat()
-      .filter((fieldObj: any) => !fieldObj.isDerived);
-
-    const filter = [
-      ...dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields?.filter.conditions,
-    ];
-
-    const array = fields.map((field, i) => {
-      let selector = "";
-
-      // TODO: add aggregator
-      // if (field?.functionName) {
-      // switch (field?.functionName) {
-      //   case "count-distinct":
-      //     selector += `count(distinct(${field?.column}))`;
-      //     break;
-      //   case "p50":
-      //     selector += `approx_percentile_cont(${field?.column}, 0.5)`;
-      //     break;
-      //   case "p90":
-      //     selector += `approx_percentile_cont(${field?.column}, 0.9)`;
-      //     break;
-      //   case "p95":
-      //     selector += `approx_percentile_cont(${field?.column}, 0.95)`;
-      //     break;
-      //   case "p99":
-      //     selector += `approx_percentile_cont(${field?.column}, 0.99)`;
-      //     break;
-      //   case "histogram": {
-      //     // if interval is not null, then use it
-      //     if (field?.args && field?.args?.length && field?.args[0].value) {
-      //       selector += `${field?.functionName}(${field?.column}, '${field?.args[0]?.value}')`;
-      //     } else {
-      //       selector += `${field?.functionName}(${field?.column})`;
-      //     }
-      //     break;
-      //   }
-      //   default:
-      //     selector += `${field?.functionName}(${field?.column})`;
-      //     break;
-      // }
-
-      selector += buildSQLQueryFromInput(field);
-      // } else {
-      //   selector += `${field?.column}`;
-      // }
-
-      selector += ` as "${field?.alias}"${i == fields.length - 1 ? " " : ", "}`;
-      return selector;
-    });
-    query += array?.join("");
-
-    // now add from stream name
-    query += ` FROM "${
+    return await buildSQLQueryWithParser(
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields?.stream
-    }" ${buildSQLJoinsFromInput(
+      ].fields,
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].joins,
-    )}`;
+    );
 
-    // Add the AND/OR condition logic
-    const filterData =
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter.conditions;
+    // // STEP 2: Now, continue if we have at least 1 field selected
+    // // merge the fields list
+    // let query = "SELECT ";
+    // const fields = [
+    //   ...dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields.x,
+    //   ...dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields.y,
+    //   ...(dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields?.breakdown
+    //     ? [
+    //         ...dashboardPanelData.data.queries[
+    //           dashboardPanelData.layout.currentQueryIndex
+    //         ].fields.breakdown,
+    //       ]
+    //     : []),
+    //   ...(dashboardPanelData.data?.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields?.z
+    //     ? [
+    //         ...dashboardPanelData.data.queries[
+    //           dashboardPanelData.layout.currentQueryIndex
+    //         ].fields.z,
+    //       ]
+    //     : []),
+    // ]
+    //   .flat()
+    //   .filter((fieldObj: any) => !fieldObj.isDerived);
 
-    const whereClause = buildWhereClause(filterData);
-    query += whereClause;
+    // const filter = [
+    //   ...dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields?.filter.conditions,
+    // ];
 
-    // add group by statement
-    const xAxisAlias = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.x
-      .filter((it: any) => !it?.isDerived)
-      .map((it: any) => it?.alias);
+    // const array = fields.map((field, i) => {
+    //   let selector = "";
 
-    const yAxisAlias = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields.y
-      .filter((it: any) => !it?.isDerived)
-      .map((it: any) => it?.alias);
+    //   // TODO: add aggregator
+    //   // if (field?.functionName) {
+    //   // switch (field?.functionName) {
+    //   //   case "count-distinct":
+    //   //     selector += `count(distinct(${field?.column}))`;
+    //   //     break;
+    //   //   case "p50":
+    //   //     selector += `approx_percentile_cont(${field?.column}, 0.5)`;
+    //   //     break;
+    //   //   case "p90":
+    //   //     selector += `approx_percentile_cont(${field?.column}, 0.9)`;
+    //   //     break;
+    //   //   case "p95":
+    //   //     selector += `approx_percentile_cont(${field?.column}, 0.95)`;
+    //   //     break;
+    //   //   case "p99":
+    //   //     selector += `approx_percentile_cont(${field?.column}, 0.99)`;
+    //   //     break;
+    //   //   case "histogram": {
+    //   //     // if interval is not null, then use it
+    //   //     if (field?.args && field?.args?.length && field?.args[0].value) {
+    //   //       selector += `${field?.functionName}(${field?.column}, '${field?.args[0]?.value}')`;
+    //   //     } else {
+    //   //       selector += `${field?.functionName}(${field?.column})`;
+    //   //     }
+    //   //     break;
+    //   //   }
+    //   //   default:
+    //   //     selector += `${field?.functionName}(${field?.column})`;
+    //   //     break;
+    //   // }
 
-    const bAxisAlias = dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ].fields?.breakdown
-      ?.filter((it: any) => !it?.isDerived)
-      ?.map((it: any) => it?.alias);
+    //   selector += buildSQLQueryFromInput(field);
+    //   // } else {
+    //   //   selector += `${field?.column}`;
+    //   // }
 
-    const tableTypeWithXFieldOnly =
-      dashboardPanelData.data.type === "table" &&
-      xAxisAlias.length > 0 &&
-      yAxisAlias.length === 0 &&
-      !bAxisAlias?.length;
+    //   selector += ` as "${field?.alias}"${i == fields.length - 1 ? " " : ", "}`;
+    //   return selector;
+    // });
+    // query += array?.join("");
 
-    if (!tableTypeWithXFieldOnly) {
-      if (dashboardPanelData.data.type == "heatmap") {
-        query +=
-          xAxisAlias.length && yAxisAlias.length
-            ? " GROUP BY " +
-              xAxisAlias.join(", ") +
-              ", " +
-              yAxisAlias.join(", ")
-            : "";
-      } else if (bAxisAlias?.length) {
-        query +=
-          xAxisAlias.length && bAxisAlias.length
-            ? " GROUP BY " +
-              xAxisAlias.join(", ") +
-              ", " +
-              bAxisAlias.join(", ")
-            : "";
-      } else {
-        query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
-      }
-    }
+    // // now add from stream name
+    // query += ` FROM "${
+    //   dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields?.stream
+    // }" ${buildSQLJoinsFromInput(
+    //   dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].joins,
+    // )}`;
 
-    // array of sorting fields with followed by asc or desc
-    const orderByArr: string[] = [];
+    // // Add the AND/OR condition logic
+    // const filterData =
+    //   dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].fields.filter.conditions;
 
-    fields.forEach((it: any) => {
-      // ignore if None is selected or sortBy is not there
-      if (it?.sortBy) {
-        orderByArr.push(`${it?.alias} ${it?.sortBy}`);
-      }
-    });
+    // const whereClause = buildWhereClause(filterData);
+    // query += whereClause;
 
-    // append with query by joining array with comma
-    query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
+    // // add group by statement
+    // const xAxisAlias = dashboardPanelData.data.queries[
+    //   dashboardPanelData.layout.currentQueryIndex
+    // ].fields.x
+    //   .filter((it: any) => !it?.isDerived)
+    //   .map((it: any) => it?.alias);
 
-    // append limit
-    // if limit is less than or equal to 0 then don't add
-    const queryLimit =
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].config.limit ?? 0;
-    query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+    // const yAxisAlias = dashboardPanelData.data.queries[
+    //   dashboardPanelData.layout.currentQueryIndex
+    // ].fields.y
+    //   .filter((it: any) => !it?.isDerived)
+    //   .map((it: any) => it?.alias);
 
-    return query;
+    // const bAxisAlias = dashboardPanelData.data.queries[
+    //   dashboardPanelData.layout.currentQueryIndex
+    // ].fields?.breakdown
+    //   ?.filter((it: any) => !it?.isDerived)
+    //   ?.map((it: any) => it?.alias);
+
+    // const tableTypeWithXFieldOnly =
+    //   dashboardPanelData.data.type === "table" &&
+    //   xAxisAlias.length > 0 &&
+    //   yAxisAlias.length === 0 &&
+    //   !bAxisAlias?.length;
+
+    // if (!tableTypeWithXFieldOnly) {
+    // if (dashboardPanelData.data.type == "heatmap") {
+    //   query +=
+    //     xAxisAlias.length && yAxisAlias.length
+    //       ? " GROUP BY " +
+    // xAxisAlias.join(", ") +
+    // ", " +
+    // yAxisAlias.join(", ")
+    //       : "";
+    // } else if (bAxisAlias?.length) {
+    //   query +=
+    //     xAxisAlias.length && bAxisAlias.length
+    //       ? " GROUP BY " +
+    // xAxisAlias.join(", ") +
+    // ", " +
+    // bAxisAlias.join(", ")
+    //       : "";
+    // } else {
+    //   query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
+    // }
+    // }
+
+    // // array of sorting fields with followed by asc or desc
+    // const orderByArr: string[] = [];
+
+    // fields.forEach((it: any) => {
+    //   // ignore if None is selected or sortBy is not there
+    //   if (it?.sortBy) {
+    //     orderByArr.push(`${it?.alias} ${it?.sortBy}`);
+    //   }
+    // });
+
+    // // append with query by joining array with comma
+    // query += orderByArr.length ? " ORDER BY " + orderByArr.join(", ") : "";
+
+    // // append limit
+    // // if limit is less than or equal to 0 then don't add
+    // const queryLimit =
+    //   dashboardPanelData.data.queries[
+    //     dashboardPanelData.layout.currentQueryIndex
+    //   ].config.limit ?? 0;
+    // query += queryLimit > 0 ? " LIMIT " + queryLimit : "";
+
+    // return query;
   };
 
   const mapChart = () => {
@@ -2706,7 +2721,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   };
 
   // based on chart type it will create auto sql query
-  const makeAutoSQLQuery = () => {
+  const makeAutoSQLQuery = async () => {
     // only continue if current mode is auto query generation
     if (
       !dashboardPanelData.data.queries[
@@ -2721,7 +2736,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       } else if (dashboardPanelData.data.type == "maps") {
         query = mapChart();
       } else {
-        query = sqlchart();
+        query = await sqlchart();
       }
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -2791,6 +2806,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           dashboardPanelData.layout.currentQueryIndex
         ].customQuery
       ) {
+        // makeAutoSQLQuery is async function
         makeAutoSQLQuery();
       }
     },
