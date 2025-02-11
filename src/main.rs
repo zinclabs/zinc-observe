@@ -244,6 +244,14 @@ async fn main() -> Result<(), anyhow::Error> {
                 .await
                 .expect("migrate resource names into supported ofga format failed");
 
+            // Initialize openfga configs, since the seaorm table migrations are run by
+            // the router also, so openfga needs to be initialized for router as well
+            #[cfg(feature = "enterprise")]
+            if let Err(e) = common_infra::init_openfga().await {
+                job_init_tx.send(false).ok();
+                panic!("ofga initialization failed: {}", e);
+            }
+
             // migrate infra_sea_orm
             if let Err(e) = infra::table::migrate().await {
                 job_init_tx.send(false).ok();

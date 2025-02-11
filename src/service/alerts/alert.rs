@@ -170,11 +170,21 @@ pub async fn save(
     prepare_alert(org_id, stream_name, name, &mut alert, create).await?;
 
     // save the alert
-    let alert_name = alert.name.clone();
+    let alert_id = alert.id.clone();
+    // TODO: Get the folder id
     match db::alerts::alert::set(org_id, alert.stream_type, stream_name, alert, create).await {
         Ok(_) => {
             if name.is_empty() {
-                set_ownership(org_id, "alerts", Authz::new(&alert_name)).await;
+                set_ownership(
+                    org_id,
+                    "alerts",
+                    Authz {
+                        obj_id: alert_id,
+                        parent_type: "alert_folders".to_owned(),
+                        parent: "".to_owned(), // TODO: Set the parent folder
+                    },
+                )
+                .await;
             }
             Ok(())
         }

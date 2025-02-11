@@ -15,8 +15,6 @@
 
 use config::cluster::LOCAL_NODE;
 use infra::file_list as infra_file_list;
-#[cfg(feature = "enterprise")]
-use o2_openfga::config::get_config as get_openfga_config;
 use regex::Regex;
 
 use crate::{
@@ -179,9 +177,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { db::file_list::cache_stats().await });
 
     #[cfg(feature = "enterprise")]
-    db::ofga::cache().await.expect("ofga model cache failed");
-
-    #[cfg(feature = "enterprise")]
     if !LOCAL_NODE.is_compactor() {
         db::session::cache()
             .await
@@ -210,20 +205,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { pipeline::run().await });
 
     #[cfg(feature = "enterprise")]
-    o2_openfga::authorizer::authz::init_open_fga().await;
-
-    #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { cipher::run().await });
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(async move { db::keys::watch().await });
-
-    // RBAC model
-    #[cfg(feature = "enterprise")]
-    if get_openfga_config().enabled {
-        if let Err(e) = crate::common::infra::ofga::init().await {
-            log::error!("OFGA init failed: {}", e);
-        }
-    }
 
     // Shouldn't serve request until initialization finishes
     log::info!("Job initialization complete");

@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use ::config::{cache_instance_id, ider};
+#[cfg(feature = "enterprise")]
+use o2_openfga::config::get_config as get_openfga_config;
 
 use crate::service::db::instance;
 
@@ -39,5 +41,19 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // because of asynchronous, we need to wait for a while
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
+    Ok(())
+}
+
+#[cfg(feature = "enterprise")]
+pub async fn init_openfga() -> Result<(), anyhow::Error> {
+    crate::service::db::ofga::cache()
+        .await
+        .expect("ofga model cache failed");
+    o2_openfga::authorizer::authz::init_open_fga().await;
+    if get_openfga_config().enabled {
+        if let Err(e) = ofga::init().await {
+            log::error!("OFGA init failed: {}", e);
+        }
+    }
     Ok(())
 }
