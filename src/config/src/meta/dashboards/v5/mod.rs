@@ -234,6 +234,10 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     top_results: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    soft_min: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    soft_max: Option<OrdF64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     top_results_others: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     axis_width: Option<OrdF64>,
