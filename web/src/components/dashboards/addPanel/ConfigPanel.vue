@@ -1079,6 +1079,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div class="space"></div>
+      
+      <div style="width: 100%; display: flex; gap: 16px">
+        <q-input
+          v-model.number="dashboardPanelData.data.config.soft_min"
+          :label="t('common.softMin')"
+          color="input-border"
+          bg-color="input-bg"
+          style="width: 50%"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+          placeholder="Auto"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelData.data.config.soft_min =
+                value !== '' ? value : null)
+          "
+          data-test="dashboard-config-soft_min"
+        >
+        </q-input>
+        <q-input
+          v-model.number="dashboardPanelData.data.config.soft_max"
+          :label="t('common.softMax')"
+          color="input-border"
+          bg-color="input-bg"
+          style="width: 50%"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+          placeholder="Auto"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelData.data.config.soft_max =
+                value !== '' ? value : null)
+          "
+          data-test="dashboard-config-soft_max"
+        >
+        </q-input>
+      </div>
+      <div class="space"></div>
 
       <q-select
         v-if="
@@ -1389,52 +1437,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="dashboardPanelData.data.type == 'table'"
       :dashboardPanelData="dashboardPanelData"
     />
-    <div class="space"></div>
-
-    <q-input
-      v-model.number="dashboardPanelData.data.config.soft_min"
-      :label="t('common.softMin')"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      outlined
-      filled
-      dense
-      label-slot
-      :type="'number'"
-      placeholder="Auto"
-      @update:model-value="
-        (value: any) =>
-          (dashboardPanelData.data.config.soft_min =
-            value !== '' ? value : null)
-      "
-      data-test="dashboard-config-soft_min"
-    >
-    </q-input>
-
-    <q-input
-      v-model.number="dashboardPanelData.data.config.soft_max"
-      :label="t('common.softMax')"
-      color="input-border"
-      bg-color="input-bg"
-      class="q-py-md showLabelOnTop"
-      stack-label
-      outlined
-      filled
-      dense
-      label-slot
-      :type="'number'"
-      placeholder="Auto"
-      @update:model-value="
-        (value: any) =>
-          (dashboardPanelData.data.config.soft_max =
-            value !== '' ? value : null)
-      "
-      data-test="dashboard-config-soft_max"
-    >
-    </q-input>
-
     <div class="space"></div>
   </div>
 </template>
