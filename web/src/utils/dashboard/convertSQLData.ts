@@ -1072,6 +1072,8 @@ export const convertSQLData = async (
           ? panelSchema.queries[0]?.fields?.y[0]?.label
           : "",
       nameLocation: "middle",
+      min: panelSchema.config.soft_min,
+      max: panelSchema.config.soft_max,
       nameGap:
         calculateWidthText(
           panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"
