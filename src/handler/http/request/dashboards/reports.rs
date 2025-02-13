@@ -20,6 +20,7 @@ use config::meta::dashboards::reports::{Report, ReportListFilters};
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    handler::http::models::reports::ListReportsResponseBody,
     service::dashboards::reports,
 };
 
@@ -159,8 +160,15 @@ async fn list_reports(org_id: web::Path<String>, req: HttpRequest) -> Result<Htt
         // Get List of allowed objects ends
     }
 
-    match reports::list(&org_id, filters, _permitted).await {
-        Ok(data) => Ok(MetaHttpResponse::json(data)),
+    let data = match reports::list(&org_id, filters, _permitted).await {
+        Ok(data) => data,
+        Err(e) => {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    };
+
+    match ListReportsResponseBody::try_from(data) {
+        Ok(response) => Ok(MetaHttpResponse::json(response)),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
     }
 }

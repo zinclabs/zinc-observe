@@ -22,8 +22,9 @@ use config::meta::{
     folder::{Folder, FolderType},
 };
 use sea_orm::{
-    prelude::Expr, sea_query::Func, ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait,
-    IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TryIntoModel,
+    prelude::Expr, sea_query::Func, ActiveModelTrait, ColumnTrait, ConnectionTrait,
+    DatabaseConnection, EntityTrait, IntoActiveModel, ModelTrait, PaginatorTrait, QueryFilter,
+    QueryOrder, Set, TryIntoModel,
 };
 use serde_json::Value as JsonValue;
 use svix_ksuid::KsuidLike;
@@ -282,8 +283,8 @@ pub async fn delete_all() -> Result<(), errors::Error> {
 }
 
 /// Tries to get a dashboard ORM entity and its parent folder ORM entity.
-async fn get_model_from_folder(
-    db: &DatabaseConnection,
+pub async fn get_model_from_folder<C: ConnectionTrait>(
+    db: &C,
     org_id: &str,
     folder_id: &str,
     dashboard_id: &str,

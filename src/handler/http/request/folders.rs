@@ -28,6 +28,7 @@ impl From<FolderError> for HttpResponse {
     fn from(value: FolderError) -> Self {
         match value {
             FolderError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            FolderError::TableReportsError(err) => MetaHttpResponse::internal_error(err),
             FolderError::MissingName => {
                 MetaHttpResponse::bad_request("Folder name cannot be empty")
             }
@@ -39,6 +40,9 @@ impl From<FolderError> for HttpResponse {
             ),
             FolderError::DeleteWithAlerts => MetaHttpResponse::bad_request(
                 "Folder contains alerts, please move/delete alerts from folder",
+            ),
+            FolderError::DeleteWithReports => MetaHttpResponse::bad_request(
+                "Folder contains reports, please move/delete reports from folder",
             ),
             FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
             FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),

@@ -27,6 +27,7 @@ pub struct Folder {
 pub enum FolderType {
     Dashboards,
     Alerts,
+    Reports,
 }
 
 pub const DEFAULT_FOLDER: &str = "default";

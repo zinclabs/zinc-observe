@@ -41,6 +41,7 @@ pub(crate) fn folder_type_into_i16(folder_type: FolderType) -> i16 {
     match folder_type {
         FolderType::Dashboards => 0,
         FolderType::Alerts => 1,
+        FolderType::Reports => 2,
     }
 }
 
