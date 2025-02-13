@@ -1083,7 +1083,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div style="width: 100%; display: flex; gap: 16px">
         <q-input
           v-model.number="dashboardPanelData.data.config.y_axis_min"
-          :label="t('common.yAxisMin')"
           color="input-border"
           bg-color="input-bg"
           style="width: 50%"
@@ -1101,11 +1100,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 value !== '' ? value : null)
           "
           data-test="dashboard-config-y_axis_min"
-        >
+          ><template v-slot:label>
+            <div class="row items-center all-pointer-events">
+              {{ t("common.yAxisMin") }}
+              <div>
+                <q-icon
+                  class="q-ml-xs"
+                  size="20px"
+                  name="info"
+                  data-test="dashboard-config-y_axis_min-info"
+                />
+                <q-tooltip
+                  class="bg-grey-8"
+                  anchor="top middle"
+                  self="bottom middle"
+                >
+                  Set the minimum value for the Y-axis.
+                  <br />
+                  This determines the lowest point displayed on the chart.
+                </q-tooltip>
+              </div>
+            </div>
+          </template>
         </q-input>
         <q-input
           v-model.number="dashboardPanelData.data.config.y_axis_max"
-          :label="t('common.yAxisMax')"
           color="input-border"
           bg-color="input-bg"
           style="width: 50%"
@@ -1123,7 +1142,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 value !== '' ? value : null)
           "
           data-test="dashboard-config-y_axis_max"
-        >
+          ><template v-slot:label>
+            <div class="row items-center all-pointer-events">
+              {{ t("common.yAxisMax") }}
+              <div>
+                <q-icon
+                  class="q-ml-xs"
+                  size="20px"
+                  name="info"
+                  data-test="dashboard-config-y_axis_max-info"
+                />
+                <q-tooltip
+                  class="bg-grey-8"
+                  anchor="top middle"
+                  self="bottom middle"
+                >
+                  Set the maximum value for the Y-axis.
+                  <br />
+                  This determines the highest point displayed on the chart.
+                </q-tooltip>
+              </div>
+            </div>
+          </template>
         </q-input>
       </div>
       <div class="space"></div>
