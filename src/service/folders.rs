@@ -239,7 +239,7 @@ pub async fn delete_folder(
         }
         FolderType::Reports => {
             let params = ListReportsParams::new(org_id).in_folder(folder_id);
-            let reports = table::reports::list(client, params).await?;
+            let reports = table::reports::list_reports(client, &params).await?;
             if !reports.is_empty() {
                 return Err(FolderError::DeleteWithReports);
             }
