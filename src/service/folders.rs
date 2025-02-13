@@ -39,6 +39,11 @@ pub enum FolderError {
     #[error("InfraError# Internal error")]
     InfraError(#[from] infra::errors::Error),
 
+    /// An error that occurs while interacting with reports through the [infra::table::reports]
+    /// module.
+    #[error("ReportsError# Internal error")]
+    TableReportsError(#[from] table::reports::Error),
+
     /// An error that occurs when trying to set a folder name to the empty string.
     #[error("Folder name cannot be empty")]
     MissingName,

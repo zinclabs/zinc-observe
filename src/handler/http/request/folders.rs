@@ -28,6 +28,7 @@ impl From<FolderError> for HttpResponse {
     fn from(value: FolderError) -> Self {
         match value {
             FolderError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            FolderError::TableReportsError(err) => MetaHttpResponse::internal_error(err),
             FolderError::MissingName => {
                 MetaHttpResponse::bad_request("Folder name cannot be empty")
             }
