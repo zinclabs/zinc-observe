@@ -32,7 +32,11 @@ use config::{
 };
 use cron::Schedule;
 use futures::{future::try_join_all, StreamExt};
-use infra::table;
+use infra::{
+    db::{connect_to_orm, ORM_CLIENT},
+    table,
+};
+use itertools::Itertools;
 use lettre::{
     message::{header::ContentType, MultiPart, SinglePart},
     AsyncTransport, Message,
@@ -53,6 +57,7 @@ pub async fn save(
     mut report: Report,
     create: bool,
 ) -> Result<(), anyhow::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let cfg = get_config();
     if cfg.common.report_server_url.is_empty() {
         // Check if SMTP is enabled, otherwise don't save the report
@@ -105,7 +110,7 @@ pub async fn save(
         report.frequency.interval = 1;
     }
 
-    match db::dashboards::reports::get(org_id, &report.name).await {
+    match db::dashboards::reports::get(conn, org_id, "default", &report.name).await {
         Ok(old_report) => {
             if create {
                 return Err(anyhow::anyhow!("Report already exists"));
@@ -166,19 +171,23 @@ pub async fn save(
         return Err(anyhow::anyhow!("Some dashboards/tabs not found"));
     }
 
-    match db::dashboards::reports::set(org_id, &report, create).await {
-        Ok(_) => {
-            if name.is_empty() {
-                set_ownership(org_id, "reports", Authz::new(&report.name)).await;
-            }
-            Ok(())
+    if create {
+        let report_name = report.name.clone();
+        db::dashboards::reports::create(conn, "default", report).await?;
+        if !name.is_empty() {
+            set_ownership(org_id, "reports", Authz::new(&report_name)).await;
+            // todo: set parent folder
         }
-        Err(e) => Err(e),
+    } else {
+        db::dashboards::reports::update(conn, "default", None, report).await?;
     }
+
+    Ok(())
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
-    db::dashboards::reports::get(org_id, name)
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    db::dashboards::reports::get(conn, org_id, "default", name)
         .await
         .map_err(|_| anyhow::anyhow!("Report not found"))
 }
@@ -187,63 +196,43 @@ pub async fn list(
     org_id: &str,
     filters: ReportListFilters,
     permitted: Option<Vec<String>>,
-) -> Result<Vec<Report>, anyhow::Error> {
-    match db::dashboards::reports::list(org_id).await {
-        Ok(reports) => {
-            let mut result = Vec::new();
-            let dashboard = filters.dashboard;
-            let destination_less = filters.destination_less;
-            for report in reports {
-                if permitted.is_none()
-                    || permitted
-                        .as_ref()
-                        .unwrap()
-                        .contains(&format!("report:{}", report.name))
-                    || permitted
-                        .as_ref()
-                        .unwrap()
-                        .contains(&format!("report:_all_{}", org_id))
-                {
-                    let mut should_include = true;
-                    if let Some(dashboard_id) = dashboard.as_ref() {
-                        // Check if report contains this dashboard
-                        if report
-                            .dashboards
-                            .iter()
-                            .any(|x| !x.dashboard.eq(dashboard_id))
-                        {
-                            should_include = false;
-                        }
-                    }
-                    if let Some(destination_less) = destination_less.as_ref() {
-                        // destination_less = true -> push only if the report is destination-less
-                        // destination_less = false -> push only if the report has destinations
-                        if (*destination_less && !report.destinations.is_empty())
-                            || (!*destination_less && report.destinations.is_empty())
-                        {
-                            should_include = false;
-                        }
-                    }
-                    if should_include {
-                        result.push(report);
-                    }
-                }
-            }
-            Ok(result)
-        }
-        Err(e) => Err(e),
-    }
+) -> Result<Vec<table::reports::ListReportsQueryResult>, anyhow::Error> {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let params = filters.into_parmas(org_id);
+    let reports = db::dashboards::reports::list(conn, &params).await?;
+    let result = reports
+        .into_iter()
+        .filter(|report| {
+            permitted.is_none()
+                || permitted
+                    .as_ref()
+                    .unwrap()
+                    .contains(&format!("report:{}", report.report_name))
+                || permitted
+                    .as_ref()
+                    .unwrap()
+                    .contains(&format!("report:_all_{}", org_id))
+        })
+        .collect_vec();
+    Ok(result)
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    if db::dashboards::reports::get(org_id, name).await.is_err() {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // TODO: If we are going to perform both the "get" and "delete" operations then they should be
+    // in a transaction.
+    if db::dashboards::reports::get(conn, org_id, "default", name)
+        .await
+        .is_err()
+    {
         return Err((
             http::StatusCode::NOT_FOUND,
             anyhow::anyhow!("Report not found {}", name),
         ));
     }
 
-    match db::dashboards::reports::delete(org_id, name).await {
+    match db::dashboards::reports::delete(conn, org_id, "default", name).await {
         Ok(_) => {
             remove_ownership(org_id, "reports", Authz::new(name)).await;
             Ok(())
@@ -253,7 +242,8 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
 }
 
 pub async fn trigger(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    let report = match db::dashboards::reports::get(org_id, name).await {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let report = match db::dashboards::reports::get(conn, org_id, "default", name).await {
         Ok(report) => report,
         _ => {
             return Err((
@@ -273,7 +263,10 @@ pub async fn enable(
     name: &str,
     value: bool,
 ) -> Result<(), (http::StatusCode, anyhow::Error)> {
-    let mut report = match db::dashboards::reports::get(org_id, name).await {
+    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // TODO: The "get" and "update" operations should be in a transaction.
+    let mut report = match db::dashboards::reports::get(conn, org_id, "default", name).await {
         Ok(report) => report,
         _ => {
             return Err((
@@ -283,7 +276,7 @@ pub async fn enable(
         }
     };
     report.enabled = value;
-    db::dashboards::reports::set(org_id, &report, false)
+    db::dashboards::reports::update(conn, "default", None, report)
         .await
         .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
 }

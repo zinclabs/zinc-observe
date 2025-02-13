@@ -3,31 +3,35 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "folders")]
+#[sea_orm(table_name = "report_dashboards")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
-    pub org: String,
-    pub folder_id: String,
-    pub name: String,
-    pub description: Option<String>,
-    pub r#type: i16,
+    pub report_id: String,
+    pub dashboard_id: String,
+    pub tab_names: Json,
+    pub variables: Json,
+    pub timerange: Json,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::alerts::Entity")]
-    Alerts,
-    #[sea_orm(has_many = "super::dashboards::Entity")]
+    #[sea_orm(
+        belongs_to = "super::dashboards::Entity",
+        from = "Column::DashboardId",
+        to = "super::dashboards::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
     Dashboards,
-    #[sea_orm(has_many = "super::reports::Entity")]
+    #[sea_orm(
+        belongs_to = "super::reports::Entity",
+        from = "Column::ReportId",
+        to = "super::reports::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
     Reports,
-}
-
-impl Related<super::alerts::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Alerts.def()
-    }
 }
 
 impl Related<super::dashboards::Entity> for Entity {

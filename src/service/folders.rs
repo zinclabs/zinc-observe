@@ -233,6 +233,9 @@ pub async fn delete_folder(
                 return Err(FolderError::DeleteWithAlerts);
             }
         }
+        FolderType::Reports => {
+            todo!();
+        }
     };
 
     if !table::folders::exists(org_id, folder_id, folder_type).await? {

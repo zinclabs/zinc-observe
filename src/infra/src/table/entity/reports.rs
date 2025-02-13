@@ -3,19 +3,28 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-#[sea_orm(table_name = "dashboards")]
+#[sea_orm(table_name = "reports")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
-    pub dashboard_id: String,
     pub folder_id: String,
-    pub owner: String,
-    pub role: Option<String>,
+    pub name: String,
     pub title: String,
     pub description: Option<String>,
-    pub data: Json,
-    pub version: i32,
+    pub enabled: bool,
+    pub frequency: Json,
+    pub destinations: Json,
+    pub message: Option<String>,
+    pub chrome_driver_login_email: Option<String>,
+    pub chrome_driver_login_password: Option<String>,
+    pub timezone: String,
+    pub tz_offset: i32,
+    pub owner: Option<String>,
+    pub last_edited_by: Option<String>,
     pub created_at: i64,
+    pub updated_at: Option<i64>,
+    pub start_at: i64,
+    pub last_triggered_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -30,8 +39,6 @@ pub enum Relation {
     Folders,
     #[sea_orm(has_many = "super::report_dashboards::Entity")]
     ReportDashboards,
-    #[sea_orm(has_many = "super::timed_annotations::Entity")]
-    TimedAnnotations,
 }
 
 impl Related<super::folders::Entity> for Entity {
@@ -43,12 +50,6 @@ impl Related<super::folders::Entity> for Entity {
 impl Related<super::report_dashboards::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::ReportDashboards.def()
-    }
-}
-
-impl Related<super::timed_annotations::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::TimedAnnotations.def()
     }
 }
 

@@ -13,173 +13,132 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use config::meta::dashboards::reports::{ListReportsParams, Report};
+use infra::table;
+use sea_orm::{ConnectionTrait, TransactionTrait};
 
-use config::{meta::dashboards::reports::Report, utils::json};
+use crate::service::db;
 
-use crate::{common::infra::config::DASHBOARD_REPORTS, service::db};
-
-pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
-    let report_key = format!("{org_id}/{name}");
-    if let Some(v) = DASHBOARD_REPORTS.get(&report_key) {
-        Ok(v.value().clone())
-    } else {
-        let key = format!("/reports/{org_id}/{name}");
-        match db::get(&key).await {
-            Ok(val) => Ok(json::from_slice(&val)?),
-            Err(_) => Err(anyhow::anyhow!("Report not found")),
-        }
-    }
-}
-
-pub async fn set(org_id: &str, report: &Report, create: bool) -> Result<(), anyhow::Error> {
-    match set_without_updating_trigger(org_id, report).await {
-        Ok(schedule_key) => {
-            let trigger = db::scheduler::Trigger {
-                org: org_id.to_string(),
-                module: db::scheduler::TriggerModule::Report,
-                module_key: schedule_key.clone(),
-                next_run_at: report.start,
-                ..Default::default()
-            };
-            if create {
-                match db::scheduler::push(trigger).await {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        log::error!("Failed to save trigger: {}", e);
-                        Ok(())
-                    }
-                }
-            } else if db::scheduler::exists(
-                org_id,
-                db::scheduler::TriggerModule::Report,
-                &schedule_key,
-            )
-            .await
-            {
-                match db::scheduler::update_trigger(trigger).await {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        log::error!("Failed to update trigger: {}", e);
-                        Ok(())
-                    }
-                }
-            } else {
-                match db::scheduler::push(trigger).await {
-                    Ok(_) => Ok(()),
-                    Err(e) => {
-                        log::error!("Failed to save trigger: {}", e);
-                        Ok(())
-                    }
-                }
-            }
-        }
-        Err(e) => Err(anyhow::anyhow!("Error saving report: {}", e)),
-    }
-}
-
-pub async fn set_without_updating_trigger(
+pub async fn get<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
     org_id: &str,
-    report: &Report,
-) -> Result<String, anyhow::Error> {
-    let schedule_key = report.name.to_string();
-    let key = format!("/reports/{org_id}/{}", &schedule_key);
-    match db::put(
-        &key,
-        json::to_vec(report).unwrap().into(),
-        db::NEED_WATCH,
-        None,
-    )
-    .await
-    {
-        Ok(_) => Ok(schedule_key),
-        Err(e) => Err(anyhow::anyhow!("{e}")),
+    folder_snowflake_id: &str,
+    name: &str,
+) -> Result<Report, anyhow::Error> {
+    match table::reports::get_by_name(conn, org_id, folder_snowflake_id, name).await? {
+        Some((_, report)) => Ok(report),
+        _ => Err(anyhow::anyhow!("Report not found")),
     }
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), anyhow::Error> {
-    let key = format!("/reports/{org_id}/{name}");
-    match db::delete(&key, false, db::NEED_WATCH, None).await {
-        Ok(_) => {
-            match db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, name).await {
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    log::error!("Failed to delete trigger: {}", e);
-                    Ok(())
-                }
-            }
-        }
-        Err(e) => Err(anyhow::anyhow!("Error deleting report: {}", e)),
-    }
-}
+pub async fn create<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    folder_snowflake_id: &str,
+    report: Report,
+) -> Result<(), anyhow::Error> {
+    let org = report.org_id.clone();
+    let schedule_key = report.name.clone();
+    let next_run_at = report.start;
 
-pub async fn list(org_id: &str) -> Result<Vec<Report>, anyhow::Error> {
-    let key = format!("/reports/{org_id}");
-    let ret = db::list_values(&key).await?;
-    let mut items: Vec<Report> = Vec::with_capacity(ret.len());
-    for item_value in ret {
-        let json_val = json::from_slice(&item_value)?;
-        items.push(json_val)
-    }
-    items.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(items)
-}
-
-pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = "/reports/";
-    let cluster_coordinator = db::get_coordinator().await;
-    let mut events = cluster_coordinator.watch(key).await?;
-    let events = Arc::get_mut(&mut events).unwrap();
-    log::info!("Start watching reports");
-    loop {
-        let ev = match events.recv().await {
-            Some(ev) => ev,
-            None => {
-                log::error!("watch_reports: event channel closed");
-                break;
-            }
-        };
-        match ev {
-            db::Event::Put(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                let item_value: Report = match db::get(&ev.key).await {
-                    Ok(val) => match json::from_slice(&val) {
-                        Ok(val) => val,
-                        Err(e) => {
-                            log::error!("Error getting value: {}", e);
-                            continue;
-                        }
-                    },
-                    Err(e) => {
-                        log::error!("Error getting value: {}", e);
-                        continue;
-                    }
-                };
-                DASHBOARD_REPORTS.insert(item_key.to_owned(), item_value);
-            }
-            db::Event::Delete(ev) => {
-                let item_key = ev.key.strip_prefix(key).unwrap();
-                DASHBOARD_REPORTS.remove(item_key);
-            }
-            db::Event::Empty => {}
-        }
-    }
+    create_without_updating_trigger(conn, folder_snowflake_id, report).await?;
+    let trigger = db::scheduler::Trigger {
+        org,
+        module: db::scheduler::TriggerModule::Report,
+        module_key: schedule_key,
+        next_run_at,
+        ..Default::default()
+    };
+    db::scheduler::push(trigger)
+        .await
+        .inspect_err(|e| log::error!("Failed to save trigger: {}", e))?;
     Ok(())
 }
 
-pub async fn cache() -> Result<(), anyhow::Error> {
-    let key = "/reports/";
-    let ret = db::list(key).await?;
-    for (item_key, item_value) in ret {
-        let key = item_key.strip_prefix(key).unwrap();
-        let json_val: Report = json::from_slice(&item_value).unwrap();
-        DASHBOARD_REPORTS.insert(key.to_owned(), json_val);
+pub async fn update<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    folder_snowflake_id: &str,
+    new_folder_snowflake_id: Option<&str>,
+    report: Report,
+) -> Result<(), anyhow::Error> {
+    let org_id = report.org_id.clone();
+    let schedule_key = report.name.clone();
+    let next_run_at = report.start;
+
+    update_without_updating_trigger(conn, folder_snowflake_id, new_folder_snowflake_id, report)
+        .await?;
+    let scheduler_exists =
+        db::scheduler::exists(&org_id, db::scheduler::TriggerModule::Report, &schedule_key).await;
+
+    let trigger = db::scheduler::Trigger {
+        org: org_id.clone(),
+        module: db::scheduler::TriggerModule::Report,
+        module_key: schedule_key,
+        next_run_at,
+        ..Default::default()
+    };
+    if scheduler_exists {
+        db::scheduler::update_trigger(trigger)
+            .await
+            .inspect_err(|e| log::error!("Failed to update trigger: {}", e))?;
+    } else {
+        db::scheduler::push(trigger)
+            .await
+            .inspect_err(|e| log::error!("Failed to save trigger: {}", e))?;
     }
-    log::info!("Reports Cached");
+
     Ok(())
 }
 
-pub async fn reset() -> Result<(), anyhow::Error> {
-    let key = "/reports/";
-    Ok(db::delete(key, true, db::NO_NEED_WATCH, None).await?)
+pub async fn create_without_updating_trigger<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    folder_snowflake_id: &str,
+    report: Report,
+) -> Result<(), anyhow::Error> {
+    table::reports::create_report(conn, folder_snowflake_id, report, None).await?;
+    // todo: emit supercluster event
+    Ok(())
+}
+
+pub async fn update_without_updating_trigger<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    folder_snowflake_id: &str,
+    new_folder_snowflake_id: Option<&str>,
+    report: Report,
+) -> Result<(), anyhow::Error> {
+    table::reports::update_report(conn, folder_snowflake_id, new_folder_snowflake_id, report)
+        .await?;
+    // todo: emit supercluster event
+    Ok(())
+}
+
+pub async fn delete<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_snowflake_id: &str,
+    name: &str,
+) -> Result<(), anyhow::Error> {
+    // let key = format!("/reports/{org_id}/{name}");
+    table::reports::delete_by_name(conn, org_id, folder_snowflake_id, name)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error deleting report: {}", e))?;
+    let _ = db::scheduler::delete(org_id, db::scheduler::TriggerModule::Report, name)
+        .await
+        .inspect_err(|e| log::error!("Failed to delete trigger: {}", e));
+    // todo: emit supercluster event
+    // todo: does deletion from scheduler need to happen in other cluster?;
+    Ok(())
+}
+
+pub async fn list<C: ConnectionTrait>(
+    conn: &C,
+    params: &ListReportsParams,
+) -> Result<Vec<table::reports::ListReportsQueryResult>, anyhow::Error> {
+    let reports = table::reports::list_reports(conn, params).await?;
+    Ok(reports)
+}
+
+pub async fn reset<C: ConnectionTrait>(conn: &C) -> Result<(), anyhow::Error> {
+    table::reports::delete_all(conn).await?;
+    // todo: emit supercluster event
+    Ok(())
 }
