@@ -562,7 +562,7 @@ pub async fn filter_file_list_by_tantivy_index(
 
         // Spawn a task for each group of files get row_id from index
         let mut tasks = Vec::new();
-        let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.cpu_num));
+        let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
         for i in 0..group_num {
             let Some(file) = index_parquet_files.get_mut(i).and_then(|g| {
                 if g.is_empty() {
