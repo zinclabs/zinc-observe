@@ -452,6 +452,7 @@ async fn cache_files_inner(
 /// If the query does not match any FST in the index file, the file will be filtered out.
 /// If the query does match then the segment IDs for the file will be updated.
 /// If the query not find corresponding index file, the file will *not* be filtered out.
+#[tracing::instrument(name = "service:search:grpc:storage:filter_by_tantivy", skip_all)]
 pub async fn filter_file_list_by_tantivy_index(
     query: Arc<super::QueryParams>,
     file_list: &mut Vec<FileKey>,
@@ -512,6 +513,7 @@ pub async fn filter_file_list_by_tantivy_index(
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
     let time_range = query.time_range.unwrap_or((0, 0));
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
+    log::info!("idx optimize rule : {:?}",idx_optimize_rule);
     let (mut index_parquet_files, query_limit) =
         if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_rule {
             if limit > 0 {
@@ -588,7 +590,7 @@ pub async fn filter_file_list_by_tantivy_index(
                 .await;
                 drop(permit);
                 ret
-            });
+            }).instrument(tracing::info_span!("search_tantivy_thread").or_current());
             tasks.push(task)
         }
 
@@ -682,6 +684,7 @@ pub async fn get_tantivy_directory(
     Ok(PuffinDirReader::from_path(source).await?)
 }
 
+#[tracing::instrument(name = "service:search:grpc:storage:search_tantivy_index", skip_all,fields(trace_id))]
 async fn search_tantivy_index(
     trace_id: &str,
     time_range: (i64, i64),
