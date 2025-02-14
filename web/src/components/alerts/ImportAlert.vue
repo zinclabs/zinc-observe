@@ -942,18 +942,18 @@ export default defineComponent({
   background-size: 170px;
 }
 .editor-container {
-  height: calc(80vh - 20px) !important;
+  height: calc(78vh - 20px) !important;
 }
 .editor-container-url {
   .monaco-editor {
-    height: calc(72vh - 8px) !important; /* Total editor height */
+    height: calc(70vh - 16px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
 }
 .editor-container-json {
   .monaco-editor {
-    height: calc(71vh - 20px) !important; /* Total editor height */
+    height: calc(68vh - 20px) !important; /* Total editor height */
     overflow: auto; /* Allows scrolling if content overflows */
     resize: none; /* Remove resize behavior */
   }
@@ -964,7 +964,7 @@ export default defineComponent({
   resize: none; /* Remove resize behavior */
 }
 .error-report-container {
-  height: calc(78vh - 8px) !important; /* Total editor height */
+  height: calc(78vh - 24px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none;
 }
