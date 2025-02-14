@@ -518,7 +518,7 @@ pub async fn filter_file_list_by_tantivy_index(
         if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_rule {
             if limit > 0 {
                 (
-                    group_files_by_time_range(index_parquet_files, cfg.limit.cpu_num),
+                    group_files_by_time_range(index_parquet_files, cfg.limit.query_thread_num),
                     limit,
                 )
             } else {
@@ -590,7 +590,7 @@ pub async fn filter_file_list_by_tantivy_index(
                 .await;
                 drop(permit);
                 ret
-            }).instrument(tracing::info_span!("search_tantivy_thread").or_current());
+            });
             tasks.push(task)
         }
 
