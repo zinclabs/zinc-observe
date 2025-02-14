@@ -3036,6 +3036,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         // auto query mode selected
         // remove the custom fields from the list
         dashboardPanelData.meta.stream.customQueryFields = [];
+        dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
       }
       // if (dashboardPanelData.data.queryType == "promql") {
       //     updatePromQLQuery()
