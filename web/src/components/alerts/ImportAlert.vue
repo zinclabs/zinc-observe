@@ -256,7 +256,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div>
                           <q-select
                             v-model="userSelectedDestinations"
-                            :options="getFormattedDestinations"
+                            :options="filteredDestinations"
+                            @filter="filterDestinations"
                             label="Destinations *"
                             :popup-content-style="{
                               textTransform: 'lowercase',
@@ -268,7 +269,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             stack-label
                             dense
                             use-input
-                            fill-input
                             :input-debounce="400"
                             behavior="menu"
                             :rules="[
@@ -299,6 +299,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </q-list>
                             </template>
                           </q-select>
+                        </div>
+                      </span>
+                      <span
+                        class="text-red"
+                        v-else-if="
+                          typeof errorMessage === 'object' &&
+                          errorMessage.field == 'stream_type'
+                        "
+                      >
+                        {{ errorMessage.message }}
+                        <div>
+                          <q-select
+                            v-model="userSelectedStreamType"
+                            :options="streamTypes"
+                            :label="t('alerts.streamType') + ' *'"
+                            :popup-content-style="{ textTransform: 'lowercase' }"
+                            color="input-border"
+                            bg-color="input-bg"
+                            class="q-py-sm showLabelOnTop no-case"
+                            stack-label
+                            outlined
+                            filled
+                            dense
+                            @update:model-value="updateStreams()"
+                            :rules="[(val: any) => !!val || 'Field is required!']"
+                            style="width: 300px"
+                          />
                         </div>
                       </span>
 
@@ -411,11 +438,15 @@ export default defineComponent({
     const queryEditorPlaceholderFlag = ref(true);
     const streamList = ref<any>([]);
     const userSelectedStreamName = ref("");
+    const userSelectedStreamType = ref("");
     const jsonFiles = ref(null);
     const url = ref("");
     const jsonArrayOfObj: any = ref([{}]);
+    const streams = ref<any>({});
     const activeTab = ref("import_json_file");
     const splitterModel = ref(60);
+    const filteredDestinations = ref([]);
+    const streamTypes = ["logs", "metrics", "traces"];
     const getFormattedDestinations = computed(() => {
       return props.destinations.map((destination: any) => {
         return destination.name;
@@ -627,7 +658,10 @@ export default defineComponent({
       const validStreamTypes = ["logs", "metrics", "traces"];
       if (!input.stream_type || !validStreamTypes.includes(input.stream_type)) {
         alertErrors.push(
-          `Alert - ${index}: Stream Type is mandatory and should be one of: 'logs', 'metrics', 'traces'.`,
+          {
+            message: `Alert - ${index}: Stream Type is mandatory and should be one of: 'logs', 'metrics', 'traces'.`,
+            field: "stream_type",
+          }
         );
       }
 
@@ -890,6 +924,29 @@ export default defineComponent({
     const onSubmit = (e: any) => {
       e.preventDefault();
     };
+    const updateStreams = async () => {
+      jsonArrayOfObj.value.stream_type = userSelectedStreamType.value;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+      const streamResponse: any = await getStreams(userSelectedStreamType.value, false);
+        streamList.value = streamResponse.list.map(
+          (stream: any) => stream.name,
+        );
+    };
+    const filterDestinations = (val: string, update: Function) => {
+        if (val === "") {
+          update(() => {
+            filteredDestinations.value = getFormattedDestinations.value;
+          });
+          return;
+        }
+
+        update(() => {
+          filteredDestinations.value = getFormattedDestinations.value.filter((destination) =>
+            destination.toLowerCase().includes(val.toLowerCase())
+          );
+        });
+      };
+
 
     return {
       t,
@@ -919,6 +976,12 @@ export default defineComponent({
       updateActiveTab,
       url,
       userSelectedAlertName,
+      streamTypes,
+      userSelectedStreamType,
+      updateStreams,
+      streams,
+      filterDestinations,
+      filteredDestinations,
     };
   },
   components: {
