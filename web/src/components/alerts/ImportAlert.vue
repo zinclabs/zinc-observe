@@ -268,7 +268,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             stack-label
                             dense
                             use-input
-                            hide-selected
                             fill-input
                             :input-debounce="400"
                             behavior="menu"
