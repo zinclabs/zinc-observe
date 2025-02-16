@@ -77,6 +77,7 @@ impl WsSession {
     }
 }
 
+#[tracing::instrument(name = "handler:http:request:websocket:session:run", skip_all, fields(req_id = %req_id))]
 pub async fn run(
     mut msg_stream: MessageStream,
     user_id: String,
@@ -146,6 +147,7 @@ pub async fn run(
 /// Text message is parsed into `WsClientEvents` and processed accordingly
 /// Depending on each event type, audit must be done
 /// Currently audit is done only for the search event
+#[tracing::instrument(name = "handler:http:request:websocket:session:handle_text_message", skip_all, fields(req_id = %req_id))]
 pub async fn handle_text_message(
     org_id: &str,
     user_id: &str,
@@ -369,6 +371,7 @@ pub async fn send_message(req_id: &str, msg: String) -> Result<(), Error> {
     })
 }
 
+#[tracing::instrument(name = "handler:http:request:websocket:session:cleanup_and_close_session", skip_all, fields(req_id = %req_id))]
 async fn cleanup_and_close_session(req_id: &str, close_reason: Option<CloseReason>) {
     if let Some(mut session) = sessions_cache_utils::get_mut_session(req_id) {
         if let Some(reason) = &close_reason {

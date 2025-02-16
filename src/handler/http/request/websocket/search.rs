@@ -51,6 +51,7 @@ use crate::{
 };
 
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(name = "handler:http:request:websocket:search:handle_cancel", skip_all, fields(trace_id = %trace_id))]
 pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     match crate::service::search::cancel_query(org_id, trace_id).await {
         Ok(ret) => {
@@ -78,6 +79,7 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
     }
 }
 
+#[tracing::instrument(name = "handler:http:request:websocket:search:handle_search_request", skip_all, fields(trace_id = %req.trace_id))]
 pub async fn handle_search_request(
     req_id: &str,
     accumulated_results: &mut Vec<SearchResultType>,
@@ -300,13 +302,8 @@ pub async fn handle_search_request(
     Ok(())
 }
 
+#[tracing::instrument(name = "handler:http:request:websocket:search:do_search", skip_all, fields(trace_id = %req.trace_id))]
 async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<Response, Error> {
-    let span = tracing::info_span!(
-        "src::handler::http::request::websocket::search::do_search",
-        trace_id = %req.trace_id,
-        org_id = %org_id,
-    );
-
     // while using search directly
     // decode the vrl i.e. query_fn
     let mut req = req.clone();
@@ -342,12 +339,12 @@ async fn do_search(req: &SearchEventReq, org_id: &str, user_id: &str) -> Result<
         Some(user_id.to_string()),
         &req.payload,
     )
-    .instrument(span)
     .await;
 
     res.map(handle_partial_response)
 }
 
+#[tracing::instrument(name = "handler:http:request:websocket:search:handle_partial_response", skip_all, fields(trace_id = %res.trace_id))]
 fn handle_partial_response(mut res: Response) -> Response {
     if res.is_partial {
         res.function_error = if res.function_error.is_empty() {
@@ -363,6 +360,7 @@ fn handle_partial_response(mut res: Response) -> Response {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[tracing::instrument(name = "handler:http:request:websocket:search:handle_cache_responses_and_deltas", skip_all, fields(trace_id = %trace_id))]
 async fn handle_cache_responses_and_deltas(
     req_id: &str,
     req: &SearchEventReq,
@@ -524,6 +522,7 @@ async fn handle_cache_responses_and_deltas(
 
 // Process a single delta (time range not covered by cache)
 #[allow(clippy::too_many_arguments)]
+#[tracing::instrument(name = "handler:http:request:websocket:search:process_delta", skip_all, fields(trace_id = %trace_id))]
 async fn process_delta(
     req_id: &str,
     req: &SearchEventReq,
@@ -704,6 +703,7 @@ async fn process_delta(
     Ok(())
 }
 
+#[tracing::instrument(name = "handler:http:request:websocket:search:get_partitions", skip_all, fields(trace_id = %req.trace_id))]
 async fn get_partitions(
     req: &SearchEventReq,
     org_id: &str,
@@ -738,6 +738,7 @@ async fn get_partitions(
     Ok(res)
 }
 
+#[tracing::instrument(name = "handler:http:request:websocket:search:send_cached_responses", skip_all, fields(trace_id = %trace_id))]
 async fn send_cached_responses(
     req_id: &str,
     trace_id: &str,
@@ -810,6 +811,7 @@ async fn send_cached_responses(
 
 // Do partitioned search without cache
 #[allow(clippy::too_many_arguments)]
+#[tracing::instrument(name = "handler:http:request:websocket:search:do_partitioned_search", skip_all, fields(trace_id = %trace_id))]
 async fn do_partitioned_search(
     req_id: &str,
     req: &mut SearchEventReq,
@@ -966,6 +968,7 @@ async fn do_partitioned_search(
     Ok(())
 }
 
+#[tracing::instrument(name = "handler:http:request:websocket:search:send_partial_search_resp", skip_all, fields(trace_id = %trace_id))]
 async fn send_partial_search_resp(
     req_id: &str,
     trace_id: &str,
@@ -1009,6 +1012,7 @@ async fn send_partial_search_resp(
     Ok(())
 }
 
+#[tracing::instrument(name = "handler:http:request:websocket:search:write_results_to_cache", skip_all, fields(trace_id = %c_resp.trace_id))]
 async fn write_results_to_cache(
     c_resp: MultiCachedQueryResponse,
     start_time: i64,

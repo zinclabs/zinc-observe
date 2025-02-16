@@ -909,6 +909,7 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
 }
 
 #[cfg(feature = "enterprise")]
+#[tracing::instrument(name = "service:search:cancel_query", skip_all, fields(trace_id = %trace_id))]
 pub async fn cancel_query(
     _org_id: &str,
     trace_id: &str,

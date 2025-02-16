@@ -390,6 +390,7 @@ pub async fn search(
 
 // based on _timestamp of first record in config::meta::search::Response either add it in start
 // or end to cache response
+#[tracing::instrument(name = "service:search:cache:merge_response", skip_all, fields(trace_id = %trace_id))]
 pub fn merge_response(
     trace_id: &str,
     cache_responses: &mut Vec<config::meta::search::Response>,
@@ -667,6 +668,7 @@ pub async fn _write_results(
 ///    - Saves the filtered response to a file named:
 ///      `"<start_time>_<end_time>_<is_aggregate>_<is_descending>.json"`.
 #[allow(clippy::too_many_arguments)]
+#[tracing::instrument(name = "service:search:cache:write_results_v2", skip_all, fields(trace_id = %trace_id))]
 pub async fn write_results_v2(
     trace_id: &str,
     ts_column: &str,
@@ -789,7 +791,7 @@ pub async fn write_results_v2(
     });
 }
 
-#[tracing::instrument(name = "service:search:cacher:check_cache_v2", skip_all)]
+#[tracing::instrument(name = "service:search:cacher:check_cache_v2", skip_all, fields(trace_id = %trace_id))]
 pub async fn check_cache_v2(
     trace_id: &str,
     org_id: &str,
