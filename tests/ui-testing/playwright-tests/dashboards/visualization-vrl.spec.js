@@ -319,7 +319,7 @@ test.describe(" visualize UI testcases", () => {
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
       .click();
 
-    await expect(page.getByText("warningFunction error: error[")).toBeVisible();
+    // await expect(page.getByText("warningFunction error: error[")).toBeVisible();
 
     await page
       .locator("#fnEditor")

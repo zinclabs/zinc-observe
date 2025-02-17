@@ -30,6 +30,7 @@ fn default_version() -> i32 {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct Dashboard {
     pub v1: Option<v1::Dashboard>,
     pub v2: Option<v2::Dashboard>,
@@ -38,6 +39,8 @@ pub struct Dashboard {
     pub v5: Option<v5::Dashboard>,
     pub version: i32,
     pub hash: String,
+    #[serde(default)]
+    pub updated_at: i64,
 }
 
 impl Dashboard {
@@ -81,6 +84,10 @@ impl Dashboard {
             } => inner.dashboard_id = dashboard_id,
             _ => {}
         };
+    }
+
+    pub fn set_updated_at(&mut self) {
+        self.updated_at = Utc::now().timestamp_micros();
     }
 
     pub fn owner(&self) -> Option<&str> {

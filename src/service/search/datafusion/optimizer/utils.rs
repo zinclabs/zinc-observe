@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::get_config;
+use config::{get_config, meta::sql::OrderBy};
 use datafusion::{
     common::{
         tree_node::{
@@ -53,14 +53,16 @@ pub fn is_complex_query(plan: &LogicalPlan) -> bool {
 pub struct AddSortAndLimit {
     pub limit: usize,
     pub offset: usize,
+    pub order_by: Option<(String, OrderBy)>,
     pub deduplication_columns: Vec<Column>,
 }
 
 impl AddSortAndLimit {
-    pub fn new(limit: usize, offset: usize) -> Self {
+    pub fn new(limit: usize, offset: usize, order_by: Option<(String, OrderBy)>) -> Self {
         Self {
             limit,
             offset,
+            order_by,
             deduplication_columns: vec![],
         }
     }
@@ -73,6 +75,7 @@ impl AddSortAndLimit {
         Self {
             limit,
             offset,
+            order_by: None,
             deduplication_columns,
         }
     }
@@ -106,7 +109,11 @@ impl TreeNodeRewriter for AddSortAndLimit {
                         // the add sort plan should reflect the limit
                         let fetch = get_int_from_expr(&limit.fetch);
                         let skip = get_int_from_expr(&limit.skip);
-                        let (sort, schema) = generate_sort_plan(limit.input.clone(), fetch + skip);
+                        let (sort, schema) = generate_sort_plan(
+                            limit.input.clone(),
+                            fetch + skip,
+                            self.order_by.clone(),
+                        );
                         limit.input = Arc::new(sort);
                         (Transformed::yes(LogicalPlan::Limit(limit)), schema)
                     }
@@ -135,8 +142,12 @@ impl TreeNodeRewriter for AddSortAndLimit {
                         None,
                     )
                 } else {
-                    let (plan, schema) =
-                        generate_limit_and_sort_plan(Arc::new(node), self.limit, self.offset);
+                    let (plan, schema) = generate_limit_and_sort_plan(
+                        Arc::new(node),
+                        self.limit,
+                        self.offset,
+                        self.order_by.clone(),
+                    );
                     (Transformed::yes(plan), schema)
                 }
             }
@@ -209,18 +220,29 @@ fn generate_limit_plan(input: Arc<LogicalPlan>, limit: usize, skip: usize) -> Lo
 fn generate_sort_plan(
     input: Arc<LogicalPlan>,
     limit: usize,
+    order_by: Option<(String, OrderBy)>,
 ) -> (LogicalPlan, Option<Arc<DFSchema>>) {
-    let config = get_config();
-    let timestamp = SortExpr {
-        expr: col(config.common.column_timestamp.clone()),
-        asc: false,
-        nulls_first: false,
+    let cfg = get_config();
+    let (sort_expr, sort_field) = match order_by {
+        Some((field, order_by)) => (
+            SortExpr {
+                expr: col(field.clone()),
+                asc: order_by == OrderBy::Asc,
+                nulls_first: false,
+            },
+            field,
+        ),
+        None => (
+            SortExpr {
+                expr: col(cfg.common.column_timestamp.clone()),
+                asc: false,
+                nulls_first: false,
+            },
+            cfg.common.column_timestamp.clone(),
+        ),
     };
     let schema = input.schema().clone();
-    if schema
-        .field_with_name(None, config.common.column_timestamp.as_str())
-        .is_err()
-    {
+    if schema.field_with_name(None, sort_field.as_str()).is_err() {
         let mut input = input.as_ref().clone();
         input = input
             .rewrite(&mut ChangeTableScanSchema::new())
@@ -228,7 +250,7 @@ fn generate_sort_plan(
             .unwrap();
         (
             LogicalPlan::Sort(Sort {
-                expr: vec![timestamp],
+                expr: vec![sort_expr],
                 input: Arc::new(input),
                 fetch: Some(limit),
             }),
@@ -239,7 +261,7 @@ fn generate_sort_plan(
         input = input.rewrite(&mut SortByTime::new()).data().unwrap();
         (
             LogicalPlan::Sort(Sort {
-                expr: vec![timestamp],
+                expr: vec![sort_expr],
                 input: Arc::new(input),
                 fetch: Some(limit),
             }),
@@ -252,8 +274,9 @@ fn generate_limit_and_sort_plan(
     input: Arc<LogicalPlan>,
     limit: usize,
     skip: usize,
+    order_by: Option<(String, OrderBy)>,
 ) -> (LogicalPlan, Option<Arc<DFSchema>>) {
-    let (sort, schema) = generate_sort_plan(input, limit + skip);
+    let (sort, schema) = generate_sort_plan(input, limit + skip, order_by);
     (
         LogicalPlan::Limit(Limit {
             skip: Some(Box::new(Expr::Literal(ScalarValue::Int64(Some(

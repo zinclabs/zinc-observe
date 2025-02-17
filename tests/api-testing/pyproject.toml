@@ -3,13 +3,14 @@ name = "pytest-openobserve"
 version = "0.1.0"
 description = "Add your description here"
 dependencies = [
-    "pytest>=7.4.2",
+    "pytest>=8.3.4",
     "pytest-sugar>=0.9.7",
     "pytest-pretty>=1.2.0",
     "requests>=2.31.0",
     "ruff>=0.1.8",
     "tink>=1.10.0",
     "protobuf",
+    "websocket-client>=1.8.0",
 ]
 readme = "README.md"
 requires-python = ">= 3.11"

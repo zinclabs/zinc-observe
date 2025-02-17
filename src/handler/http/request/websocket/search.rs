@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,7 @@ use config::{
 use infra::errors::{Error, ErrorCodes};
 use tracing::Instrument;
 
-use super::utils::cancellation_registry_cache_utils;
+use super::sort::order_search_results;
 #[allow(unused_imports)]
 use crate::handler::http::request::websocket::utils::enterprise_utils;
 use crate::{
@@ -43,7 +43,7 @@ use crate::{
     },
     handler::http::request::websocket::{
         session::send_message,
-        utils::{TimeOffset, WsServerEvents},
+        utils::{search_registry_utils, TimeOffset, WsServerEvents},
     },
     service::search::{
         self as SearchService, cache, datafusion::distributed_plan::streaming_aggs_exec, sql::Sql,
@@ -72,7 +72,7 @@ pub async fn handle_cancel(trace_id: &str, org_id: &str) -> WsServerEvents {
             );
             WsServerEvents::CancelResponse {
                 trace_id: trace_id.to_string(),
-                is_success: false,
+                is_success: true,
             }
         }
     }
@@ -163,9 +163,6 @@ pub async fn handle_search_request(
         );
     }
     let order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
-
-    // Set cancel flag to stop search when cancel event is received
-    cancellation_registry_cache_utils::add_cancellation_flag(&trace_id);
 
     // Search start
     log::info!(
@@ -470,6 +467,7 @@ async fn handle_cache_responses_and_deltas(
                     cached,
                     accumulated_results,
                     &mut curr_res_size,
+                    req.fallback_order_by_col.clone(),
                 )
                 .await?;
                 cached_resp_iter.next();
@@ -504,6 +502,7 @@ async fn handle_cache_responses_and_deltas(
                 cached,
                 accumulated_results,
                 &mut curr_res_size,
+                req.fallback_order_by_col.clone(),
             )
             .await?;
         }
@@ -576,7 +575,7 @@ async fn process_delta(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
-        if cancellation_registry_cache_utils::is_cancelled(&trace_id) {
+        if search_registry_utils::is_cancelled(&trace_id) {
             log::info!(
                 "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping delta search",
                 trace_id
@@ -606,6 +605,7 @@ async fn process_delta(
         );
 
         if !search_res.hits.is_empty() {
+            search_res = order_search_results(search_res, req.fallback_order_by_col);
             // for every partition, compute the queried range omitting the result cache ratio
             let queried_range =
                 calc_queried_range(start_time, end_time, search_res.result_cache_ratio);
@@ -745,8 +745,9 @@ async fn send_cached_responses(
     cached: &CachedQueryResponse,
     accumulated_results: &mut Vec<SearchResultType>,
     curr_res_size: &mut i64,
+    fallback_order_by_col: Option<String>,
 ) -> Result<(), Error> {
-    if cancellation_registry_cache_utils::is_cancelled(trace_id) {
+    if search_registry_utils::is_cancelled(trace_id) {
         log::info!(
             "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping cached response",
             trace_id
@@ -777,6 +778,8 @@ async fn send_cached_responses(
             cached.cached_response.total = cache_hits;
         }
     }
+
+    cached.cached_response = order_search_results(cached.cached_response, fallback_order_by_col);
 
     // Accumulate the result
     accumulated_results.push(SearchResultType::Cached(cached.cached_response.clone()));
@@ -872,7 +875,7 @@ async fn do_partitioned_search(
 
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         // Check if the cancellation flag is set
-        if cancellation_registry_cache_utils::is_cancelled(trace_id) {
+        if search_registry_utils::is_cancelled(trace_id) {
             log::info!(
                 "[WS_SEARCH]: Cancellation detected for trace_id: {}, stopping partitioned search",
                 trace_id
@@ -895,6 +898,8 @@ async fn do_partitioned_search(
         curr_res_size += search_res.hits.len() as i64;
 
         if !search_res.hits.is_empty() {
+            search_res = order_search_results(search_res, req.fallback_order_by_col);
+
             // check range error
             if !range_error.is_empty() {
                 search_res.is_partial = true;

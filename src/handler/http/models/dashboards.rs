@@ -85,6 +85,9 @@ pub struct ListDashboardsResponseBodyItem {
     pub owner: String,
     #[schema(value_type = String, format = DateTime)]
     pub created: DateTime<FixedOffset>,
+    // TODO: All client APIs should return camelCase
+    #[serde(rename = "updatedAt")]
+    pub updated_at: i64,
 }
 
 /// HTTP request body for `MoveDashboard` endpoint.
@@ -97,6 +100,7 @@ pub struct MoveDashboardRequestBody {
 
 /// Version-specific dashboard details and hash.
 #[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DashboardDetails {
     pub v1: Option<v1::Dashboard>,
     pub v2: Option<v2::Dashboard>,
@@ -105,6 +109,7 @@ pub struct DashboardDetails {
     pub v5: Option<v5::Dashboard>,
     pub version: i32,
     pub hash: String,
+    pub updated_at: i64,
 }
 
 impl TryFrom<CreateDashboardRequestBody> for MetaDashboard {
@@ -213,6 +218,7 @@ impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
             description: dashboard.description().unwrap_or_default().to_owned(),
             role: dashboard.role().unwrap_or_default().to_owned(),
             owner: dashboard.owner().unwrap_or_default().to_owned(),
+            // TODO: Return timestamp in microseconds just like all other apis
             created: dashboard.created_at_deprecated().unwrap_or_else(|| {
                 Utc::now().with_timezone(
                     &FixedOffset::east_opt(0).expect("Out of bounds timezone difference"),
@@ -220,6 +226,7 @@ impl From<(MetaFolder, MetaDashboard)> for ListDashboardsResponseBodyItem {
             }),
             hash: dashboard.hash,
             version: dashboard.version,
+            updated_at: dashboard.updated_at,
             // Populate deprecated fields until they are removed from the API.
             v1: dashboard.v1,
             v2: dashboard.v2,
@@ -240,6 +247,7 @@ impl From<MetaDashboard> for DashboardDetails {
             v4: value.v4,
             v5: value.v5,
             hash: value.hash,
+            updated_at: value.updated_at,
         }
     }
 }

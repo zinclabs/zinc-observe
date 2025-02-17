@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -57,9 +57,9 @@ use crate::{
     },
 };
 
-#[cfg(feature = "enterprise")]
-pub mod job;
 pub mod multi_streams;
+#[cfg(feature = "enterprise")]
+pub mod query_manager;
 pub mod saved_view;
 #[cfg(feature = "enterprise")]
 pub mod search_job;

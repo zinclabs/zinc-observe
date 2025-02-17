@@ -982,17 +982,9 @@ pub async fn cancel_query(
         }
     }
 
-    let mut is_success = false;
-    for res in results {
-        if res.is_success {
-            is_success = true;
-            break;
-        }
-    }
-
     Ok(search::CancelQueryResponse {
         trace_id: trace_id.to_string(),
-        is_success,
+        is_success: true,
     })
 }
 

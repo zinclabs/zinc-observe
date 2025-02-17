@@ -918,9 +918,12 @@ fn create_const_labels() -> HashMap<String, String> {
 }
 
 pub fn create_prometheus_handler() -> PrometheusMetrics {
-    PrometheusMetricsBuilder::new(NAMESPACE)
-        .endpoint(format!("{}/metrics", crate::config::get_config().common.base_uri).as_str())
-        .const_labels(create_const_labels())
+    let cfg = crate::config::get_config();
+    let mut srv = PrometheusMetricsBuilder::new(NAMESPACE);
+    if cfg.common.prometheus_enabled {
+        srv = srv.endpoint(format!("{}/metrics", cfg.common.base_uri).as_str());
+    };
+    srv.const_labels(create_const_labels())
         .registry(get_registry())
         .build()
         .expect("Prometheus build failed")

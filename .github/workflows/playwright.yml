@@ -31,6 +31,7 @@ env:
   ZO_USAGE_REPORTING_ENABLED: true
   ZO_MIN_AUTO_REFRESH_INTERVAL: 5
   ZO_WEBSOCKET_ENABLED: true
+  ZO_COLS_PER_RECORD_LIMIT: "80000"
 
 jobs:
   build_binary:
@@ -119,7 +120,8 @@ jobs:
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
             "enrichment.spec.js",
-            "sanity2.spec.js"
+            "sanity2.spec.js",
+            "schemaload.spec.js",
             # "remotepipeline.spec.js",
 
           ]
@@ -224,5 +226,3 @@ jobs:
           name: coverage-report
           path: tests/ui-testing/coverage-report
           retention-days: 7
-
-             

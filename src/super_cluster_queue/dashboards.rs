@@ -29,7 +29,8 @@ pub(crate) async fn process_msg(msg: DashboardMessage) -> Result<()> {
             folder_id,
             dashboard,
         } => {
-            table::dashboards::put(&org_id, &folder_id, dashboard).await?;
+            // `clone` is always true for super cluster
+            table::dashboards::put(&org_id, &folder_id, dashboard, true).await?;
         }
         DashboardMessage::Delete {
             org_id,

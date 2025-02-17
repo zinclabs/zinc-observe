@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -150,6 +150,17 @@ impl Sql {
             .collect::<Vec<_>>();
         let group_by = column_visitor.group_by;
         let mut order_by = column_visitor.order_by;
+        if order_by.is_empty() && !query.sort_by.is_empty() {
+            // example: sort_by: "timestamp ASC"
+            let sort_by = query.sort_by.split_whitespace().collect::<Vec<_>>();
+            if sort_by.len() >= 2 {
+                if sort_by[1].to_lowercase() == "desc" {
+                    order_by.push((sort_by[0].to_string(), OrderBy::Desc));
+                } else {
+                    order_by.push((sort_by[0].to_string(), OrderBy::Asc));
+                }
+            }
+        }
 
         // check if need sort by time
         if order_by.is_empty()

@@ -52,7 +52,8 @@ impl RedirectResponse {
     }
 
     fn build_redirect_response(&self) -> HttpResponse {
-        let redirect_uri = self.build_full_redirect_uri();
+        let mut redirect_uri = self.build_full_redirect_uri();
+        redirect_uri = redirect_uri.trim_matches('"').to_string();
         if redirect_uri.len() < 1024 {
             HttpResponse::Found()
                 .append_header((LOCATION, redirect_uri))

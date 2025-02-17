@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -261,20 +261,17 @@ impl Search for Searcher {
         req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
         let trace_id = req.into_inner().trace_id;
-        match self.remove(&trace_id, true).await {
-            Some(cancelled) => {
-                for (_, senders) in cancelled {
-                    for sender in senders.abort_senders.into_iter().rev() {
-                        let _ = sender.send(());
-                    }
-                    metrics::QUERY_CANCELED_NUMS
-                        .with_label_values(&[&senders.org_id.unwrap_or_default()])
-                        .inc();
+        if let Some(cancelled) = self.remove(&trace_id, true).await {
+            for (_, senders) in cancelled {
+                for sender in senders.abort_senders.into_iter().rev() {
+                    let _ = sender.send(());
                 }
-                Ok(Response::new(CancelQueryResponse { is_success: true }))
+                metrics::QUERY_CANCELED_NUMS
+                    .with_label_values(&[&senders.org_id.unwrap_or_default()])
+                    .inc();
             }
-            None => Ok(Response::new(CancelQueryResponse { is_success: false })),
         }
+        Ok(Response::new(CancelQueryResponse { is_success: true }))
     }
 
     #[cfg(not(feature = "enterprise"))]
@@ -293,12 +290,10 @@ impl Search for Searcher {
         use crate::service::search as SearchService;
 
         let trace_id = req.into_inner().trace_id;
-        match SearchService::cancel_query("", &trace_id).await {
-            Ok(ret) => Ok(Response::new(CancelQueryResponse {
-                is_success: ret.is_success,
-            })),
-            Err(_) => Ok(Response::new(CancelQueryResponse { is_success: false })),
+        if let Err(e) = SearchService::cancel_query("", &trace_id).await {
+            log::error!("failed to cancel query: {e}");
         }
+        Ok(Response::new(CancelQueryResponse { is_success: true }))
     }
 
     #[cfg(not(feature = "enterprise"))]

@@ -34,4 +34,6 @@ pub struct SearchEventReq {
     pub search_type: crate::meta::search::SearchEventType,
     #[serde(flatten)]
     pub search_event_context: Option<SearchEventContext>,
+    #[serde(default)]
+    pub fallback_order_by_col: Option<String>,
 }

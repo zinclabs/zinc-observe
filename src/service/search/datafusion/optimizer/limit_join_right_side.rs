@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -73,7 +73,7 @@ impl OptimizerRule for LimitJoinRightSide {
                 if right_column.is_empty() {
                     let plan = (*join.right)
                         .clone()
-                        .rewrite(&mut AddSortAndLimit::new(self.limit, 0))?
+                        .rewrite(&mut AddSortAndLimit::new(self.limit, 0, None))?
                         .data;
                     join.right = Arc::new(plan);
                     Ok(Transformed::yes(LogicalPlan::Join(join)))

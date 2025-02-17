@@ -134,7 +134,7 @@ const defaultObject = {
     queryEditorPlaceholderFlag: true,
     functionEditorPlaceholderFlag: true,
     resultGrid: {
-      rowsPerPage: 100,
+      rowsPerPage: 50,
       wrapCells: false,
       manualRemoveFields: false,
       chartInterval: "1 second",
@@ -1238,6 +1238,10 @@ const useLogs = () => {
             })
             .catch((err: any) => {
               searchObj.loading = false;
+
+              // Reset cancel query on search error
+              searchObj.data.isOperationCancelled = false;
+
               let trace_id = "";
               searchObj.data.errorMsg =
                 "Error while processing partition request.";
@@ -1480,6 +1484,10 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
+
+      // Reset cancel query on new search request initation
+      searchObj.data.isOperationCancelled = false;
+
       // get websocket enable config from store
       // window will have more priority
       // if window has use_web_socket property then use that
@@ -2002,6 +2010,10 @@ const useLogs = () => {
         })
         .catch((err) => {
           searchObj.loading = false;
+
+          // Reset cancel query on search error
+          searchObj.data.isOperationCancelled = false;
+
           let trace_id = "";
           searchObj.data.countErrorMsg =
             "Error while retrieving total events: ";
@@ -2301,6 +2313,10 @@ const useLogs = () => {
           // TODO OK : create handleError function, which will handle error and return error message and detail
 
           searchObj.loading = false;
+
+          // Reset cancel query on search error
+          searchObj.data.isOperationCancelled = false;
+
           let trace_id = "";
           searchObj.data.errorMsg =
             typeof err == "string" && err
@@ -2550,6 +2566,11 @@ const useLogs = () => {
           })
           .catch((err) => {
             searchObj.loadingHistogram = false;
+
+
+            // Reset cancel query on search error
+            searchObj.data.isOperationCancelled = false;
+
             let trace_id = "";
 
             if (err?.request?.status != 429) {

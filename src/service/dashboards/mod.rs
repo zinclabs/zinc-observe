@@ -520,7 +520,7 @@ async fn put(
     dashboard.set_title(title);
 
     dashboard.set_dashboard_id(dashboard_id.to_owned());
-    let dash = table::dashboards::put(org_id, folder_id, dashboard).await?;
+    let dash = table::dashboards::put(org_id, folder_id, dashboard, false).await?;
     Ok(dash)
 }
 

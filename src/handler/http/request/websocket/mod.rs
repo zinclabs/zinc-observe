@@ -15,6 +15,7 @@
 
 pub mod search;
 pub mod session;
+pub mod sort;
 pub mod utils;
 
 use actix_web::{get, web, Error, HttpRequest, HttpResponse};

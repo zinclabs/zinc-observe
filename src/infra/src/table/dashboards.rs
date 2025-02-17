@@ -56,6 +56,7 @@ impl TryFrom<dashboards::Model> for Dashboard {
                 "description".to_owned(),
                 value.description.unwrap_or_default().into(),
             );
+            obj.insert("updatedAt".to_owned(), value.updated_at.into());
         }
 
         match value.version {
@@ -158,10 +159,15 @@ pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
 
 /// Creates a new dashboard or updates an existing dashboard in the database.
 /// Returns the new or updated dashboard.
+///
+/// `clone` is a boolean that determines whether the dashboard should be cloned.
+/// if `clone` is true, the given dashboard will be used as it is when saving to db.
+/// `clone` should be always true for super cluster.
 pub async fn put(
     org_id: &str,
     folder_id: &str,
-    dashboard: Dashboard,
+    mut dashboard: Dashboard,
+    clone: bool,
 ) -> Result<Dashboard, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
@@ -191,6 +197,10 @@ pub async fn put(
         .map(|d| d.to_owned());
     let version = dashboard.version;
     let created_at_depricated = dashboard.created_at_deprecated();
+    if clone {
+        dashboard.set_updated_at();
+    }
+    let updated_at = dashboard.updated_at;
 
     let data = inner_data_as_json(dashboard)?;
 
@@ -211,12 +221,14 @@ pub async fn put(
             dash_am.description = Set(description);
             dash_am.data = Set(data);
             dash_am.version = Set(version);
+            dash_am.updated_at = Set(updated_at);
             let model: dashboards::Model = dash_am.update(client).await?.try_into_model()?;
             Ok(model)
         }
         Some((folder_m, None)) => {
             // Destination folder exists but dashboard does not exist, so create
             // a new dashboard.
+            // TODO: Use timestamp in microseconds like all other resources
             let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
                 created_at_tz.timestamp()
             } else {
@@ -234,6 +246,7 @@ pub async fn put(
                 data: Set(data),
                 version: Set(version),
                 created_at: Set(created_at_unix),
+                updated_at: Set(updated_at),
             };
             let model: dashboards::Model = dash_am.insert(client).await?.try_into_model()?;
             Ok(model)
@@ -471,7 +484,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Postgres,
-                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = $1 AND "folders"."type" = $2 AND "folders"."folder_id" = $3 AND LOWER("title") LIKE $4 ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT $5 OFFSET $6"#,
+                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = $1 AND "folders"."type" = $2 AND "folders"."folder_id" = $3 AND LOWER("title") LIKE $4 ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT $5 OFFSET $6"#,
                 [
                     "orgId".into(),
                     0i16.into(),
@@ -501,7 +514,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::MySql,
-                r#"SELECT `dashboards`.`id` AS `A_id`, `dashboards`.`dashboard_id` AS `A_dashboard_id`, `dashboards`.`folder_id` AS `A_folder_id`, `dashboards`.`owner` AS `A_owner`, `dashboards`.`role` AS `A_role`, `dashboards`.`title` AS `A_title`, `dashboards`.`description` AS `A_description`, `dashboards`.`data` AS `A_data`, `dashboards`.`version` AS `A_version`, `dashboards`.`created_at` AS `A_created_at`, `folders`.`id` AS `B_id`, `folders`.`org` AS `B_org`, `folders`.`folder_id` AS `B_folder_id`, `folders`.`name` AS `B_name`, `folders`.`description` AS `B_description`, `folders`.`type` AS `B_type` FROM `dashboards` LEFT JOIN `folders` ON `dashboards`.`folder_id` = `folders`.`id` WHERE `folders`.`org` = ? AND `folders`.`type` = ? AND `folders`.`folder_id` = ? AND LOWER(`title`) LIKE ? ORDER BY `dashboards`.`title` ASC, `folders`.`name` ASC LIMIT ? OFFSET ?"#,
+                r#"SELECT `dashboards`.`id` AS `A_id`, `dashboards`.`dashboard_id` AS `A_dashboard_id`, `dashboards`.`folder_id` AS `A_folder_id`, `dashboards`.`owner` AS `A_owner`, `dashboards`.`role` AS `A_role`, `dashboards`.`title` AS `A_title`, `dashboards`.`description` AS `A_description`, `dashboards`.`data` AS `A_data`, `dashboards`.`version` AS `A_version`, `dashboards`.`created_at` AS `A_created_at`, `dashboards`.`updated_at` AS `A_updated_at`, `folders`.`id` AS `B_id`, `folders`.`org` AS `B_org`, `folders`.`folder_id` AS `B_folder_id`, `folders`.`name` AS `B_name`, `folders`.`description` AS `B_description`, `folders`.`type` AS `B_type` FROM `dashboards` LEFT JOIN `folders` ON `dashboards`.`folder_id` = `folders`.`id` WHERE `folders`.`org` = ? AND `folders`.`type` = ? AND `folders`.`folder_id` = ? AND LOWER(`title`) LIKE ? ORDER BY `dashboards`.`title` ASC, `folders`.`name` ASC LIMIT ? OFFSET ?"#,
                 [
                     "orgId".into(),
                     0i16.into(),
@@ -531,7 +544,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Sqlite,
-                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = ? AND "folders"."type" = ? AND "folders"."folder_id" = ? AND LOWER("title") LIKE ? ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT ? OFFSET ?"#,
+                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = ? AND "folders"."type" = ? AND "folders"."folder_id" = ? AND LOWER("title") LIKE ? ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT ? OFFSET ?"#,
                 [
                     "orgId".into(),
                     0i16.into(),

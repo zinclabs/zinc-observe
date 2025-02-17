@@ -94,6 +94,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             details of the variables and queries executed to render this panel
           </q-tooltip>
         </q-btn>
+        <!-- show error here -->
+        <q-btn
+          v-if="errorData"
+          :key="errorData"
+          :icon="outlinedWarning"
+          flat
+          size="xs"
+          padding="2px"
+          data-test="dashboard-panel-error-data"
+          class="warning"
+        >
+          <q-tooltip anchor="bottom right" self="top right" max-width="220px">
+            <div style="white-space: pre-wrap">
+              {{ errorData }}
+            </div>
+          </q-tooltip>
+        </q-btn>
         <q-btn
           v-if="maxQueryRange.length > 0"
           :icon="outlinedWarning"
@@ -257,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:initial-variable-values="
         (...args) => $emit('update:initial-variable-values', ...args)
       "
+      @error="onError"
       ref="PanleSchemaRendererRef"
       :allowAnnotationsAdd="true"
     ></PanelSchemaRenderer>
@@ -381,6 +399,8 @@ export default defineComponent({
             store.state.timezone,
           );
           combinedWarnings.push(combinedMessage);
+        } else if (query?.function_error) {
+          combinedWarnings.push(query.function_error);
         }
       });
 
@@ -568,6 +588,11 @@ export default defineComponent({
       });
     });
 
+    const errorData = ref("");
+    const onError = (error: any) => {
+      errorData.value = typeof error === "string" ? error : error?.value;
+    }
+
     return {
       props,
       onEditPanel,
@@ -594,6 +619,8 @@ export default defineComponent({
       movePanelDialog,
       onRefreshPanel,
       variablesDataUpdated,
+      onError,
+      errorData
     };
   },
   methods: {

@@ -40,6 +40,8 @@ pub struct Dashboard {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub layouts: Option<Vec<Layout>>,
     pub variables: Option<Variables>,
+    #[serde(default, skip_serializing)]
+    pub updated_at: i64,
 }
 
 impl From<Dashboard> for super::Dashboard {
@@ -50,6 +52,7 @@ impl From<Dashboard> for super::Dashboard {
         hasher.write_i32(version);
         value.hash(&mut hasher);
         let hash = hasher.finish().to_string();
+        let updated_at = value.updated_at;
 
         Self {
             v1: Some(value),
@@ -59,6 +62,7 @@ impl From<Dashboard> for super::Dashboard {
             v5: None,
             version,
             hash,
+            updated_at,
         }
     }
 }
@@ -346,6 +350,7 @@ mod tests {
                     ],
                 ),
                 variables: None,
+                updated_at: 0,
             }
         "##]].assert_debug_eq(&dashboard);
     }
@@ -516,6 +521,7 @@ mod tests {
                     ],
                 ),
                 variables: None,
+                updated_at: 0,
             }
         "##]].assert_debug_eq(&dashboard);
     }

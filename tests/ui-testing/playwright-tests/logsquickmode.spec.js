@@ -53,12 +53,7 @@ async function ingestion(page) {
   console.log(response);
 }
 
-const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-  await page.waitForTimeout(4000);
-  await page.locator('[data-test="log-search-index-list-select-stream"]').click({ force: true });
-  
-  await page.locator("div.q-item").getByText(`${stream}`).first().click({ force: true });
-};
+
 
 test.describe("Logs Quickmode testcases", () => {
   let logsPage;

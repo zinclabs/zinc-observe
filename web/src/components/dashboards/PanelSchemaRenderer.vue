@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="errorMessage"
       >
         <q-icon size="md" name="warning" />
-        <div style="height: 80%; width: 100%">{{ errorDetail }}</div>
+        <div style="height: 80%; width: 100%">Error Loading Data</div>
       </div>
       <div
         v-if="
@@ -756,7 +756,7 @@ export default defineComponent({
     // when the error changes, emit the error
     watch(errorDetail, () => {
       //check if there is an error message or not
-      if (!errorDetail.value) return;
+      // if (!errorDetail.value) return; // emmit is required to reset the error on parent component
       emit("error", errorDetail);
     });
 
@@ -1542,7 +1542,7 @@ export default defineComponent({
   height: 80%;
   overflow: hidden;
   text-align: center;
-  color: rgba(255, 0, 0, 0.8);
+  // color: rgba(255, 0, 0, 0.8);
   text-overflow: ellipsis;
 }
 

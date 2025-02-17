@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use config::meta::sql::OrderBy;
 use datafusion::{
     common::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion},
@@ -28,11 +29,16 @@ use super::utils::AddSortAndLimit;
 pub struct AddSortAndLimitRule {
     limit: usize,
     offset: usize,
+    order_by: Option<(String, OrderBy)>,
 }
 
 impl AddSortAndLimitRule {
-    pub fn new(limit: usize, offset: usize) -> Self {
-        Self { limit, offset }
+    pub fn new(limit: usize, offset: usize, order_by: Option<(String, OrderBy)>) -> Self {
+        Self {
+            limit,
+            offset,
+            order_by,
+        }
     }
 }
 
@@ -54,7 +60,11 @@ impl OptimizerRule for AddSortAndLimitRule {
         plan: LogicalPlan,
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
-        let mut plan = plan.rewrite(&mut AddSortAndLimit::new(self.limit, self.offset))?;
+        let mut plan = plan.rewrite(&mut AddSortAndLimit::new(
+            self.limit,
+            self.offset,
+            self.order_by.clone(),
+        ))?;
         plan.tnr = TreeNodeRecursion::Stop;
         Ok(plan)
     }
@@ -192,7 +202,7 @@ mod tests {
         let ctx = SessionContext::new();
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.add_optimizer_rule(Arc::new(AddSortAndLimitRule::new(2, 0)));
+        ctx.add_optimizer_rule(Arc::new(AddSortAndLimitRule::new(2, 0, None)));
 
         for item in sqls {
             let df = ctx.sql(item.0).await.unwrap();

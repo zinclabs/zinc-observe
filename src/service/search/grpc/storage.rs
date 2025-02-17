@@ -509,6 +509,13 @@ pub async fn filter_file_list_by_tantivy_index(
         start.elapsed().as_millis()
     );
 
+    // set target partitions based on cache type
+    let target_partitions = if cache_type == file_data::CacheType::None {
+        cfg.limit.query_thread_num
+    } else {
+        cfg.limit.cpu_num
+    };
+
     let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
     let time_range = query.time_range.unwrap_or((0, 0));
@@ -518,7 +525,7 @@ pub async fn filter_file_list_by_tantivy_index(
         if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_rule {
             if limit > 0 {
                 (
-                    group_files_by_time_range(index_parquet_files, cfg.limit.query_thread_num),
+                    group_files_by_time_range(index_parquet_files, target_partitions),
                     limit,
                 )
             } else {
@@ -562,7 +569,7 @@ pub async fn filter_file_list_by_tantivy_index(
 
         // Spawn a task for each group of files get row_id from index
         let mut tasks = Vec::new();
-        let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
+        let semaphore = std::sync::Arc::new(Semaphore::new(target_partitions));
         for i in 0..group_num {
             let Some(file) = index_parquet_files.get_mut(i).and_then(|g| {
                 if g.is_empty() {

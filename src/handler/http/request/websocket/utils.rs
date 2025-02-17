@@ -118,54 +118,26 @@ pub mod sessions_cache_utils {
     }
 }
 
-pub mod cancellation_registry_cache_utils {
-    use crate::handler::http::request::websocket::session::CANCELLATION_FLAGS;
+pub mod search_registry_utils {
+    use tokio::sync::mpsc;
 
-    /// Add a new cancellation flag for the given trace_id
-    pub fn add_cancellation_flag(trace_id: &str) {
-        CANCELLATION_FLAGS.insert(trace_id.to_string(), false);
-        log::info!(
-            "[WS_CANCEL]: Added cancellation flag for trace_id: {}",
-            trace_id
-        );
+    use crate::handler::http::request::websocket::session::SEARCH_REGISTRY;
+
+    // Core state management
+    #[derive(Debug)]
+    pub enum SearchState {
+        Running {
+            #[allow(unused)]
+            cancel_tx: mpsc::Sender<()>,
+        },
+        Cancelled,
+        Completed,
     }
 
-    /// Set the cancellation flag for the given trace_id
-    pub fn set_cancellation_flag(trace_id: &str) {
-        if let Some(mut flag) = CANCELLATION_FLAGS.get_mut(trace_id) {
-            *flag = true; // Set the flag to `true`
-            log::info!(
-                "[WS_CANCEL]: Cancellation flag set for trace_id: {}",
-                trace_id
-            );
-        } else {
-            log::warn!(
-                "[WS_CANCEL]: No cancellation flag found for trace_id: {}",
-                trace_id
-            );
-        }
-    }
-
-    /// Remove the cancellation flag for the given trace_id
-    pub fn remove_cancellation_flag(trace_id: &str) {
-        if CANCELLATION_FLAGS.remove(trace_id).is_some() {
-            log::info!(
-                "[WS_CANCEL]: Cancellation flag removed for trace_id: {}",
-                trace_id
-            );
-        } else {
-            log::warn!(
-                "[WS_CANCEL]: No cancellation flag found to remove for trace_id: {}",
-                trace_id
-            );
-        }
-    }
-
-    /// Check if a cancellation flag is set for the given trace_id
     pub fn is_cancelled(trace_id: &str) -> bool {
-        CANCELLATION_FLAGS
+        SEARCH_REGISTRY
             .get(trace_id)
-            .map(|flag| *flag)
+            .map(|state| matches!(state.value(), SearchState::Cancelled))
             .unwrap_or(false)
     }
 }

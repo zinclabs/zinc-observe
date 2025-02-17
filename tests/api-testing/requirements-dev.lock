@@ -5,26 +5,54 @@
 #   pre: false
 #   features: []
 #   all-features: false
+#   with-sources: false
+#   generate-hashes: false
+#   universal: false
 
 -e file:.
-black==23.11.0
+absl-py==2.1.0
+    # via tink
 certifi==2023.11.17
+    # via requests
 charset-normalizer==3.3.2
-click==8.1.7
+    # via requests
 idna==3.6
+    # via requests
 iniconfig==2.0.0
+    # via pytest
 markdown-it-py==3.0.0
+    # via rich
 mdurl==0.1.2
-mypy-extensions==1.0.0
+    # via markdown-it-py
 packaging==23.2
-pathspec==0.11.2
-platformdirs==4.0.0
-pluggy==1.3.0
+    # via pytest
+    # via pytest-sugar
+pluggy==1.5.0
+    # via pytest
+protobuf==4.25.6
+    # via pytest-openobserve
+    # via tink
 pygments==2.17.2
-pytest==7.4.3
+    # via rich
+pytest==8.3.4
+    # via pytest-openobserve
+    # via pytest-pretty
+    # via pytest-sugar
 pytest-pretty==1.2.0
+    # via pytest-openobserve
 pytest-sugar==0.9.7
+    # via pytest-openobserve
 requests==2.31.0
+    # via pytest-openobserve
 rich==13.7.0
+    # via pytest-pretty
+ruff==0.9.4
+    # via pytest-openobserve
 termcolor==2.3.0
+    # via pytest-sugar
+tink==1.10.0
+    # via pytest-openobserve
 urllib3==2.1.0
+    # via requests
+websocket-client==1.8.0
+    # via pytest-openobserve

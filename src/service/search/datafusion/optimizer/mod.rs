@@ -111,7 +111,11 @@ pub fn generate_optimizer_rules(sql: &Sql) -> Vec<Arc<dyn OptimizerRule + Send +
     // *********** custom rules ***********
     rules.push(Arc::new(RewriteHistogram::new(start_time, end_time)));
     if let Some(limit) = limit {
-        rules.push(Arc::new(AddSortAndLimitRule::new(limit, offset)));
+        rules.push(Arc::new(AddSortAndLimitRule::new(
+            limit,
+            offset,
+            sql.order_by.first().cloned(),
+        )));
     };
     rules.push(Arc::new(AddTimestampRule::new(start_time, end_time)));
     #[cfg(feature = "enterprise")]

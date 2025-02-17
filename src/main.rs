@@ -687,12 +687,10 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .keep_alive(if cfg.limit.keep_alive_disabled {
-        KeepAlive::Disabled
-    } else {
-        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.keep_alive)))
-    })
-    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.request_timeout)))
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
+        cfg.limit.http_keep_alive,
+    )))
+    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
         let sc = http_tls_config()?;
@@ -799,12 +797,10 @@ async fn init_http_server_without_tracing() -> Result<(), anyhow::Error> {
                 r#"%a "%r" %s %b "%{Content-Length}i" "%{Referer}i" "%{User-Agent}i" %T"#,
             ))
     })
-    .keep_alive(if cfg.limit.keep_alive_disabled {
-        KeepAlive::Disabled
-    } else {
-        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.keep_alive)))
-    })
-    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.request_timeout)))
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
+        cfg.limit.http_keep_alive,
+    )))
+    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
         let sc = http_tls_config()?;
@@ -1042,12 +1038,10 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
             ))
             .wrap(RequestTracing::new())
     })
-    .keep_alive(if cfg.limit.keep_alive_disabled {
-        KeepAlive::Disabled
-    } else {
-        KeepAlive::Timeout(Duration::from_secs(max(1, cfg.limit.keep_alive)))
-    })
-    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.request_timeout)))
+    .keep_alive(KeepAlive::Timeout(Duration::from_secs(
+        cfg.limit.http_keep_alive,
+    )))
+    .client_request_timeout(Duration::from_secs(max(1, cfg.limit.http_request_timeout)))
     .shutdown_timeout(max(1, cfg.limit.http_shutdown_timeout));
     let server = if cfg.http.tls_enabled {
         let sc = http_tls_config()?;

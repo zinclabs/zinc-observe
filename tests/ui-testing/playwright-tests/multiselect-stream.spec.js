@@ -8,7 +8,10 @@ test.describe.configure({ mode: "parallel" });
 async function login(page) {
   await page.goto(process.env["ZO_BASE_URL"]);
   await page.waitForTimeout(1000);
-  // await page.getByText("Login as internal user").click();
+  if (await page.getByText('Login as internal user').isVisible()) {
+    await page.getByText('Login as internal user').click();
+}
+ 
   await page
     .locator('[data-cy="login-user-id"]')
     .fill(process.env["ZO_ROOT_USER_EMAIL"]);
@@ -19,17 +22,6 @@ async function login(page) {
   await page.locator('[data-cy="login-sign-in"]').click();
 }
 
-// const selectStreamAndStreamTypeForLogs = async (page, stream) => {
-//   await page.waitForTimeout(4000);
-//   await page
-//     .locator('[data-test="log-search-index-list-select-stream"]')
-//     .click({ force: true });
-//   await page
-//     .locator("div.q-item")
-//     .getByText(`${stream}`)
-//     .first()
-//     .click({ force: true });
-// };
 
 const getHeaders = () => {
   const basicAuthCredentials = Buffer.from(

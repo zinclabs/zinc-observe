@@ -100,6 +100,14 @@ export const usePanelDataLoader = (
     panelSchema.value.id,
   );
 
+  const getFallbackOrderByCol = () => {
+    // from panelSchema, get first x axis field alias
+    if (panelSchema?.value?.queries?.[0]?.fields?.x) {
+      return panelSchema.value?.queries[0]?.fields?.x?.[0]?.alias ?? null;
+    }
+    return null;
+  };
+
   /**
    * Calculate cache key for panel
    * @returns cache key
@@ -365,7 +373,7 @@ export const usePanelDataLoader = (
     addTraceId(traceId);
     try {
       // partition api call
-      const res = await callWithAbortController(
+      const res: any = await callWithAbortController(
         async () =>
           queryService.partition({
             org_identifier: store.state.selectedOrganization.identifier,
@@ -455,20 +463,21 @@ export const usePanelDataLoader = (
           // remove past error detail
           state.errorDetail = "";
 
+          // Removing below part to allow rendering chart if the error is a function error
           // if there is an function error and which not related to stream range, throw error
-          if (
-            searchRes.data.function_error &&
-            searchRes.data.is_partial != true
-          ) {
-            // abort on unmount
-            if (abortControllerRef) {
-              // this will stop partition api call
-              abortControllerRef?.abort();
-            }
+          // if (
+          //   searchRes.data.function_error &&
+          //   searchRes.data.is_partial != true
+          // ) {
+          //   // abort on unmount
+          //   if (abortControllerRef) {
+          //     // this will stop partition api call
+          //     abortControllerRef?.abort();
+          //   }
 
-            // throw error
-            throw new Error(`Function error: ${searchRes.data.function_error}`);
-          }
+          //   // throw error
+          //   throw new Error(`Function error: ${searchRes.data.function_error}`);
+          // }
 
           // if the query is aborted or the response is partial, break the loop
           if (abortControllerRef?.signal?.aborted) {
@@ -569,8 +578,17 @@ export const usePanelDataLoader = (
     // remove past error detail
     state.errorDetail = "";
 
+    // is streaming aggs
+    const streaming_aggs = searchRes?.content?.streaming_aggs ?? false;
+
+    // if streaming aggs, replace the state data
+    if (streaming_aggs) {
+      state.data[payload?.queryReq?.currentQueryIndex] = [
+        ...(searchRes?.content?.results?.hits ?? {}),
+      ];
+    }
     // if order by is desc, append new partition response at end
-    if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
+    else if (searchRes?.content?.results?.order_by?.toLowerCase() === "asc") {
       // else append new partition response at start
       state.data[payload?.queryReq?.currentQueryIndex] = [
         ...(searchRes?.content?.results?.hits ?? {}),
@@ -646,6 +664,7 @@ export const usePanelDataLoader = (
         use_cache: (window as any).use_cache ?? true,
         dashboard_id: dashboardId?.value,
         folder_id: folderId?.value,
+        fallback_order_by_col: getFallbackOrderByCol(),
       },
     });
   };
