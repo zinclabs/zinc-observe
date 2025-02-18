@@ -436,17 +436,17 @@ export default defineComponent({
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
 
-    const updateTemplateName = (name: string, index: number) => {
+    const updateTemplateName = (name: any, index: number) => {
       userSelectedTemplateNames.value[index] = name;
       jsonArrayOfObj.value[index].name = name;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
-    const updateTemplateBody = (body: string, index: number) => {
+    const updateTemplateBody = (body: any, index: number) => {
       userSelectedTemplateBodies.value[index] = body;
       jsonArrayOfObj.value[index].body = body;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
-    const updateTemplateTitle = (title: string, index: number) => {
+    const updateTemplateTitle = (title: any, index: number) => {
       userSelectedTemplateTitles.value[index] = title;
       jsonArrayOfObj.value[index].title = title;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
@@ -456,7 +456,7 @@ export default defineComponent({
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
 
-    watch(jsonFiles, async (newVal, oldVal) => {
+    watch(jsonFiles, async (newVal: any, oldVal: any) => {
       if (newVal) {
         let combinedJson: any[] = [];
         
@@ -638,7 +638,7 @@ export default defineComponent({
           message: `Template - ${index}: The "name" field is required and should be a valid string.`,
           field: "template_name",
         });
-      } else if (props.templates.some(template => template.name === input.name)) {
+      } else if (props.templates.some((template: any) => template.name === input.name)) {
         templateErrors.push({
           message: `Template - ${index}: "${input.name}" already exists`,
           field: "template_name",
