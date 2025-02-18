@@ -202,8 +202,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <div style="width: 300px">
                           <q-input
-                            v-model="userSelectedDestinationName"
-                            :label="'Destination *'"
+                            v-model="userSelectedDestinationName[index]"
+                            :label="t('destination.name') + ' *'"
                             color="input-border"
                             bg-color="input-bg"
                             class="showLabelOnTop"
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dense
                             tabindex="0"
                             @update:model-value="
-                              updateDestinationName(userSelectedDestinationName)
+                              updateDestinationName(userSelectedDestinationName[index], index)
                             "
                           />
                         </div>
@@ -229,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <div style="width: 300px">
                           <q-input
-                            v-model="userSelectedDestinationUrl"
+                            v-model="userSelectedDestinationUrl[index]"
                             :label="'Destination URL *'"
                             color="input-border"
                             bg-color="input-bg"
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dense
                             tabindex="0"
                             @update:model-value="
-                              updateDestinationUrl(userSelectedDestinationUrl)
+                              updateDestinationUrl(userSelectedDestinationUrl[index], index)
                             "
                           />
                         </div>
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-select
-                            v-model="userSelectedDestinationType"
+                            v-model="userSelectedDestinationType[index]"
                             :options="destinationTypes"
                             :label="'Destination Type *'"
                             :popup-content-style="{
@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             fill-input
                             :input-debounce="400"
                             @update:model-value="
-                              updateDestinationType(userSelectedDestinationType)
+                              updateDestinationType(userSelectedDestinationType[index], index)
                             "
                             behavior="menu"
                           />
@@ -289,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-select
-                            v-model="userSelectedDestinationMethod"
+                            v-model="userSelectedDestinationMethod[index]"
                             :options="destinationMethods"
                             :label="'Destination Method *'"
                             :popup-content-style="{
@@ -306,9 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             fill-input
                             :input-debounce="400"
                             @update:model-value="
-                              updateDestinationMethod(
-                                userSelectedDestinationMethod,
-                              )
+                              updateDestinationMethod(userSelectedDestinationMethod[index], index)
                             "
                             behavior="menu"
                           />
@@ -324,8 +322,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div>
                           <q-select
-                            v-model="userSelectedTemplates"
-                            :options="getFormattedTemplates"
+                            v-model="userSelectedTemplates[index]"
+                            :options="getFormattedTemplates(index)"
                             label="Templates *"
                             :popup-content-style="{
                               textTransform: 'lowercase',
@@ -345,8 +343,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               (val: any) => !!val || 'Field is required!',
                             ]"
                             style="width: 300px"
+                            @update:model-value="updateDestinationTemplate(userSelectedTemplates[index], index)"
                           >
                           </q-select>
+                        </div>
+                      </span>
+                      <span
+                        class="text-red"
+                        v-else-if="
+                          typeof errorMessage === 'object' &&
+                          errorMessage.field == 'email_input'
+                        "
+                      >
+                        {{ errorMessage.message }}
+                        <div style="width: 300px">
+                          <q-input
+                            v-model="userSelectedEmails[index]"
+                            :label="'Emails (comma separated) *'"
+                            color="input-border"
+                            bg-color="input-bg"
+                            class="showLabelOnTop"
+                            stack-label
+                            outlined
+                            filled
+                            dense
+                            tabindex="0"
+                            @update:model-value="
+                              updateDestinationEmails(userSelectedEmails[index], index)
+                            "
+                          />
                         </div>
                       </span>
 
@@ -441,62 +466,107 @@ export default defineComponent({
 
     const destinationErrorsToDisplay = ref<destinationErrors>([]);
 
-    const userSelectedTemplates = ref([]);
+    const userSelectedTemplates = ref<string[]>([]);
     const destinationTypes = ["http", "email"];
     const destinationMethods = ["post", "get", "put"];
 
     const destinationCreators = ref<destinationCreator>([]);
     const queryEditorPlaceholderFlag = ref(true);
-    const userSelectedDestinationType = ref("");
-    const userSelectedDestinationMethod = ref("");
+    const userSelectedDestinationType = ref([]);
+    const userSelectedDestinationMethod = ref([]);
     const jsonFiles = ref(null);
-    const userSelectedDestinationName = ref("");
-    const userSelectedDestinationUrl = ref("");
+    const userSelectedDestinationName = ref([]);
+    const userSelectedDestinationUrl = ref([]);
     const url = ref("");
-    const jsonArrayOfObj: any = ref([{}]);
+    const jsonArrayOfObj = ref<any[]>([{}]);
     const activeTab = ref("import_json_file");
     const splitterModel = ref(60);
     const getFormattedTemplates = computed(() => {
-      return props.templates.map((template: any) => {
-        return template.name;
-      });
+      return (index: number) => {
+        return props.templates
+          .filter((template: any) => {
+            // Get the destination type for the specific index
+            const currentDestinationType = jsonArrayOfObj.value[index]?.type;
+            
+            if (currentDestinationType === "email" && template.type === "email") {
+              return true;
+            } else if (currentDestinationType !== "email") {
+              return true;
+            }
+            return false;
+          })
+          .map((template: any) => template.name);
+      };
     });
 
-    watch(
-      () => userSelectedTemplates.value,
-      (newVal, oldVal) => {
-        if (newVal) {
-          jsonArrayOfObj.value.template = newVal;
-          jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    const userSelectedEmails = ref([]);
+
+    const updateDestinationType = (type: any, index: number) => {
+      jsonArrayOfObj.value[index].type = type;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+    const updateDestinationMethod = (method: any, index: number) => {
+      jsonArrayOfObj.value[index].method = method;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+
+    const updateDestinationName = (destinationName: string, index: number) => {
+      jsonArrayOfObj.value[index].name = destinationName;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+    const updateDestinationUrl = (url: any, index: number) => {
+      jsonArrayOfObj.value[index].url = url;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+
+    const updateDestinationTemplate = (template: string, index: number) => {
+      jsonArrayOfObj.value[index].template = template;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+
+    const updateDestinationEmails = (emails: string, index: number) => {
+      // Split comma-separated emails and trim whitespace
+      const emailArray = emails.split(',').map(email => email.trim());
+      jsonArrayOfObj.value[index].emails = emailArray;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+
+    watch(jsonFiles, async (newVal: any, oldVal: any) => {
+      if (newVal && newVal.length > 0) {
+        let combinedJson: any[] = [];
+        
+        for (const file of newVal) {
+          try {
+            const result: any = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (e: any) => {
+                try {
+                  const parsedJson = JSON.parse(e.target.result);
+                  // Convert to array if it's a single object
+                  const jsonArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+                  resolve(jsonArray);
+                } catch (error) {
+                  q.notify({
+                    message: `Error parsing JSON from file ${file.name}`,
+                    color: "negative",
+                    position: "bottom",
+                    timeout: 2000,
+                  });
+                  resolve([]);
+                }
+              };
+              reader.readAsText(file);
+            });
+            
+            combinedJson = [...combinedJson, ...result];
+          } catch (error) {
+            console.error('Error reading file:', error);
+          }
         }
-      },
-    );
-
-    const updateDestinationType = (type: any) => {
-      jsonArrayOfObj.value.type = type;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
-    const updateDestinationMethod = (method: any) => {
-      jsonArrayOfObj.value.method = method;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
-
-    const updateDestinationName = (alertName: any) => {
-      jsonArrayOfObj.value.name = alertName;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
-    const updateDestinationUrl = (url: any) => {
-      jsonArrayOfObj.value.url = url;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
-
-    watch(jsonFiles, (newVal, oldVal) => {
-      if (newVal) {
-        const reader = new FileReader();
-        reader.onload = (e: any) => {
-          jsonStr.value = e.target.result;
-        };
-        reader.readAsText(newVal[0]);
+        
+        // Update the refs with combined JSON data
+        jsonArrayOfObj.value = combinedJson;
+        jsonStr.value = JSON.stringify(combinedJson, null, 2);
       }
     });
     watch(url, async (newVal, oldVal) => {
@@ -561,17 +631,15 @@ export default defineComponent({
     const importJson = async () => {
       destinationErrorsToDisplay.value = [];
       destinationCreators.value = [];
-      // userSelectedTemplates.value = [];
 
       try {
-        // Check if jsonStr.value is empty or null
         if ((!jsonStr.value || jsonStr.value.trim() === "") && !url.value) {
           throw new Error("JSON string is empty");
         } else {
-          jsonArrayOfObj.value = JSON.parse(jsonStr.value);
+          const parsedJson = JSON.parse(jsonStr.value);
+          jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
         }
       } catch (e: any) {
-        // Handle parsing errors and other issues
         q.notify({
           message: e.message || "Invalid JSON format",
           color: "negative",
@@ -581,17 +649,33 @@ export default defineComponent({
         return;
       }
 
-      // Check if jsonArrayOfObj is an array or a single object
-      const isArray = Array.isArray(jsonArrayOfObj.value);
+      let hasErrors = false;
+      let successCount = 0;
+      const totalCount = jsonArrayOfObj.value.length;
 
-      // If it's an array, process each object sequentially
-      if (isArray) {
-        for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
-          await processJsonObject(jsonObj, index + 1); // Pass the index along with jsonObj
+      for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
+        const success = await processJsonObject(jsonObj, index + 1);
+        if (!success) {
+          hasErrors = true;
+        } else {
+          successCount++;
         }
-      } else {
-        // If it's a single object, just process it
-        await processJsonObject(jsonArrayOfObj.value, 1);
+      }
+
+      // Only redirect and show success message if ALL destinations were imported successfully
+      if (successCount === totalCount) {
+        q.notify({
+          message: `Successfully imported ${successCount} destination${successCount > 1 ? 's' : ''}`,
+          color: "positive",
+          position: "bottom",
+          timeout: 2000,
+        });
+        router.push({
+          name: "alertDestinations",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
       }
     };
 
@@ -603,27 +687,14 @@ export default defineComponent({
           index,
         );
         if (!isValidDestination) {
-          return;
+          return false;
         }
 
         if (destinationErrorsToDisplay.value.length === 0) {
           const hasCreatedDestination = await createDestination(jsonObj, index);
-
-          if (hasCreatedDestination) {
-            q.notify({
-              message: "Destination imported successfully",
-              color: "positive",
-              position: "bottom",
-              timeout: 2000,
-            });
-            router.push({
-              name: "alertDestinations",
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            });
-          }
+          return hasCreatedDestination;
         }
+        return false;
       } catch (e: any) {
         q.notify({
           message: "Error importing Destination please check the JSON",
@@ -631,6 +702,7 @@ export default defineComponent({
           position: "bottom",
           timeout: 2000,
         });
+        return false;
       }
     };
 
@@ -681,9 +753,18 @@ export default defineComponent({
         });
       }
 
-      if (!checkTemplatesInList(props.templates, input.template)) {
+      // Update template validation to consider type-specific templates
+      const availableTemplates = props.templates
+        .filter((template: any) => {
+          if (input.type === "email" && template.type === "email") return true;
+          else if (input.type !== "email") return true;
+          return false;
+        })
+        .map((template: any) => template.name);
+
+      if (!availableTemplates.includes(input.template)) {
         destinationErrors.push({
-          message: `Destination - ${index} ---> template "${input.template}" does not exists`,
+          message: `Destination - ${index} template "${input.template}" does not exist for type "${input.type}"`,
           field: "template_name",
         });
       }
@@ -736,11 +817,12 @@ export default defineComponent({
         if (
           !Array.isArray(input.emails) ||
           input.emails.some((email: any) => typeof email !== "string") ||
-          input.emails.length == 0
+          input.emails.length === 0
         ) {
-          destinationErrors.push(
-            `Destination - ${index} 'emails' should be an array of strings for email`,
-          );
+          destinationErrors.push({
+            message: `Destination - ${index} 'emails' should be an array of strings for email type`,
+            field: "email_input",
+          });
         }
       }
 
@@ -775,29 +857,29 @@ export default defineComponent({
       return templatesList.includes(templateName);
     };
 
-    const createDestination = async (input: any, index: any) => {
+    const createDestination = async (input: any, index: number) => {
       try {
-        // Await the destination creation service call
         await destinationService.create({
           org_identifier: store.state.selectedOrganization.identifier,
           destination_name: input.name,
           data: input,
         });
 
-        // Success block
         destinationCreators.value.push({
-          message: `Destination - ${index}: "${input.name}" created successfully`,
+          message: `Destination - ${index}: "${input.name}" created successfully \nNote: please remove the created desination object ${input.name} from the json file`,
           success: true,
         });
+
+        // Emit update after each successful creation
         emit("update:destinations");
-        return true; // Return true for success
+        
+        return true;
       } catch (error: any) {
-        // Error block
         destinationCreators.value.push({
           message: `Destination - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
           success: false,
         });
-        return false; // Return false for failure
+        return false;
       }
     };
     const arrowBackFn = () => {
@@ -843,6 +925,9 @@ export default defineComponent({
       destinationTypes,
       destinationMethods,
       url,
+      updateDestinationTemplate,
+      userSelectedEmails,
+      updateDestinationEmails,
     };
   },
   components: {
@@ -887,7 +972,7 @@ export default defineComponent({
   resize: none; /* Remove resize behavior */
 }
 .error-report-container {
-  height: calc(60vh - 8px) !important; /* Total editor height */
+  height: calc(70vh - 8px) !important; /* Total editor height */
   overflow: auto; /* Allows scrolling if content overflows */
   resize: none;
 }
