@@ -199,10 +199,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         {{ errorMessage.message }}
-
                         <div style="width: 300px">
                           <q-input
-                            v-model="userSelectedTemplateName"
+                            v-model="userSelectedTemplateNames[index]"
                             :label="'Template Name *'"
                             color="input-border"
                             bg-color="input-bg"
@@ -213,7 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dense
                             tabindex="0"
                             @update:model-value="
-                              updateTemplateName(userSelectedTemplateName)
+                              updateTemplateName($event, index)
                             "
                           />
                         </div>
@@ -226,10 +225,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                       >
                         {{ errorMessage.message }}
-
                         <div style="width: 300px">
                           <q-input
-                            v-model="userSelectedBody"
+                            v-model="userSelectedTemplateBodies[index]"
                             :label="'Template Body *'"
                             color="input-border"
                             bg-color="input-bg"
@@ -240,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dense
                             tabindex="0"
                             @update:model-value="
-                              updateTemplateBody(userSelectedBody)
+                              updateTemplateBody($event, index)
                             "
                           />
                         </div>
@@ -256,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-select
-                            v-model="userSelectedTemplateType"
+                            v-model="userSelectedTemplateTypes[index]"
                             :options="destinationTypes"
                             :label="'Template Type *'"
                             :popup-content-style="{
@@ -273,13 +271,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             fill-input
                             :input-debounce="400"
                             @update:model-value="
-                              updateTemplateType(userSelectedTemplateType)
+                              updateTemplateType($event, index)
                             "
                             behavior="menu"
                           />
                         </div>
                       </span>
-
+                      <span
+                        class="text-red"
+                        v-else-if="
+                          typeof errorMessage === 'object' &&
+                          errorMessage.field == 'title' &&
+                          jsonArrayOfObj.value[index]?.type === 'email'
+                        "
+                      >
+                        {{ errorMessage.message }}
+                        <div style="width: 300px">
+                          <q-input
+                            v-model="userSelectedTemplateTitles[index]"
+                            :label="'Template Title *'"
+                            color="input-border"
+                            bg-color="input-bg"
+                            class="showLabelOnTop"
+                            stack-label
+                            outlined
+                            filled
+                            dense
+                            tabindex="0"
+                            @update:model-value="
+                              updateTemplateTitle($event, index)
+                            "
+                          />
+                        </div>
+                      </span>
                       <span class="text-red" v-else>{{ errorMessage }}</span>
                     </div>
                   </div>
@@ -372,7 +396,7 @@ export default defineComponent({
     const q = useQuasar();
 
     const templateErrorsToDisplay = ref<templateErrors>([]);
-    const userSelectedTemplates = ref([]);
+    const userSelectedTemplates = ref<any[]>([]);
     const destinationTypes = ["http", "email"];
     const destinationMethods = ["post", "get", "put"];
 
@@ -380,10 +404,11 @@ export default defineComponent({
 
     const queryEditorPlaceholderFlag = ref(true);
     const streamList = ref([]);
-    const userSelectedTemplateType = ref("");
+    const userSelectedTemplateTypes = ref<any[]>([]);
     const jsonFiles = ref(null);
-    const userSelectedTemplateName = ref("");
-    const userSelectedBody = ref("");
+    const userSelectedTemplateNames = ref<any[]>([]);
+    const userSelectedTemplateBodies = ref<any[]>([]);
+    const userSelectedTemplateTitles = ref<any[]>([]);
     const userSelectedDestinationUrl = ref("");
     const jsonArrayOfObj = ref<any>([{}]);
     const activeTab = ref("import_json_file");
@@ -405,17 +430,25 @@ export default defineComponent({
       },
     );
 
-    const updateTemplateType = (type: any) => {
-      jsonArrayOfObj.value.type = type;
+    const updateTemplateType = (type: string, index: number) => {
+      userSelectedTemplateTypes.value[index] = type;
+      jsonArrayOfObj.value[index].type = type;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
 
-    const updateTemplateName = (alertName: any) => {
-      jsonArrayOfObj.value.name = alertName;
+    const updateTemplateName = (name: string, index: number) => {
+      userSelectedTemplateNames.value[index] = name;
+      jsonArrayOfObj.value[index].name = name;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
-    const updateTemplateBody = (body: any) => {
-      jsonArrayOfObj.value.body = body;
+    const updateTemplateBody = (body: string, index: number) => {
+      userSelectedTemplateBodies.value[index] = body;
+      jsonArrayOfObj.value[index].body = body;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+    const updateTemplateTitle = (title: string, index: number) => {
+      userSelectedTemplateTitles.value[index] = title;
+      jsonArrayOfObj.value[index].title = title;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
     const updateDestinationUrl = (url: any) => {
@@ -423,15 +456,46 @@ export default defineComponent({
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
 
-    watch(jsonFiles, (newVal, oldVal) => {
+    watch(jsonFiles, async (newVal, oldVal) => {
       if (newVal) {
-        const reader = new FileReader();
-        reader.onload = (e: any) => {
-          jsonStr.value = e.target.result;
-        };
-        reader.readAsText(newVal[0]);
+        let combinedJson: any[] = [];
+        
+        for (const file of newVal) {
+          try {
+            const content = await readFileContent(file);
+            const parsedContent = JSON.parse(content);
+            
+            // Handle both array and single object cases
+            if (Array.isArray(parsedContent)) {
+              combinedJson = [...combinedJson, ...parsedContent];
+            } else {
+              combinedJson.push(parsedContent);
+            }
+          } catch (error) {
+            q.notify({
+              message: `Error reading file ${file.name}: Invalid JSON format`,
+              color: "negative",
+              position: "bottom",
+              timeout: 2000,
+            });
+            return;
+          }
+        }
+        
+        jsonStr.value = JSON.stringify(combinedJson, null, 2);
       }
     });
+
+    // Add this helper function
+    const readFileContent = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e: any) => resolve(e.target.result);
+        reader.onerror = (e) => reject(e);
+        reader.readAsText(file);
+      });
+    };
+
     watch(url, async (newVal, oldVal) => {
       try {
         if (newVal) {
@@ -496,14 +560,13 @@ export default defineComponent({
       tempalteCreators.value = [];
 
       try {
-        // Check if jsonStr.value is empty or null
         if ((!jsonStr.value || jsonStr.value.trim() === "") && !url.value) {
           throw new Error("JSON string is empty");
         } else {
-          jsonArrayOfObj.value = JSON.parse(jsonStr.value);
+          const parsedJson = JSON.parse(jsonStr.value);
+          jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
         }
       } catch (e: any) {
-        // Handle parsing errors and other issues
         q.notify({
           message: e.message || "Invalid JSON format",
           color: "negative",
@@ -513,45 +576,48 @@ export default defineComponent({
         return;
       }
 
-      // Check if jsonArrayOfObj is an array or a single object
-      const isArray = Array.isArray(jsonArrayOfObj.value);
+      let hasErrors = false;
+      let successCount = 0;
+      const totalCount = jsonArrayOfObj.value.length;
 
-      // If it's an array, process each object sequentially
-      if (isArray) {
-        for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
-          await processJsonObject(jsonObj, index + 1); // Pass the index along with jsonObj
+      for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
+        const success = await processJsonObject(jsonObj, index + 1);
+        if (!success) {
+          hasErrors = true;
+        } else {
+          successCount++;
         }
-      } else {
-        // If it's a single object, just process it
-        await processJsonObject(jsonArrayOfObj.value, 1);
+      }
+
+      // Only redirect and show success message if ALL templates were imported successfully
+      if (successCount === totalCount) {
+        q.notify({
+          message: `Successfully imported ${successCount} template${successCount > 1 ? 's' : ''}`,
+          color: "positive",
+          position: "bottom",
+          timeout: 2000,
+        });
+        router.push({
+          name: "alertTemplates",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
       }
     };
 
     const processJsonObject = async (jsonObj: any, index: number) => {
       try {
-        const isValidTemplate = await validateTemplateInputs(jsonObj, 0);
+        const isValidTemplate = await validateTemplateInputs(jsonObj, index);
         if (!isValidTemplate) {
-          return;
+          return false;
         }
 
         if (templateErrorsToDisplay.value.length === 0) {
           const hasCreatedTemplate = await createTemplate(jsonObj, index);
-
-          if (hasCreatedTemplate) {
-            q.notify({
-              message: "Template imported successfully",
-              color: "positive",
-              position: "bottom",
-              timeout: 2000,
-            });
-            router.push({
-              name: "alertTemplates",
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            });
-          }
+          return hasCreatedTemplate;
         }
+        return false;
       } catch (e: any) {
         q.notify({
           message: "Error importing Template please check the JSON",
@@ -559,43 +625,44 @@ export default defineComponent({
           position: "bottom",
           timeout: 2000,
         });
+        return false;
       }
     };
-    const validateTemplateInputs = async (input: any, index: any) => {
+
+    const validateTemplateInputs = async (input: any, index: number) => {
       let templateErrors: (string | { message: string; field: string })[] = [];
-      // Validate name: should be a non-empty string
-      if (
-        !input.name ||
-        typeof input.name !== "string" ||
-        input.name.trim() === ""
-      ) {
-        templateErrors.push(
-          `Template - ${index}: The "name" field is required and should be a valid string.`,
-        );
-      }
-      console.log(checkTemplatesInList(props.templates, input.name));
-      if (checkTemplatesInList(props.templates, input.name)) {
+
+      // Validate name using the updated props.templates
+      if (!input.name || typeof input.name !== "string" || input.name.trim() === "") {
+        templateErrors.push({
+          message: `Template - ${index}: The "name" field is required and should be a valid string.`,
+          field: "template_name",
+        });
+      } else if (props.templates.some(template => template.name === input.name)) {
         templateErrors.push({
           message: `Template - ${index}: "${input.name}" already exists`,
           field: "template_name",
         });
       }
 
-      // Validate body: should be a non-empty string
-      if (
-        !input.body ||
-        typeof input.body !== "string" ||
-        input.body.trim() === ""
-      ) {
-        templateErrors.push(
-          `Template - ${index}: The "body" field is required and should be a valid JSON string.`,
-        );
+      // Validate type
+      if (!input.type || (input.type !== "email" && input.type !== "http")) {
+        templateErrors.push({
+          message: `Template - ${index}: The "type" field must be either "email" or "http"`,
+          field: "type",
+        });
+      }
+
+      // Validate body
+      if (!input.body || typeof input.body !== "string" || input.body.trim() === "") {
+        templateErrors.push({
+          message: `Template - ${index}: The "body" field is required and should be a valid JSON string.`,
+          field: "body",
+        });
       } else {
         try {
-          // Try to parse the body as JSON
           JSON.parse(input.body);
         } catch (e) {
-          // If parsing fails, it is not a valid JSON
           templateErrors.push({
             message: `Template - ${index}: The "body" field should contain a valid JSON.`,
             field: "body",
@@ -603,35 +670,21 @@ export default defineComponent({
         }
       }
 
-      // Validate type: should be either "email" or "http"
-      if (!input.type || (input.type !== "email" && input.type !== "http")) {
-        templateErrors.push({
-          message: `Template - ${index}: The "type" field must be either "email" or "http".`,
-          field: "type",
-        });
-      }
-
-      // Validate title based on type
+      // Validate title for email type
       if (input.type === "email") {
-        // For email type, title should be a non-empty string
-        if (
-          !input.title ||
-          typeof input.title !== "string" ||
-          input.title.trim() === ""
-        ) {
-          templateErrors.push(
-            `Template - ${index}: The "title" field is required and should be a non-empty string for "email" type.`,
-          );
+        if (!input.title || typeof input.title !== "string" || input.title.trim() === "") {
+          templateErrors.push({
+            message: `Template - ${index}: The "title" field is required for email type templates.`,
+            field: "title",
+          });
         }
       }
 
-      // If there are errors, log them at the end
       if (templateErrors.length > 0) {
         templateErrorsToDisplay.value.push(templateErrors);
         return false;
       }
 
-      // If all validations pass
       return true;
     };
 
@@ -640,9 +693,8 @@ export default defineComponent({
       return templatesList.includes(templateName);
     };
 
-    const createTemplate = async (input: any, index: any) => {
+    const createTemplate = async (input: any, index: number) => {
       try {
-        // Await the template creation service call
         await templateService.create({
           org_identifier: store.state.selectedOrganization.identifier,
           template_name: input.name,
@@ -654,20 +706,21 @@ export default defineComponent({
           },
         });
 
-        // Success block
         tempalteCreators.value.push({
           message: `Template - ${index}: "${input.name}" created successfully`,
           success: true,
         });
+
+        // Emit update after each successful creation
         emit("update:templates");
-        return true; // Return true for success
+        
+        return true;
       } catch (error: any) {
-        // Error block
         tempalteCreators.value.push({
-          message: `Template - ${index}: "${input.name}" creation failed`,
+          message: `Template - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
           success: false,
         });
-        return false; // Return false for failure
+        return false;
       }
     };
 
@@ -701,19 +754,21 @@ export default defineComponent({
       getFormattedTemplates,
       jsonArrayOfObj,
       streamList,
-      userSelectedTemplateType,
+      userSelectedTemplateTypes,
       updateTemplateType,
       updateTemplateName,
       updateDestinationUrl,
       jsonFiles,
       updateActiveTab,
       arrowBackFn,
-      userSelectedTemplateName,
-      userSelectedBody,
+      userSelectedTemplateNames,
+      userSelectedTemplateBodies,
+      userSelectedTemplateTitles,
       userSelectedDestinationUrl,
       destinationTypes,
       destinationMethods,
       updateTemplateBody,
+      updateTemplateTitle,
       url,
     };
   },

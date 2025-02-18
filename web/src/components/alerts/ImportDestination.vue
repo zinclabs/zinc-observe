@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div>
                           <q-select
                             v-model="userSelectedTemplates[index]"
-                            :options="getFormattedTemplates(index)"
+                            :options="filteredTemplates"
                             label="Templates *"
                             :popup-content-style="{
                               textTransform: 'lowercase',
@@ -335,15 +335,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             stack-label
                             dense
                             use-input
+                            input-debounce="400"
+                            behavior="menu"
                             hide-selected
                             fill-input
-                            :input-debounce="400"
-                            behavior="menu"
+                            @filter="filterTemplates"
                             :rules="[
-                              (val: any) => !!val || 'Field is required!',
+                              (val) => !!val || 'Field is required!',
                             ]"
                             style="width: 300px"
-                            @update:model-value="updateDestinationTemplate(userSelectedTemplates[index], index)"
+                            @update:model-value="updateDestinationTemplate($event, index)"
                           >
                           </q-select>
                         </div>
@@ -374,7 +375,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </div>
                       </span>
-
+                      <span
+                        class="text-red"
+                        v-else-if="
+                          typeof errorMessage === 'object' &&
+                          errorMessage.field == 'skip_tls_verify'
+                        "
+                      >
+                        {{ errorMessage.message }}
+                        <div style="width: 300px">
+                          <q-toggle
+                            :model-value="userSelectedSkipTlsVerify[index] ?? false"
+                            :label="t('alert_destinations.skip_tls_verify')"
+                            class="q-mt-sm"
+                            @update:model-value="
+                              updateSkipTlsVerify($event, index)
+                            "
+                          />
+                        </div>
+                      </span>
                       <span class="text-red" v-else>{{ errorMessage }}</span>
                     </div>
                   </div>
@@ -481,22 +500,24 @@ export default defineComponent({
     const jsonArrayOfObj = ref<any[]>([{}]);
     const activeTab = ref("import_json_file");
     const splitterModel = ref(60);
+    const filteredTemplates = ref<string[]>([]);
+
+    const userSelectedSkipTlsVerify = ref<boolean[]>([]);
+
     const getFormattedTemplates = computed(() => {
-      return (index: number) => {
-        return props.templates
-          .filter((template: any) => {
-            // Get the destination type for the specific index
-            const currentDestinationType = jsonArrayOfObj.value[index]?.type;
-            
-            if (currentDestinationType === "email" && template.type === "email") {
-              return true;
-            } else if (currentDestinationType !== "email") {
-              return true;
-            }
-            return false;
-          })
-          .map((template: any) => template.name);
-      };
+      return props.templates
+        .filter((template: any) => {
+          // Get the current destination type
+          const currentDestinationType = jsonArrayOfObj.value[destinationErrorsToDisplay.value.length - 1]?.type;
+          
+          if (currentDestinationType === "email" && template.type === "email") {
+            return true;
+          } else if (currentDestinationType !== "email") {
+            return true;
+          }
+          return false;
+        })
+        .map((template: any) => template.name);
     });
 
     const userSelectedEmails = ref([]);
@@ -529,6 +550,28 @@ export default defineComponent({
       const emailArray = emails.split(',').map(email => email.trim());
       jsonArrayOfObj.value[index].emails = emailArray;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+
+    const updateSkipTlsVerify = (value: boolean, index: number) => {
+      userSelectedSkipTlsVerify.value[index] = value;
+      jsonArrayOfObj.value[index].skip_tls_verify = value;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+
+    const filterTemplates = (val: string, update: Function) => {
+      if (val === "") {
+        update(() => {
+          filteredTemplates.value = getFormattedTemplates.value;
+        });
+        return;
+      }
+
+      update(() => {
+        const needle = val.toLowerCase();
+        filteredTemplates.value = getFormattedTemplates.value.filter(
+          (template: string) => template.toLowerCase().includes(needle)
+        );
+      });
     };
 
     watch(jsonFiles, async (newVal: any, oldVal: any) => {
@@ -784,9 +827,10 @@ export default defineComponent({
         input.skip_tls_verify === undefined ||
         typeof input.skip_tls_verify !== "boolean"
       ) {
-        destinationErrors.push(
-          `Destination - ${index} 'skip_tls_verify' is required and should be a boolean value`,
-        );
+        destinationErrors.push({
+          message: `Destination - ${index} 'skip_tls_verify' is required and should be a boolean value`,
+          field: "skip_tls_verify",
+        });
       }
 
       // Check if 'headers' is required for webhook but not for email
@@ -928,6 +972,10 @@ export default defineComponent({
       updateDestinationTemplate,
       userSelectedEmails,
       updateDestinationEmails,
+      filterTemplates,
+      filteredTemplates,
+      userSelectedSkipTlsVerify,
+      updateSkipTlsVerify,
     };
   },
   components: {
