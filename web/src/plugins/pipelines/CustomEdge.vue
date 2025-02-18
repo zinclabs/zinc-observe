@@ -21,7 +21,12 @@
         class="remove-edge-button"
         aria-label="Remove edge"
       >
-      <q-icon name="close" />
+      <q-icon name="close"
+      flat
+      dense
+      size="12px"
+      class="red-btn"
+       />
       </button>
     </div>
   </EdgeLabelRenderer>
@@ -89,7 +94,7 @@ onMounted(() => {
 })
 
 
-const path = computed(() => getSmoothStepPath(props))
+const path = computed(() => getBezierPath(props))
 function handleClick(event) {
   event.stopPropagation() // Prevent edge selection
   removeEdges(props.id)
@@ -110,7 +115,11 @@ export default {
   border: none;
   border-radius: 100%;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 0px 6px !important;
+}
+.red-btn{
+  padding: 0px !important;
+  bottom: 1px;
 }
 </style>
 

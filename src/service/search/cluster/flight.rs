@@ -371,6 +371,7 @@ pub async fn run_datafusion(
         .collect::<HashMap<_, _>>();
 
     // check inverted index prefix search
+    #[allow(deprecated)]
     if sql.stream_type == StreamType::Index
         && cfg.common.full_text_search_type.to_lowercase() != "contains"
     {
@@ -825,6 +826,7 @@ async fn get_inverted_index_file_lists(
     query: &SearchQuery,
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = get_config();
+    #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let (use_inverted_index, index_terms) = super::super::is_use_inverted_index(sql);
     let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";
@@ -882,6 +884,7 @@ pub async fn get_inverted_index_file_list(
     let terms = match_terms
         .iter()
         .filter_map(|t| {
+            #[allow(deprecated)]
             let tokens = split_token(t, &cfg.common.inverted_index_split_chars);
             if tokens.is_empty() {
                 None
@@ -896,6 +899,7 @@ pub async fn get_inverted_index_file_list(
         })
         .collect::<HashSet<String>>();
 
+    #[allow(deprecated)]
     let fts_condition = terms
         .iter()
         .map(|x| match cfg.common.full_text_search_type.as_str() {
@@ -905,6 +909,7 @@ pub async fn get_inverted_index_file_list(
         })
         .collect::<Vec<_>>()
         .join(" OR ");
+    #[allow(deprecated)]
     let fts_condition = if fts_condition.is_empty() {
         fts_condition
     } else if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
@@ -946,6 +951,7 @@ pub async fn get_inverted_index_file_list(
         }
     };
 
+    #[allow(deprecated)]
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()

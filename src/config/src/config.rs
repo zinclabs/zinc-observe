@@ -821,24 +821,28 @@ pub struct Common {
         help = "Toggle inverted index cache."
     )]
     pub inverted_index_cache_enabled: bool,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_SPLIT_CHARS",
         default = "",
         help = "Characters which should be used as a delimiter to split the string, default using all ascii punctuations."
     )]
     pub inverted_index_split_chars: String,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_OLD_FORMAT",
         default = false,
         help = "Use old format for inverted index, it will generate same stream name for index."
     )]
     pub inverted_index_old_format: bool,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_STORE_FORMAT",
         default = "tantivy",
         help = "InvertedIndex store format, parquet(default), tantivy, both"
     )]
     pub inverted_index_store_format: String,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_INVERTED_INDEX_SEARCH_FORMAT",
         default = "tantivy",
@@ -857,6 +861,7 @@ pub struct Common {
         help = "Toggle inverted index count optimizer."
     )]
     pub inverted_index_count_optimizer_enabled: bool,
+    #[deprecated(since = "0.14.3", note = "will be removed in 0.15.0")]
     #[env_config(
         name = "ZO_FULL_TEXT_SEARCH_TYPE",
         default = "eq",
@@ -1953,27 +1958,34 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check default inverted index search format
-    cfg.common.inverted_index_store_format = cfg.common.inverted_index_store_format.to_lowercase();
-    if cfg.common.inverted_index_store_format.is_empty() {
-        cfg.common.inverted_index_store_format = "parquet".to_string();
-    }
-    if !["both", "parquet", "tantivy"].contains(&cfg.common.inverted_index_store_format.as_str()) {
-        return Err(anyhow::anyhow!(
-            "ZO_INVERTED_INDEX_STORE_FORMAT must be one of parquet, tantivy, both."
-        ));
-    }
-    cfg.common.inverted_index_search_format =
-        cfg.common.inverted_index_search_format.to_lowercase();
-    if cfg.common.inverted_index_search_format.is_empty() {
-        cfg.common.inverted_index_search_format = cfg.common.inverted_index_store_format.clone();
-    }
-    if cfg.common.inverted_index_search_format == "both" {
-        cfg.common.inverted_index_search_format = "parquet".to_string();
-    }
-    if !["parquet", "tantivy"].contains(&cfg.common.inverted_index_search_format.as_str()) {
-        return Err(anyhow::anyhow!(
-            "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
-        ));
+    #[allow(deprecated)]
+    {
+        cfg.common.inverted_index_store_format =
+            cfg.common.inverted_index_store_format.to_lowercase();
+        if cfg.common.inverted_index_store_format.is_empty() {
+            cfg.common.inverted_index_store_format = "parquet".to_string();
+        }
+        if !["both", "parquet", "tantivy"]
+            .contains(&cfg.common.inverted_index_store_format.as_str())
+        {
+            return Err(anyhow::anyhow!(
+                "ZO_INVERTED_INDEX_STORE_FORMAT must be one of parquet, tantivy, both."
+            ));
+        }
+        cfg.common.inverted_index_search_format =
+            cfg.common.inverted_index_search_format.to_lowercase();
+        if cfg.common.inverted_index_search_format.is_empty() {
+            cfg.common.inverted_index_search_format =
+                cfg.common.inverted_index_store_format.clone();
+        }
+        if cfg.common.inverted_index_search_format == "both" {
+            cfg.common.inverted_index_search_format = "parquet".to_string();
+        }
+        if !["parquet", "tantivy"].contains(&cfg.common.inverted_index_search_format.as_str()) {
+            return Err(anyhow::anyhow!(
+                "ZO_INVERTED_INDEX_SEARCH_FORMAT must be one of parquet, tantivy."
+            ));
+        }
     }
 
     // check for join match one

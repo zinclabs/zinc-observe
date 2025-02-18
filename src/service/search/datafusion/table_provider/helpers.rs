@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -171,6 +171,7 @@ pub fn split_files(
 }
 
 pub fn generate_access_plan(file: &PartitionedFile) -> Option<Arc<ParquetAccessPlan>> {
+    #[allow(deprecated)]
     if config::get_config()
         .common
         .inverted_index_search_format

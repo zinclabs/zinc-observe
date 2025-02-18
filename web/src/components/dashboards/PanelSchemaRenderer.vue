@@ -76,13 +76,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-          <CustomChartRenderer
+        <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
-            :data="panelData"
-            style="width: 100%; height: 100%"
-            class="col"
-            @error="errorDetail = $event"
-          />
+          :data="panelData"
+          style="width: 100%; height: 100%"
+          class="col"
+          @error="errorDetail = $event"
+        />
         <ChartRenderer
           v-else
           :data="
@@ -380,6 +380,7 @@ export default defineComponent({
     "is-cached-data-differ-with-current-time-range-update",
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
+    "loading-state-change",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -506,6 +507,11 @@ export default defineComponent({
       { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
     );
 
+    // Watch loading state changes and emit them to parent
+    watch(loading, (newLoadingState) => {
+      emit("loading-state-change", newLoadingState);
+    });
+
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
     watch(loading, (updatedLoadingValue) => {
       if (variablesAndPanelsDataLoadingState) {
@@ -573,7 +579,7 @@ export default defineComponent({
 
           emit("updated:vrlFunctionFieldList", responseFields);
         }
-        if(panelData.value.chartType == 'custom_chart') errorDetail.value = '';
+        if (panelData.value.chartType == "custom_chart") errorDetail.value = "";
 
         // panelData.value = convertPanelData(panelSchema.value, data.value, store);
         if (!errorDetail.value && validatePanelData?.value?.length === 0) {
@@ -589,7 +595,7 @@ export default defineComponent({
               metadata.value,
               chartPanelStyle.value,
               annotations,
-              loading.value
+              loading.value,
             );
 
             errorDetail.value = "";

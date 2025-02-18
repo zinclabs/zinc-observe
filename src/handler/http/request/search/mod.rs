@@ -526,14 +526,15 @@ pub async fn around(
             .unwrap();
 
     // search forward
+    let fw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, false)
+        .unwrap_or(around_sql.to_string());
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: around_sql.clone(),
+            sql: fw_sql,
             from: 0,
             size: around_size / 2,
             start_time: around_start_time,
             end_time: around_key,
-            sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
@@ -580,14 +581,15 @@ pub async fn around(
     };
 
     // search backward
+    let bw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, true)
+        .unwrap_or(around_sql.to_string());
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: around_sql.clone(),
+            sql: bw_sql,
             from: 0,
             size: around_size / 2,
             start_time: around_key,
             end_time: around_end_time,
-            sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
@@ -1329,7 +1331,7 @@ pub async fn search_history(
 
     // Search
     let stream_name = USAGE_STREAM;
-    let search_query_req = match req.to_query_req(stream_name, &cfg.common.column_timestamp) {
+    let search_query_req = match req.to_query_req(stream_name) {
         Ok(r) => r,
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));

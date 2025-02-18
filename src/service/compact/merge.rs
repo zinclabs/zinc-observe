@@ -1042,6 +1042,7 @@ async fn generate_inverted_index(
     let cfg = get_config();
 
     // generate parquet format inverted index
+    #[allow(deprecated)]
     let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
     if matches!(
         index_format,

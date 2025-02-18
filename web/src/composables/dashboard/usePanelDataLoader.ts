@@ -792,7 +792,6 @@ export const usePanelDataLoader = (
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
       };
-
       const requestId = fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
@@ -971,6 +970,7 @@ export const usePanelDataLoader = (
           };
           state.resultMetaData = [];
           state.annotations = [];
+          state.isOperationCancelled = false;
 
           // Call search API
 

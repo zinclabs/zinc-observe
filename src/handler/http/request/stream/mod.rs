@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -201,6 +201,7 @@ async fn update_settings(
 
     // sync the data retention to index stream
     if stream_type.is_basic_type() && stream_settings.data_retention.is_some() {
+        #[allow(deprecated)]
         let index_stream_name =
             if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
                 stream_name.to_string()

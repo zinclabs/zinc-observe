@@ -43,8 +43,9 @@ use regex::Regex;
 use sqlparser::{
     ast::{
         BinaryOperator, DuplicateTreatment, Expr, Function, FunctionArg, FunctionArgExpr,
-        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, Query, Select,
-        SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, VisitMut, VisitorMut,
+        FunctionArgumentList, FunctionArguments, GroupByExpr, Ident, ObjectName, OrderByExpr,
+        Query, Select, SelectItem, SetExpr, Statement, TableFactor, TableWithJoins, VisitMut,
+        VisitorMut,
     },
     dialect::PostgreSqlDialect,
     parser::Parser,
@@ -150,17 +151,6 @@ impl Sql {
             .collect::<Vec<_>>();
         let group_by = column_visitor.group_by;
         let mut order_by = column_visitor.order_by;
-        if order_by.is_empty() && !query.sort_by.is_empty() {
-            // example: sort_by: "timestamp ASC"
-            let sort_by = query.sort_by.split_whitespace().collect::<Vec<_>>();
-            if sort_by.len() >= 2 {
-                if sort_by[1].to_lowercase() == "desc" {
-                    order_by.push((sort_by[0].to_string(), OrderBy::Desc));
-                } else {
-                    order_by.push((sort_by[0].to_string(), OrderBy::Asc));
-                }
-            }
-        }
 
         // check if need sort by time
         if order_by.is_empty()
@@ -253,6 +243,7 @@ impl Sql {
         // 11. generate tantivy query
         let mut index_condition = None;
         let mut can_optimize = false;
+        #[allow(deprecated)]
         if cfg.common.inverted_index_search_format.eq("tantivy")
             && stream_names.len() == 1
             && cfg.common.inverted_index_enabled
@@ -1670,6 +1661,51 @@ pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
     }
 }
 
+/// check if the sql is complex query, if not, add ordering term by timestamp
+pub fn check_or_add_order_by_timestamp(sql: &str, is_asc: bool) -> infra::errors::Result<String> {
+    let mut statement = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+        .map_err(|e| Error::Message(e.to_string()))?
+        .pop()
+        .unwrap();
+    if is_complex_query(&mut statement) {
+        return Ok(sql.to_string());
+    }
+    let mut visitor =
+        AddOrderingTermVisitor::new(get_config().common.column_timestamp.to_string(), is_asc);
+    statement.visit(&mut visitor);
+    Ok(statement.to_string())
+}
+
+struct AddOrderingTermVisitor {
+    field: String,
+    is_asc: bool,
+}
+
+impl AddOrderingTermVisitor {
+    fn new(field: String, is_asc: bool) -> Self {
+        Self { field, is_asc }
+    }
+}
+
+impl VisitorMut for AddOrderingTermVisitor {
+    type Break = ();
+
+    fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
+        if query.order_by.is_none() {
+            query.order_by = Some(sqlparser::ast::OrderBy {
+                exprs: vec![OrderByExpr {
+                    expr: Expr::Identifier(Ident::new(self.field.clone())),
+                    asc: Some(self.is_asc),
+                    nulls_first: None,
+                    with_fill: None,
+                }],
+                interpolate: None,
+            });
+        }
+        ControlFlow::Continue(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -1916,5 +1952,43 @@ mod tests {
             .pop()
             .unwrap();
         assert_eq!(is_simple_count_query(&mut statement), false);
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_no_order_asc() {
+        let sql = "SELECT * FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(result, "SELECT * FROM logs ORDER BY _timestamp ASC");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_no_order_desc() {
+        let sql = "SELECT * FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, false).unwrap();
+        assert_eq!(result, "SELECT * FROM logs ORDER BY _timestamp DESC");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_aggregation() {
+        let sql = "SELECT COUNT(*) FROM logs";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(result, "SELECT COUNT(*) FROM logs");
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_existing_order() {
+        let sql = "SELECT * FROM logs ORDER BY field1 DESC";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(sql, result);
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_with_where() {
+        let sql = "SELECT * FROM logs WHERE field1 = 'value'";
+        let result = check_or_add_order_by_timestamp(sql, true).unwrap();
+        assert_eq!(
+            result,
+            "SELECT * FROM logs WHERE field1 = 'value' ORDER BY _timestamp ASC"
+        );
     }
 }

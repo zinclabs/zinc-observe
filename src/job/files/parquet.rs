@@ -791,6 +791,7 @@ async fn merge_files(
     }
 
     // generate parquet format inverted index
+    #[allow(deprecated)]
     let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
     if matches!(
         index_format,
@@ -852,6 +853,7 @@ pub(crate) async fn generate_index_on_ingester(
     }
 
     let cfg = get_config();
+    #[allow(deprecated)]
     let index_stream_name =
         if cfg.common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -920,6 +922,7 @@ pub(crate) async fn generate_index_on_ingester(
         .await;
     } else if let Some(schema) = schema_map.get(&index_stream_name) {
         // check if the schema has been updated <= v0.10.8-rc4
+        #[allow(deprecated)]
         if cfg.common.inverted_index_old_format
             && stream_type == StreamType::Logs
             && !schema.fields_map().contains_key("segment_ids")
@@ -1033,6 +1036,7 @@ pub(crate) async fn generate_index_on_compactor(
         return Ok(vec![]);
     }
 
+    #[allow(deprecated)]
     let index_stream_name =
         if get_config().common.inverted_index_old_format && stream_type == StreamType::Logs {
             stream_name.to_string()
@@ -1207,6 +1211,7 @@ async fn prepare_index_record_batches(
             // split the column into terms
             let terms = (0..num_rows)
                 .flat_map(|i| {
+                    #[allow(deprecated)]
                     split_token(column_data.value(i), &cfg.common.inverted_index_split_chars)
                         .into_iter()
                         .map(|s| (s, i))

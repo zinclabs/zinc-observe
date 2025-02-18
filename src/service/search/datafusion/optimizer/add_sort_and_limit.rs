@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::sql::OrderBy;
 use datafusion::{
     common::{
         tree_node::{Transformed, TreeNode, TreeNodeRecursion},
@@ -29,16 +28,11 @@ use super::utils::AddSortAndLimit;
 pub struct AddSortAndLimitRule {
     limit: usize,
     offset: usize,
-    order_by: Option<(String, OrderBy)>,
 }
 
 impl AddSortAndLimitRule {
-    pub fn new(limit: usize, offset: usize, order_by: Option<(String, OrderBy)>) -> Self {
-        Self {
-            limit,
-            offset,
-            order_by,
-        }
+    pub fn new(limit: usize, offset: usize) -> Self {
+        Self { limit, offset }
     }
 }
 
@@ -60,11 +54,7 @@ impl OptimizerRule for AddSortAndLimitRule {
         plan: LogicalPlan,
         _config: &dyn OptimizerConfig,
     ) -> Result<Transformed<LogicalPlan>> {
-        let mut plan = plan.rewrite(&mut AddSortAndLimit::new(
-            self.limit,
-            self.offset,
-            self.order_by.clone(),
-        ))?;
+        let mut plan = plan.rewrite(&mut AddSortAndLimit::new(self.limit, self.offset))?;
         plan.tnr = TreeNodeRecursion::Stop;
         Ok(plan)
     }
@@ -202,7 +192,7 @@ mod tests {
         let ctx = SessionContext::new();
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
-        ctx.add_optimizer_rule(Arc::new(AddSortAndLimitRule::new(2, 0, None)));
+        ctx.add_optimizer_rule(Arc::new(AddSortAndLimitRule::new(2, 0)));
 
         for item in sqls {
             let df = ctx.sql(item.0).await.unwrap();

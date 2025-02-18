@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -47,10 +47,7 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    service::{
-        search::{self as SearchService, RESULT_ARRAY},
-        self_reporting::report_request_usage_stats,
-    },
+    service::{search as SearchService, self_reporting::report_request_usage_stats},
 };
 
 /// SearchStreamData
@@ -502,9 +499,11 @@ pub async fn search_multi(
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
 
-        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+        let apply_over_hits = SearchService::RESULT_ARRAY.is_match(&input_fn);
         if apply_over_hits {
-            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
+            input_fn = SearchService::RESULT_ARRAY
+                .replace(&input_fn, "")
+                .to_string();
         }
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {
@@ -971,14 +970,15 @@ pub async fn around_multi(
             .dec();
 
         // search forward
+        let fw_sql = SearchService::sql::check_or_add_order_by_timestamp(around_sql, false)
+            .unwrap_or(around_sql.to_string());
         let req = config::meta::search::Request {
             query: config::meta::search::Query {
-                sql: around_sql.clone(),
+                sql: fw_sql,
                 from: 0,
                 size: around_size / 2,
                 start_time: around_start_time,
                 end_time: around_key,
-                sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
@@ -1047,14 +1047,15 @@ pub async fn around_multi(
         };
 
         // search backward
+        let bw_sql = SearchService::sql::check_or_add_order_by_timestamp(around_sql, true)
+            .unwrap_or(around_sql.to_string());
         let req = config::meta::search::Request {
             query: config::meta::search::Query {
-                sql: around_sql.clone(),
+                sql: bw_sql,
                 from: 0,
                 size: around_size / 2,
                 start_time: around_key,
                 end_time: around_end_time,
-                sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,

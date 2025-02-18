@@ -158,6 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Refresh Panel"
           data-test="dashboard-panel-refresh-panel-btn"
           :color="variablesDataUpdated ? 'warning' : ''"
+          :disable="isPanelLoading"
         >
           <q-tooltip>
             {{
@@ -264,6 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboard-id="props.dashboardId"
       :folder-id="props.folderId"
       :report-id="props.reportId"
+      @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
       @result-metadata-update="handleResultMetadataUpdate"
       @last-triggered-at-update="handleLastTriggeredAtUpdate"
@@ -530,15 +532,27 @@ export default defineComponent({
       emit("onMovePanel", props.data.id, selectedTabId);
     };
 
-    const onRefreshPanel = () => {
-      emit("refreshPanelRequest", props.data.id);
+    const isPanelLoading = ref(false);
+
+    const handleLoadingStateChange = (isLoading: any) => {
+      isPanelLoading.value = isLoading;
     };
 
+    const onRefreshPanel = async () => {
+      if (isPanelLoading.value) return;
+
+      isPanelLoading.value = true;
+      try {
+        await emit("refreshPanelRequest", props.data.id);
+      } finally {
+        isPanelLoading.value = false;
+      }
+    };
     const createVariableRegex = (name: any) =>
       new RegExp(
         `.*\\$\\{?${name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
       );
-      
+
     const getDependentVariablesData = () =>
       props.variablesData?.values
         ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
@@ -591,7 +605,7 @@ export default defineComponent({
     const errorData = ref("");
     const onError = (error: any) => {
       errorData.value = typeof error === "string" ? error : error?.value;
-    }
+    };
 
     return {
       props,
@@ -620,7 +634,9 @@ export default defineComponent({
       onRefreshPanel,
       variablesDataUpdated,
       onError,
-      errorData
+      errorData,
+      isPanelLoading,
+      handleLoadingStateChange,
     };
   },
   methods: {

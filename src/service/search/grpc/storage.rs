@@ -123,6 +123,7 @@ pub async fn search(
 
     // check inverted index
     let cfg = get_config();
+    #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let use_inverted_index = query.use_inverted_index && inverted_index_type == "tantivy";
     if use_inverted_index {

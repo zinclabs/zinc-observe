@@ -881,8 +881,6 @@ pub struct SearchQuery {
     pub start_time: i64,
     #[prost(int64, tag = "7")]
     pub end_time: i64,
-    #[prost(string, tag = "8")]
-    pub sort_by: ::prost::alloc::string::String,
     #[prost(bool, tag = "9")]
     pub track_total_hits: bool,
     #[prost(string, tag = "10")]

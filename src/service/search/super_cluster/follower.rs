@@ -278,6 +278,7 @@ async fn get_inverted_index_file_lists(
     match_terms: &[String],
 ) -> Result<(bool, Vec<FileKey>, usize, usize)> {
     let cfg = config::get_config();
+    #[allow(deprecated)]
     let inverted_index_type = cfg.common.inverted_index_search_format.clone();
     let use_inverted_index = req.use_inverted_index;
     let use_parquet_inverted_index = use_inverted_index && inverted_index_type == "parquet";

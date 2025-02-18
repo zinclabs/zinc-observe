@@ -148,11 +148,14 @@ export default {
         });
     onMounted(async () => {
         setTimeout(() => {
-          if (vueFlowRef.value) {
+          if (vueFlowRef.value && pipelineObj.currentSelectedPipeline.nodes.length > 4) {
             vueFlowRef.value.fitView({ padding: 0.1});
           }
+          else if(vueFlowRef.value){
+            vueFlowRef.value.fitView({ padding: 1});
+          }
         }, 100);
-        });
+      });
 
     
 function resetTransform() {
