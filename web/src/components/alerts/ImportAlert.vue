@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <div style="width: 300px">
                           <q-input
-                            v-model="userSelectedAlertName"
+                            v-model="userSelectedAlertName[index]"
                             :label="t('alerts.name') + ' *'"
                             color="input-border"
                             bg-color="input-bg"
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             dense
                             tabindex="0"
                             @update:model-value="
-                              updateAlertName(userSelectedAlertName)
+                              updateAlertName(userSelectedAlertName[index],index)
                             "
                           />
                         </div>
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div style="width: 300px">
                           <q-select
-                            v-model="userSelectedStreamName"
+                            v-model="userSelectedStreamName[index]"
                             :options="streamList"
                             :label="t('alerts.stream_name') + ' *'"
                             :popup-content-style="{
@@ -238,9 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             hide-selected
                             fill-input
                             :input-debounce="400"
-                            @update:model-value="
-                              updateStreamFields(userSelectedStreamName)
-                            "
+                            @update:model-value="updateStreamFields(userSelectedStreamName[index], index)"
                             behavior="menu"
                           />
                         </div>
@@ -255,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div>
                           <q-select
-                            v-model="userSelectedDestinations"
+                            v-model="userSelectedDestinations[index]"
                             :options="filteredDestinations"
                             @filter="filterDestinations"
                             label="Destinations *"
@@ -269,34 +267,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             stack-label
                             dense
                             use-input
+                            multiple
                             :input-debounce="400"
                             behavior="menu"
                             :rules="[
                               (val: any) => !!val || 'Field is required!',
                             ]"
                             style="width: 300px"
+                            @update:model-value="updateUserSelectedDestinations(userSelectedDestinations[index],index)"
                           >
-                            <template v-slot:option="option">
-                              <q-list dense>
-                                <q-item
-                                  tag="label"
-                                  :data-test="`add-alert-destination-${option.opt}-select-item`"
-                                >
-                                  <q-item-section avatar>
-                                    <q-checkbox
-                                      size="xs"
-                                      dense
-                                      v-model="userSelectedDestinations"
-                                      :val="option.opt"
-                                    />
-                                  </q-item-section>
-                                  <q-item-section>
-                                    <q-item-label class="ellipsis"
-                                      >{{ option.opt }}
-                                    </q-item-label>
-                                  </q-item-section>
-                                </q-item>
-                              </q-list>
+                            <template v-slot:option="scope">
+                              <q-item
+                                v-bind="scope.itemProps"
+                                :data-test="`add-alert-destination-${scope.opt}-select-item`"
+                              >
+                                <q-item-section side>
+                                  <q-checkbox 
+                                    :model-value="userSelectedDestinations[index]?.includes(scope.opt) ?? false"
+                                    dense
+                                    @update:model-value="toggleDestination(scope.opt, index)"
+                                  />
+                                </q-item-section>
+                                <q-item-section>
+                                  <q-item-label>{{ scope.opt }}</q-item-label>
+                                </q-item-section>
+                              </q-item>
                             </template>
                           </q-select>
                         </div>
@@ -311,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ errorMessage.message }}
                         <div>
                           <q-select
-                            v-model="userSelectedStreamType"
+                            v-model="userSelectedStreamType[index]"
                             :options="streamTypes"
                             :label="t('alerts.streamType') + ' *'"
                             :popup-content-style="{ textTransform: 'lowercase' }"
@@ -322,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             outlined
                             filled
                             dense
-                            @update:model-value="updateStreams()"
+                            @update:model-value="updateStreams(userSelectedStreamType[index], index)"
                             :rules="[(val: any) => !!val || 'Field is required!']"
                             style="width: 300px"
                           />
@@ -429,16 +424,16 @@ export default defineComponent({
     const destinationErrorsToDisplay = ref([]);
 
     const alertErrorsToDisplay = ref<AlertErrors>([]);
-    const userSelectedDestinations = ref([]);
-    const userSelectedAlertName = ref("");
+    const userSelectedDestinations = ref<string[][]>([]);
+    const userSelectedAlertName = ref<string[]>([]);
 
     const tempalteCreators = ref([]);
     const destinationCreators = ref([]);
     const alertCreators = ref<alertCreator>([]);
     const queryEditorPlaceholderFlag = ref(true);
     const streamList = ref<any>([]);
-    const userSelectedStreamName = ref("");
-    const userSelectedStreamType = ref("");
+    const userSelectedStreamName = ref<string[]>([]);
+    const userSelectedStreamType = ref<string[]>([]);
     const jsonFiles = ref(null);
     const url = ref("");
     const jsonArrayOfObj: any = ref([{}]);
@@ -453,33 +448,67 @@ export default defineComponent({
       });
     });
 
-    watch(
-      () => userSelectedDestinations.value,
-      (newVal, oldVal) => {
-        if (newVal) {
-          jsonArrayOfObj.value.destinations = newVal;
-          jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    // watch(
+    //   () => userSelectedDestinations.value,
+    //   (newVal, oldVal) => {
+    //     if (newVal) {
+    //       jsonArrayOfObj.value.destinations = newVal;
+    //       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    //     }
+    //   },
+    // );
+
+    const updateUserSelectedDestinations = (destinations: string[], index: number) => {
+      jsonArrayOfObj.value[index].destinations = destinations;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    }
+
+    const updateStreamFields = (stream_name: string, index: number) => {
+      jsonArrayOfObj.value[index].stream_name = stream_name;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+
+    const updateAlertName = (alertName: string, index: number) => {
+      jsonArrayOfObj.value[index].name = alertName;
+      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
+    };
+
+    watch(jsonFiles, async (newVal, oldVal) => {
+      if (newVal && newVal.length > 0) {
+        let combinedJson: any[] = [];
+        
+        for (const file of newVal) {
+          try {
+            const result: any = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onload = (e: any) => {
+                try {
+                  const parsedJson = JSON.parse(e.target.result);
+                  // Convert to array if it's a single object
+                  const jsonArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
+                  resolve(jsonArray);
+                } catch (error) {
+                  q.notify({
+                    message: `Error parsing JSON from file ${file.name}`,
+                    color: "negative",
+                    position: "bottom",
+                    timeout: 2000,
+                  });
+                  resolve([]);
+                }
+              };
+              reader.readAsText(file);
+            });
+            
+            combinedJson = [...combinedJson, ...result];
+          } catch (error) {
+            console.error('Error reading file:', error);
+          }
         }
-      },
-    );
-
-    const updateStreamFields = (stream_name: string) => {
-      jsonArrayOfObj.value.stream_name = stream_name;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
-
-    const updateAlertName = (alertName: string) => {
-      jsonArrayOfObj.value.name = alertName;
-      jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-    };
-
-    watch(jsonFiles, (newVal, oldVal) => {
-      if (newVal) {
-        const reader = new FileReader();
-        reader.onload = (e: any) => {
-          jsonStr.value = e.target.result;
-        };
-        reader.readAsText(newVal[0]);
+        
+        // Update the refs with combined JSON data
+        jsonArrayOfObj.value = combinedJson;
+        jsonStr.value = JSON.stringify(combinedJson, null, 2);
       }
     });
     watch(url, async (newVal, oldVal) => {
@@ -549,37 +578,49 @@ export default defineComponent({
       destinationErrorsToDisplay.value = [];
       destinationCreators.value = [];
       alertCreators.value = [];
-      // userSelectedDestinations.value = [];
 
       try {
         // Check if jsonStr.value is empty or null
         if ((!jsonStr.value || jsonStr.value.trim() === "") && !url.value) {
           throw new Error("JSON string is empty");
         } else {
-          jsonArrayOfObj.value = JSON.parse(jsonStr.value);
+          const parsedJson = JSON.parse(jsonStr.value);
+          // Convert single object to array if needed
+          jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
         }
       } catch (e: any) {
-        // Handle parsing errors and other issues
         q.notify({
           message: e.message || "Invalid JSON format",
           color: "negative",
-          position: "bottom",
+          position: "bottom", 
           timeout: 2000,
         });
         return;
       }
 
-      // Check if jsonArrayOfObj is an array or a single object
-      const isArray = Array.isArray(jsonArrayOfObj.value);
-
-      // If it's an array, process each object sequentially
-      if (isArray) {
-        for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
-          await processJsonObject(jsonObj, index + 1); // Pass the index along with jsonObj
+      let allAlertsCreated = true;
+      // Now we can always process as an array
+      for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
+        const success = await processJsonObject(jsonObj, index + 1);
+        if (!success) {
+          allAlertsCreated = false;
         }
-      } else {
-        // If it's a single object, just process it
-        await processJsonObject(jsonArrayOfObj.value, 1);
+      }
+
+      if (allAlertsCreated) {
+        emit("update:alerts");
+        q.notify({
+          message: "Alert(s) imported successfully",
+          color: "positive",
+          position: "bottom",
+          timeout: 2000,
+        });
+        router.push({
+          name: "alertList",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
       }
     };
 
@@ -587,35 +628,22 @@ export default defineComponent({
       try {
         const isValidAlert = await validateAlertInputs(jsonObj, index);
         if (!isValidAlert) {
-          return;
+          return false;
         }
 
         if (alertErrorsToDisplay.value.length === 0 && isValidAlert) {
-          const hasCreatedAlert = await createAlert(jsonObj, index);
-
-          if (hasCreatedAlert) {
-            q.notify({
-              message: "Alert imported successfully",
-              color: "positive",
-              position: "bottom",
-              timeout: 2000,
-            });
-            router.push({
-              name: "alertList",
-              query: {
-                org_identifier: store.state.selectedOrganization.identifier,
-              },
-            });
-          }
+          return await createAlert(jsonObj, index);
         }
       } catch (e: any) {
         q.notify({
-          message: "Error importing Alert please check the JSON",
+          message: "Error importing Alert(s) please check the JSON",
           color: "negative",
           position: "bottom",
           timeout: 2000,
         });
+        return false;
       }
+      return false;
     };
 
     const validateAlertInputs = async (input: any, index: number) => {
@@ -891,7 +919,6 @@ export default defineComponent({
 
     const checkAlertsInList = (alerts: any, alertName: any) => {
       const alertsList = alerts.map((alert: any) => alert.name);
-      console.log(alertsList, alertName);
       return alertsList.includes(alertName);
     };
 
@@ -909,28 +936,36 @@ export default defineComponent({
           message: `Alert - ${index}: "${input.name}" created successfully \nNote: please remove the created alert object ${input.name} from the json file`,
           success: true,
         });
+
+        // Emit update after each successful creation
         emit("update:alerts");
-        return true; // Return true if the alert creation is successful
+        
+        return true;
       } catch (error: any) {
         // Failure
         alertCreators.value.push({
           message: `Alert - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
           success: false,
         });
-        return false; // Return false if there was an error
+        return false;
       }
     };
 
     const onSubmit = (e: any) => {
       e.preventDefault();
     };
-    const updateStreams = async () => {
-      jsonArrayOfObj.value.stream_type = userSelectedStreamType.value;
+    const updateStreams = async (streamType: string, index: number) => {
+      jsonArrayOfObj.value[index].stream_type = streamType;
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
-      const streamResponse: any = await getStreams(userSelectedStreamType.value, false);
+      
+      try {
+        const streamResponse: any = await getStreams(streamType, false);
         streamList.value = streamResponse.list.map(
           (stream: any) => stream.name,
         );
+      } catch (error) {
+        console.error('Error fetching streams:', error);
+      }
     };
     const filterDestinations = (val: string, update: Function) => {
         if (val === "") {
@@ -947,6 +982,22 @@ export default defineComponent({
         });
       };
 
+    const toggleDestination = (destination: string, index: number) => {
+      if (!userSelectedDestinations.value[index]) {
+        userSelectedDestinations.value[index] = [];
+      }
+      
+      const destinations = userSelectedDestinations.value[index];
+      const destinationIndex = destinations.indexOf(destination);
+      
+      if (destinationIndex === -1) {
+        destinations.push(destination);
+      } else {
+        destinations.splice(destinationIndex, 1);
+      }
+      
+      updateUserSelectedDestinations(destinations, index);
+    };
 
     return {
       t,
@@ -982,6 +1033,8 @@ export default defineComponent({
       streams,
       filterDestinations,
       filteredDestinations,
+      updateUserSelectedDestinations,
+      toggleDestination,
     };
   },
   components: {
