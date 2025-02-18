@@ -100,7 +100,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               filled
               dense
               tabindex="0"
-              style="width: 600px"
+              style="width: 800px"
+            />
+          </div>
+
+          <div
+            data-test="add-action-script-type"
+            class="report-name-input o2-input q-px-sm q-pb-md"
+          >
+            <q-select
+              data-test="add-action-script-type-select"
+              v-model="formData.type"
+              :label="t('common.type') + ' *'"
+              :options="actionTypes"
+              color="input-border"
+              bg-color="input-bg"
+              class="showLabelOnTop no-case tw-w-[400px]"
+              stack-label
+              outlined
+              filled
+              dense
+              :rules="[(val: any) => !!val || 'Field is required!']"
             />
           </div>
 
@@ -197,6 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-step>
 
             <q-step
+              v-if="formData.type === 'scheduled'"
               data-test="add-action-script-step-2"
               :name="2"
               title="Schedule"
@@ -430,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <q-btn
                   data-test="add-action-script-step3-back-btn"
-                  @click="step = 2"
+                  @click="step = formData.type === 'scheduled' ? 2 : 1"
                   flat
                   color="primary"
                   label="Back"
@@ -626,6 +647,7 @@ const defaultActionScript = {
   fileNameToShow: "",
   id: "",
   service_account: "",
+  type: "scheduled",
 };
 
 const { t } = useI18n();
@@ -642,6 +664,17 @@ const step = ref(1);
 const formData = ref(defaultActionScript);
 
 const q = useQuasar();
+
+const actionTypes = [
+  {
+    label: "Scheduled",
+    value: "scheduled",
+  },
+  {
+    label: "Service",
+    value: "service",
+  },
+];
 
 const dialog = ref({
   show: false,
@@ -800,7 +833,10 @@ const saveActionScript = async () => {
   const commonFields: Record<string, any> = {
     name: formData.value.name,
     description: formData.value.description,
-    execution_details: frequency.value.type,
+    execution_details:
+      formData.value.type === "scheduled"
+        ? frequency.value.type
+        : formData.value.type,
     service_account: formData.value.service_account,
   };
   // const convertedDateTime = convertDateToTimestamp(
@@ -992,6 +1028,12 @@ const setupEditingActionScript = async (report: any) => {
     timezone: report.timezone || "UTC",
   };
   formData.value.fileNameToShow = report.zip_file_name;
+
+  formData.value.type = "scheduled";
+
+  if (formData.value.execution_details === "service") {
+    formData.value.type = "service";
+  }
 
   // set date, time and timezone in scheduling
   // const date = new Date(report.start / 1000);
