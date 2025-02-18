@@ -953,7 +953,8 @@
     "api_header": "Header",
     "api_header_value": "Value",
     "add_template": "New Template",
-    "skip_tls_verify": "Skip TLS Verify"
+    "skip_tls_verify": "Skip TLS Verify",
+    "action": "Action"
   },
   "pipeline_destinations": {
     "header":"Pipeline Destinations"

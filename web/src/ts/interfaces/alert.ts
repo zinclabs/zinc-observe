@@ -89,7 +89,8 @@ export interface Destination {
   headers: Headers;
   template: string | Template;
   emails: string;
-  type: "http" | "email" | "sns";
+  type: "http" | "email" | "sns" | "action";
+  action: string;
 }
 
 export interface DestinationPayload {
@@ -100,7 +101,8 @@ export interface DestinationPayload {
   headers: Headers;
   template: string | Template;
   emails: string[];
-  type: "http" | "email" | "sns";
+  type: "http" | "email" | "sns" | "action";
+  action: string;
 }
 
 // Destination object which is modified in frontend to display in table and form
