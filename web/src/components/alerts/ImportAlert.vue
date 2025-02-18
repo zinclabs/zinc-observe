@@ -440,9 +440,9 @@ export default defineComponent({
     const streams = ref<any>({});
     const activeTab = ref("import_json_file");
     const splitterModel = ref(60);
-    const filteredDestinations = ref([]);
+    const filteredDestinations = ref<string[]>([]);
     const streamTypes = ["logs", "metrics", "traces"];
-    const getFormattedDestinations = computed(() => {
+    const getFormattedDestinations: any = computed(() => {
       return props.destinations.map((destination: any) => {
         return destination.name;
       });
@@ -473,7 +473,7 @@ export default defineComponent({
       jsonStr.value = JSON.stringify(jsonArrayOfObj.value, null, 2);
     };
 
-    watch(jsonFiles, async (newVal, oldVal) => {
+    watch(jsonFiles, async (newVal:any, oldVal:any) => {
       if (newVal && newVal.length > 0) {
         let combinedJson: any[] = [];
         
@@ -976,7 +976,7 @@ export default defineComponent({
         }
 
         update(() => {
-          filteredDestinations.value = getFormattedDestinations.value.filter((destination) =>
+          filteredDestinations.value = getFormattedDestinations.value.filter((destination: string) =>
             destination.toLowerCase().includes(val.toLowerCase())
           );
         });
