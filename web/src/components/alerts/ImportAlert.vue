@@ -783,9 +783,11 @@ export default defineComponent({
       }
 
       // 9. Validate 'multi_time_range'
-      if (!Array.isArray(input.query_condition.multi_time_range)) {
+      if (input.query_condition.type === 'custom' && 
+          input.query_condition.multi_time_range !== null && 
+          (!Array.isArray(input.query_condition.multi_time_range) || input.query_condition.multi_time_range.length > 0)) {
         alertErrors.push(
-          `Alert - ${index}: Multi Time Range should be an empty array.`,
+          `Alert - ${index}: Multi Time Range should be an empty array or null.`,
         );
       }
 
