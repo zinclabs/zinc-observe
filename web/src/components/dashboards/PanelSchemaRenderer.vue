@@ -1219,7 +1219,7 @@ export default defineComponent({
             modifiedQuery = `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`;
           } else {
             // Create drilldown variables object exactly as you do for other drilldown types
-            const drilldownVariables = {};
+            const drilldownVariables: any = {};
 
             // Add time range
             if (
@@ -1250,14 +1250,14 @@ export default defineComponent({
 
             // Handle different chart types
             if (panelSchema.value.type == "table") {
-              const fields = {};
-              panelSchema.value.queries.forEach((query) => {
-                const panelFields = [
+              const fields: any = {};
+              panelSchema.value.queries.forEach((query: any) => {
+                const panelFields: any = [
                   ...query.fields.x,
                   ...query.fields.y,
                   ...query.fields.z,
                 ];
-                panelFields.forEach((field) => {
+                panelFields.forEach((field: any) => {
                   fields[field.label] = drilldownParams[1][0][field.alias];
                   fields[field.alias] = drilldownParams[1][0][field.alias];
                 });
@@ -1294,7 +1294,7 @@ export default defineComponent({
               };
             }
 
-            variablesData?.value?.values?.forEach((variable) => {
+            variablesData?.value?.values?.forEach((variable: any) => {
               if (variable.type != "dynamic_filters") {
                 drilldownVariables[variable.name] = variable.value;
               }
