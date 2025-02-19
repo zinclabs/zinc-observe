@@ -15,7 +15,6 @@
 
 use std::{str::FromStr, time::Duration};
 
-use actix_web::http;
 use async_trait::async_trait;
 use chromiumoxide::{browser::Browser, cdp::browser_protocol::page::PrintToPdfParams, Page};
 use chrono::Timelike;
@@ -51,27 +50,76 @@ use crate::{
     service::{db, short_url},
 };
 
+/// Errors that can occur when interacting with reports.
+#[derive(Debug, thiserror::Error)]
+pub enum ReportError {
+    #[error("SMTP configuration not enabled")]
+    SmtpNotEnabled,
+
+    #[error("Chrome not enabled")]
+    ChromeNotEnabled,
+
+    #[error("Report username and password ENVs not set")]
+    ReportUsernamePasswordNotSet,
+
+    #[error("Report name cannot contain ':', '#', '?', '&', '%', quotes and space characters")]
+    NameContainsOpenFgaUnsupportedCharacters,
+
+    #[error("Report name is required")]
+    NameIsEmpty,
+
+    #[error("Report name cannot contain '/'")]
+    NameContainsForwardSlash,
+
+    #[error("Report already exists")]
+    CreateReportNameAlreadyUsed,
+
+    #[error("Report not found")]
+    ReportNotFound,
+
+    #[error("Atleast one dashboard is required")]
+    NoDashboards,
+
+    #[error("Atleast one tab is required")]
+    NoDashboardTabs,
+
+    #[error("Atleast one destination is required")]
+    NoDestinations,
+
+    #[error("Some dashboards/tabs not found")]
+    DashboardTabNotFound,
+
+    #[error(transparent)]
+    ParseCronError(#[from] cron::error::Error),
+
+    #[error(transparent)]
+    DbError(anyhow::Error),
+
+    #[error(transparent)]
+    SendReportError(#[from] SendReportError),
+}
+
 pub async fn save(
     org_id: &str,
     name: &str,
     mut report: Report,
     create: bool,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let cfg = get_config();
     if cfg.common.report_server_url.is_empty() {
         // Check if SMTP is enabled, otherwise don't save the report
         if !cfg.smtp.smtp_enabled {
-            return Err(anyhow::anyhow!("SMTP configuration not enabled"));
+            return Err(ReportError::SmtpNotEnabled);
         }
 
         // Check if Chrome is enabled, otherwise don't save the report
         if !cfg.chrome.chrome_enabled || cfg.chrome.chrome_path.is_empty() {
-            return Err(anyhow::anyhow!("Chrome not enabled"));
+            return Err(ReportError::ChromeNotEnabled);
         }
 
         if cfg.common.report_user_name.is_empty() || cfg.common.report_user_password.is_empty() {
-            return Err(anyhow::anyhow!("Report username and password ENVs not set"));
+            return Err(ReportError::ReportUsernamePasswordNotSet);
         }
     }
 
@@ -81,15 +129,13 @@ pub async fn save(
 
     // Don't allow the characters not supported by ofga
     if is_ofga_unsupported(&report.name) {
-        return Err(anyhow::anyhow!(
-            "Report name cannot contain ':', '#', '?', '&', '%', quotes and space characters"
-        ));
+        return Err(ReportError::NameContainsOpenFgaUnsupportedCharacters);
     }
     if report.name.is_empty() {
-        return Err(anyhow::anyhow!("Report name is required"));
+        return Err(ReportError::NameIsEmpty);
     }
     if report.name.contains('/') {
-        return Err(anyhow::anyhow!("Report name cannot contain '/'"));
+        return Err(ReportError::NameContainsForwardSlash);
     }
 
     if report.frequency.frequency_type == ReportFrequencyType::Cron {
@@ -113,7 +159,7 @@ pub async fn save(
     match db::dashboards::reports::get(conn, org_id, "default", &report.name).await {
         Ok(old_report) => {
             if create {
-                return Err(anyhow::anyhow!("Report already exists"));
+                return Err(ReportError::CreateReportNameAlreadyUsed);
             }
             report.last_triggered_at = old_report.last_triggered_at;
             report.owner = old_report.owner;
@@ -121,7 +167,7 @@ pub async fn save(
         }
         Err(_) => {
             if !create {
-                return Err(anyhow::anyhow!("Report not found"));
+                return Err(ReportError::ReportNotFound);
             } else {
                 report.last_triggered_at = None;
             }
@@ -130,9 +176,7 @@ pub async fn save(
 
     // Atleast one `ReportDashboard` needs to be present
     if report.dashboards.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Atleast one dashboard/destination is required"
-        ));
+        return Err(ReportError::NoDashboards);
     }
 
     // Check if dashboards & tabs exist
@@ -141,7 +185,7 @@ pub async fn save(
         let dash_id = &dashboard.dashboard;
         let folder = &dashboard.folder;
         if dashboard.tabs.is_empty() {
-            return Err(anyhow::anyhow!("Atleast one tab is required"));
+            return Err(ReportError::NoDashboardTabs);
         }
 
         // Supports only one tab for now
@@ -168,38 +212,44 @@ pub async fn save(
         });
     }
     if try_join_all(tasks).await.is_err() {
-        return Err(anyhow::anyhow!("Some dashboards/tabs not found"));
+        return Err(ReportError::DashboardTabNotFound);
     }
 
     if create {
         let report_name = report.name.clone();
-        db::dashboards::reports::create(conn, "default", report).await?;
+        db::dashboards::reports::create(conn, "default", report)
+            .await
+            .map_err(ReportError::DbError)?;
         if !name.is_empty() {
             set_ownership(org_id, "reports", Authz::new(&report_name)).await;
             // todo: set parent folder
         }
     } else {
-        db::dashboards::reports::update(conn, "default", None, report).await?;
+        db::dashboards::reports::update(conn, "default", None, report)
+            .await
+            .map_err(ReportError::DbError)?;
     }
 
     Ok(())
 }
 
-pub async fn get(org_id: &str, name: &str) -> Result<Report, anyhow::Error> {
+pub async fn get(org_id: &str, name: &str) -> Result<Report, ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     db::dashboards::reports::get(conn, org_id, "default", name)
         .await
-        .map_err(|_| anyhow::anyhow!("Report not found"))
+        .map_err(|_| ReportError::ReportNotFound)
 }
 
 pub async fn list(
     org_id: &str,
     filters: ReportListFilters,
     permitted: Option<Vec<String>>,
-) -> Result<Vec<table::reports::ListReportsQueryResult>, anyhow::Error> {
+) -> Result<Vec<table::reports::ListReportsQueryResult>, ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let params = filters.into_parmas(org_id);
-    let reports = db::dashboards::reports::list(conn, &params).await?;
+    let reports = db::dashboards::reports::list(conn, &params)
+        .await
+        .map_err(ReportError::DbError)?;
     let result = reports
         .into_iter()
         .filter(|report| {
@@ -217,7 +267,7 @@ pub async fn list(
     Ok(result)
 }
 
-pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
+pub async fn delete(org_id: &str, name: &str) -> Result<(), ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     // TODO: If we are going to perform both the "get" and "delete" operations then they should be
@@ -226,10 +276,7 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
         .await
         .is_err()
     {
-        return Err((
-            http::StatusCode::NOT_FOUND,
-            anyhow::anyhow!("Report not found {}", name),
-        ));
+        return Err(ReportError::ReportNotFound);
     }
 
     match db::dashboards::reports::delete(conn, org_id, "default", name).await {
@@ -237,62 +284,77 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), (http::StatusCode, a
             remove_ownership(org_id, "reports", Authz::new(name)).await;
             Ok(())
         }
-        Err(e) => Err((http::StatusCode::INTERNAL_SERVER_ERROR, e)),
+        Err(e) => Err(ReportError::DbError(e)),
     }
 }
 
-pub async fn trigger(org_id: &str, name: &str) -> Result<(), (http::StatusCode, anyhow::Error)> {
+pub async fn trigger(org_id: &str, name: &str) -> Result<(), ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let report = match db::dashboards::reports::get(conn, org_id, "default", name).await {
         Ok(report) => report,
         _ => {
-            return Err((
-                http::StatusCode::NOT_FOUND,
-                anyhow::anyhow!("Report not found"),
-            ));
+            return Err(ReportError::ReportNotFound);
         }
     };
-    report
-        .send_subscribers()
-        .await
-        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+    report.send_subscribers().await?;
+    Ok(())
 }
 
-pub async fn enable(
-    org_id: &str,
-    name: &str,
-    value: bool,
-) -> Result<(), (http::StatusCode, anyhow::Error)> {
+pub async fn enable(org_id: &str, name: &str, value: bool) -> Result<(), ReportError> {
     let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
 
     // TODO: The "get" and "update" operations should be in a transaction.
     let mut report = match db::dashboards::reports::get(conn, org_id, "default", name).await {
         Ok(report) => report,
         _ => {
-            return Err((
-                http::StatusCode::NOT_FOUND,
-                anyhow::anyhow!("Report not found"),
-            ));
+            return Err(ReportError::ReportNotFound);
         }
     };
     report.enabled = value;
     db::dashboards::reports::update(conn, "default", None, report)
         .await
-        .map_err(|e| (http::StatusCode::INTERNAL_SERVER_ERROR, e))
+        .map_err(ReportError::DbError)
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SendReportError {
+    #[error("Atleast one dashboard is required")]
+    NoDashboards,
+
+    #[error("Error contacting report server: {0}")]
+    ReportServerClientError(#[from] reqwest::Error),
+
+    #[error("report send error status: {0}, err: {1:?}")]
+    ReportServerErrorRepsponse(reqwest::StatusCode, Result<bytes::Bytes, reqwest::Error>),
+
+    #[error("SMTP configuration not enabled")]
+    SmtpNotEnabled,
+
+    #[error(transparent)]
+    ParseAddressError(#[from] lettre::address::AddressError),
+
+    #[error(transparent)]
+    ParseContentTypeError(#[from] lettre::message::header::ContentTypeErr),
+
+    #[error("Error sending email: {0}")]
+    SendEmailError(#[from] lettre::transport::smtp::Error),
+
+    #[error(transparent)]
+    GenerateReportError(#[from] GenerateReportError),
 }
 
 #[async_trait]
 pub trait SendReport {
     /// Sends the report to subscribers
-    async fn send_subscribers(&self) -> Result<(), anyhow::Error>;
+    async fn send_subscribers(&self) -> Result<(), SendReportError>;
 }
 
 #[async_trait]
 impl SendReport for Report {
     /// Sends the report to subscribers
-    async fn send_subscribers(&self) -> Result<(), anyhow::Error> {
+    async fn send_subscribers(&self) -> Result<(), SendReportError> {
         if self.dashboards.is_empty() {
-            return Err(anyhow::anyhow!("Atleast one dashboard is required"));
+            return Err(SendReportError::NoDashboards);
         }
 
         let cfg = get_config();
@@ -333,15 +395,14 @@ impl SendReport for Report {
             {
                 Ok(resp) => {
                     if !resp.status().is_success() {
-                        return Err(anyhow::anyhow!(
-                            "report send error status: {}, err: {:?}",
+                        return Err(SendReportError::ReportServerErrorRepsponse(
                             resp.status(),
-                            resp.bytes().await
+                            resp.bytes().await,
                         ));
                     }
                 }
                 Err(e) => {
-                    return Err(anyhow::anyhow!("Error contacting report server: {e}"));
+                    return Err(SendReportError::ReportServerClientError(e));
                 }
             }
             Ok(())
@@ -368,10 +429,10 @@ async fn send_email(
     report: &Report,
     pdf_data: &[u8],
     dashb_url: String,
-) -> Result<(), anyhow::Error> {
+) -> Result<(), SendReportError> {
     let cfg = get_config();
     if !cfg.smtp.smtp_enabled {
-        return Err(anyhow::anyhow!("SMTP configuration not enabled"));
+        return Err(SendReportError::SmtpNotEnabled);
     }
 
     let mut recipients = vec![];
@@ -421,8 +482,44 @@ async fn send_email(
             log::info!("email sent successfully for the report {}", &report.name);
             Ok(())
         }
-        Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
+        Err(e) => Err(SendReportError::SendEmailError(e)),
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum GenerateReportError {
+    #[error("Chrome not enabled")]
+    ChromeNotEnabled,
+
+    #[error("Atleast one tab is required")]
+    NoDashboardTabs,
+
+    #[error(transparent)]
+    ChromiumOxideError(#[from] chromiumoxide::error::CdpError),
+
+    #[error(transparent)]
+    ParseTimeDurationError(std::num::ParseIntError),
+
+    #[error(transparent)]
+    BrowserCloseWaitError(std::io::Error),
+
+    #[error(transparent)]
+    JoinHandlerError(#[from] tokio::task::JoinError),
+
+    #[error("[REPORT] main element not rendered yet for dashboard {dashboard_id}: {e}")]
+    MainElementNotRendered {
+        dashboard_id: String,
+        e: chromiumoxide::error::CdpError,
+    },
+
+    #[error("[REPORT] div.displayDiv element not rendered yet for dashboard {dashboard_id}: {e}")]
+    DisplayDivElementNotRendered {
+        dashboard_id: String,
+        e: chromiumoxide::error::CdpError,
+    },
+
+    #[error("span element indicator for data load not rendered yet")]
+    DataLoadElementNotRendered,
 }
 
 async fn generate_report(
@@ -433,18 +530,18 @@ async fn generate_report(
     timezone: &str,
     no_of_recipients: usize,
     report_name: &str,
-) -> Result<(Vec<u8>, String), anyhow::Error> {
+) -> Result<(Vec<u8>, String), GenerateReportError> {
     let cfg = get_config();
     // Check if Chrome is enabled, otherwise don't save the report
     if !cfg.chrome.chrome_enabled {
-        return Err(anyhow::anyhow!("Chrome not enabled"));
+        return Err(GenerateReportError::ChromeNotEnabled);
     }
 
     let dashboard_id = &dashboard.dashboard;
     let folder_id = &dashboard.folder;
 
     if dashboard.tabs.is_empty() {
-        return Err(anyhow::anyhow!("Atleast one tab is required"));
+        return Err(GenerateReportError::NoDashboardTabs);
     }
     // Only one tab is supported for now
     let tab_id = &dashboard.tabs[0];
@@ -513,7 +610,9 @@ async fn generate_report(
                 "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&{search_type_params}&period={period}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
             );
 
-            let time_duration: i64 = time_duration.parse()?;
+            let time_duration: i64 = time_duration
+                .parse()
+                .map_err(GenerateReportError::ParseTimeDurationError)?;
             let end_time = chrono::Utc::now().timestamp_micros();
             let start_time = match time_unit {
                 "m" => {
@@ -594,19 +693,27 @@ async fn generate_report(
 
     if let Err(e) = page.find_element("main").await {
         browser.close().await?;
-        browser.wait().await?;
+        browser
+            .wait()
+            .await
+            .map_err(GenerateReportError::BrowserCloseWaitError)?;
         handle.await?;
-        return Err(anyhow::anyhow!(
-            "[REPORT] main element not rendered yet for dashboard {dashboard_id}: {e}"
-        ));
+        return Err(GenerateReportError::MainElementNotRendered {
+            dashboard_id: dashboard_id.clone(),
+            e,
+        });
     }
     if let Err(e) = page.find_element("div.displayDiv").await {
         browser.close().await?;
-        browser.wait().await?;
+        browser
+            .wait()
+            .await
+            .map_err(GenerateReportError::BrowserCloseWaitError)?;
         handle.await?;
-        return Err(anyhow::anyhow!(
-            "[REPORT] div.displayDiv element not rendered yet for dashboard {dashboard_id}: {e}"
-        ));
+        return Err(GenerateReportError::DisplayDivElementNotRendered {
+            dashboard_id: dashboard_id.clone(),
+            e,
+        });
     }
 
     // Last two elements loaded means atleast the metric components have loaded.
@@ -623,7 +730,10 @@ async fn generate_report(
     };
 
     browser.close().await?;
-    browser.wait().await?;
+    browser
+        .wait()
+        .await
+        .map_err(GenerateReportError::BrowserCloseWaitError)?;
     handle.await?;
     log::debug!("done with headless browser");
 
@@ -638,7 +748,7 @@ async fn generate_report(
     Ok((pdf_data, email_dashb_url))
 }
 
-async fn wait_for_panel_data_load(page: &Page) -> Result<(), anyhow::Error> {
+async fn wait_for_panel_data_load(page: &Page) -> Result<(), GenerateReportError> {
     let start = std::time::Instant::now();
     let timeout = Duration::from_secs(get_config().chrome.chrome_sleep_secs.into());
     log::info!("waiting for headless data to load");
@@ -652,9 +762,7 @@ async fn wait_for_panel_data_load(page: &Page) -> Result<(), anyhow::Error> {
         }
 
         if start.elapsed() >= timeout {
-            return Err(anyhow::anyhow!(
-                "span element indicator for data load not rendered yet"
-            ));
+            return Err(GenerateReportError::DataLoadElementNotRendered);
         }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
