@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       popup-no-route-dismiss
       popup-content-style="z-index: 10001"
       @blur="applyChanges"
+      @focus="loadFieldValues"
     >
       <template v-slot:no-option>
         <q-item>
@@ -92,12 +93,9 @@ import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplet
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
-  props: ["modelValue", "variableItem"],
+  props: ["modelValue", "variableItem", "loadOptions"],
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
-
-    const variableName = props.variableItem?.label || props.variableItem?.name
-
     //get v-model value for selected value  using props
     const selectedValue = ref(props.variableItem?.value);
 
@@ -112,7 +110,7 @@ export default defineComponent({
       () => props.variableItem,
       () => {
         options.value = props.variableItem?.options;
-      }
+      },
     );
 
     // isAllSelected should be true if all options are selected and false otherwise
@@ -127,7 +125,7 @@ export default defineComponent({
     const toggleSelectAll = () => {
       if (!isAllSelected.value) {
         selectedValue.value = fieldsFilteredOptions.value.map(
-          (option: any) => option.value
+          (option: any) => option.value,
         );
       } else {
         selectedValue.value = [];
@@ -135,21 +133,21 @@ export default defineComponent({
     };
 
     const applyChanges = () => {
-      if(props.variableItem.multiSelect) {
+      if (props.variableItem.multiSelect) {
         emitSelectedValues();
       }
-    }
+    };
 
     // update selected value
     watch(selectedValue, () => {
-      if(!props.variableItem.multiSelect) {
-        emitSelectedValues()
+      if (!props.variableItem.multiSelect) {
+        emitSelectedValues();
       }
     });
 
     const emitSelectedValues = () => {
       emit("update:modelValue", selectedValue.value);
-    }
+    };
 
     // Display the selected value
     const displayValue = computed(() => {
@@ -181,6 +179,20 @@ export default defineComponent({
       }
     });
 
+    const loadFieldValues = () => {
+      if (props.variableItem.isLoading || !props.loadOptions) {
+        return;
+      }
+      loadVariableTemp();
+    };
+
+    const loadVariableTemp = () => {
+      try {
+        props.loadOptions(props.variableItem);
+        options.value = props.variableItem.options;
+      } catch (error) {}
+    };
+
     return {
       selectedValue,
       fieldsFilterFn,
@@ -188,7 +200,8 @@ export default defineComponent({
       isAllSelected,
       toggleSelectAll,
       displayValue,
-      applyChanges
+      applyChanges,
+      loadFieldValues,
     };
   },
 });

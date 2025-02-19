@@ -221,8 +221,8 @@ async fn prepare_alert(
             if create {
                 return Err(AlertError::CreateAlreadyExists);
             }
-            alert.last_triggered_at = old_alert.last_triggered_at;
-            alert.last_satisfied_at = old_alert.last_satisfied_at;
+            alert.set_last_triggered_at(old_alert.get_last_triggered_at_from_table());
+            alert.set_last_satisfied_at(old_alert.get_last_satisfied_at_from_table());
             alert.owner = old_alert.owner;
         }
         Ok(None) => {
@@ -1178,7 +1178,7 @@ async fn process_dest_template(
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
-            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}{}&type={}",
+            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}{}&type={}&show_histogram=false",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -1217,7 +1217,7 @@ async fn process_dest_template(
         };
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
-            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}&type={}",
+            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}&type={}&show_histogram=false",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -1498,10 +1498,8 @@ mod tests {
         let org_id = "default";
         let stream_name = "default";
         let alert_name = "abc/alert";
-        let alert = Alert {
-            name: alert_name.to_string(),
-            ..Default::default()
-        };
+        let mut alert: Alert = Default::default();
+        alert.name = alert_name.to_string();
         let ret = save(org_id, stream_name, alert_name, alert, true).await;
         // alert name should not contain /
         assert!(ret.is_err());

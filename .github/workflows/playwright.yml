@@ -19,6 +19,7 @@ env:
   ZO_BASE_URL: http://localhost:5080
   WS_ZO_BASE_URL: ws://localhost:5080
   ZO_BASE_URL_SC: http://localhost:5080
+  ZO_BASE_URL_SC_UI: http://localhost:5080
   INGESTION_URL: http://localhost:5080
   ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 100
@@ -156,6 +157,7 @@ jobs:
           echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
           echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
           echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
+          echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
           echo "ORGNAME=${ORGNAME}" >> .env
           mv .env tests/ui-testing

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use chrono::{TimeZone, Utc};
 use config::{
     get_config,
@@ -85,11 +87,19 @@ pub async fn search(
         .query_fn
         .as_ref()
         .and_then(|v| base64::decode_url(v).ok());
+    let action = req
+        .query
+        .action_id
+        .as_ref()
+        .and_then(|v| svix_ksuid::Ksuid::from_str(v).ok());
 
     // calculate hash for the query
     let mut hash_body = vec![origin_sql.to_string()];
     if let Some(vrl_function) = &query_fn {
         hash_body.push(vrl_function.to_string());
+    }
+    if let Some(action_id) = action {
+        hash_body.push(action_id.to_string());
     }
     if !req.regions.is_empty() {
         hash_body.extend(req.regions.clone());

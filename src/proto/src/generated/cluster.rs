@@ -891,6 +891,8 @@ pub struct SearchQuery {
     pub query_fn: ::prost::alloc::string::String,
     #[prost(bool, tag = "14")]
     pub skip_wal: bool,
+    #[prost(string, tag = "15")]
+    pub action_id: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

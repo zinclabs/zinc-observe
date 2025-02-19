@@ -3,7 +3,6 @@
 use std::{collections::HashMap, fmt::Display};
 
 use chrono::{DateTime, Utc};
-use regex::Regex;
 use sea_orm::{DeriveActiveEnum, EnumIter};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
@@ -14,6 +13,7 @@ pub enum ExecutionDetailsType {
     #[default]
     Once,
     Repeat,
+    Serve,
 }
 
 impl std::fmt::Display for ExecutionDetailsType {
@@ -21,6 +21,7 @@ impl std::fmt::Display for ExecutionDetailsType {
         let s = match self {
             ExecutionDetailsType::Once => "Once",
             ExecutionDetailsType::Repeat => "Repeat",
+            ExecutionDetailsType::Serve => "Serve",
         };
         write!(f, "{}", s)
     }
@@ -33,6 +34,7 @@ impl TryFrom<&str> for ExecutionDetailsType {
         match value {
             "Once" => Ok(ExecutionDetailsType::Once),
             "Repeat" => Ok(ExecutionDetailsType::Repeat),
+            "Serve" => Ok(ExecutionDetailsType::Serve),
             _ => Err(anyhow::anyhow!("Invalid ExecutionDetailsType")),
         }
     }
@@ -97,7 +99,6 @@ pub struct Action {
     pub execution_details: ExecutionDetailsType,
     #[serde(default)]
     pub cron_expr: Option<String>,
-    #[serde(deserialize_with = "validate_env_vars")]
     pub environment_variables: HashMap<String, String>,
     #[serde(default)]
     pub created_by: String,
@@ -114,24 +115,6 @@ pub struct Action {
     pub origin_cluster_url: String,
     pub service_account: String,
 }
-
-fn validate_env_vars<'de, D>(deserializer: D) -> Result<HashMap<String, String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let map: HashMap<String, String> = HashMap::deserialize(deserializer)?;
-    let key_regex = Regex::new(r"^[A-Z][A-Z0-9_]*$").unwrap();
-
-    for key in map.keys() {
-        if !key_regex.is_match(key) {
-            return Err(serde::de::Error::custom(
-                "Environment variable keys must be uppercase and alphanumeric",
-            ));
-        }
-    }
-    Ok(map)
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateActionDetailsRequest {
     #[serde(default)]
@@ -146,31 +129,6 @@ pub struct UpdateActionDetailsRequest {
     pub description: Option<String>,
     #[serde(default)]
     pub service_account: Option<String>,
-}
-
-/// Request send to Action Deployer, to deploy an action
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct DeployActionRequest {
-    #[serde(default)]
-    pub job_name: String,
-    #[serde(default)]
-    pub label_name: String,
-    #[serde(default)]
-    pub execution_details: ExecutionDetailsType,
-    #[serde(default)]
-    pub cron_expr: Option<String>,
-    #[serde(default)]
-    pub environment_variables: HashMap<String, String>,
-    #[serde(default)]
-    pub ksuid: String,
-    #[serde(default)]
-    pub runtime: String,
-    #[serde(default)]
-    pub origin_cluster_url: String,
-    #[serde(default)]
-    pub sa_token: String,
-    #[serde(default)]
-    pub service_account: String,
 }
 
 /// Request send to Action Deployer, to deploy an action
@@ -192,6 +150,7 @@ pub enum ActionType {
     #[default]
     Job,
     CronJob,
+    Service,
 }
 
 impl Display for ActionType {
@@ -199,6 +158,7 @@ impl Display for ActionType {
         let str = match self {
             ActionType::Job => "job".to_string(),
             ActionType::CronJob => "cronjob".to_string(),
+            ActionType::Service => "service".to_string(),
         };
         write!(f, "{}", str)
     }
@@ -210,6 +170,7 @@ impl TryFrom<&str> for ActionType {
         match s {
             "job" => Ok(ActionType::Job),
             "cronjob" => Ok(ActionType::CronJob),
+            "service" => Ok(ActionType::Service),
             _ => Err(anyhow::anyhow!("Invalid action type: {}", s)),
         }
     }
@@ -220,6 +181,7 @@ impl From<ExecutionDetailsType> for ActionType {
         match e {
             ExecutionDetailsType::Once => ActionType::Job,
             ExecutionDetailsType::Repeat => ActionType::CronJob,
+            ExecutionDetailsType::Serve => ActionType::Service,
         }
     }
 }

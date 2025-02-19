@@ -512,7 +512,7 @@ mod tests {
         let start = end - second_micros(3600);
         let step = second_micros(15);
         let (start, end) = adjust_start_end(start, end, step, false);
-        
+
         // Create test samples
         let mut range_values = vec![RangeValue {
             labels: Labels::new(),

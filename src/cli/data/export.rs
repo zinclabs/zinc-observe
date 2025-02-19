@@ -67,6 +67,7 @@ impl Context for Export {
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
+            action_id: None,
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -33,7 +33,7 @@ use opentelemetry_sdk::{
     },
     runtime, Resource,
 };
-use tokio::{sync::RwLock, time};
+use tokio::{sync::Mutex, time};
 
 use crate::{
     common::infra::{cluster::get_cached_online_nodes, config::USERS},
@@ -57,13 +57,13 @@ pub struct TraceMetricsItem {
 
 pub type TraceMetricsChan = (
     tokio::sync::mpsc::Sender<TraceMetricsItem>,
-    RwLock<tokio::sync::mpsc::Receiver<TraceMetricsItem>>,
+    Mutex<tokio::sync::mpsc::Receiver<TraceMetricsItem>>,
 );
 
 pub static TRACE_METRICS_CHAN: Lazy<TraceMetricsChan> = Lazy::new(|| {
     let (tx, rx) =
         tokio::sync::mpsc::channel(get_config().common.traces_span_metrics_channel_buffer);
-    (tx, RwLock::new(rx))
+    (tx, Mutex::new(rx))
 });
 
 pub static TRACE_METRICS_SPAN_HISTOGRAM: Lazy<Histogram<f64>> = Lazy::new(|| {
@@ -315,7 +315,7 @@ pub async fn init_meter_provider() -> Result<SdkMeterProvider, anyhow::Error> {
 }
 
 async fn traces_metrics_collect() -> Result<(), anyhow::Error> {
-    let mut receiver = TRACE_METRICS_CHAN.1.write().await;
+    let mut receiver = TRACE_METRICS_CHAN.1.lock().await;
 
     while let Some(item) = receiver.recv().await {
         // Record measurements using the histogram instrument.

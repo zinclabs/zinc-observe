@@ -383,22 +383,24 @@ pub async fn handle_otlp_request(
                     // get json object
                     let record_val = match value.take() {
                         json::Value::Object(mut v) => {
-                            // build span metrics item
-                            let sm = crate::job::metrics::TraceMetricsItem {
-                                organization: org_id.to_string(),
-                                traces_stream_name: traces_stream_name.clone(),
-                                service_name: service_name.clone(),
-                                span_name: v
-                                    .remove("o2_span_metrics_name")
-                                    .map_or(span.name.clone(), |name| {
-                                        name.as_str().unwrap().to_string()
-                                    }),
-                                span_status: span_status_for_spanmetric,
-                                span_kind: span.kind.to_string(),
-                                duration: ((end_time - start_time) / 1_000_000) as f64, /* milliseconds */
-                                span_id: v["span_id"].to_string(),
-                            };
-                            span_metrics.push(sm);
+                            if cfg.common.traces_span_metrics_enabled {
+                                // build span metrics item
+                                let sm = crate::job::metrics::TraceMetricsItem {
+                                    organization: org_id.to_string(),
+                                    traces_stream_name: traces_stream_name.clone(),
+                                    service_name: service_name.clone(),
+                                    span_name: v
+                                        .remove("o2_span_metrics_name")
+                                        .map_or(span.name.clone(), |name| {
+                                            name.as_str().unwrap().to_string()
+                                        }),
+                                    span_status: span_status_for_spanmetric,
+                                    span_kind: span.kind.to_string(),
+                                    duration: ((end_time - start_time) / 1_000_000) as f64, /* milliseconds */
+                                    span_id: v["span_id"].to_string(),
+                                };
+                                span_metrics.push(sm);
+                            }
                             v
                         }
                         _ => {
@@ -456,22 +458,24 @@ pub async fn handle_otlp_request(
                         // get json object
                         let record_val = match res.take() {
                             json::Value::Object(mut v) => {
-                                // build span metrics item
-                                let sm = crate::job::metrics::TraceMetricsItem {
-                                    organization: org_id.to_string(),
-                                    traces_stream_name: stream_params.stream_name.to_string(),
-                                    service_name: services[idx].to_owned(),
-                                    span_name: v
-                                        .remove("o2_span_metrics_name")
-                                        .map_or(span_names[idx].to_owned(), |name| {
-                                            name.as_str().unwrap().to_string()
-                                        }),
-                                    span_status: span_status_for_spanmetrics[idx].to_owned(),
-                                    span_kind: span_kinds[idx].to_owned(),
-                                    duration: span_durations[idx], // milliseconds
-                                    span_id: v["span_id"].to_string(),
-                                };
-                                span_metrics.push(sm);
+                                if cfg.common.traces_span_metrics_enabled {
+                                    // build span metrics item
+                                    let sm = crate::job::metrics::TraceMetricsItem {
+                                        organization: org_id.to_string(),
+                                        traces_stream_name: stream_params.stream_name.to_string(),
+                                        service_name: services[idx].to_owned(),
+                                        span_name: v
+                                            .remove("o2_span_metrics_name")
+                                            .map_or(span_names[idx].to_owned(), |name| {
+                                                name.as_str().unwrap().to_string()
+                                            }),
+                                        span_status: span_status_for_spanmetrics[idx].to_owned(),
+                                        span_kind: span_kinds[idx].to_owned(),
+                                        duration: span_durations[idx], // milliseconds
+                                        span_id: v["span_id"].to_string(),
+                                    };
+                                    span_metrics.push(sm);
+                                }
                                 v
                             }
                             _ => {

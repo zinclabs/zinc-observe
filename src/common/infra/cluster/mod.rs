@@ -341,6 +341,12 @@ async fn watch_node_list() -> Result<()> {
                 }
                 log::info!("[CLUSTER] join {:?}", item_value);
                 item_value.broadcasted = true;
+                // check if the same node is already in the cluster
+                if let Some(node) = get_cached_node_by_name(&item_value.name).await {
+                    if node.uuid.ne(&item_value.uuid) {
+                        NODES.write().await.remove(&node.uuid);
+                    }
+                }
                 if item_value.is_interactive_querier() {
                     add_node_to_consistent_hash(
                         &item_value,

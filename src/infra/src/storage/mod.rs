@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,7 +27,6 @@ pub mod local;
 pub mod remote;
 
 pub const CONCURRENT_REQUESTS: usize = 1000;
-pub const MULTI_PART_UPLOAD_DATA_SIZE: f64 = 100.0;
 
 pub static DEFAULT: Lazy<Box<dyn ObjectStore>> = Lazy::new(default);
 pub static LOCAL_WAL: Lazy<Box<dyn ObjectStore>> = Lazy::new(local_wal);
@@ -83,7 +82,8 @@ pub async fn head(file: &str) -> object_store::Result<ObjectMeta> {
 }
 
 pub async fn put(file: &str, data: bytes::Bytes) -> object_store::Result<()> {
-    if bytes_size_in_mb(&data) >= MULTI_PART_UPLOAD_DATA_SIZE {
+    let multi_part_upload_size = get_config().s3.multi_part_upload_size;
+    if multi_part_upload_size > 0 && multi_part_upload_size < bytes_size_in_mb(&data) as usize {
         put_multipart(file, data).await?;
     } else {
         DEFAULT.put(&file.into(), data.into()).await?;

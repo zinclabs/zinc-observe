@@ -1006,7 +1006,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
 
     // following command will setup the namespace
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::actions::app_deployer::init().await?;
+    o2_enterprise::enterprise::actions::action_deployer::init().await?;
 
     let server = HttpServer::new(move || {
         let cfg = get_config();
@@ -1096,7 +1096,8 @@ pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
             .service(script_server::create_job)
             .service(script_server::delete_job)
             .service(script_server::get_app_details)
-            .service(script_server::list_deployed_apps),
+            .service(script_server::list_deployed_apps)
+            .service(script_server::patch_action),
     );
 }
 
@@ -1118,7 +1119,6 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         openobserve::super_cluster_queue::init().await?;
     }
 
-    openobserve::service::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
-
+    o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
     Ok(())
 }

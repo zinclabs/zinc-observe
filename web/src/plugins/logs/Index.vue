@@ -189,6 +189,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-else-if="
+                    (!searchObj.data.stream.selectedStreamFields ||
+                    searchObj.data.stream.selectedStreamFields.length == 0) &&
+                    searchObj.loading == false
+                  "
+                  class="row q-mt-lg"
+                >
+                  <h6
+                    data-test="logs-search-no-stream-selected-text"
+                    class="text-center col-10 q-mx-none"
+                  >
+                    <q-icon name="info" color="primary" size="md" /> No field found in selected stream.
+                  </h6>
+                </div>
+                <div
+                  v-else-if="
                     searchObj.data.queryResults.hasOwnProperty('hits') &&
                     searchObj.data.queryResults.hits.length == 0 &&
                     searchObj.loading == false &&

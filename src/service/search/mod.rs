@@ -714,7 +714,11 @@ pub async fn search_partition(
         .num_microseconds()
         .unwrap();
     if is_aggregate && ts_column.is_some() {
-        min_step *= sql.histogram_interval.unwrap_or(1);
+        let hist_int = sql.histogram_interval.unwrap_or(1);
+        // add a check if histogram interval is greater than 0 to avoid panic with min_step being 0
+        if hist_int > 0 {
+            min_step *= hist_int;
+        }
     }
 
     let mut total_secs = resp.original_size / cfg.limit.query_group_base_speed / cpu_cores;
@@ -734,7 +738,7 @@ pub async fn search_partition(
     if step < min_step {
         step = min_step;
     }
-    if step % min_step > 0 {
+    if min_step > 0 && step % min_step > 0 {
         step = step - step % min_step;
     }
     // this is to ensure we create partitions less than max_query_range

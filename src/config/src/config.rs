@@ -219,7 +219,7 @@ static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default
 pub static TELEMETRY_CLIENT: Lazy<segment::HttpClient> = Lazy::new(|| {
     segment::HttpClient::new(
         reqwest::Client::builder()
-            .connect_timeout(Duration::new(10, 0))
+            .connect_timeout(Duration::from_secs(10))
             .build()
             .unwrap(),
         CONFIG.load().common.telemetry_url.clone(),
@@ -855,6 +855,12 @@ pub struct Common {
         help = "Tantivy search mode, puffin or mmap, default is puffin."
     )]
     pub inverted_index_tantivy_mode: String,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_CAMEL_CASE_TOKENIZER_DISABLED",
+        default = false,
+        help = "Disable camel case tokenizer for inverted index."
+    )]
+    pub inverted_index_camel_case_tokenizer_disabled: bool,
     #[env_config(
         name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
         default = true,
@@ -1555,6 +1561,12 @@ pub struct S3 {
     // https://github.com/hyperium/hyper/issues/2136#issuecomment-589488526
     #[env_config(name = "ZO_S3_CONNECTION_KEEPALIVE_TIMEOUT", default = 20)] // seconds
     pub keepalive_timeout: u64, // aws s3 by has timeout of 20 sec
+    #[env_config(
+        name = "ZO_S3_MULTI_PART_UPLOAD_SIZE",
+        default = 100,
+        help = "The size of the file will switch to multi-part upload in MB"
+    )]
+    pub multi_part_upload_size: usize,
 }
 
 #[derive(Debug, EnvConfig)]

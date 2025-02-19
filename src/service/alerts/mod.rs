@@ -346,6 +346,7 @@ impl QueryConditionExt for QueryCondition {
                     quick_mode: false,
                     query_type: "".to_string(),
                     track_total_hits: false,
+                    action_id: None,
                     uses_zo_fn: false,
                     query_fn: if self.vrl_function.is_some() {
                         match base64::decode_url(self.vrl_function.as_ref().unwrap()) {

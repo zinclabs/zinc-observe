@@ -116,6 +116,8 @@ pub struct Query {
     #[serde(default)]
     pub query_fn: Option<String>,
     #[serde(default)]
+    pub action_id: Option<String>,
+    #[serde(default)]
     pub skip_wal: bool,
     // streaming output
     #[serde(default)]
@@ -141,6 +143,7 @@ impl Default for Query {
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
+            action_id: None,
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
@@ -494,6 +497,7 @@ impl SearchHistoryRequest {
                 track_total_hits: false,
                 uses_zo_fn: false,
                 query_fn: None,
+                action_id: None,
                 skip_wal: false,
                 streaming_output: false,
                 streaming_id: None,
@@ -693,6 +697,7 @@ impl From<Query> for cluster_rpc::SearchQuery {
             track_total_hits: query.track_total_hits,
             uses_zo_fn: query.uses_zo_fn,
             query_fn: query.query_fn.unwrap_or_default(),
+            action_id: query.action_id.unwrap_or_default(),
             skip_wal: query.skip_wal,
         }
     }
@@ -1023,6 +1028,7 @@ impl MultiStreamRequest {
                     track_total_hits: self.track_total_hits,
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn,
+                    action_id: None,
                     skip_wal: self.skip_wal,
                     streaming_output: false,
                     streaming_id: None,

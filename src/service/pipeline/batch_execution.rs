@@ -31,6 +31,8 @@ use config::{
     },
 };
 use futures::future::try_join_all;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::pipeline::pipeline_wal_writer::get_pipeline_wal_writer;
 use once_cell::sync::Lazy;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
@@ -38,7 +40,6 @@ use crate::{
     common::infra::config::QUERY_FUNCTIONS,
     service::{
         ingestion::{apply_vrl_fn, compile_vrl_function},
-        pipeline::pipeline_wal_writer::get_pipeline_wal_writer,
         self_reporting::publish_error,
     },
 };
@@ -674,6 +675,7 @@ async fn process_node(
             }
             log::debug!("[Pipeline]: query node {node_idx} done processing {count} records");
         }
+        #[cfg(feature = "enterprise")]
         NodeData::RemoteStream(remote_stream) => {
             let mut records = vec![];
             log::debug!(
@@ -706,6 +708,19 @@ async fn process_node(
             }
 
             log::debug!("[Pipeline]: DestinationNode {node_idx} done processing {count} records");
+        }
+        #[cfg(not(feature = "enterprise"))]
+        NodeData::RemoteStream(_) => {
+            let err_msg = "[Pipeline]: remote destination is not supported in open source version. Records dropped".to_string();
+            log::error!("{err_msg}");
+            if let Err(send_err) = error_sender
+                .send((node.id.to_string(), node.node_type(), err_msg))
+                .await
+            {
+                log::error!(
+                        "[Pipeline({pipeline_id})]: DestinationNode failed sending errors for collection caused by: {send_err}"
+                    );
+            }
         }
     }
 

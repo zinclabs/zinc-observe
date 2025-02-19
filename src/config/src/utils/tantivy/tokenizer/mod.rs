@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,19 +16,38 @@
 mod o2_tokenizer;
 
 pub use o2_tokenizer::O2Tokenizer;
-use tantivy::tokenizer::{TextAnalyzer, Token};
+use tantivy::tokenizer::{SimpleTokenizer, TextAnalyzer, Token};
+
+use crate::get_config;
 
 pub const O2_TOKENIZER: &str = "o2";
 
 pub fn o2_tokenizer_build() -> TextAnalyzer {
-    tantivy::tokenizer::TextAnalyzer::builder(O2Tokenizer::default())
-        .filter(tantivy::tokenizer::RemoveLongFilter::limit(40))
-        .filter(tantivy::tokenizer::LowerCaser)
-        .build()
+    if get_config()
+        .common
+        .inverted_index_camel_case_tokenizer_disabled
+    {
+        tantivy::tokenizer::TextAnalyzer::builder(SimpleTokenizer::default())
+            .filter(tantivy::tokenizer::RemoveLongFilter::limit(40))
+            .filter(tantivy::tokenizer::LowerCaser)
+            .build()
+    } else {
+        tantivy::tokenizer::TextAnalyzer::builder(O2Tokenizer::default())
+            .filter(tantivy::tokenizer::RemoveLongFilter::limit(40))
+            .filter(tantivy::tokenizer::LowerCaser)
+            .build()
+    }
 }
 
 pub fn o2_collect_tokens(text: &str) -> Vec<String> {
-    let mut a = TextAnalyzer::from(O2Tokenizer::default());
+    let mut a = if get_config()
+        .common
+        .inverted_index_camel_case_tokenizer_disabled
+    {
+        TextAnalyzer::from(SimpleTokenizer::default())
+    } else {
+        TextAnalyzer::from(O2Tokenizer::default())
+    };
     let mut token_stream = a.token_stream(text);
     let mut tokens: Vec<String> = Vec::new();
     let mut add_token = |token: &Token| {

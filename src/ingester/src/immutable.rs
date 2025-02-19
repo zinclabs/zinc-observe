@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -183,8 +183,4 @@ pub(crate) async fn persist_table(idx: usize, path: PathBuf) -> Result<()> {
     metrics::INGEST_MEMTABLE_FILES.with_label_values(&[]).dec();
 
     Ok(())
-}
-
-pub(crate) async fn len() -> usize {
-    IMMUTABLES.read().await.len()
 }

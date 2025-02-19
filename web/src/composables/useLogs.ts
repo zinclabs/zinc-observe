@@ -723,7 +723,14 @@ const useLogs = () => {
           true,
           true,
         );
+
         searchObj.data.stream.selectedStreamFields = streamData.schema;
+        
+        if(!searchObj.data.stream.selectedStreamFields || searchObj.data.stream.selectedStreamFields.length == 0) {
+          searchObj.data.stream.selectedStreamFields = [];
+          searchObj.loading = false;
+          return false;
+        }
       }
 
       const streamFieldNames: any =
@@ -1063,8 +1070,6 @@ const useLogs = () => {
 
       return req;
     } catch (e: any) {
-      // showErrorNotification("Invalid SQL Syntax");
-      console.log(e);
       notificationMsg.value =
         "An error occurred while constructing the search query.";
       return "";
