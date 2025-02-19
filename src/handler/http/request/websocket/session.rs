@@ -100,6 +100,21 @@ pub async fn run(
     let cfg = get_config();
     let mut close_reason: Option<CloseReason> = None;
 
+    let handle = tokio::spawn(async || {
+        loop {
+            if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+                if let Err(e) = session.ping("ping".as_bytes()).await {
+                    // nothing
+                    break;
+                }
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            } else {
+                // session was removed for whatever reason
+                break;
+            }
+        }
+    });
+
     loop {
         tokio::select! {
             Some(msg) = msg_stream.next() => {
@@ -161,6 +176,8 @@ pub async fn run(
         }
     }
     cleanup_and_close_session(&req_id, close_reason).await;
+    // stop sending ping frames
+    handle.abort();
 }
 
 /// Handle the incoming text message
