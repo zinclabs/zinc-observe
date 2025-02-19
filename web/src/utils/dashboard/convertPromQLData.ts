@@ -897,45 +897,48 @@ export const convertPromQLData = async (
 
           case "vector": {
             const convertedData = convertVectorToMatrixFormat([it])[0];
-            const series =
-              convertedData?.result?.map((metric: any) => {
-                const value = metric.values[0]?.[1] ?? 0;
+            const vector = convertedData?.result?.[0];
 
-                const unitValue = getUnitValue(
-                  value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                );
+            const values = vector.values.sort((a: any, b: any) => a[0] - b[0]);
+            const latestValue = values[values.length - 1]?.[1] ?? 0;
 
-                return {
-                  type: "custom",
-                  silent: true,
-                  data: [[0, 0]],
-                  renderItem: function (params: any, api: any) {
-                    const value = formatUnitValue(unitValue);
-                    const fontSize = calculateOptimalFontSize(
-                      value,
-                      Math.min(params.coordSys.width, params.coordSys.height),
-                    );
+            const unitValue = getUnitValue(
+              latestValue,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals,
+            );
 
-                    return {
-                      type: "text",
-                      style: {
-                        text: value,
-                        fontSize: fontSize,
-                        fontWeight: 500,
-                        align: "center",
-                        verticalAlign: "middle",
-                        x: params.coordSys.x + params.coordSys.width / 2,
-                        y: params.coordSys.y + params.coordSys.height / 2,
-                        fill: store.state.theme === "dark" ? "#fff" : "#000",
-                      },
-                    };
-                  },
-                };
-              }) ?? [];
+            const series = [
+              {
+                type: "custom",
+                silent: true,
+                data: [[0, 0]],
+                renderItem: function (params: any, api: any) {
+                  const value = formatUnitValue(unitValue);
+                  const fontSize = calculateOptimalFontSize(
+                    value,
+                    Math.min(params.coordSys.width, params.coordSys.height) * 2,
+                  );
 
+                  return {
+                    type: "text",
+                    style: {
+                      text: value,
+                      fontSize: fontSize,
+                      fontWeight: 500,
+                      align: "center",
+                      verticalAlign: "middle",
+                      x: params.coordSys.x + params.coordSys.width / 2,
+                      y: params.coordSys.y + params.coordSys.height / 2,
+                      fill: store.state.theme === "dark" ? "#fff" : "#000",
+                    },
+                  };
+                },
+              },
+            ];
+
+            // Set required options for metric chart
             options.grid = [
               {
                 top: "10%",
