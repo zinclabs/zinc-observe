@@ -818,47 +818,47 @@ export const convertPromQLData = async (
 
         switch (it?.resultType) {
           case "matrix": {
-            const series =
-              it?.result?.map((metric: any) => {
-                const values = metric.values.sort(
-                  (a: any, b: any) => a[0] - b[0],
-                );
-                const latestValue = values[values.length - 1]?.[1] ?? 0;
+            // take first result
+            const metric = it?.result?.[0];
 
-                const unitValue = getUnitValue(
-                  latestValue,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                );
+            const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+            const latestValue = values[values.length - 1]?.[1] ?? 0;
 
-                return {
-                  type: "custom",
-                  silent: true,
-                  data: [[0, 0]],
-                  renderItem: function (params: any, api: any) {
-                    const value = formatUnitValue(unitValue);
-                    const fontSize = calculateOptimalFontSize(
-                      value,
-                      Math.min(params.coordSys.width, params.coordSys.height),
-                    );
+            const unitValue = getUnitValue(
+              latestValue,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals,
+            );
 
-                    return {
-                      type: "text",
-                      style: {
-                        text: value,
-                        fontSize: fontSize,
-                        fontWeight: 500,
-                        align: "center",
-                        verticalAlign: "middle",
-                        x: params.coordSys.x + params.coordSys.width / 2,
-                        y: params.coordSys.y + params.coordSys.height / 2,
-                        fill: store.state.theme === "dark" ? "#fff" : "#000",
-                      },
-                    };
-                  },
-                };
-              }) ?? [];
+            const series = [
+              {
+                type: "custom",
+                silent: true,
+                data: [[0, 0]],
+                renderItem: function (params: any, api: any) {
+                  const value = formatUnitValue(unitValue);
+                  const fontSize = calculateOptimalFontSize(
+                    value,
+                    Math.min(params.coordSys.width, params.coordSys.height) * 2,
+                  );
+
+                  return {
+                    type: "text",
+                    style: {
+                      text: value,
+                      fontSize: fontSize,
+                      fontWeight: 500,
+                      align: "center",
+                      verticalAlign: "middle",
+                      x: params.coordSys.x + params.coordSys.width / 2,
+                      y: params.coordSys.y + params.coordSys.height / 2,
+                      fill: store.state.theme === "dark" ? "#fff" : "#000",
+                    },
+                  };
+                },
+              },
+            ];
 
             // Set required options for metric chart
             options.grid = [
@@ -910,8 +910,8 @@ export const convertPromQLData = async (
 
                 return {
                   type: "custom",
-                  silent: true, 
-                  data: [[0, 0]], 
+                  silent: true,
+                  data: [[0, 0]],
                   renderItem: function (params: any, api: any) {
                     const value = formatUnitValue(unitValue);
                     const fontSize = calculateOptimalFontSize(
