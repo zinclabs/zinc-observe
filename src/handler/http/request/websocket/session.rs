@@ -100,11 +100,13 @@ pub async fn run(
     let cfg = get_config();
     let mut close_reason: Option<CloseReason> = None;
 
-    let handle = tokio::spawn(async || {
+    let id = req_id.clone();
+    let pingpong = async move {
         loop {
-            if let Some(mut session) = sessions_cache_utils::get_mut_session(&req_id) {
+            if let Some(mut session) = sessions_cache_utils::get_mut_session(&id) {
                 if let Err(e) = session.ping("ping".as_bytes()).await {
                     // nothing
+                    log::info!("error in ping pong : {e}");
                     break;
                 }
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
@@ -113,7 +115,9 @@ pub async fn run(
                 break;
             }
         }
-    });
+    };
+
+    let handle = actix_web::rt::spawn(pingpong);
 
     loop {
         tokio::select! {
