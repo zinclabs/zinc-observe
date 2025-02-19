@@ -814,113 +814,158 @@ export const convertPromQLData = async (
         }
       }
       case "metric": {
-        // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
 
         switch (it?.resultType) {
           case "matrix": {
-            // take first result
-            const series = [it?.result[0]]?.map((metric: any) => {
-              const values = metric.values.sort(
-                (a: any, b: any) => a[0] - b[0],
-              );
-              // first value
-              const unitValue = getUnitValue(
-                values?.[0]?.[1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals,
-              );
+            const series =
+              it?.result?.map((metric: any) => {
+                const values = metric.values.sort(
+                  (a: any, b: any) => a[0] - b[0],
+                );
+                const latestValue = values[values.length - 1]?.[1] ?? 0;
 
-              return {
-                ...getPropsByChartTypeForSeries(panelSchema.type),
-                renderItem: function (params: any) {
-                  return {
-                    type: "text",
-                    style: {
-                      text: formatUnitValue(unitValue),
-                      fontSize: calculateOptimalFontSize(
-                        formatUnitValue(unitValue),
-                        params.coordSys.cx * 2,
-                      ), //coordSys is relative. so that we can use it to calculate the dynamic size
-                      fontWeight: 500,
-                      align: "center",
-                      verticalAlign: "middle",
-                      x: params.coordSys.cx,
-                      y: params.coordSys.cy,
-                      fill: store.state.theme == "dark" ? "#fff" : "#000",
-                    },
-                  };
-                },
-              };
-            });
+                const unitValue = getUnitValue(
+                  latestValue,
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals,
+                );
+
+                return {
+                  type: "custom",
+                  silent: true,
+                  data: [[0, 0]],
+                  renderItem: function (params: any, api: any) {
+                    const value = formatUnitValue(unitValue);
+                    const fontSize = calculateOptimalFontSize(
+                      value,
+                      Math.min(params.coordSys.width, params.coordSys.height),
+                    );
+
+                    return {
+                      type: "text",
+                      style: {
+                        text: value,
+                        fontSize: fontSize,
+                        fontWeight: 500,
+                        align: "center",
+                        verticalAlign: "middle",
+                        x: params.coordSys.x + params.coordSys.width / 2,
+                        y: params.coordSys.y + params.coordSys.height / 2,
+                        fill: store.state.theme === "dark" ? "#fff" : "#000",
+                      },
+                    };
+                  },
+                };
+              }) ?? [];
 
             // Set required options for metric chart
-            options.dataset = { source: [[]] };
+            options.grid = [
+              {
+                top: "10%",
+                right: "10%",
+                bottom: "10%",
+                left: "10%",
+                containLabel: true,
+              },
+            ];
+
+            options.xAxis = [
+              {
+                type: "value",
+                show: false,
+                min: 0,
+                max: 1,
+              },
+            ];
+
+            options.yAxis = [
+              {
+                type: "value",
+                show: false,
+                min: 0,
+                max: 1,
+              },
+            ];
+
             options.tooltip = { show: false };
-            // Set coordinate system options
-            options.xAxis = [];
-            options.yAxis = [];
-            options.angleAxis = {
-              show: false,
-            };
-            options.radiusAxis = {
-              show: false,
-            };
-            options.polar = {};
-            options.xAxis = [];
+            options.legend = { show: false };
 
             return series;
           }
+
           case "vector": {
             const convertedData = convertVectorToMatrixFormat([it])[0];
-            const series = [convertedData?.result[0]]?.map((metric: any) => {
-              const values = metric.values;
-              const unitValue = getUnitValue(
-                values?.[0]?.[1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals,
-              );
+            const series =
+              convertedData?.result?.map((metric: any) => {
+                const value = metric.values[0]?.[1] ?? 0;
 
-              return {
-                ...getPropsByChartTypeForSeries(panelSchema.type),
-                renderItem: function (params: any) {
-                  return {
-                    type: "text",
-                    style: {
-                      text: formatUnitValue(unitValue),
-                      fontSize: calculateOptimalFontSize(
-                        formatUnitValue(unitValue),
-                        params.coordSys.cx * 2,
-                      ),
-                      fontWeight: 500,
-                      align: "center",
-                      verticalAlign: "middle",
-                      x: params.coordSys.cx,
-                      y: params.coordSys.cy,
-                      fill: store.state.theme == "dark" ? "#fff" : "#000",
-                    },
-                  };
-                },
-              };
-            });
+                const unitValue = getUnitValue(
+                  value,
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals,
+                );
 
-            // Set required options for metric chart
-            options.dataset = { source: [[]] };
+                return {
+                  type: "custom",
+                  silent: true, 
+                  data: [[0, 0]], 
+                  renderItem: function (params: any, api: any) {
+                    const value = formatUnitValue(unitValue);
+                    const fontSize = calculateOptimalFontSize(
+                      value,
+                      Math.min(params.coordSys.width, params.coordSys.height),
+                    );
+
+                    return {
+                      type: "text",
+                      style: {
+                        text: value,
+                        fontSize: fontSize,
+                        fontWeight: 500,
+                        align: "center",
+                        verticalAlign: "middle",
+                        x: params.coordSys.x + params.coordSys.width / 2,
+                        y: params.coordSys.y + params.coordSys.height / 2,
+                        fill: store.state.theme === "dark" ? "#fff" : "#000",
+                      },
+                    };
+                  },
+                };
+              }) ?? [];
+
+            options.grid = [
+              {
+                top: "10%",
+                right: "10%",
+                bottom: "10%",
+                left: "10%",
+                containLabel: true,
+              },
+            ];
+
+            options.xAxis = [
+              {
+                type: "value",
+                show: false,
+                min: 0,
+                max: 1,
+              },
+            ];
+
+            options.yAxis = [
+              {
+                type: "value",
+                show: false,
+                min: 0,
+                max: 1,
+              },
+            ];
+
             options.tooltip = { show: false };
-
-            // Set coordinate system options
-            options.xAxis = [];
-            options.yAxis = [];
-            options.angleAxis = {
-              show: false,
-            };
-            options.radiusAxis = {
-              show: false,
-            };
-            options.polar = {};
-            options.xAxis = [];
+            options.legend = { show: false };
 
             return series;
           }
