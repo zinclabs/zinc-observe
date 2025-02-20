@@ -18,18 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     data-test="add-stream-query-routing-section "
     class="full-width stream-routing-section "
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+    :class="[
+      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
+      { 'fullscreen-mode': isFullscreenMode }
+    ]"
   >
-  <div class="flex justify-between q-px-md q-pr-xl">
-    <div class="stream-routing-title q-pb-sm q-pl-md">
-      {{ t("pipeline.query") }}
-    </div>
 
-  </div>
 
     <q-separator />
 
-    <div class="stream-routing-container q-px-md q-pt-md q-pr-xl">
+    <div class="stream-routing-container q-px-md  ">
       <q-form ref="queryFormRef" @submit="saveQueryData">
         <div class="full-width">
           <scheduled-pipeline
@@ -51,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @submit:form="saveQueryData"
             @cancel:form="openCancelDialog"
             @delete:node="openDeleteDialog"
+            @update:fullscreen="updateFullscreenMode"
             
             class="q-mt-sm"
           />
@@ -191,6 +190,12 @@ const dialog = ref({
   message: "",
   okCallback: () => {},
 });
+
+const isFullscreenMode = ref(false);
+
+const updateFullscreenMode = (val: boolean) => {
+  isFullscreenMode.value = val;
+};
 
 const getDefaultStreamRoute: any = () => {
   if (pipelineObj.isEditNode) {
@@ -464,7 +469,6 @@ const validateSqlQuery = () => {
 <style scoped>
 .stream-routing-title {
   font-size: 20px;
-  padding-top: 16px;
 }
 .stream-routing-container {
   width: 100%;
@@ -476,5 +480,9 @@ const validateSqlQuery = () => {
   min-height: 100%;
   width: 97vw !important;
   padding-left: 1rem;
+
+  &.fullscreen-mode {
+    width: 100vw !important;
+  }
 }
 </style>
