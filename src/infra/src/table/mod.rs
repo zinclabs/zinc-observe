@@ -32,12 +32,15 @@ pub mod distinct_values;
 pub mod entity;
 pub mod folders;
 mod migration;
+pub mod org_users;
+pub mod organizations;
 pub mod search_job;
 pub mod search_queue;
 pub mod short_urls;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
+pub mod users;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
@@ -81,6 +84,14 @@ async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
 pub async fn down(steps: Option<u32>) -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     Migrator::down(client, steps).await?;
+    Ok(())
+}
+
+pub async fn create_user_tables() -> Result<(), anyhow::Error> {
+    organizations::create_table().await?;
+    users::create_table().await?;
+    org_users::create_table().await?;
+
     Ok(())
 }
 

@@ -36,6 +36,7 @@ pub mod kv;
 pub mod metrics;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
+pub mod org_users;
 pub mod organization;
 pub mod pipeline;
 pub mod saved_view;

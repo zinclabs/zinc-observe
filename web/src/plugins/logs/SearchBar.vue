@@ -2090,6 +2090,11 @@ export default defineComponent({
               }
               await updatedLocalLogFilterField();
             }
+
+            if(searchObj.meta.toggleFunction == false) {
+              searchObj.config.fnSplitterModel = 99.5;
+              resetFunctionContent();
+            }
             $q.notify({
               message: `${item.view_name} view applied successfully.`,
               color: "positive",

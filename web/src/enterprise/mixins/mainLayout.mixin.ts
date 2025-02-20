@@ -22,22 +22,23 @@ const MainLayoutCloudMixin = {
      * @returns linksList.value
      */
     const leftNavigationLinks = (linksList: any, t: any) => {
-      // linksList.value.splice(7, 0, {
-      //   title: t("menu.billings"),
-      //   icon: "payment",
-      //   link: "/billings",
-      // });
       linksList.value.splice(5, 0, {
         title: t("menu.pipeline"),
         iconComponent: markRaw(PipelineIcon),
         link: "/pipeline",
         name: "pipeline",
       });
-      linksList.value.splice(10, 0, {
-        title: t("menu.billings"),
-        icon: "payments",
-        link: "/billings",
-      });
+
+      if(!store.state.zoConfig?.custom_hide_menus
+          ?.split(",")
+          ?.includes("billings")
+      ) {
+        linksList.value.splice(10, 0, {
+          title: t("menu.billings"),
+          icon: "payments",
+          link: "/billings",
+        });
+      }
 
       return linksList.value;
     };
@@ -165,7 +166,7 @@ const MainLayoutCloudMixin = {
             // quotaThresholdMsg.value = usageMessage;
             store.dispatch("setQuotaThresholdMsg", usageMessage);
           })
-          .catch((error) => console.log(error));
+          .catch((error: any) => console.log(error));
       }
     };
 

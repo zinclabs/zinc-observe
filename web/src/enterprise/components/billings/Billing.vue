@@ -37,7 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             exact
             default
             name="usage"
-            :to="'/billings/usage'"
+            :to="
+              '/billings/usage?org_identifier=' +
+              store.state.selectedOrganization.identifier
+            "
             :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
             :label="t('billing.usageLabel')"
             content-class="tab_content"
@@ -45,7 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-route-tab
             exact
             name="plans"
-            :to="'/billings/plans'"
+            :to="
+              '/billings/plans?org_identifier=' +
+              store.state.selectedOrganization.identifier
+            "
             :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
             :label="t('billing.plansLabel')"
             content-class="tab_content"
@@ -53,7 +59,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-route-tab
             exact
             name="invoice_history"
-            :to="'/billings/invoice_history'"
+            :to="
+              '/billings/invoice_history?org_identifier=' +
+              store.state.selectedOrganization.identifier
+            "
             :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
             :label="t('billing.invoiceHistoryLabel')"
             content-class="tab_content"

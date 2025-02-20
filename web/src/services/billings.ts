@@ -40,6 +40,11 @@ const billings = {
       `/api/${org_identifier}/billings/hosted_subscription_url?plan=${plan_name}`
     );
   },
+  get_session_url: (org_identifier: string, customer_id: string) => {
+    return http().get(
+      `/api/${org_identifier}/billings/billing_portal?customer_id=${customer_id}`
+    );
+  },
   retrieve_hosted_page: (org_identifier: string, hosted_page_id: string) => {
     return http().get(
       `/api/${org_identifier}/billings/hosted_page_status/${hosted_page_id}`

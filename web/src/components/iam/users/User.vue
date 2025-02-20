@@ -30,27 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #no-data>
         <NoData></NoData>
       </template>
-      <template #body-cell-role="props">
-        <q-td :props="props" v-if="props?.row?.enableChangeRole">
-          <q-select
-            dense
-            borderless
-            v-model="props.row.role"
-            :options="options"
-            emit-value
-            map-options
-            style="width: 70px"
-            @update:model-value="updateUserRole(props.row)"
-          />
-        </q-td>
-        <q-td :props="props" v-else>
-          {{ props.row.role }}
-        </q-td>
+      <template v-slot:header="props">
+        <q-tr :props="props">
+          <q-th v-for="col in props.cols"
+:key="col.name" :props="props">
+            <span>{{ col.label }}</span>
+          </q-th>
+        </q-tr>
       </template>
       <template #body-cell-actions="props">
         <q-td :props="props" side>
           <q-btn
-            v-if="props.row.enableDelete"
+            v-if="props.row.enableDelete && props.row.status != 'pending'"
             :icon="outlinedDelete"
             :title="t('user.delete')"
             class="q-ml-xs"
@@ -61,9 +52,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             @click="confirmDeleteAction(props)"
             style="cursor: pointer !important"
+            :data-test="`delete-basic-user-${props.row.email}`"
           />
           <q-btn
-            v-if="props.row.enableEdit"
+            v-if="props.row.enableEdit && props.row.status != 'pending'"
             icon="edit"
             :title="t('user.update')"
             class="q-ml-xs"
@@ -74,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flat
             @click="addRoutePush(props)"
             style="cursor: pointer !important"
+             :data-test="`edit-basic-user-${props.row.email}`"
           />
         </q-td>
       </template>
@@ -82,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="q-table__title full-width q-mb-md"
           data-test="user-title-text"
         >
-          {{ t("user.header") }}
+          {{ t("iam.basicUsers") }}
         </div>
         <div class="full-width row q-mb-xs items-start">
           <q-input
@@ -96,10 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <q-icon name="search" />
             </template>
           </q-input>
-
-          <div class="col-6">
+          <div class="col-6" v-if="config.isCloud == 'true'">
+            <member-invitation
+              :key="currentUserRole"
+              v-model:currentrole="currentUserRole"
+            />
+          </div>
+          <div class="col-6" v-else>
             <q-btn
-              v-if="showAddUserBtn"
               class="q-ml-md q-mb-xs text-bold no-border"
               style="float: right; cursor: pointer !important"
               padding="sm lg"
@@ -108,19 +105,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dense
               :label="t(`user.add`)"
               @click="addRoutePush({})"
+              data-test="add-basic-user"
             />
           </div>
         </div>
         <QTablePagination
           :scope="scope"
-          :pageTitle="t('user.header')"
+          :pageTitle="t('iam.basicUsers')"
           :resultTotal="resultTotal"
           :perPageOptions="perPageOptions"
           position="top"
           @update:changeRecordPerPage="changePagination"
         />
       </template>
-
       <template #bottom="scope">
         <QTablePagination
           :scope="scope"
@@ -132,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </q-table>
     <q-dialog
+      v-if="config.isCloud == 'false'"
       v-model="showUpdateUserDialog"
       position="right"
       full-height
@@ -147,11 +145,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       maximized
     >
       <add-user
+        v-if="config.isCloud == 'false'"
         style="width: 35vw"
         v-model="selectedUser"
         :isUpdated="isUpdated"
         :userRole="currentUserRole"
         :roles="options"
+        :customRoles="customRoles"
         @updated="addMember"
         @cancel:hideform="hideForm"
       />
@@ -165,7 +165,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-card-section>
 
         <q-card-actions class="confirmActions">
-          <q-btn v-close-popup="true" unelevated no-caps class="q-mr-sm">
+          <q-btn v-close-popup="true" unelevated
+            no-caps class="q-mr-sm">
             {{ t("user.cancel") }}
           </q-btn>
           <q-btn
@@ -198,6 +199,7 @@ import AddUser from "@/components/iam/users/AddUser.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
+import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
 import {
   getImageURL,
   verifyOrganizationStatus,
@@ -212,7 +214,13 @@ import { getRoles } from "@/services/iam";
 
 export default defineComponent({
   name: "UserPageOpenSource",
-  components: { QTablePagination, UpdateUserRole, NoData, AddUser },
+  components: {
+    QTablePagination,
+    UpdateUserRole,
+    NoData,
+    AddUser,
+    MemberInvitation,
+  },
   emits: [
     "updated:fields",
     "deleted:fields",
@@ -252,19 +260,28 @@ export default defineComponent({
     onBeforeMount(async () => {
       isEnterprise.value = config.isEnterprise == "true";
       await getOrgMembers();
-      if (isEnterprise.value) await getRoles();
+      if (isEnterprise.value || config.isCloud == "true") await _getRoles();
 
-      if (
-        (isEnterprise.value && isCurrentUserInternal.value) ||
-        !isEnterprise.value
-      ) {
-        columns.value.push({
-          name: "actions",
-          field: "actions",
-          label: t("user.actions"),
-          align: "left",
-        });
-      }
+      // if (config.isCloud == "true") {
+        // columns.value.push({
+        //   name: "status",
+        //   field: "status",
+        //   label: t("user.status"),
+        //   align: "left",
+        // });
+      // }
+
+      // if (
+      //   (isEnterprise.value && isCurrentUserInternal.value) ||
+      //   !isEnterprise.value
+      // ) {
+      //   columns.value.push({
+      //     name: "actions",
+      //     field: "actions",
+      //     label: t("user.actions"),
+      //     align: "left",
+      //   });
+      // }
 
       updateUserActions();
     });
@@ -304,14 +321,21 @@ export default defineComponent({
         align: "left",
         sortable: true,
       },
+      {
+        name: "actions",
+        field: "actions",
+        label: t("user.actions"),
+        align: "left",
+      },
     ]);
     const userEmail: any = ref("");
-    const options = ref([{ label: "Admin", value: "admin" }]);
-    const selectedRole = ref(options.value[0].value);
+    const options = ref([]);
+    const customRoles = ref([]);
+    const selectedRole = ref();
     const currentUserRole = ref("");
     let deleteUserEmail = "";
 
-    const getRoles = () => {
+    const _getRoles = () => {
       return new Promise((resolve) => {
         usersService
           .getRoles(store.state.selectedOrganization.identifier)
@@ -321,6 +345,40 @@ export default defineComponent({
           .finally(() => resolve(true));
       });
     };
+    const getCustomRoles = async () => {
+      await getRoles(store.state.selectedOrganization.identifier)
+        .then((res) => {
+          customRoles.value = res.data;
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    };
+
+    const getInvitedMembers = () => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading users...",
+      });
+
+      return new Promise((resolve, reject) => {
+        usersService
+          .invitedUsers(store.state.selectedOrganization.identifier)
+          .then((res) => {
+            if(res.status == 200) {
+              dismiss();
+              resolve(res.data);
+            } else {
+              dismiss();
+              resolve([]);
+            }
+          })
+          .catch(() => {
+            dismiss();
+            reject([]);
+          });
+      });
+    }
 
     const getOrgMembers = () => {
       const dismiss = $q.notify({
@@ -330,19 +388,20 @@ export default defineComponent({
 
       return new Promise((resolve, reject) => {
         usersService
-          .orgUsers(
-            0,
-            1000,
-            "email",
-            false,
-            "",
-            store.state.selectedOrganization.identifier
-          )
-          .then((res) => {
+          .orgUsers(store.state.selectedOrganization.identifier)
+          .then(async (res) => {
             resultTotal.value = res.data.data.length;
+            let users = [...res.data.data];
+
+            if (config.isCloud) {
+              const invitedMembers: any = await getInvitedMembers();
+              resultTotal.value += invitedMembers.length;
+              users = [...res.data.data, ...invitedMembers];
+            }
+            
             let counter = 1;
             currentUserRole.value = "";
-            usersState.users = res.data.data.map((data: any) => {
+            usersState.users = users.map((data: any) => {
               if (store.state.userInfo.email == data.email) {
                 currentUserRole.value = data.role;
                 isCurrentUserInternal.value = !data.is_external;
@@ -357,21 +416,11 @@ export default defineComponent({
                 email: maskText(data.email),
                 first_name: data.first_name,
                 last_name: data.last_name,
-                role: data.role,
-                member_created: date.formatDate(
-                  parseInt(data.member_created),
-                  "YYYY-MM-DDTHH:mm:ssZ"
-                ),
-                member_updated: date.formatDate(
-                  parseInt(data.member_updated),
-                  "YYYY-MM-DDTHH:mm:ssZ"
-                ),
-                org_member_id: data.org_member_id,
-                isLoggedinUser: store.state.userInfo.email == data.email,
-                isExternal: !!data.is_external,
-                enableEdit: false,
+                role: data?.status == "pending" ? data.role + " (Invited)": data.role,
+                enableEdit: store.state.userInfo.email == data.email ? true : false,
                 enableChangeRole: false,
-                enableDelete: false,
+                enableDelete: config.isCloud ? true : false,
+                status: data?.status,
               };
             });
 
@@ -391,17 +440,16 @@ export default defineComponent({
       value: number | String;
     }
     const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
+      { label: "25", value: 25 },
       { label: "50", value: 50 },
       { label: "100", value: 100 },
-      { label: "All", value: 0 },
+      { label: "250", value: 250 },
+      { label: "500", value: 500 },
     ];
-    const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
+    const maxRecordToReturn = ref<number>(500);
+    const selectedPerPage = ref<number>(25);
     const pagination: any = ref({
-      rowsPerPage: 20,
+      rowsPerPage: 25,
     });
 
     const changePagination = (val: { label: string; value: any }) => {
@@ -410,18 +458,18 @@ export default defineComponent({
       qTable.value.setPagination(pagination.value);
     };
 
-    const showAddUserBtn = computed(() => {
-      if (isEnterprise.value) {
-        return (
-          isCurrentUserInternal.value &&
-          (currentUserRole.value == "admin" || currentUserRole.value == "root")
-        );
-      } else {
-        return (
-          currentUserRole.value == "admin" || currentUserRole.value == "root"
-        );
-      }
-    });
+    // const showAddUserBtn = computed(() => {
+    //   if (isEnterprise.value) {
+    //     return (
+    //       isCurrentUserInternal.value &&
+    //       (currentUserRole.value == "admin" || currentUserRole.value == "root")
+    //     );
+    //   } else {
+    //     return (
+    //       currentUserRole.value == "admin" || currentUserRole.value == "root"
+    //     );
+    //   }
+    // });
 
     const currentUser = computed(() => store.state.userInfo.email);
 
@@ -433,21 +481,29 @@ export default defineComponent({
       });
     };
 
+    // const shouldAllowEdit = (user: any) => {
+    //   if (isEnterprise.value) {
+    //     return (
+    //       isCurrentUserInternal.value &&
+    //       !user.isExternal &&
+    //       (currentUserRole.value == "root" ||
+    //         (currentUserRole.value == "admin" && user.role !== "root"))
+    //     );
+    //   } else {
+    //     return (
+    //       user.isLoggedinUser ||
+    //       currentUserRole.value == "root" ||
+    //       (currentUserRole.value == "admin" && user.role !== "root")
+    //     );
+    //   }
+    // };
     const shouldAllowEdit = (user: any) => {
-      if (isEnterprise.value) {
-        return (
-          isCurrentUserInternal.value &&
-          !user.isExternal &&
-          (currentUserRole.value == "root" ||
-            (currentUserRole.value == "admin" && user.role !== "root"))
-        );
-      } else {
-        return (
-          user.isLoggedinUser ||
-          currentUserRole.value == "root" ||
-          (currentUserRole.value == "admin" && user.role !== "root")
-        );
+      // Allow editing for root users only if the current user is root
+      if (user.role === "root") {
+        return store.state.userInfo.email === user.email;
       }
+      // Allow editing for all other users
+      return true;
     };
 
     const shouldAllowChangeRole = (user: any) => {
@@ -532,7 +588,7 @@ export default defineComponent({
           {
             row: props.row,
           },
-          true
+          true,
         );
       } else {
         addUser({}, false);
@@ -544,6 +600,54 @@ export default defineComponent({
           },
         });
       }
+    };
+    const toggleExpand = (row: any) => {
+      if (!row.showGroups) {
+        row.showGroups = true;
+        fetchUserGroups(row.email);
+        fetchUserRoles(row.email);
+      } else {
+        row.showGroups = false;
+      }
+    };
+    const forceCloseRow = (row: any) => {
+      if (row.showGroups) {
+        row.showGroups = false;
+      }
+    };
+    const fetchUserGroups = (userEmail: any) => {
+      const orgId = store.state.selectedOrganization.identifier;
+      usersService.getUserGroups(orgId, userEmail).then((response) => {
+        // Update the user_groups property in the row object
+        const updatedUsers = usersState.users.map((user) => {
+          if (user.email === userEmail) {
+            return {
+              ...user,
+              user_groups: response.data.join(", "),
+              // user_groups: response.data
+            };
+          }
+          return user;
+        });
+        usersState.users = updatedUsers;
+      });
+    };
+    const fetchUserRoles = (userEmail: any) => {
+      const orgId = store.state.selectedOrganization.identifier;
+      usersService.getUserRoles(orgId, userEmail).then((response) => {
+        // Update the user_roles property in the row object
+        const updatedUsers = usersState.users.map((user) => {
+          if (user.email === userEmail) {
+            return {
+              ...user,
+              user_roles: response.data.join(", "),
+              // user_roles: response.data
+            };
+          }
+          return user;
+        });
+        usersState.users = updatedUsers;
+      });
     };
 
     const updateMember = async (data: any) => {
@@ -574,12 +678,57 @@ export default defineComponent({
     const addMember = async (res: any, data: any, operationType: string) => {
       showAddUserDialog.value = false;
       if (res.code == 200) {
-        $q.notify({
-          color: "positive",
-          message: "User added successfully.",
+        router.push({
+          name: "users",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
         });
         await getOrgMembers();
         updateUserActions();
+        if (operationType == "created") {
+          $q.notify({
+            color: "positive",
+            message: "User added successfully.",
+          });
+          // if (
+          //   store.state.selectedOrganization.identifier == data.organization
+          // ) {
+          //   const user = {
+          //     "#":
+          //       usersState.users.length + 1 <= 9
+          //         ? `0${usersState.users.length + 1}`
+          //         : usersState.users.length + 1,
+          //     email: data.email,
+          //     first_name: data.first_name,
+          //     last_name: data.last_name,
+          //     role: data.role,
+          //     isExternal: false,
+          //     enableEdit: false,
+          //     enableChangeRole: false,
+          //     enableDelete: false,
+          //   };
+
+          //   user["enableEdit"] = shouldAllowEdit(user);
+          //   user["enableChangeRole"] = shouldAllowChangeRole(user);
+          //   user["enableDelete"] = shouldAllowDelete(user);
+
+          //   usersState.users.push(user);
+          // }
+        } else {
+          $q.notify({
+            color: "positive",
+            message: "User updated successfully.",
+          });
+          // usersState.users.forEach((member: any, key: number) => {
+          //   if (member.email == data.email) {
+          //     usersState.users[key] = {
+          //       ...usersState.users[key],
+          //       ...data,
+          //     };
+          //   }
+          // });
+        }
       }
       router.replace({
         name: "users",
@@ -608,7 +757,7 @@ export default defineComponent({
           }
         })
         .catch((err: any) => {
-          if(err.response.status != 403){
+          if (err.response.status != 403) {
             $q.notify({
               color: "negative",
               message: "Error while deleting user.",
@@ -632,7 +781,7 @@ export default defineComponent({
             email: row.email,
             organization_id: parseInt(store.state.selectedOrganization.id),
           },
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         )
         .then((res: { data: any }) => {
           if (res.data.error_members != null) {
@@ -696,6 +845,9 @@ export default defineComponent({
       changeMaxRecordToReturn,
       outlinedDelete,
       filterQuery: ref(""),
+      fetchUserGroups,
+      toggleExpand,
+      forceCloseRow,
       filterData(rows: any, terms: any) {
         var filtered = [];
         terms = terms.toLowerCase();
@@ -714,13 +866,14 @@ export default defineComponent({
       userEmail,
       selectedRole,
       options,
+      customRoles,
       currentUserRole,
       updateUserRole,
       getImageURL,
       verifyOrganizationStatus,
       isEnterprise,
       isCurrentUserInternal,
-      showAddUserBtn,
+      // showAddUserBtn,
     };
   },
 });

@@ -155,7 +155,7 @@ export default defineComponent({
       )
         .then((res) => {
           dismiss();
-          const invoiceList = res.data.data;
+          const invoiceList = res.data;
           if (invoiceList.length > 0) {
             resultTotal.value = invoiceList.length;
             invoiceHistory.value = invoiceList.map((invoice, index) => {

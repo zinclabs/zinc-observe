@@ -3103,6 +3103,10 @@ mod tests {
                 fake_es_version: String::default(),
                 websocket_enabled: bool::default(),
                 min_auto_refresh_interval: u32::default(),
+                create_org_through_ingestion: bool::default(),
+                es_version: String::default(),
+                ingestion_url: String::default(),
+                org_invite_expiry: u32::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),

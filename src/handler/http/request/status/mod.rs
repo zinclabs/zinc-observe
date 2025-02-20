@@ -122,6 +122,7 @@ struct ConfigResponse<'a> {
     usage_enabled: bool,
     usage_publish_interval: i64,
     websocket_enabled: bool,
+    ingestion_url: String,
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
 }
@@ -305,6 +306,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
         websocket_enabled: cfg.common.websocket_enabled,
+        ingestion_url: cfg.common.ingestion_url.to_string(),
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
     }))
@@ -448,7 +450,9 @@ async fn get_stream_schema_status() -> (usize, usize, usize) {
 #[cfg(feature = "enterprise")]
 #[get("/redirect")]
 pub async fn redirect(req: HttpRequest) -> Result<HttpResponse, Error> {
-    use crate::common::meta::user::{AuthTokens, UserRole};
+    use config::meta::user::UserRole;
+
+    use crate::common::meta::user::AuthTokens;
 
     let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
     let code = match query.get("code") {

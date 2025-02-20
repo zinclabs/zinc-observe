@@ -34,19 +34,19 @@ test_data = [
 
 (
     "logs integer comparison query",
-    'SELECT * FROM "default" WHERE k8s_container_restart_count = 1',
+    'SELECT * FROM "stream_pytest_data" WHERE k8s_container_restart_count = 1',
     1,
 ),
 
   (
     "logs integer cast comparison query",
-    'SELECT * FROM "default" WHERE cast(k8s_container_restart_count as INT) = 1',
+    'SELECT * FROM "stream_pytest_data" WHERE cast(k8s_container_restart_count as INT) = 1',
     1,
 ),  
     
 (
     "logs integer try_cast comparison query",
-    'SELECT * FROM "default" WHERE try_cast(k8s_container_restart_count as INT) = 1',
+    'SELECT * FROM "stream_pytest_data" WHERE try_cast(k8s_container_restart_count as INT) = 1',
     1,
 ),  
    
@@ -58,7 +58,7 @@ def test_e2e_try_cast_queries(create_session, base_url, test_name, sql_query, ex
     """Parameterized E2E test for various try_cast SQL queries."""
     session = create_session
     url = base_url
-    org_id = "org_pytest_data"
+    org_id = "default"
     
     # Define time range for the query
     now = datetime.now(timezone.utc)

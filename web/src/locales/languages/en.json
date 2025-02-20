@@ -291,7 +291,9 @@
     "apiKeyNotFound": "User API Key Not Found.",
     "allowedOrg": "Allowed Organization",
     "roles": "Roles",
-    "groups": "Groups"
+    "groups": "Groups",
+    "customRole": "Custom Roles",
+    "status": "Status"
   },
   "serviceAccounts": {
     "header": "Service Accounts",
@@ -314,7 +316,7 @@
     "groups": "User Groups",
     "roles": "Roles",
     "organizations": "Organizations",
-    "addGroup": "Add Group",
+    "addGroup": "Add User Group",
     "addRole": "Add Role",
     "roleName": "Role Name",
     "groupName": "Group Name",
@@ -330,9 +332,11 @@
     "userName": "User Name",
     "resourceName": "Resource Name",
     "searchRole": "Search Role",
-    "searchGroup": "Search Group",
+    "searchGroup": "Search User Group",
     "object": "Object",
-    "serviceAccounts": "Service Accounts"
+    "serviceAccounts": "Service Accounts",
+    "serviceAccountsName": "Service Accounts Name",
+    "basicUsers": "Users"
   },
   "ticket": {
     "header": "Support Tickets",
@@ -360,7 +364,7 @@
   "organization": {
     "header": "Organizations",
     "orgName": "Organization Name",
-    "createOrganization": "Create Organization",
+    "createOrganization": "Add Organization",
     "updateOrganization": "Update Organization",
     "nameHolder": "Type name here",
     "add": "Add Organization",
@@ -389,7 +393,8 @@
     "role": "Role",
     "nameRequired": "Name is required",
     "subscription_type": "Plan Type",
-    "proceed_subscription": "Proceed to Subscription"
+    "proceed_subscription": "Proceed to Subscription",
+    "subscription_plan": "Subscription Plan"
   },
   "template": {
     "header": "Templates",
@@ -811,11 +816,11 @@
     "header": "Usage & Billing",
     "plans": "Plans",
     "subtitle": "Simple, transparent pricing",
-    "individuals": "For individuals",
-    "startups": "For startups",
-    "basic": "Basic",
-    "pro": "Pro",
-    "business": "Business",
+    "individuals": "For Individuals",
+    "startups": "For Startups",
+    "basic": "Free",
+    "pro": "Pay as you Go",
+    "business": "Enterprise",
     "whatIsIncluded": "What’s included",
     "subscribed": "Subscribed",
     "getStarted": "Get started",

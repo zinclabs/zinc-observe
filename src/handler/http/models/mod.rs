@@ -18,6 +18,8 @@
 
 pub mod action;
 pub mod alerts;
+#[cfg(feature = "cloud")]
+pub mod billings;
 pub mod dashboards;
 pub mod destinations;
 pub mod folders;

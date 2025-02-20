@@ -21,17 +21,21 @@ mod destinations;
 mod distinct_values;
 mod folders;
 mod meta;
+mod org_user;
+mod organization;
 mod pipelines;
 mod scheduler;
 mod schemas;
 mod search_job;
 mod short_urls;
 mod templates;
+mod user;
 
 use config::cluster::{is_offline, LOCAL_NODE};
 use o2_enterprise::enterprise::super_cluster::queue::{
     ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, FoldersQueue, MetaQueue,
-    PipelinesQueue, SchemasQueue, SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue,
+    OrgUsersQueue, OrganizationsQueue, PipelinesQueue, SchemasQueue, SearchJobsQueue,
+    SuperClusterQueueTrait, TemplatesQueue, UsersQueue,
 };
 
 /// Creates a super cluster queue for each super cluster topic and begins
@@ -77,6 +81,16 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let action_scripts_queue = ActionScriptsQueue {
         on_action_script_msg: action_scripts::process,
     };
+    let orgs_queue = OrganizationsQueue {
+        on_meta_msg: meta::process,
+        on_orgs_msg: organization::process,
+    };
+    let users_queue = UsersQueue {
+        on_user_msg: user::process,
+    };
+    let org_users_queue = OrgUsersQueue {
+        on_org_users_msg: org_user::process,
+    };
 
     let queues: Vec<Box<dyn SuperClusterQueueTrait + Sync + Send>> = vec![
         Box::new(meta_queue),
@@ -89,6 +103,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(templates_queue),
         Box::new(destinations_queue),
         Box::new(action_scripts_queue),
+        Box::new(orgs_queue),
+        Box::new(users_queue),
+        Box::new(org_users_queue),
     ];
 
     for queue in queues {

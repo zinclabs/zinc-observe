@@ -17,9 +17,12 @@ use config::meta::cluster::get_internal_grpc_token;
 use http_auth_basic::Credentials;
 use tonic::{metadata::MetadataValue, Request, Status};
 
-use crate::common::{
-    infra::config::{ROOT_USER, USERS},
-    utils::auth::{get_hash, is_root_user},
+use crate::{
+    common::{
+        infra::config::ROOT_USER,
+        utils::auth::{get_hash, is_root_user},
+    },
+    service::db::org_users::get_cached_user_org,
 };
 
 pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
@@ -72,12 +75,9 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
         let user_id = credentials.user_id;
         let user = if is_root_user(&user_id) {
-            ROOT_USER.get("root").unwrap()
-        } else if let Some(user) = USERS.get(&format!(
-            "{}/{}",
-            org_id.unwrap().to_str().unwrap(),
-            &user_id
-        )) {
+            ROOT_USER.get("root").unwrap().to_owned()
+        } else if let Some(user) = get_cached_user_org(org_id.unwrap().to_str().unwrap(), &user_id)
+        {
             user
         } else {
             return Err(Status::unauthenticated("No valid auth token[4]"));
@@ -103,10 +103,9 @@ pub fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
 
 #[cfg(test)]
 mod tests {
-    use config::{cache_instance_id, get_config};
+    use config::{cache_instance_id, get_config, meta::user::User};
 
     use super::*;
-    use crate::common::meta::user::User;
 
     #[tokio::test]
     async fn test_check_no_auth() {
@@ -116,7 +115,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
@@ -149,7 +148,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),
@@ -180,7 +179,7 @@ mod tests {
             User {
                 email: "root@example.com".to_string(),
                 password: "Complexpass#123".to_string(),
-                role: crate::common::meta::user::UserRole::Root,
+                role: config::meta::user::UserRole::Root,
                 salt: "Complexpass#123".to_string(),
                 first_name: "root".to_owned(),
                 last_name: "".to_owned(),

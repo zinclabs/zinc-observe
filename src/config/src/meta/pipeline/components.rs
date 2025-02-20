@@ -52,6 +52,15 @@ pub struct DerivedStream {
     pub tz_offset: i32,
 }
 
+impl DerivedStream {
+    pub fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String {
+        format!(
+            "{}/{}/{}/{}",
+            self.stream_type, self.org_id, pipeline_name, pipeline_id
+        )
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub struct Node {

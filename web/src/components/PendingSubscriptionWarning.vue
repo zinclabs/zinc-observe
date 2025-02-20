@@ -39,14 +39,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useRouter } from "vue-router";
 // @ts-nocheck
 import { defineComponent } from "vue";
+import { useStore } from "vuex";
 
 export default defineComponent({
   name: "PendingSubscriptionWarning",
   setup() {
     const router = useRouter();
+    const store = useStore();
 
     const routerPush = () => {
-      router.push({ name: "plans" });
+      router.push({
+        name: "plans",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
     };
 
     return {

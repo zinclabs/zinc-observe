@@ -155,7 +155,6 @@ pub async fn delete(
 
 #[async_trait]
 pub trait DerivedStreamExt: Sync + Send + 'static {
-    fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String;
     async fn evaluate(
         &self,
         (start_time, end_time): (Option<i64>, i64),
@@ -165,13 +164,6 @@ pub trait DerivedStreamExt: Sync + Send + 'static {
 
 #[async_trait]
 impl DerivedStreamExt for DerivedStream {
-    fn get_scheduler_module_key(&self, pipeline_name: &str, pipeline_id: &str) -> String {
-        format!(
-            "{}/{}/{}/{}",
-            self.stream_type, self.org_id, pipeline_name, pipeline_id
-        )
-    }
-
     async fn evaluate(
         &self,
         (start_time, end_time): (Option<i64>, i64),

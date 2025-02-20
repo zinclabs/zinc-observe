@@ -17,6 +17,8 @@
 pub mod actions;
 pub mod alerts;
 pub mod authz;
+#[cfg(feature = "cloud")]
+pub mod billings;
 pub mod clusters;
 pub mod dashboards;
 pub mod enrichment_table;
