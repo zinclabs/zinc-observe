@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </q-btn>
         <q-btn
           v-if="limitNumberOfSeriesWarningMessage"
-          :icon="outlinedWarning"
+          :icon="symOutlinedDataInfoAlert"
           flat
           size="xs"
           padding="2px"
@@ -355,6 +355,7 @@ import {
   outlinedWarning,
   outlinedRunningWithErrors,
 } from "@quasar/extras/material-icons-outlined";
+import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
@@ -758,6 +759,7 @@ export default defineComponent({
       deletePanelDialog,
       isCurrentlyHoveredPanel,
       outlinedWarning,
+      symOutlinedDataInfoAlert,
       outlinedRunningWithErrors,
       store,
       metaDataValue,
