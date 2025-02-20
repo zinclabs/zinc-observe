@@ -242,8 +242,9 @@ const loading = ref(false);
 
 const afterFlattening = ref(
   (pipelineObj.currentSelectedNodeData?.data as { after_flatten?: boolean })
-    ?.after_flatten || true,
+    ?.after_flatten ?? true
 );
+
 
 const filteredFunctions: Ref<any[]> = ref([]);
 
