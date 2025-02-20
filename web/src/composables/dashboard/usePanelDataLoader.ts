@@ -626,6 +626,7 @@ export const usePanelDataLoader = (
       }
 
       if (response.type === "end") {
+        saveCurrentStateToCache();
         // set loading to false
         state.loading = false;
         state.isOperationCancelled = false;
@@ -1235,7 +1236,7 @@ export const usePanelDataLoader = (
                 );
               }
 
-              saveCurrentStateToCache();
+              // saveCurrentStateToCache();
             }
           }
 

@@ -127,6 +127,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
         <q-btn
+          v-if="limitNumberOfSeriesWarningMessage"
+          :icon="outlinedWarning"
+          flat
+          size="xs"
+          padding="2px"
+          data-test="dashboard-panel-limit-number-of-series-warning"
+        >
+          <q-tooltip anchor="bottom right" self="top right">
+            <div style="white-space: pre-wrap">
+              {{ limitNumberOfSeriesWarningMessage }}
+            </div>
+          </q-tooltip>
+        </q-btn>
+        <q-btn
           v-if="isCachedDataDifferWithCurrentTimeRange"
           :icon="outlinedRunningWithErrors"
           flat
@@ -282,6 +296,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :report-id="props.reportId"
       @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
+      @limit-number-of-series-warning-message-update="
+        handleLimitNumberOfSeriesWarningMessageUpdate
+      "
       @result-metadata-update="handleResultMetadataUpdate"
       @last-triggered-at-update="handleLastTriggeredAtUpdate"
       @is-cached-data-differ-with-current-time-range-update="
@@ -403,6 +420,8 @@ export default defineComponent({
 
     const maxQueryRange: any = ref([]);
 
+    const limitNumberOfSeriesWarningMessage = ref("");
+
     const handleResultMetadataUpdate = (metadata: any) => {
       const combinedWarnings: any[] = [];
       metadata.forEach((query: any) => {
@@ -440,6 +459,10 @@ export default defineComponent({
       isDiffer: boolean,
     ) => {
       isCachedDataDifferWithCurrentTimeRange.value = isDiffer;
+    };
+
+    const handleLimitNumberOfSeriesWarningMessageUpdate = (message: string) => {
+      limitNumberOfSeriesWarningMessage.value = message;
     };
 
     const showText = ref(false);
@@ -758,6 +781,8 @@ export default defineComponent({
       errorData,
       isPanelLoading,
       handleLoadingStateChange,
+      limitNumberOfSeriesWarningMessage,
+      handleLimitNumberOfSeriesWarningMessageUpdate,
     };
   },
   methods: {
