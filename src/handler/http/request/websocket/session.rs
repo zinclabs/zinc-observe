@@ -104,11 +104,15 @@ pub async fn run(
     let pingpong = async move {
         loop {
             if let Some(mut session) = sessions_cache_utils::get_mut_session(&id) {
-                if let Err(e) = session.ping("ping".as_bytes()).await {
-                    // nothing
-                    log::info!("error in ping pong : {e}");
-                    break;
+                match session.ping("ping".as_bytes()).await {
+                    Err(e) => {
+                        // nothing
+                        log::info!("error in ping pong : {e}");
+                        break;
+                    }
+                    Ok(_) => {}
                 }
+                drop(session);
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             } else {
                 // session was removed for whatever reason
