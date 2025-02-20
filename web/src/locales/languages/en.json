@@ -115,6 +115,7 @@
     "exportLogs": "Export logs",
     "runQuery": "Run query",
     "syntaxGuideLabel": "Syntax Guide",
+    "legendLabel":"Legends",
     "logs": "Logs",
     "enrichmentTables": "Enrichment Tables",
     "savedViewsLabel": "Save View",

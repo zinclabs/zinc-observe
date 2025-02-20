@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -69,7 +69,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             search_events.push(usage_data.clone());
             continue;
         }
-
+        let node = usage_data.node_name.clone().unwrap_or_default();
         let key = GroupKey {
             stream_name: usage_data.stream_name.clone(),
             org_id: usage_data.org_id.clone(),
@@ -78,6 +78,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
             hour: usage_data.hour,
             event: usage_data.event,
             email: usage_data.user_email.clone(),
+            node,
         };
 
         let is_new = groups.contains_key(&key);

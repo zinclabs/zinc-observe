@@ -16,6 +16,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    get_config,
     meta::{
         search::{SearchEventContext, SearchEventType},
         stream::{FileMeta, StreamType},
@@ -117,6 +118,8 @@ pub struct UsageData {
     pub is_partial: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub work_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_name: Option<String>,
 }
 
 #[derive(Hash, PartialEq, Eq)]
@@ -128,6 +131,7 @@ pub struct GroupKey {
     pub hour: u32,
     pub event: UsageEvent,
     pub email: String,
+    pub node: String,
 }
 
 pub struct AggregatedData {
@@ -288,6 +292,8 @@ pub struct RequestStats {
     pub is_partial: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub work_group: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub node_name: Option<String>,
 }
 impl Default for RequestStats {
     fn default() -> Self {
@@ -310,6 +316,7 @@ impl Default for RequestStats {
             result_cache_ratio: None,
             is_partial: false,
             work_group: None,
+            node_name: Some(get_config().common.instance_name.clone()),
         }
     }
 }
@@ -335,6 +342,7 @@ impl From<FileMeta> for RequestStats {
             result_cache_ratio: None,
             is_partial: false,
             work_group: None,
+            node_name: None,
         }
     }
 }

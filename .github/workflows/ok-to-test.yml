@@ -13,27 +13,27 @@ jobs:
     # Only run for PRs, not issue comments
     if: ${{ github.event.issue.pull_request }}
     steps:
-    # Generate a GitHub App installation access token from an App ID and private key
-    # To create a new GitHub App:
-    #   https://developer.github.com/apps/building-github-apps/creating-a-github-app/
-    # See app.yml for an example app manifest - you can use fake URLs when generating
-    # the app such as example.com urls. They do not need to properly resolve for the
-    # purpose that they app is being used for.
-    - name: Generate token
-      id: generate_token
-      uses: tibdex/github-app-token@v2
-      with:
-        app_id: ${{ secrets.APP_ID }}
-        private_key: ${{ secrets.PRIVATE_KEY }}
+      # Generate a GitHub App installation access token from an App ID and private key
+      # To create a new GitHub App:
+      #   https://developer.github.com/apps/building-github-apps/creating-a-github-app/
+      # See app.yml for an example app manifest - you can use fake URLs when generating
+      # the app such as example.com urls. They do not need to properly resolve for the
+      # purpose that they app is being used for.
+      - name: Generate token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.PRIVATE_KEY }}
 
-    - name: Slash Command Dispatch
-      uses: peter-evans/slash-command-dispatch@v4
-      env:
-        TOKEN: ${{ steps.generate_token.outputs.token }}
-      with:
-        token: ${{ env.TOKEN }} # GitHub App installation access token
-        # token: ${{ secrets.PERSONAL_ACCESS_TOKEN }} # PAT or OAuth token will also work
-        reaction-token: ${{ secrets.GITHUB_TOKEN }}
-        issue-type: pull-request
-        commands: ok-to-test
-        permission: write
+      - name: Slash Command Dispatch
+        uses: peter-evans/slash-command-dispatch@v4
+        env:
+          TOKEN: ${{ steps.generate_token.outputs.token }}
+        with:
+          token: ${{ env.TOKEN }} # GitHub App installation access token
+          # token: ${{ secrets.PERSONAL_ACCESS_TOKEN }} # PAT or OAuth token will also work
+          reaction-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-type: pull-request
+          commands: ok-to-test
+          permission: write
