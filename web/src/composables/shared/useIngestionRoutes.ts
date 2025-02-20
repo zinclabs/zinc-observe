@@ -44,6 +44,8 @@ import LinuxConfig from "@/components/ingestion/recommended/LinuxConfig.vue";
 import OtelConfig from "@/components/ingestion/recommended/OtelConfig.vue";
 import WindowsConfig from "@/components/ingestion/recommended/WindowsConfig.vue";
 
+import DatabaseConfig from "@/components/ingestion/Database.vue";
+
 const useIngestionRoutes = () => {
   const ingestionRoutes: any = [
     {
@@ -271,6 +273,14 @@ const useIngestionRoutes = () => {
               },
             },
           ],
+        },
+        {
+          path: "databases",
+          name: "databases",
+          component: DatabaseConfig,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
       ],
     },
