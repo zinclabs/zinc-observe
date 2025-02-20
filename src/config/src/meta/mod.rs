@@ -19,6 +19,7 @@ pub mod bitvec;
 pub mod cluster;
 pub mod dashboards;
 pub mod destinations;
+pub mod enrichment_table;
 pub mod folder;
 pub mod function;
 pub mod inverted_index;

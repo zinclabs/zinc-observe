@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-if="!showAddJSTransformDialog">
       <q-table
         ref="qTable"
-        :rows="jsTransforms"
+        :rows="selectedStreamType == 'all' ? jsTransforms : jobsValue"
         :columns="columns"
         row-key="id"
         :pagination="pagination"
@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-slot:body-cell-actions="props">
           <q-td :props="props">
             <q-btn
+              v-if="selectedStreamType == 'all'"
               icon="search"
               :title="t('logStream.explore')"
               class="q-ml-xs"
@@ -46,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="exploreEnrichmentTable(props)"
             />
             <q-btn
+              v-if="selectedStreamType == 'all'"
               icon="edit"
               class="q-ml-xs"
               padding="sm"
@@ -57,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="showAddUpdateFn(props)"
             ></q-btn>
             <q-btn
+              v-if="selectedStreamType == 'all'"
               :icon="outlinedDelete"
               class="q-ml-xs"
               padding="sm"
@@ -67,6 +70,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('function.delete')"
               @click="showDeleteDialogFn(props)"
             ></q-btn>
+            <q-btn
+              v-if="selectedStreamType == 'pending'"
+              :icon="outlinedDelete"
+              class="q-ml-xs"
+              padding="sm"
+              unelevated
+              size="sm"
+              round
+              flat
+              :title="t('function.delete')"
+              @click="deleteJob(props.row)"
+            />
           </q-td>
         </template>
 
@@ -84,7 +99,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="q-table__title">
             {{ t("function.enrichmentTables") }}
           </div>
-          <div class="q-ml-auto" data-test="enrichment-tables-search-input">
+          <div class="flex items-center q-ml-auto" data-test="enrichment-tables-search-input">
+            <div class="flex justify-between items-end q-px-md">
+              <div
+                style="
+                  border: 1px solid #cacaca;
+                  padding: 4px;
+                  border-radius: 2px;
+                "
+              >
+                <template
+                  v-for="visual in streamFilterValues"
+                  :key="visual.value"
+                >
+                  <q-btn
+                    :color="
+                      visual.value === selectedStreamType ? 'primary' : ''
+                    "
+                    :flat="visual.value === selectedStreamType ? false : true"
+                    dense
+                    emit-value
+                    no-caps
+                    class="visual-selection-btn"
+                    style="height: 30px; margin: 0 2px; padding: 4px 12px"
+                    @click="onChangeStreamFilter(visual.value)"
+                  >
+                    {{ visual.label }}</q-btn
+                  >
+                </template>
+              </div>
+            </div>
             <q-input
               v-model="filterQuery"
               borderless
@@ -111,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :scope="scope"
             :pageTitle="t('function.enrichmentTables')"
             :position="'top'"
-            :resultTotal="resultTotal"
+            :resultTotal="selectedStreamType == 'all' ? resultTotal : jobsValue.length"
             :perPageOptions="perPageOptions"
             @update:changeRecordPerPage="changePagination"
           />
@@ -121,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <QTablePagination
             :scope="scope"
             :position="'bottom'"
-            :resultTotal="resultTotal"
+            :resultTotal="selectedStreamType == 'all' ? resultTotal : jobsValue.length"
             :perPageOptions="perPageOptions"
             @update:changeRecordPerPage="changePagination"
           />
@@ -162,6 +206,7 @@ import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
+import jstransform from "@/services/jstransform";
 
 export default defineComponent({
   name: "EnrichmentTableList",
@@ -177,6 +222,7 @@ export default defineComponent({
     const $q = useQuasar();
     const router = useRouter();
     const jsTransforms: any = ref([]);
+    const jobsValue: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
     const qTable: any = ref(null);
@@ -205,10 +251,46 @@ export default defineComponent({
         sortable: false,
       },
     ]);
-    const { getStreams, resetStreamType, getStream } = useStreams();
+    const { getStreams, resetStreamType ,getStream} = useStreams();
+    const selectedStreamType = ref("all");
+    const streamFilterValues = [
+      // { label: t("logStream.labelAll"), value: "all" },
+      { label: "Tables", value: "all" },
+      { label: "Jobs", value: "pending" }
+    ];
+    const onChangeStreamFilter = (value:any) =>{
+      console.log(value);
+      selectedStreamType.value = value;
+    }
+    const fetchJobs = () => {
+      const dismiss = $q.notify({
+        spinner: true,
+        message: "Please wait while loading functions...",
+      });
+      streamService
+        .getJobs({
+          org_identifier: store.state.selectedOrganization.identifier,
+        })
+        .then((res: any) => {
+          console.log(res);
+          let counter = 1;
+
+          jobsValue.value = res.data.map((data: any) => {
+            return {
+              "#": counter <= 9 ? `0${counter++}` : counter++,
+              id: data.stream_name + counter,
+              name: data.stream_name,
+              actions: "action buttons",
+              task_id: data.task_id,
+            };
+          });
+          dismiss();
+        })
+    };
 
     onBeforeMount(() => {
       getLookupTables();
+      fetchJobs();
     });
 
     const getLookupTables = () => {
@@ -365,7 +447,30 @@ export default defineComponent({
         page: "Functions",
       });
     };
-
+    const deleteJob = (job:any) => {
+      streamService
+        .deleteJob(
+          store.state.selectedOrganization.identifier,
+          job.task_id
+        )
+        .then((res: any) => {
+          if (res.data.code == 200) {
+            $q.notify({
+              color: "positive",
+              message: `${job.name} deleted successfully.`,
+            });
+            fetchJobs();
+          }
+        })
+        .catch((err: any) => {
+          if(err.response.status != 403){
+            $q.notify({
+            color: "negative",
+            message: err.response?.data?.message || "Error while deleting stream.",
+          });
+          }
+        });
+    };
     const showDeleteDialogFn = (props: any) => {
       selectedDelete.value = props.row;
       confirmDelete.value = true;
@@ -474,12 +579,27 @@ export default defineComponent({
       getImageURL,
       verifyOrganizationStatus,
       exploreEnrichmentTable,
+      selectedStreamType,
+      streamFilterValues,
+      onChangeStreamFilter,
+      fetchJobs,
+      jobsValue,
+      deleteJob
     };
   },
   computed: {
     selectedOrg() {
       return this.store.state.selectedOrganization.identifier;
     },
+    // filteredData() {
+    //   if (this.selectedStreamType === "all") {
+    //     return this.jsTransforms; 
+    //   } else if (this.selectedStreamType === "pending") {
+    //     return this.jobsValue; 
+    //   } else {
+    //     return []; // Handle unexpected cases
+    //   }
+    // }
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {

@@ -28,6 +28,7 @@ pub mod cipher;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_values;
+pub mod enrichment_table_jobs;
 #[allow(unused_imports)]
 pub mod entity;
 pub mod folders;
@@ -42,6 +43,7 @@ pub mod timed_annotations;
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
     short_urls::init().await?;
+    enrichment_table_jobs::init().await?;
     Ok(())
 }
 

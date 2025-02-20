@@ -33,6 +33,7 @@ mod cipher;
 mod compactor;
 pub(crate) mod files;
 mod flatten_compactor;
+mod ingester;
 pub mod metrics;
 mod mmdb_downloader;
 mod promql;
@@ -202,6 +203,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(async move { metrics::run().await });
     tokio::task::spawn(async move { promql::run().await });
     tokio::task::spawn(async move { alert_manager::run().await });
+    tokio::task::spawn(async move { ingester::run().await });
 
     // load metrics disk cache
     tokio::task::spawn(async move { crate::service::promql::search::init().await });

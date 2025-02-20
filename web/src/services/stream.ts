@@ -113,6 +113,20 @@ const stream = {
 
     return http().get(url);
   },
+  getJobs: ({
+    org_identifier
+  }: any) => {
+    let url = `/api/${org_identifier}/enrichment_tables/jobs`;
+    return http().get(url);
+  },
+  deleteJob: (
+    org_identifier: string,
+    taskId: string
+  ) => {
+    return http().delete(
+      `/api/${org_identifier}/enrichment_tables/jobs/${taskId}`
+    );
+  },
 
   labelValues: ({
     org_identifier,
