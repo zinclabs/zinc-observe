@@ -1,0 +1,59 @@
+[
+    {
+      "testName": "XSS Injection in Tooltip",
+      "chartConfig": {
+        "tooltip": {
+          "trigger": "axis",
+          "formatter": "<img src=x onerror=alert('XSS')>"
+        },
+        "xAxis": {
+          "type": "category",
+          "data": ["Jan", "Feb", "Mar"]
+        },
+        "yAxis": {
+          "type": "value"
+        },
+        "series": [{
+          "data": [820, 932, 901],
+          "type": "line"
+        }]
+      }
+
+    },
+    {
+      "testName": "Document Cookie Leak",
+      "chartConfig": {
+        "graphic": [{
+          "type": "text",
+          "left": "center",
+          "top": "middle",
+          "style": {
+            "text": "document.cookie",
+            "font": "20px Arial",
+            "fill": "#f00"
+          }
+        }]
+      },
+      "expectedError": "Unsafe code detected: Invalid"
+    },
+    {
+      "testName": "Arbitrary JavaScript Execution",
+      "chartConfig": {
+        "series": [{
+          "type": "line",
+          "data": [1, 2, 3],
+          "markLine": {
+            "silent": false,
+            "data": [{
+              "name": "Eval Execution",
+              "label": {
+                "formatter": "eval('alert(\"Hacked\")')"
+              }
+            }]
+          }
+        }]
+      },
+      "expectedError": "Unsafe code detected: Invalid"
+    }
+  ]
+  
