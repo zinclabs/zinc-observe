@@ -68,18 +68,21 @@ pub async fn ws_proxy(
     let (backend_kill_tx, backend_kill_rx) = oneshot::channel::<()>();
 
     let client_to_backend = {
-        let mut client_kill_rx = client_kill_rx; // Take ownership here
+        let mut client_kill_rx = client_kill_rx;
         async move {
             loop {
                 tokio::select! {
                     Some(msg_result) = client_msg_stream.next() => {
                         match msg_result {
                             Ok(msg) => {
-                                // Convert actix message to tungstenite message
                                 let ws_msg = from_actix_message(msg);
                                 match ws_msg {
-                                    tungstenite::protocol::Message::Close(_) => {
+                                    tungstenite::protocol::Message::Close(reason) => {
                                         log::info!("[WS_PROXY] Client initiated close");
+                                        let close_msg = tungstenite::protocol::Message::Close(reason.clone());
+                                        if let Err(e) = backend_ws_sink.send(close_msg).await {
+                                            log::error!("[WS_PROXY] Failed to forward close to backend: {}", e);
+                                        }
                                         let _ = backend_kill_tx.send(());
                                         break;
                                     }
@@ -96,7 +99,7 @@ pub async fn ws_proxy(
                             }
                         }
                     }
-                    _ = &mut client_kill_rx => {  // Use &mut reference
+                    _ = &mut client_kill_rx => {
                         log::info!("[WS_PROXY] Client task received shutdown signal");
                         break;
                     }
@@ -112,40 +115,50 @@ pub async fn ws_proxy(
             loop {
                 tokio::select! {
                     Some(msg_result) = backend_ws_stream.next() => {
-                        let ws_msg = from_tungstenite_msg_to_actix_msg(msg_result.unwrap());
-                        match ws_msg {
-                            Message::Close(reason) => {
-                                log::info!("[WS_PROXY] Backend initiated close: {:?}", reason);
-                                let _ = client_kill_tx.send(());
-                                let _ = session.close(reason).await;
-                                closed_normally = true;
+                        match msg_result {
+                            Ok(msg) => {
+                                let ws_msg = from_tungstenite_msg_to_actix_msg(msg);
+                                match ws_msg {
+                                    Message::Close(reason) => {
+                                        log::info!("[WS_PROXY] Backend initiated close: {:?}", reason);
+                                        // Send close to client
+                                        let _ = session.close(reason).await;
+                                        // Then signal client to shutdown
+                                        let _ = client_kill_tx.send(());
+                                        closed_normally = true;
+                                        break;
+                                    }
+                                    Message::Text(text) => {
+                                        if session.text(text).await.is_err() {
+                                            break;
+                                        }
+                                    }
+                                    Message::Binary(bin) => {
+                                        if session.binary(bin).await.is_err() {
+                                            break;
+                                        }
+                                    }
+                                    Message::Ping(ping) => {
+                                        if session.ping(&ping).await.is_err() {
+                                            break;
+                                        }
+                                    }
+                                    Message::Pong(pong) => {
+                                        if session.pong(&pong).await.is_err() {
+                                            break;
+                                        }
+                                    }
+                                    Message::Continuation(_) => {
+                                        log::warn!("[WS_PROXY] Unsupported message type from backend: {:?}", ws_msg);
+                                    }
+                                    Message::Nop => {
+                                        log::warn!("[WS_PROXY] Unsupported message type from backend: Nop");
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                log::error!("[WS_PROXY] Backend message error: {:?}", e);
                                 break;
-                            }
-                            Message::Text(text) => {
-                                if session.text(text).await.is_err() {
-                                    break;
-                                }
-                            }
-                            Message::Binary(bin) => {
-                                if session.binary(bin).await.is_err() {
-                                    break;
-                                }
-                            }
-                            Message::Ping(ping) => {
-                                if session.ping(&ping).await.is_err() {
-                                    break;
-                                }
-                            }
-                            Message::Pong(pong) => {
-                                if session.pong(&pong).await.is_err() {
-                                    break;
-                                }
-                            }
-                            Message::Continuation(_) => {
-                                log::warn!("[WS_PROXY] Unsupported message type from backend: {:?}", ws_msg);
-                            }
-                            Message::Nop => {
-                                log::warn!("[WS_PROXY] Unsupported message type from backend: Nop");
                             }
                         }
                     }
