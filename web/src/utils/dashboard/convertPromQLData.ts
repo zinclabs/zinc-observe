@@ -58,31 +58,6 @@ const getMarkLineData = (panelSchema: any) => {
   );
 };
 
-function convertVectorToMatrixFormat(vectorData: any) {
-  if (!vectorData || !Array.isArray(vectorData) || vectorData.length === 0) {
-    return vectorData;
-  }
-
-  return vectorData.map((queryResult) => {
-    if (queryResult.resultType !== "vector") {
-      return queryResult;
-    }
-
-    return {
-      resultType: "matrix",
-      result: queryResult.result.map((item: any) => {
-        const timestamp = item.value[0];
-        const value = item.value[1];
-
-        return {
-          metric: item.metric,
-          values: [[timestamp, value]],
-        };
-      }),
-    };
-  });
-}
-
 /**
  * Converts PromQL data into a format suitable for rendering a chart.
  *
@@ -124,10 +99,8 @@ export const convertPromQLData = async (
   // get the x axis key which will be timestamp
   let xAxisData: any = new Set();
 
-  const normalizedData = convertVectorToMatrixFormat(searchQueryData);
-
   // add all series timestamp
-  normalizedData.forEach((queryData: any) =>
+  searchQueryData.forEach((queryData: any) =>
     queryData.result.forEach((result: any) =>
       result.values.forEach((value: any) => xAxisData.add(value[0])),
     ),
@@ -532,286 +505,134 @@ export const convertPromQLData = async (
             return seriesObj;
           }
           case "vector": {
-            const convertedData = convertVectorToMatrixFormat([it])[0];
-            const seriesObj = convertedData?.result?.map((metric: any) => {
-              const seriesDataObj: any = {};
-              metric.values.forEach((value: any) => {
-                seriesDataObj[value[0]] = value[1];
-              });
-
-              const seriesName = getPromqlLegendName(
-                metric.metric,
-                panelSchema.queries[index].config.promql_legend,
-              );
-
+            const traces = it?.result?.map((metric: any) => {
+              const values = [metric.value];
               return {
-                name: seriesName,
-                zlevel: 2,
-                itemStyle: {
-                  color: (() => {
-                    try {
-                      return getSeriesColor(
-                        panelSchema?.config?.color,
-                        seriesName,
-                        metric.values.map((value: any) => value[1]),
-                        chartMin,
-                        chartMax,
-                      );
-                    } catch (error) {
-                      console.warn("Failed to get series color:", error);
-                      return undefined;
-                    }
-                  })(),
-                },
-                data: xAxisData.map((value: any) => [
-                  value[1],
-                  seriesDataObj[value[0]] ?? null,
-                ]),
-                ...seriesPropsBasedOnChartType,
-                markLine: {
-                  silent: true,
-                  animation: false,
-                  data: getMarkLineData(panelSchema),
-                },
-                connectNulls: panelSchema.config?.connect_nulls ?? false,
+                name: JSON.stringify(metric.metric),
+                x: values.map((value: any) =>
+                  moment(value[0] * 1000).toISOString(true),
+                ),
+                y: values.map((value: any) => value[1]),
               };
             });
-
-            return seriesObj;
+            return traces;
           }
         }
       }
       case "gauge": {
-        if (it?.resultType === "vector") {
-          const convertedData = convertVectorToMatrixFormat([it])[0];
-          const series = convertedData?.result?.map((metric: any) => {
-            const values = metric.values;
-            gaugeIndex++;
+        isTimeSeriesFlag = false;
+        // Matrix result type handling
+        const series = it?.result?.map((metric: any) => {
+          const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+          gaugeIndex++;
 
-            const seriesName = getPromqlLegendName(
-              metric.metric,
-              panelSchema.queries[index].config.promql_legend,
-            );
+          const seriesName = getPromqlLegendName(
+            metric.metric,
+            panelSchema.queries[index].config.promql_legend,
+          );
 
-            return {
-              ...getPropsByChartTypeForSeries(panelSchema.type),
-              min: panelSchema?.queries[index]?.config?.min || 0,
-              max: panelSchema?.queries[index]?.config?.max || 100,
-              gridIndex: gaugeIndex - 1,
-              radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
-              progress: {
-                show: true,
+          return {
+            ...getPropsByChartTypeForSeries(panelSchema.type),
+            min: panelSchema?.queries[index]?.config?.min || 0,
+            max: panelSchema?.queries[index]?.config?.max || 100,
+            gridIndex: gaugeIndex - 1,
+            radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
+            progress: {
+              show: true,
+              width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
+            },
+            axisLine: {
+              lineStyle: {
                 width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
               },
-              axisLine: {
-                lineStyle: {
-                  width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
-                },
-              },
-              title: {
-                fontSize: 10,
-                offsetCenter: [0, "70%"],
-                width: `${gridDataForGauge.gridWidth}`,
-                overflow: "truncate",
-              },
-              center: [
-                `${parseFloat(options.grid[gaugeIndex - 1].left) + parseFloat(options.grid[gaugeIndex - 1].width) / 2}%`,
-                `${parseFloat(options.grid[gaugeIndex - 1].top) + parseFloat(options.grid[gaugeIndex - 1].height) / 2}%`,
-              ],
-              data: [
-                {
-                  name: seriesName,
-                  value: values[0][1],
-                  detail: {
-                    formatter: function (value: any) {
-                      const unitValue = getUnitValue(
-                        value,
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      );
-                      return unitValue.value + unitValue.unit;
-                    },
-                  },
-                  itemStyle: {
-                    color: (() => {
-                      const defaultColor = null;
-                      if (!values?.[0]?.[1]) return defaultColor;
-                      return (
-                        getSeriesColor(
-                          panelSchema?.config?.color,
-                          seriesName,
-                          values[0][1],
-                          chartMin,
-                          chartMax,
-                        ) ?? defaultColor
-                      );
-                    })(),
+            },
+            title: {
+              fontSize: 10,
+              offsetCenter: [0, "70%"],
+              width: `${gridDataForGauge.gridWidth}`,
+              overflow: "truncate",
+            },
+            center: [
+              `${parseFloat(options.grid[gaugeIndex - 1].left) + parseFloat(options.grid[gaugeIndex - 1].width) / 2}%`,
+              `${parseFloat(options.grid[gaugeIndex - 1].top) + parseFloat(options.grid[gaugeIndex - 1].height) / 2}%`,
+            ],
+            data: [
+              {
+                name: seriesName,
+                value: values[0][1],
+                detail: {
+                  formatter: function (value: any) {
+                    const unitValue = getUnitValue(
+                      value,
+                      panelSchema.config?.unit,
+                      panelSchema.config?.unit_custom,
+                      panelSchema.config?.decimals,
+                    );
+                    return unitValue.value + unitValue.unit;
                   },
                 },
-              ],
-              detail: {
-                valueAnimation: true,
-                offsetCenter: [0, 0],
-                fontSize: 12,
+                itemStyle: {
+                  color: (() => {
+                    const defaultColor = null;
+                    if (!values?.[0]?.[1]) return defaultColor;
+                    return (
+                      getSeriesColor(
+                        panelSchema?.config?.color,
+                        seriesName,
+                        values[0][1],
+                        chartMin,
+                        chartMax,
+                      ) ?? defaultColor
+                    );
+                  })(),
+                },
               },
-            };
-          });
-
-          // Set required options for gauge chart
-          options.dataset = { source: [[]] };
-          options.tooltip = {
-            show: true,
-            trigger: "item",
-            textStyle: {
-              color: store.state.theme === "dark" ? "#fff" : "#000",
+            ],
+            detail: {
+              valueAnimation: true,
+              offsetCenter: [0, 0],
               fontSize: 12,
             },
-            valueFormatter: (value: any) => {
-              return formatUnitValue(
-                getUnitValue(
-                  value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                ),
-              );
-            },
-            enterable: true,
-            backgroundColor:
-              store.state.theme === "dark"
-                ? "rgba(0,0,0,1)"
-                : "rgba(255,255,255,1)",
-            extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
           };
+        });
 
-          // Set coordinate system options
-          options.xAxis = [{ type: "value", show: false }];
-          options.yAxis = [{ type: "value", show: false }];
-          options.angleAxis = {
-            show: false,
-          };
-          options.radiusAxis = {
-            show: false,
-          };
-          options.polar = {};
-
-          return series;
-        } else {
-          isTimeSeriesFlag = false;
-          // Matrix result type handling
-          const series = it?.result?.map((metric: any) => {
-            const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
-            gaugeIndex++;
-
-            const seriesName = getPromqlLegendName(
-              metric.metric,
-              panelSchema.queries[index].config.promql_legend,
+        options.dataset = { source: [[]] };
+        options.tooltip = {
+          show: true,
+          trigger: "item",
+          textStyle: {
+            color: store.state.theme === "dark" ? "#fff" : "#000",
+            fontSize: 12,
+          },
+          valueFormatter: (value: any) => {
+            return formatUnitValue(
+              getUnitValue(
+                value,
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals,
+              ),
             );
+          },
+          enterable: true,
+          backgroundColor:
+            store.state.theme === "dark"
+              ? "rgba(0,0,0,1)"
+              : "rgba(255,255,255,1)",
+          extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
+        };
 
-            return {
-              ...getPropsByChartTypeForSeries(panelSchema.type),
-              min: panelSchema?.queries[index]?.config?.min || 0,
-              max: panelSchema?.queries[index]?.config?.max || 100,
-              gridIndex: gaugeIndex - 1,
-              radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
-              progress: {
-                show: true,
-                width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
-              },
-              axisLine: {
-                lineStyle: {
-                  width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
-                },
-              },
-              title: {
-                fontSize: 10,
-                offsetCenter: [0, "70%"],
-                width: `${gridDataForGauge.gridWidth}`,
-                overflow: "truncate",
-              },
-              center: [
-                `${parseFloat(options.grid[gaugeIndex - 1].left) + parseFloat(options.grid[gaugeIndex - 1].width) / 2}%`,
-                `${parseFloat(options.grid[gaugeIndex - 1].top) + parseFloat(options.grid[gaugeIndex - 1].height) / 2}%`,
-              ],
-              data: [
-                {
-                  name: seriesName,
-                  value: values[0][1],
-                  detail: {
-                    formatter: function (value: any) {
-                      const unitValue = getUnitValue(
-                        value,
-                        panelSchema.config?.unit,
-                        panelSchema.config?.unit_custom,
-                        panelSchema.config?.decimals,
-                      );
-                      return unitValue.value + unitValue.unit;
-                    },
-                  },
-                  itemStyle: {
-                    color: (() => {
-                      const defaultColor = null;
-                      if (!values?.[0]?.[1]) return defaultColor;
-                      return (
-                        getSeriesColor(
-                          panelSchema?.config?.color,
-                          seriesName,
-                          values[0][1],
-                          chartMin,
-                          chartMax,
-                        ) ?? defaultColor
-                      );
-                    })(),
-                  },
-                },
-              ],
-              detail: {
-                valueAnimation: true,
-                offsetCenter: [0, 0],
-                fontSize: 12,
-              },
-            };
-          });
-
-          options.dataset = { source: [[]] };
-          options.tooltip = {
-            show: true,
-            trigger: "item",
-            textStyle: {
-              color: store.state.theme === "dark" ? "#fff" : "#000",
-              fontSize: 12,
-            },
-            valueFormatter: (value: any) => {
-              return formatUnitValue(
-                getUnitValue(
-                  value,
-                  panelSchema.config?.unit,
-                  panelSchema.config?.unit_custom,
-                  panelSchema.config?.decimals,
-                ),
-              );
-            },
-            enterable: true,
-            backgroundColor:
-              store.state.theme === "dark"
-                ? "rgba(0,0,0,1)"
-                : "rgba(255,255,255,1)",
-            extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
-          };
-
-          // Set coordinate system options
-          options.xAxis = [{ type: "value", show: false }];
-          options.yAxis = [{ type: "value", show: false }];
-          options.angleAxis = {
-            show: false,
-          };
-          options.radiusAxis = {
-            show: false,
-          };
-          options.polar = {};
-          return series;
-        }
+        // Set coordinate system options
+        options.xAxis = [{ type: "value", show: false }];
+        options.yAxis = [{ type: "value", show: false }];
+        options.angleAxis = {
+          show: false,
+        };
+        options.radiusAxis = {
+          show: false,
+        };
+        options.polar = {};
+        return series;
       }
       case "metric": {
         isTimeSeriesFlag = false;
@@ -896,81 +717,15 @@ export const convertPromQLData = async (
           }
 
           case "vector": {
-            const convertedData = convertVectorToMatrixFormat([it])[0];
-            const vector = convertedData?.result?.[0];
-
-            const values = vector.values.sort((a: any, b: any) => a[0] - b[0]);
-            const latestValue = values[values.length - 1]?.[1] ?? 0;
-
-            const unitValue = getUnitValue(
-              latestValue,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
-            );
-
-            const series = [
-              {
-                type: "custom",
-                silent: true,
-                data: [[0, 0]],
-                renderItem: function (params: any, api: any) {
-                  const value = formatUnitValue(unitValue);
-                  const fontSize = calculateOptimalFontSize(
-                    value,
-                    Math.min(params.coordSys.width, params.coordSys.height) * 2,
-                  );
-
-                  return {
-                    type: "text",
-                    style: {
-                      text: value,
-                      fontSize: fontSize,
-                      fontWeight: 500,
-                      align: "center",
-                      verticalAlign: "middle",
-                      x: params.coordSys.x + params.coordSys.width / 2,
-                      y: params.coordSys.y + params.coordSys.height / 2,
-                      fill: store.state.theme === "dark" ? "#fff" : "#000",
-                    },
-                  };
-                },
-              },
-            ];
-
-            // Set required options for metric chart
-            options.grid = [
-              {
-                top: "10%",
-                right: "10%",
-                bottom: "10%",
-                left: "10%",
-                containLabel: true,
-              },
-            ];
-
-            options.xAxis = [
-              {
-                type: "value",
-                show: false,
-                min: 0,
-                max: 1,
-              },
-            ];
-
-            options.yAxis = [
-              {
-                type: "value",
-                show: false,
-                min: 0,
-                max: 1,
-              },
-            ];
-
-            options.tooltip = { show: false };
-            options.legend = { show: false };
-
-            return series;
+            const traces = it?.result?.map((metric: any) => {
+              const values = [metric.value];
+              return {
+                name: JSON.stringify(metric.metric),
+                value: metric?.value?.length > 1 ? metric.value[1] : "",
+                ...getPropsByChartTypeForSeries(panelSchema.type),
+              };
+            });
+            return traces;
           }
         }
         break;
