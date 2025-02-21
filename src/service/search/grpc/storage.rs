@@ -229,7 +229,7 @@ pub async fn search(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let cache_type = cache_files(
+    let (cache_type, download_frac) = cache_files(
         &query.trace_id,
         &files.iter().map(|f| f.key.as_ref()).collect_vec(),
         &mut scan_stats,
@@ -257,8 +257,8 @@ pub async fn search(
         cache_start.elapsed().as_millis()
     );
 
-    // set target partitions based on cache type
-    let target_partitions = if cache_type == file_data::CacheType::None {
+    // set target partitions based on how many files we have to download
+    let target_partitions = if download_frac > 0.30 {
         cfg.limit.query_thread_num
     } else {
         cfg.limit.cpu_num
@@ -318,13 +318,16 @@ async fn cache_files(
     files: &[&str],
     scan_stats: &mut ScanStats,
     file_type: &str,
-) -> Result<file_data::CacheType, Error> {
+) -> Result<(file_data::CacheType, f64), Error> {
     // check how many files already cached
+    let mut download_count: usize = 0;
     for file in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
         } else if file_data::disk::exist(file).await {
             scan_stats.querier_disk_cached_files += 1;
+        } else {
+            download_count += 1;
         }
     }
     if files.len() as i64
@@ -333,6 +336,8 @@ async fn cache_files(
         // all files are cached
         return Ok(file_data::CacheType::None);
     }
+
+    let download_percentage = download_count as f64 / files.len() as f64;
 
     // check cache size
     let cfg = get_config();
@@ -379,7 +384,7 @@ async fn cache_files(
             }
         }
     });
-    Ok(cache_type)
+    Ok((cache_type, download_percentage))
 }
 
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files_inner", skip_all)]
@@ -482,7 +487,7 @@ pub async fn filter_file_list_by_tantivy_index(
         })
         .collect_vec();
     scan_stats.querier_files = index_file_names.len() as i64;
-    let cache_type = cache_files(
+    let (cache_type, download_frac) = cache_files(
         &query.trace_id,
         &index_file_names
             .iter()
@@ -510,8 +515,8 @@ pub async fn filter_file_list_by_tantivy_index(
         start.elapsed().as_millis()
     );
 
-    // set target partitions based on cache type
-    let target_partitions = if cache_type == file_data::CacheType::None {
+    // set target partitions based on how many files have to be downloaded
+    let target_partitions = if download_frac > 0.30 {
         cfg.limit.query_thread_num
     } else {
         cfg.limit.cpu_num
@@ -521,7 +526,7 @@ pub async fn filter_file_list_by_tantivy_index(
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
     let time_range = query.time_range.unwrap_or((0, 0));
     let index_parquet_files = index_file_names.into_iter().map(|(_, f)| f).collect_vec();
-    log::info!("idx optimize rule : {:?}",idx_optimize_rule);
+    log::info!("idx optimize rule : {:?}", idx_optimize_rule);
     let (mut index_parquet_files, query_limit) =
         if let Some(InvertedIndexOptimizeMode::SimpleSelect(limit, _ascend)) = idx_optimize_rule {
             if limit > 0 {
@@ -598,7 +603,7 @@ pub async fn filter_file_list_by_tantivy_index(
                 .await;
                 drop(permit);
                 ret
-            });
+            }).instrument(tracing::info_span!("tantivy_search"));
             tasks.push(task)
         }
 
@@ -677,6 +682,11 @@ pub async fn filter_file_list_by_tantivy_index(
     ))
 }
 
+#[tracing::instrument(
+    name = "service:search:grpc:storage:get_tantivy_directory",
+    skip_all,
+    fields(trace_id)
+)]
 pub async fn get_tantivy_directory(
     _trace_id: &str,
     file_name: &str,
@@ -692,7 +702,11 @@ pub async fn get_tantivy_directory(
     Ok(PuffinDirReader::from_path(source).await?)
 }
 
-#[tracing::instrument(name = "service:search:grpc:storage:search_tantivy_index", skip_all,fields(trace_id))]
+#[tracing::instrument(
+    name = "service:search:grpc:storage:search_tantivy_index",
+    skip_all,
+    fields(trace_id)
+)]
 async fn search_tantivy_index(
     trace_id: &str,
     time_range: (i64, i64),
@@ -832,6 +846,7 @@ async fn search_tantivy_index(
                 .search(&query, &tantivy::collector::Count)
                 .map(|ret| (HashSet::new(), ret)),
         })
+        .instrument(tracing::info_span!("tantivy_search_thread"))
         .await??;
 
     // return early if no matches in tantivy

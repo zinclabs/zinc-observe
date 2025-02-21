@@ -79,6 +79,11 @@ pub fn get_file_from_empty_puffin_dir_with_ext(file_ext: &str) -> Result<OwnedBy
     Ok(file_data.read_bytes()?)
 }
 
+#[tracing::instrument(
+    name = "service:search:tantivy::convert_puffin_to_tantivy",
+    skip_all,
+    fields(trace_id)
+)]
 pub async fn convert_puffin_file_to_tantivy_dir<T: Into<PathBuf>>(
     puffin_dir: PuffinDirReader,
     dest_path: T,
