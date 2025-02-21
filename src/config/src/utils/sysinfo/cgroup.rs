@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sysinfo::SystemExt;
-
 /// Get cpu limit by cgroup or return the node cpu cores
 pub fn get_cpu_limit() -> usize {
     let mut cpu_num = read_cpu_cgroup_v1();
@@ -28,9 +26,7 @@ pub fn get_cpu_limit() -> usize {
             cpu_num / 100000
         }
     } else {
-        let mut system = sysinfo::System::new();
-        system.refresh_cpu();
-        system.cpus().len()
+        super::cpu::get_cpu_num()
     }
 }
 

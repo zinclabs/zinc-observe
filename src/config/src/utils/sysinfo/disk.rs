@@ -13,26 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod arrow;
-pub mod async_file;
-pub mod base64;
-pub mod download_utils;
-pub mod file;
-pub mod flatten;
-pub mod hash;
-pub mod inverted_index;
-pub mod json;
-pub mod md5;
-pub mod parquet;
-pub mod prom_json_encoder;
-pub mod rand;
-pub mod record_batch_ext;
-pub mod schema;
-pub mod schema_ext;
-pub mod sort;
-pub mod sql;
-pub mod str;
-pub mod sysinfo;
-pub mod tantivy;
-pub mod time;
-pub mod util;
+pub struct DiskUsage {
+    pub mount_point: String,
+    pub total_space: u64,
+    pub available_space: u64,
+}
+
+pub fn get_disk_usage() -> Vec<DiskUsage> {
+    let mut disks: Vec<_> = sysinfo::Disks::new_with_refreshed_list()
+        .iter()
+        .map(|d| DiskUsage {
+            mount_point: d.mount_point().to_str().unwrap().to_string(),
+            total_space: d.total_space(),
+            available_space: d.available_space(),
+        })
+        .collect();
+    disks.sort_by(|a, b| b.mount_point.cmp(&a.mount_point));
+    disks
+}

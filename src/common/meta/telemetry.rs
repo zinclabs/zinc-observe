@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,12 +16,14 @@
 use std::collections::HashMap;
 
 use config::{
-    cluster::LOCAL_NODE, get_config, get_instance_id, utils::json, SIZE_IN_MB, TELEMETRY_CLIENT,
+    cluster::LOCAL_NODE,
+    get_config, get_instance_id,
+    utils::{json, sysinfo},
+    SIZE_IN_MB, TELEMETRY_CLIENT,
 };
 use hashbrown::HashSet;
 use infra::{cache::stats, db as infra_db, schema::STREAM_SCHEMAS_LATEST};
 use segment::{message::Track, Client, Message};
-use sysinfo::SystemExt;
 
 use crate::common::infra::{cluster::get_cached_online_nodes, config::*};
 
@@ -92,12 +94,15 @@ impl Telemetry {
 }
 
 pub fn get_base_info(data: &mut HashMap<String, json::Value>) -> HashMap<String, json::Value> {
-    let system = sysinfo::System::new_all();
-    data.insert("cpu_count".to_string(), system.cpus().len().into());
-    data.insert("total_memory".to_string(), system.total_memory().into());
-    data.insert("free_memory".to_string(), system.free_memory().into());
-    data.insert("os".to_string(), system.name().into());
-    data.insert("os_release".to_string(), system.os_version().into());
+    let mem_info = sysinfo::mem::get_memory_stats();
+    data.insert("cpu_count".to_string(), sysinfo::cpu::get_cpu_num().into());
+    data.insert("total_memory".to_string(), mem_info.total_memory.into());
+    data.insert("free_memory".to_string(), mem_info.free_memory.into());
+    data.insert("os".to_string(), sysinfo::os::get_os_name().into());
+    data.insert(
+        "os_release".to_string(),
+        sysinfo::os::get_os_version().into(),
+    );
     data.insert(
         "time_zone".to_string(),
         chrono::Local::now().offset().local_minus_utc().into(),

@@ -112,7 +112,6 @@ jsonwebtoken = "9.2.0"
 log.workspace = true
 maxminddb = "0.23.0"
 memchr.workspace = true
-memory-stats = "1.1.0"
 mimalloc = { version = "0.1", default-features = false, optional = true }
 once_cell.workspace = true
 opentelemetry.workspace = true
@@ -145,7 +144,6 @@ snap.workspace = true
 sqlparser.workspace = true
 strum.workspace = true
 svix-ksuid.workspace = true
-sysinfo.workspace = true
 syslog_loose = "0.18.0"
 thiserror.workspace = true
 time.workspace = true
@@ -218,7 +216,7 @@ report_server = { path = "src/report_server" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 actix-web = { version = "4.9", features = ["rustls-0_23"] }
-actix-web-prometheus = { version = "0.1", features = ["process"] }
+actix-web-prometheus = "0.1"
 actix-tls = { version = "3.4", features = [
     "connect",
     "uri",
@@ -330,7 +328,7 @@ sqlx = { version = "0.8.2", features = [
 ] }
 strum = { version = "0.26", features = ["derive"] }
 svix-ksuid = { version = "0.8", features = ["serde"] }
-sysinfo = "0.29"
+sysinfo = "0.33"
 tantivy = { version = "0.22.0", features = ["quickwit"] }
 tempfile = "3"
 thiserror = "1.0"

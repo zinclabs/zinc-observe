@@ -31,11 +31,10 @@ use lettre::{
     AsyncSmtpTransport, Tokio1Executor,
 };
 use once_cell::sync::Lazy;
-use sysinfo::{DiskExt, SystemExt};
 
 use crate::{
     meta::cluster,
-    utils::{cgroup, file::get_file_meta},
+    utils::{file::get_file_meta, sysinfo},
 };
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -1764,7 +1763,7 @@ pub fn init() -> Config {
 
 fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // set real cpu num
-    cfg.limit.real_cpu_num = max(1, cgroup::get_cpu_limit());
+    cfg.limit.real_cpu_num = max(1, sysinfo::get_cpu_limit());
     // set at least 2 threads
     let cpu_num = max(2, cfg.limit.real_cpu_num);
     cfg.limit.cpu_num = cpu_num;
@@ -1895,7 +1894,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
-        cfg.common.instance_name = sysinfo::System::new().host_name().unwrap();
+        cfg.common.instance_name = sysinfo::os::get_hostname();
     }
     cfg.common.instance_name_short = cfg
         .common
@@ -2119,7 +2118,7 @@ fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    let mem_total = cgroup::get_memory_limit();
+    let mem_total = sysinfo::get_memory_limit();
     cfg.limit.mem_total = mem_total;
     if cfg.memory_cache.max_size == 0 {
         if cfg.common.local_mode {
@@ -2204,29 +2203,15 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    let mut system = sysinfo::System::new();
-    system.refresh_disks_list();
-    let mut disks: Vec<(&str, u64, u64)> = system
-        .disks()
-        .iter()
-        .map(|d| {
-            (
-                d.mount_point().to_str().unwrap(),
-                d.total_space(),
-                d.available_space(),
-            )
-        })
-        .collect();
-    disks.sort_by(|a, b| b.0.cmp(a.0));
-
     std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
     let cache_dir = Path::new(&cfg.common.data_cache_dir)
         .canonicalize()
         .unwrap();
     let cache_dir = cache_dir.to_str().unwrap();
-    let disk = disks.iter().find(|d| cache_dir.starts_with(d.0));
+    let disks = sysinfo::disk::get_disk_usage();
+    let disk = disks.iter().find(|d| cache_dir.starts_with(&d.mount_point));
     let (disk_total, disk_free) = match disk {
-        Some(d) => (d.1, d.2),
+        Some(d) => (d.total_space, d.available_space),
         None => (0, 0),
     };
     cfg.limit.disk_total = disk_total as usize;
