@@ -342,7 +342,7 @@ pub async fn run_datafusion(
     idx_file_list: Vec<FileKey>,
 ) -> Result<(Vec<RecordBatch>, ScanStats, String)> {
     let cfg = get_config();
-    let ctx = generate_context(&req, &sql, cfg.limit.query_thread_num).await?;
+    let ctx = generate_context(&req, &sql, cfg.limit.cpu_num).await?;
 
     register_table(&ctx, &sql).await?;
 
