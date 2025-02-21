@@ -334,7 +334,7 @@ async fn cache_files(
         == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files
     {
         // all files are cached
-        return Ok(file_data::CacheType::None);
+        return Ok((file_data::CacheType::None, 0.0));
     }
 
     let download_percentage = download_count as f64 / files.len() as f64;
@@ -354,7 +354,7 @@ async fn cache_files(
         file_data::CacheType::Disk
     } else {
         // no cache, the files are too big than cache size
-        return Ok(file_data::CacheType::None);
+        return Ok((file_data::CacheType::None, download_percentage));
     };
 
     let trace_id = trace_id.to_string();
@@ -603,7 +603,8 @@ pub async fn filter_file_list_by_tantivy_index(
                 .await;
                 drop(permit);
                 ret
-            }).instrument(tracing::info_span!("tantivy_search"));
+            })
+            .instrument(tracing::info_span!("tantivy_search"));
             tasks.push(task)
         }
 
