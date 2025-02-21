@@ -9,19 +9,20 @@ use svix_ksuid::Ksuid;
 use utoipa::ToSchema;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ExecutionDetailsType {
     #[default]
     Once,
     Repeat,
-    Serve,
+    Service,
 }
 
 impl std::fmt::Display for ExecutionDetailsType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            ExecutionDetailsType::Once => "Once",
-            ExecutionDetailsType::Repeat => "Repeat",
-            ExecutionDetailsType::Serve => "Serve",
+            ExecutionDetailsType::Once => "once",
+            ExecutionDetailsType::Repeat => "repeat",
+            ExecutionDetailsType::Service => "service",
         };
         write!(f, "{}", s)
     }
@@ -32,9 +33,9 @@ impl TryFrom<&str> for ExecutionDetailsType {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "Once" => Ok(ExecutionDetailsType::Once),
-            "Repeat" => Ok(ExecutionDetailsType::Repeat),
-            "Serve" => Ok(ExecutionDetailsType::Serve),
+            "once" => Ok(ExecutionDetailsType::Once),
+            "repeat" => Ok(ExecutionDetailsType::Repeat),
+            "service" => Ok(ExecutionDetailsType::Service),
             _ => Err(anyhow::anyhow!("Invalid ExecutionDetailsType")),
         }
     }
@@ -181,7 +182,7 @@ impl From<ExecutionDetailsType> for ActionType {
         match e {
             ExecutionDetailsType::Once => ActionType::Job,
             ExecutionDetailsType::Repeat => ActionType::CronJob,
-            ExecutionDetailsType::Serve => ActionType::Service,
+            ExecutionDetailsType::Service => ActionType::Service,
         }
     }
 }

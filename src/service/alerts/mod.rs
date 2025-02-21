@@ -18,7 +18,7 @@ use arrow_schema::DataType;
 use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use config::{
-    get_config, ider,
+    ider,
     meta::{
         alerts::{AggFunction, Condition, Operator, QueryCondition, QueryType, TriggerCondition},
         search::{SearchEventContext, SearchEventType, SqlQuery},
@@ -29,6 +29,7 @@ use config::{
         base64,
         json::{Map, Value},
     },
+    TIMESTAMP_COL_NAME,
 };
 
 use super::promql;
@@ -591,15 +592,14 @@ async fn build_sql(
         AggFunction::P99 => format!("approx_percentile_cont(\"{}\", 0.99)", agg.having.column),
     };
 
-    let cfg = get_config();
     if let Some(group) = agg.group_by.as_ref() {
         if !group.is_empty() {
             sql = format!(
                 "SELECT {}, {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} GROUP BY {} HAVING {}",
                 group.join(", "),
                 func_expr,
-                cfg.common.column_timestamp,
-                cfg.common.column_timestamp,
+                TIMESTAMP_COL_NAME,
+                TIMESTAMP_COL_NAME,
                 stream_name,
                 where_sql,
                 group.join(", "),
@@ -611,8 +611,8 @@ async fn build_sql(
         sql = format!(
             "SELECT {} AS alert_agg_value, MIN({}) as zo_sql_min_time, MAX({}) AS zo_sql_max_time FROM \"{}\" {} HAVING {}",
             func_expr,
-            cfg.common.column_timestamp,
-            cfg.common.column_timestamp,
+            TIMESTAMP_COL_NAME,
+            TIMESTAMP_COL_NAME,
             stream_name,
             where_sql,
             having_expr

@@ -39,7 +39,7 @@ use config::{
         base64,
         json::{Map, Value},
     },
-    SMTP_CLIENT,
+    SMTP_CLIENT, TIMESTAMP_COL_NAME,
 };
 use cron::Schedule;
 use infra::{schema::unwrap_stream_settings, table};
@@ -984,7 +984,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
             process_variable_replace(&mut resp, key, &VarValue::Str(&value), false);
 
             // calculate start and end time
-            if key == &get_config().common.column_timestamp {
+            if key == TIMESTAMP_COL_NAME {
                 let val = value.parse::<i64>().unwrap_or_default();
                 if alert_start_time == 0 || val < alert_start_time {
                     alert_start_time = val;
@@ -1349,12 +1349,10 @@ pub fn get_alert_start_end_time(
         return (start_time, rows_end_time);
     }
 
-    let cfg = get_config();
-
     // calculate start and end time
     let mut alert_start_time = 0;
     let mut alert_end_time = 0;
-    if let Some(values) = vars.get(&cfg.common.column_timestamp) {
+    if let Some(values) = vars.get(TIMESTAMP_COL_NAME) {
         for val in values {
             let val = val.parse::<i64>().unwrap_or_default();
             if alert_start_time == 0 || val < alert_start_time {

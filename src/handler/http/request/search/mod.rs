@@ -28,7 +28,7 @@ use config::{
     },
     metrics,
     utils::{base64, json},
-    DISTINCT_FIELDS,
+    DISTINCT_FIELDS, TIMESTAMP_COL_NAME,
 };
 use infra::{cache::stats, errors};
 use tracing::{Instrument, Span};
@@ -813,10 +813,7 @@ async fn values_v1(
         }
     }
 
-    let default_sql = format!(
-        "SELECT {} FROM \"{stream_name}\"",
-        cfg.common.column_timestamp
-    );
+    let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
     let mut query_sql = match query.get("filter") {
         None => default_sql,
         Some(v) => {

@@ -21,14 +21,14 @@ use config::{
     get_config,
     meta::{
         function::VRLResultResolver,
-        search,
-        search::PARTIAL_ERROR_RESPONSE_MESSAGE,
+        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
     },
     metrics,
     utils::{base64, json},
+    TIMESTAMP_COL_NAME,
 };
 use infra::errors;
 use tracing::{Instrument, Span};
@@ -592,7 +592,7 @@ pub async fn search_multi(
         };
     }
 
-    let column_timestamp = get_config().common.column_timestamp.to_string();
+    let column_timestamp = TIMESTAMP_COL_NAME.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
         if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {

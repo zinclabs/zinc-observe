@@ -2203,18 +2203,32 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ?.filter((it: any) => !it?.isDerived)
       ?.map((it: any) => it?.alias);
 
-    if (dashboardPanelData.data.type == "heatmap") {
-      query +=
-        xAxisAlias.length && yAxisAlias.length
-          ? " GROUP BY " + xAxisAlias.join(", ") + ", " + yAxisAlias.join(", ")
-          : "";
-    } else if (bAxisAlias?.length) {
-      query +=
-        xAxisAlias.length && bAxisAlias.length
-          ? " GROUP BY " + xAxisAlias.join(", ") + ", " + bAxisAlias.join(", ")
-          : "";
-    } else {
-      query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
+    const tableTypeWithXFieldOnly =
+      dashboardPanelData.data.type === "table" &&
+      xAxisAlias.length > 0 &&
+      yAxisAlias.length === 0 &&
+      !bAxisAlias?.length;
+
+    if (!tableTypeWithXFieldOnly) {
+      if (dashboardPanelData.data.type == "heatmap") {
+        query +=
+          xAxisAlias.length && yAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              yAxisAlias.join(", ")
+            : "";
+      } else if (bAxisAlias?.length) {
+        query +=
+          xAxisAlias.length && bAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              bAxisAlias.join(", ")
+            : "";
+      } else {
+        query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
+      }
     }
 
     // array of sorting fields with followed by asc or desc
@@ -3009,7 +3023,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
     () => {
-      
       // Only continue if the current mode is "show custom query"
       if (
         dashboardPanelData.data.queries[

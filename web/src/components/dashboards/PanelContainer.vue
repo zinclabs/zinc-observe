@@ -239,6 +239,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item>
             <q-item
               clickable
+              v-if="metaData && metaData.queries?.length > 0"
+              :disable="props.data.queryType != 'sql'"
+              v-close-popup="true"
+              @click="onLogPanel"
+            >
+              <q-item-section>
+                <q-item-label
+                  data-test="dashboard-move-to-logs-module"
+                  class="q-pa-sm"
+                  >Move To Logs</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item
+              clickable
               v-close-popup="true"
               @click="onPanelModifyClick('MovePanel')"
             >
@@ -311,6 +326,7 @@ import {
   computed,
   defineAsyncComponent,
   watch,
+  onBeforeMount,
 } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
@@ -327,6 +343,7 @@ import RelativeTime from "@/components/common/RelativeTime.vue";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -465,6 +482,111 @@ export default defineComponent({
         },
       });
     };
+    const getOriginalQueryAndStream = (queryDetails: any, metadata: any) => {
+      const originalQuery = metadata?.value?.queries[0]?.query;
+      const streamName = queryDetails?.queries[0]?.fields?.stream;
+
+      if (!originalQuery || !streamName) {
+        console.error("Missing query or stream name.");
+        return null;
+      }
+
+      return { originalQuery, streamName };
+    };
+    const constructLogsUrl = (
+      streamName: string,
+      encodedQuery: string,
+      queryDetails: any,
+      currentUrl: string,
+    ) => {
+      const logsUrl = new URL(currentUrl + "/logs");
+      logsUrl.searchParams.set(
+        "stream_type",
+        queryDetails.queries[0]?.fields?.stream_type,
+      );
+      logsUrl.searchParams.set("stream", streamName);
+      logsUrl.searchParams.set(
+        "from",
+        metaData.value.queries[0]?.startTime.toString(),
+      );
+      logsUrl.searchParams.set(
+        "to",
+        metaData.value.queries[0]?.endTime.toString(),
+      );
+      logsUrl.searchParams.set("sql_mode", "true");
+      logsUrl.searchParams.set("query", encodedQuery);
+      logsUrl.searchParams.set(
+        "org_identifier",
+        store.state.selectedOrganization.identifier,
+      );
+      logsUrl.searchParams.set("quick_mode", "false");
+      logsUrl.searchParams.set("show_histogram", "false");
+
+      return logsUrl;
+    };
+    let parser: any;
+    onBeforeMount(async () => {
+      await importSqlParser();
+    });
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+    const parseQuery = async (originalQuery: string, parser: any) => {
+      try {
+        return parser.astify(originalQuery);
+      } catch (error) {
+        console.error("Failed to parse query:", error);
+        return null;
+      }
+    };
+
+    const onLogPanel = async () => {
+      const queryDetails = props.data;
+      if (!queryDetails) {
+        console.error("Data is undefined.");
+        return;
+      }
+
+      const { originalQuery, streamName } =
+        getOriginalQueryAndStream(queryDetails, metaData) || {};
+      if (!originalQuery || !streamName) return;
+
+      if (!parser) {
+        await importSqlParser();
+      }
+
+      const ast = await parseQuery(originalQuery, parser);
+      if (!ast) return;
+
+      let modifiedQuery = originalQuery;
+
+      modifiedQuery = modifiedQuery.replace(/`/g, '"');
+
+      const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
+
+      const pos = window.location.pathname.indexOf("/web/");
+      const currentUrl =
+        pos > -1
+          ? window.location.origin +
+            window.location.pathname.slice(0, pos) +
+            "/web"
+          : window.location.origin;
+
+      const logsUrl = constructLogsUrl(
+        streamName,
+        encodedQuery,
+        queryDetails,
+        currentUrl,
+      );
+
+      const searchParams = Object.fromEntries(logsUrl.searchParams.entries());
+      const routerUrl = `/logs?${new URLSearchParams(searchParams).toString()}`;
+      window.open(routerUrl, "_blank");
+    };
+
     //create a duplicate panel
     const onDuplicatePanel = async (data: any): Promise<void> => {
       // Show a loading spinner notification.
@@ -610,6 +732,7 @@ export default defineComponent({
     return {
       props,
       onEditPanel,
+      onLogPanel,
       onDuplicatePanel,
       deletePanelDialog,
       isCurrentlyHoveredPanel,

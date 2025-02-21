@@ -307,6 +307,12 @@ async fn search_in_cluster(
         series_data.push(series);
     });
 
+    // with cache maybe we only get the last point from original data, then the result_type will
+    // return as vector, but if the query is range query, the result_type should be matrix
+    if result_type == "vector" && original_start != end {
+        result_type = "matrix".to_string();
+    }
+
     // merge result
     let values = if result_type == "matrix" {
         merge_matrix_query(&series_data)

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ use config::{
         stream::{FileKey, FileMeta, StreamType},
     },
     utils::{parquet::new_parquet_writer, schema_ext::SchemaExt},
-    PARQUET_BATCH_SIZE,
+    PARQUET_BATCH_SIZE, TIMESTAMP_COL_NAME,
 };
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
@@ -117,7 +117,7 @@ pub async fn merge_parquet_files(
     let sql = if stream_type == StreamType::Index {
         format!(
             "SELECT * FROM tbl WHERE file_name NOT IN (SELECT file_name FROM tbl WHERE deleted IS TRUE ORDER BY {} DESC) ORDER BY {} DESC",
-            cfg.common.column_timestamp, cfg.common.column_timestamp
+            TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME
         )
     } else if cfg.limit.distinct_values_hourly
         && stream_type == StreamType::Metadata
@@ -126,23 +126,16 @@ pub async fn merge_parquet_files(
         let fields = schema
             .fields()
             .iter()
-            .filter(|f| f.name() != &cfg.common.column_timestamp && f.name() != "count")
+            .filter(|f| f.name() != TIMESTAMP_COL_NAME && f.name() != "count")
             .map(|x| x.name().to_string())
             .collect::<Vec<_>>();
         let fields_str = fields.join(", ");
         format!(
             "SELECT MIN({}) AS {}, SUM(count) as count, {} FROM tbl GROUP BY {} ORDER BY {} DESC",
-            cfg.common.column_timestamp,
-            cfg.common.column_timestamp,
-            fields_str,
-            fields_str,
-            cfg.common.column_timestamp
+            TIMESTAMP_COL_NAME, TIMESTAMP_COL_NAME, fields_str, fields_str, TIMESTAMP_COL_NAME
         )
     } else {
-        format!(
-            "SELECT * FROM tbl ORDER BY {} DESC",
-            cfg.common.column_timestamp
-        )
+        format!("SELECT * FROM tbl ORDER BY {} DESC", TIMESTAMP_COL_NAME)
     };
     log::debug!("merge_parquet_files sql: {}", sql);
 
@@ -493,10 +486,9 @@ pub async fn register_table(
     rules: HashMap<String, DataType>,
     sort_key: &[(String, bool)],
 ) -> Result<SessionContext> {
-    let cfg = get_config();
     // only sort by timestamp desc
     let sorted_by_time =
-        sort_key.len() == 1 && sort_key[0].0 == cfg.common.column_timestamp && sort_key[0].1;
+        sort_key.len() == 1 && sort_key[0].0 == TIMESTAMP_COL_NAME && sort_key[0].1;
 
     let ctx = prepare_datafusion_context(
         session.work_group.clone(),
@@ -564,7 +556,7 @@ pub async fn create_parquet_table(
         // specify sort columns for parquet file
         listing_options =
             listing_options.with_file_sort_order(vec![vec![datafusion::logical_expr::SortExpr {
-                expr: Expr::Column(Column::new_unqualified(cfg.common.column_timestamp.clone())),
+                expr: Expr::Column(Column::new_unqualified(TIMESTAMP_COL_NAME.to_string())),
                 asc: false,
                 nulls_first: false,
             }]]);
@@ -595,15 +587,15 @@ pub async fn create_parquet_table(
     };
 
     let mut config = ListingTableConfig::new(prefix).with_listing_options(listing_options);
-    let timestamp_field = schema.field_with_name(&cfg.common.column_timestamp);
+    let timestamp_field = schema.field_with_name(TIMESTAMP_COL_NAME);
     let schema = if timestamp_field.is_ok() && timestamp_field.unwrap().is_nullable() {
         let new_fields = schema
             .fields()
             .iter()
             .map(|x| {
-                if x.name() == &cfg.common.column_timestamp {
+                if x.name() == TIMESTAMP_COL_NAME {
                     Arc::new(Field::new(
-                        cfg.common.column_timestamp.clone(),
+                        TIMESTAMP_COL_NAME.to_string(),
                         DataType::Int64,
                         false,
                     ))
@@ -652,16 +644,12 @@ async fn get_cpu_and_mem_limit(
 
 #[cfg(feature = "enterprise")]
 fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> String {
-    let cfg = get_config();
     let step = rule.step;
     let fields = schema
         .fields()
         .iter()
         .filter_map(|f| {
-            if f.name() != HASH_LABEL
-                && f.name() != VALUE_LABEL
-                && f.name() != &cfg.common.column_timestamp
-            {
+            if f.name() != HASH_LABEL && f.name() != VALUE_LABEL && f.name() != TIMESTAMP_COL_NAME {
                 Some(format!("max({}) as {}", f.name(), f.name()))
             } else {
                 None
@@ -674,7 +662,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
             "{}({} ORDER BY {} ASC) as {}",
             rule.function.fun(),
             VALUE_LABEL,
-            cfg.common.column_timestamp,
+            TIMESTAMP_COL_NAME,
             VALUE_LABEL
         )
     } else {
@@ -690,7 +678,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
         "SELECT {}, to_unixtime(date_bin(interval '{} second', to_timestamp_micros({}), to_timestamp('2001-01-01T00:00:00'))) * 1000000 as {}, {}, {} FROM tbl GROUP BY {}, {}",
         HASH_LABEL,
         step,
-        cfg.common.column_timestamp,
+        TIMESTAMP_COL_NAME,
         TIMESTAMP_ALIAS,
         fields.join(", "),
         fun_str,
@@ -702,10 +690,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
         .fields()
         .iter()
         .filter_map(|f| {
-            if f.name() != HASH_LABEL
-                && f.name() != VALUE_LABEL
-                && f.name() != &cfg.common.column_timestamp
-            {
+            if f.name() != HASH_LABEL && f.name() != VALUE_LABEL && f.name() != TIMESTAMP_COL_NAME {
                 Some(f.name().to_string())
             } else {
                 None
@@ -718,7 +703,7 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
         VALUE_LABEL,
         fields.join(", "),
         TIMESTAMP_ALIAS,
-        cfg.common.column_timestamp,
+        TIMESTAMP_COL_NAME,
         sql,
         TIMESTAMP_ALIAS,
     )
@@ -726,9 +711,8 @@ fn generate_downsampling_sql(schema: &Arc<Schema>, rule: &DownsamplingRule) -> S
 
 #[cfg(feature = "enterprise")]
 fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
-    let cfg = get_config();
     let timestamp = record_batch
-        .column_by_name(&cfg.common.column_timestamp)
+        .column_by_name(TIMESTAMP_COL_NAME)
         .unwrap()
         .as_any()
         .downcast_ref::<Int64Array>()
@@ -738,9 +722,8 @@ fn get_max_timestamp(record_batch: &RecordBatch) -> i64 {
 
 #[cfg(feature = "enterprise")]
 fn get_min_timestamp(record_batch: &RecordBatch) -> i64 {
-    let cfg = get_config();
     let timestamp = record_batch
-        .column_by_name(&cfg.common.column_timestamp)
+        .column_by_name(TIMESTAMP_COL_NAME)
         .unwrap()
         .as_any()
         .downcast_ref::<Int64Array>()

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,7 @@ use std::{
 
 use arrow::array::{BooleanArray, Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array};
 use arrow_schema::{DataType, SortOptions};
+use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     arrow::datatypes::SchemaRef,
     common::{internal_err, Result, Statistics},
@@ -135,7 +136,6 @@ impl ExecutionPlan for DeduplicationExec {
     // if don't have this, the optimizer will not merge the SortExec
     // and get wrong result
     fn required_input_ordering(&self) -> Vec<Option<LexRequirement>> {
-        let cfg = config::get_config();
         let mut sort_requirment = self
             .deduplication_columns
             .iter()
@@ -146,9 +146,9 @@ impl ExecutionPlan for DeduplicationExec {
                 )
             })
             .collect_vec();
-        if let Some((index, _)) = self.schema().column_with_name(&cfg.common.column_timestamp) {
+        if let Some((index, _)) = self.schema().column_with_name(TIMESTAMP_COL_NAME) {
             sort_requirment.push(PhysicalSortRequirement::new(
-                Arc::new(Column::new(&cfg.common.column_timestamp, index)) as _,
+                Arc::new(Column::new(TIMESTAMP_COL_NAME, index)) as _,
                 Some(SortOptions::new(true, false)),
             ));
         }

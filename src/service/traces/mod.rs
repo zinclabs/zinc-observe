@@ -29,7 +29,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json, schema_ext::SchemaExt},
-    DISTINCT_FIELDS,
+    DISTINCT_FIELDS, TIMESTAMP_COL_NAME,
 };
 use hashbrown::HashSet;
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
@@ -361,7 +361,7 @@ pub async fn handle_otlp_request(
                 let mut value: json::Value = json::to_value(local_val).unwrap();
                 // add timestamp
                 value.as_object_mut().unwrap().insert(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     json::Value::Number(timestamp.into()),
                 );
 
@@ -492,7 +492,7 @@ pub async fn handle_otlp_request(
                         };
 
                         let Some(timestamp) = record_val
-                            .get(&cfg.common.column_timestamp)
+                            .get(TIMESTAMP_COL_NAME)
                             .and_then(|ts| ts.as_i64())
                         else {
                             log::error!(
@@ -619,7 +619,7 @@ pub async fn ingest_json(
     let mut json_data_by_stream = HashMap::new();
     let mut partial_success = ExportTracePartialSuccess::default();
     for mut value in json_values {
-        let timestamp = value[&cfg.common.column_timestamp].as_i64().unwrap_or(
+        let timestamp = value[TIMESTAMP_COL_NAME].as_i64().unwrap_or(
             value["start_time"]
                 .as_i64()
                 .map(|ts| ts / 1000)
@@ -658,7 +658,7 @@ pub async fn ingest_json(
 
         // add timestamp
         record_val.insert(
-            cfg.common.column_timestamp.clone(),
+            TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
         let (ts_data, _) = json_data_by_stream

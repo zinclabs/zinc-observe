@@ -67,7 +67,9 @@ pub async fn save_alert(
     // Hack for frequency: convert minutes to seconds
     let mut alert = alert.into_inner();
     alert.trigger_condition.frequency *= 60;
-    alert.owner = Some(user_email.user_id.clone());
+    if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
+        alert.owner = Some(user_email.user_id.clone());
+    };
     alert.last_edited_by = Some(user_email.user_id);
     alert.updated_at = Some(datetime_now());
     alert.set_last_satisfied_at(None);

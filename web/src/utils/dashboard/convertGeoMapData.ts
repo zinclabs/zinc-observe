@@ -37,7 +37,7 @@ export const convertGeoMapData = (panelSchema: any, mapData: any) => {
   }
 
   const filteredMapData = panelSchema.queries.map((query: any, index: any) => {
-    return mapData[index].filter((item: any) => {
+    return mapData?.[index]?.filter((item: any) => {
       if (
         item[query.fields.latitude.alias] != null &&
         item[query.fields.longitude.alias] != null

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,9 +27,8 @@ use serde_json::{Map, Value};
 
 use super::str::find;
 use crate::{
-    get_config,
     meta::{promql::HASH_LABEL, stream::StreamType},
-    FxIndexMap,
+    FxIndexMap, TIMESTAMP_COL_NAME,
 };
 
 const MAX_PARTITION_KEY_LENGTH: usize = 100;
@@ -232,13 +231,12 @@ fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
             })
             .collect::<Vec<_>>()
     };
-    let cfg = get_config();
     fields = fields
         .into_iter()
         .map(|x| {
-            if x.name() == &cfg.common.column_timestamp {
+            if x.name() == TIMESTAMP_COL_NAME {
                 Arc::new(Field::new(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     DataType::Int64,
                     false,
                 ))

@@ -33,6 +33,7 @@ use config::{
         schema::filter_source_by_partition_key,
         sql::{is_aggregate_query, is_simple_aggregate_query},
     },
+    TIMESTAMP_COL_NAME,
 };
 use datafusion::distributed_plan::streaming_aggs_exec;
 use hashbrown::HashMap;
@@ -501,7 +502,7 @@ pub async fn search_multi(
         multi_res.hits
     };
     log::debug!("multi_res len after applying vrl: {}", multi_res.hits.len());
-    let column_timestamp = get_config().common.column_timestamp.to_string();
+    let column_timestamp = TIMESTAMP_COL_NAME.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
         if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
@@ -578,7 +579,7 @@ pub async fn search_partition(
 
     // if there is no _timestamp field in the query, return single partitions
     let is_aggregate = is_aggregate_query(&req.sql).unwrap_or(false);
-    let res_ts_column = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let res_ts_column = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let ts_column = res_ts_column.map(|(v, _)| v);
     let is_streaming_aggregate = ts_column.is_none()
         && is_simple_aggregate_query(&req.sql).unwrap_or(false)

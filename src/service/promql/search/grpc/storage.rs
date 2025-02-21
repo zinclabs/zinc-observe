@@ -22,6 +22,7 @@ use config::{
         search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
+    TIMESTAMP_COL_NAME,
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -334,9 +335,8 @@ fn convert_matchers_to_index_condition(
     index_fields: &HashSet<String>,
 ) -> Result<IndexCondition> {
     let mut index_condition = IndexCondition::default();
-    let cfg = get_config();
     for mat in matchers.matchers.iter() {
-        if mat.name == cfg.common.column_timestamp
+        if mat.name == TIMESTAMP_COL_NAME
             || mat.name == VALUE_LABEL
             || !index_fields.contains(&mat.name)
             || schema.field_with_name(&mat.name).is_err()

@@ -479,7 +479,9 @@ async fn init_common_grpc_server(
     let gaddr: SocketAddr = format!("{}:{}", ip, cfg.grpc.port).parse()?;
     let event_svc = EventServer::new(Eventer)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let search_svc = SearchServer::new(SEARCH_SERVER.clone())
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -492,10 +494,14 @@ async fn init_common_grpc_server(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let metrics_ingest_svc = MetricsServiceServer::new(MetricsIngester)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let logs_svc = LogsServiceServer::new(LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let trace_svc = TraceServiceServer::new(TraceServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -503,10 +509,14 @@ async fn init_common_grpc_server(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let ingest_svc = IngestServer::new(Ingester)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let streams_svc = StreamsServer::new(StreamServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -514,7 +524,9 @@ async fn init_common_grpc_server(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     log::info!(
         "starting gRPC server {} at {}",
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -32,7 +32,7 @@ use sqlparser::{
 use utoipa::ToSchema;
 
 use super::stream::StreamType;
-use crate::get_config;
+use crate::{get_config, TIMESTAMP_COL_NAME};
 
 pub const MAX_LIMIT: i64 = 100000;
 pub const MAX_OFFSET: i64 = 100000;
@@ -392,12 +392,7 @@ impl<'a> TryFrom<Timerange<'a>> for Option<(i64, i64)> {
     fn try_from(selection: Timerange<'a>) -> Result<Self, Self::Error> {
         let mut fields = Vec::new();
         if let Some(expr) = selection.0 {
-            parse_expr_for_field(
-                expr,
-                &SqlOperator::And,
-                &get_config().common.column_timestamp,
-                &mut fields,
-            )?
+            parse_expr_for_field(expr, &SqlOperator::And, TIMESTAMP_COL_NAME, &mut fields)?
         }
 
         let mut time_min = Vec::new();
@@ -628,10 +623,7 @@ fn parse_expr_check_field_name(s: &str, field: &str) -> bool {
         return true;
     }
     let cfg = get_config();
-    if field == "*"
-        && s != cfg.common.column_all.as_str()
-        && s != cfg.common.column_timestamp.as_str()
-    {
+    if field == "*" && s != cfg.common.column_all.as_str() && s != TIMESTAMP_COL_NAME {
         return true;
     }
 

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -31,7 +31,7 @@ use super::{
     json::{get_bool_value, get_float_value, get_int_value, get_string_value, get_uint_value},
     schema_ext::SchemaExt,
 };
-use crate::{get_config, FxIndexMap};
+use crate::{FxIndexMap, TIMESTAMP_COL_NAME};
 
 const USIZE_SIZE: usize = std::mem::size_of::<usize>();
 
@@ -577,7 +577,7 @@ pub fn merge_record_batches(
     // 4. sort concatenated record batch by timestamp col in desc order
     let sort_indices = arrow::compute::sort_to_indices(
         concated_record_batch
-            .column_by_name(&get_config().common.column_timestamp)
+            .column_by_name(TIMESTAMP_COL_NAME)
             .ok_or_else(|| {
                 log::error!(
                     "[{job_name}:JOB:{thread_id}] merge small files failed to find _timestamp column from merged record batch.",

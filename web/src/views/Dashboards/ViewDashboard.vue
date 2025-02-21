@@ -663,7 +663,7 @@ export default defineComponent({
 
       window.dispatchEvent(new Event("resize"));
 
-      await renderDashboardChartsRef.value?.saveDashboard();
+      await renderDashboardChartsRef?.value?.saveDashboardData?.execute?.();
     };
 
     // when the date changes from the picker, update the current time object for the dashboard

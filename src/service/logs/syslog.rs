@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -29,7 +29,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json},
-    ID_COL_NAME, ORIGINAL_DATA_COL_NAME,
+    ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
 };
 use syslog_loose::{Message, ProcId, Protocol};
 
@@ -286,9 +286,8 @@ pub async fn ingest(msg: &str, addr: SocketAddr) -> Result<HttpResponse> {
                         }
 
                         // handle timestamp
-                        let Some(timestamp) = local_val
-                            .get(&cfg.common.column_timestamp)
-                            .and_then(|ts| ts.as_i64())
+                        let Some(timestamp) =
+                            local_val.get(TIMESTAMP_COL_NAME).and_then(|ts| ts.as_i64())
                         else {
                             let err = "record _timestamp inserted before pipeline processing, but missing after pipeline processing";
                             stream_status.status.failed += 1;

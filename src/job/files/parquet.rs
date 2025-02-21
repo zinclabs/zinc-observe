@@ -54,6 +54,7 @@ use config::{
         tantivy::tokenizer::{o2_tokenizer_build, O2_TOKENIZER},
     },
     FxIndexMap, INDEX_FIELD_NAME_FOR_ALL, INDEX_SEGMENT_LENGTH, PARQUET_BATCH_SIZE,
+    TIMESTAMP_COL_NAME,
 };
 use futures::TryStreamExt;
 use hashbrown::HashSet;
@@ -974,11 +975,7 @@ pub(crate) async fn generate_index_on_ingester(
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
     for row in json_rows {
-        let timestamp: i64 = row
-            .get(&cfg.common.column_timestamp)
-            .unwrap()
-            .as_i64()
-            .unwrap();
+        let timestamp: i64 = row.get(TIMESTAMP_COL_NAME).unwrap().as_i64().unwrap();
 
         let hour_key = crate::service::ingestion::get_write_partition_key(
             timestamp,
@@ -1153,7 +1150,7 @@ async fn prepare_index_record_batches(
         .collect::<HashMap<_, _>>();
 
     let new_schema = Arc::new(Schema::new(vec![
-        Field::new(cfg.common.column_timestamp.as_str(), DataType::Int64, false),
+        Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
         Field::new("min_ts", DataType::Int64, true),
         Field::new("max_ts", DataType::Int64, true),
         Field::new("field", DataType::Utf8, true),
@@ -1182,7 +1179,7 @@ async fn prepare_index_record_batches(
 
         // get _timestamp column
         let Some(time_data) = batch
-            .column_by_name(&cfg.common.column_timestamp)
+            .column_by_name(TIMESTAMP_COL_NAME)
             .unwrap()
             .as_any()
             .downcast_ref::<Int64Array>()

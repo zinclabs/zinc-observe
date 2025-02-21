@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use config::get_config;
+use config::TIMESTAMP_COL_NAME;
 use datafusion::{
     common::{
         tree_node::{
@@ -82,7 +82,6 @@ impl TreeNodeRewriter for AddSortAndLimit {
     type Node = LogicalPlan;
 
     fn f_down(&mut self, node: LogicalPlan) -> Result<Transformed<LogicalPlan>> {
-        let cfg = config::get_config();
         if self.limit == 0 {
             return Ok(Transformed::new(node, false, TreeNodeRecursion::Stop));
         }
@@ -160,12 +159,9 @@ impl TreeNodeRewriter for AddSortAndLimit {
                 });
             }
 
-            if schema
-                .field_with_name(None, cfg.common.column_timestamp.as_str())
-                .is_ok()
-            {
+            if schema.field_with_name(None, TIMESTAMP_COL_NAME).is_ok() {
                 sort_columns.push(SortExpr {
-                    expr: col(cfg.common.column_timestamp.clone()),
+                    expr: col(TIMESTAMP_COL_NAME.to_string()),
                     asc: false,
                     nulls_first: false,
                 });
@@ -210,17 +206,13 @@ fn generate_sort_plan(
     input: Arc<LogicalPlan>,
     limit: usize,
 ) -> (LogicalPlan, Option<Arc<DFSchema>>) {
-    let config = get_config();
     let timestamp = SortExpr {
-        expr: col(config.common.column_timestamp.clone()),
+        expr: col(TIMESTAMP_COL_NAME),
         asc: false,
         nulls_first: false,
     };
     let schema = input.schema().clone();
-    if schema
-        .field_with_name(None, config.common.column_timestamp.as_str())
-        .is_err()
-    {
+    if schema.field_with_name(None, TIMESTAMP_COL_NAME).is_err() {
         let mut input = input.as_ref().clone();
         input = input
             .rewrite(&mut ChangeTableScanSchema::new())
@@ -293,8 +285,7 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
         let mut transformed = match node {
             LogicalPlan::TableScan(scan) => {
                 let schema = scan.source.schema();
-                let timestamp_idx =
-                    schema.index_of(get_config().common.column_timestamp.as_str())?;
+                let timestamp_idx = schema.index_of(TIMESTAMP_COL_NAME)?;
                 let mut projection = scan.projection.clone().unwrap();
                 projection.push(timestamp_idx);
                 let mut table_scan = TableScan::try_new(

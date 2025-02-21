@@ -108,7 +108,9 @@ pub async fn create_alert(
         .clone()
         .unwrap_or(DEFAULT_FOLDER.to_string());
     let mut alert: MetaAlert = req_body.into();
-    alert.owner = Some(user_email.user_id.clone());
+    if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
+        alert.owner = Some(user_email.user_id.clone());
+    }
     alert.last_edited_by = Some(user_email.user_id);
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;

@@ -56,7 +56,9 @@ pub async fn create_report(
     let org_id = path.into_inner();
 
     let mut report = report.into_inner();
-    report.owner = user_email.user_id;
+    if report.owner.is_empty() {
+        report.owner = user_email.user_id;
+    }
     match reports::save(&org_id, "", report, true).await {
         Ok(_) => Ok(MetaHttpResponse::ok("Report saved")),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),

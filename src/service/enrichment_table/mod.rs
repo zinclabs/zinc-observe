@@ -30,7 +30,7 @@ use config::{
         stream::{PartitionTimeLevel, StreamType},
     },
     utils::{flatten::format_key, json, schema_ext::SchemaExt},
-    SIZE_IN_MB,
+    SIZE_IN_MB, TIMESTAMP_COL_NAME,
 };
 use futures::{StreamExt, TryStreamExt};
 use infra::{
@@ -131,12 +131,12 @@ pub async fn save_enrichment_data(
     let mut records_size = 0;
     let timestamp = Utc::now().timestamp_micros();
     for mut json_record in payload {
-        let timestamp = match json_record.get(&cfg.common.column_timestamp) {
+        let timestamp = match json_record.get(TIMESTAMP_COL_NAME) {
             Some(v) => v.as_i64().unwrap_or(timestamp),
             None => timestamp,
         };
         json_record.insert(
-            cfg.common.column_timestamp.clone(),
+            TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
 

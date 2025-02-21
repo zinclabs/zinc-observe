@@ -27,6 +27,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json, schema::infer_json_schema, schema_ext::SchemaExt, time},
+    TIMESTAMP_COL_NAME,
 };
 use datafusion::arrow::datatypes::Schema;
 use infra::schema::{unwrap_partition_time_level, SchemaCache};
@@ -91,7 +92,6 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<(json::Value, String)>> = HashMap::new();
 
-    let cfg = config::get_config();
     let reader: Vec<json::Value> = json::from_slice(&body)?;
     for record in reader.into_iter() {
         // JSON Flattening
@@ -157,7 +157,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         }
 
         // check timestamp
-        let timestamp: i64 = match record.get(&cfg.common.column_timestamp) {
+        let timestamp: i64 = match record.get(TIMESTAMP_COL_NAME) {
             None => chrono::Utc::now().timestamp_micros(),
             Some(json::Value::Number(s)) => {
                 time::parse_i64_to_timestamp_micros(s.as_f64().unwrap() as i64)
@@ -168,7 +168,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
         };
         // reset time
         record.insert(
-            cfg.common.column_timestamp.clone(),
+            TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
 
@@ -302,7 +302,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
             );
 
             let timestamp = record
-                .get(&cfg.common.column_timestamp)
+                .get(TIMESTAMP_COL_NAME)
                 .and_then(|ts| ts.as_i64())
                 .ok_or_else(|| anyhow::anyhow!("missing timestamp"))?;
 
@@ -314,10 +314,7 @@ pub async fn ingest(org_id: &str, body: web::Bytes) -> Result<IngestionResponse>
 
             // convert every label to string
             for (k, v) in record.iter_mut() {
-                if k == NAME_LABEL
-                    || k == TYPE_LABEL
-                    || k == VALUE_LABEL
-                    || k == &cfg.common.column_timestamp
+                if k == NAME_LABEL || k == TYPE_LABEL || k == VALUE_LABEL || k == TIMESTAMP_COL_NAME
                 {
                     continue;
                 }

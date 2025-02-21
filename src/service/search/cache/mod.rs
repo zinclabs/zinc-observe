@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,7 @@ use config::{
     },
     metrics,
     utils::{base64, hash::Sum64, json, sql::is_aggregate_query},
+    TIMESTAMP_COL_NAME,
 };
 use infra::{
     cache::{file_data::disk::QUERY_RESULT_CACHE, meta::ResultCacheMeta},
@@ -135,7 +136,7 @@ pub async fn search(
         match crate::service::search::Sql::new(&query, org_id, stream_type).await {
             Ok(v) => {
                 let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, &cfg.common.column_timestamp, is_aggregate)
+                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
                 MultiCachedQueryResponse {
@@ -807,8 +808,6 @@ pub async fn check_cache_v2(
     in_req: &search::Request,
     use_cache: bool,
 ) -> Result<MultiCachedQueryResponse, Error> {
-    let cfg = get_config();
-
     // Result caching check start
     let mut origin_sql = in_req.query.sql.clone();
     origin_sql = origin_sql.replace('\n', " ");
@@ -869,7 +868,7 @@ pub async fn check_cache_v2(
         match crate::service::search::Sql::new(&query, org_id, stream_type).await {
             Ok(v) => {
                 let (ts_column, is_descending) =
-                    cacher::get_ts_col_order_by(&v, &cfg.common.column_timestamp, is_aggregate)
+                    cacher::get_ts_col_order_by(&v, TIMESTAMP_COL_NAME, is_aggregate)
                         .unwrap_or_default();
 
                 MultiCachedQueryResponse {
