@@ -489,7 +489,6 @@ export const convertPromQLData = async (
       case "gauge": {
         // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
-
         const series = it?.result?.map((metric: any) => {
           const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
           gaugeIndex++;
@@ -503,57 +502,28 @@ export const convertPromQLData = async (
             ...getPropsByChartTypeForSeries(panelSchema.type),
             min: panelSchema?.queries[index]?.config?.min || 0,
             max: panelSchema?.queries[index]?.config?.max || 100,
-
             //which grid will be used
             gridIndex: gaugeIndex - 1,
             // radius, progress and axisline width will be calculated based on grid width and height
-            radius: `${
-              Math.min(
-                gridDataForGauge.gridWidth,
-                gridDataForGauge.gridHeight,
-              ) /
-                2 -
-              5
-            }px`,
+            radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
             progress: {
               show: true,
-              width: `${
-                Math.min(
-                  gridDataForGauge.gridWidth,
-                  gridDataForGauge.gridHeight,
-                ) / 6
-              }`,
+              width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
             },
             axisLine: {
               lineStyle: {
-                width: `${
-                  Math.min(
-                    gridDataForGauge.gridWidth,
-                    gridDataForGauge.gridHeight,
-                  ) / 6
-                }`,
+                width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
               },
             },
             title: {
               fontSize: 10,
               offsetCenter: [0, "70%"],
-              // width: upto chart width
               width: `${gridDataForGauge.gridWidth}`,
               overflow: "truncate",
             },
-
-            // center of gauge
-            // x: left + width / 2,
-            // y: top + height / 2,
             center: [
-              `${
-                parseFloat(options.grid[gaugeIndex - 1].left) +
-                parseFloat(options.grid[gaugeIndex - 1].width) / 2
-              }%`,
-              `${
-                parseFloat(options.grid[gaugeIndex - 1].top) +
-                parseFloat(options.grid[gaugeIndex - 1].height) / 2
-              }%`,
+              `${parseFloat(options.grid[gaugeIndex - 1].left) + parseFloat(options.grid[gaugeIndex - 1].width) / 2}%`,
+              `${parseFloat(options.grid[gaugeIndex - 1].top) + parseFloat(options.grid[gaugeIndex - 1].height) / 2}%`,
             ],
             data: [
               {
@@ -595,6 +565,7 @@ export const convertPromQLData = async (
             },
           };
         });
+
         options.dataset = { source: [[]] };
         options.tooltip = {
           show: true,
@@ -604,7 +575,6 @@ export const convertPromQLData = async (
             fontSize: 12,
           },
           valueFormatter: (value: any) => {
-            // unit conversion
             return formatUnitValue(
               getUnitValue(
                 value,
@@ -621,6 +591,10 @@ export const convertPromQLData = async (
               : "rgba(255,255,255,1)",
           extraCssText: "max-height: 200px; overflow: auto; max-width: 500px",
         };
+
+        // Set coordinate system options
+        options.xAxis = [{ type: "value", show: false }];
+        options.yAxis = [{ type: "value", show: false }];
         options.angleAxis = {
           show: false,
         };
@@ -628,65 +602,90 @@ export const convertPromQLData = async (
           show: false,
         };
         options.polar = {};
-        options.xAxis = [];
-        options.yAxis = [];
         return series;
       }
       case "metric": {
-        // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
 
         switch (it?.resultType) {
           case "matrix": {
             // take first result
-            const series = [it?.result[0]]?.map((metric: any) => {
-              const values = metric.values.sort(
-                (a: any, b: any) => a[0] - b[0],
-              );
-              // first value
-              const unitValue = getUnitValue(
-                values?.[0]?.[1],
-                panelSchema.config?.unit,
-                panelSchema.config?.unit_custom,
-                panelSchema.config?.decimals,
-              );
-              return {
-                ...getPropsByChartTypeForSeries(panelSchema.type),
-                renderItem: function (params: any) {
+            const metric = it?.result?.[0];
+
+            const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+            const latestValue = values[values.length - 1]?.[1] ?? 0;
+
+            const unitValue = getUnitValue(
+              latestValue,
+              panelSchema.config?.unit,
+              panelSchema.config?.unit_custom,
+              panelSchema.config?.decimals,
+            );
+
+            const series = [
+              {
+                type: "custom",
+                silent: true,
+                data: [[0, 0]],
+                renderItem: function (params: any, api: any) {
+                  const value = formatUnitValue(unitValue);
+                  const fontSize = calculateOptimalFontSize(
+                    value,
+                    Math.min(params.coordSys.width, params.coordSys.height) * 2,
+                  );
+
                   return {
                     type: "text",
                     style: {
-                      text: formatUnitValue(unitValue),
-                      fontSize: calculateOptimalFontSize(
-                        formatUnitValue(unitValue),
-                        params.coordSys.cx * 2,
-                      ), //coordSys is relative. so that we can use it to calculate the dynamic size
+                      text: value,
+                      fontSize: fontSize,
                       fontWeight: 500,
                       align: "center",
                       verticalAlign: "middle",
-                      x: params.coordSys.cx,
-                      y: params.coordSys.cy,
-                      fill: store.state.theme == "dark" ? "#fff" : "#000",
+                      x: params.coordSys.x + params.coordSys.width / 2,
+                      y: params.coordSys.y + params.coordSys.height / 2,
+                      fill: store.state.theme === "dark" ? "#fff" : "#000",
                     },
                   };
                 },
-              };
-            });
-            options.dataset = { source: [[]] };
-            options.tooltip = {
-              show: false,
-            };
-            options.angleAxis = {
-              show: false,
-            };
-            options.radiusAxis = {
-              show: false,
-            };
-            options.polar = {};
-            options.xAxis = [];
-            options.yAxis = [];
+              },
+            ];
+
+            // Set required options for metric chart
+            options.grid = [
+              {
+                top: "10%",
+                right: "10%",
+                bottom: "10%",
+                left: "10%",
+                containLabel: true,
+              },
+            ];
+
+            options.xAxis = [
+              {
+                type: "value",
+                show: false,
+                min: 0,
+                max: 1,
+              },
+            ];
+
+            options.yAxis = [
+              {
+                type: "value",
+                show: false,
+                min: 0,
+                max: 1,
+              },
+            ];
+
+            options.tooltip = { show: false };
+            options.legend = { show: false };
+
             return series;
           }
+
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
               const values = [metric.value];
@@ -723,7 +722,7 @@ export const convertPromQLData = async (
       data: markLines,
     },
     markArea: getSeriesMarkArea(),
-  zlevel: 1,
+    zlevel: 1,
   });
   options.series = options.series.flat();
 
