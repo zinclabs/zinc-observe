@@ -851,15 +851,6 @@ export const convertSQLData = async (
     dataValue: number,
     isMin: boolean,
   ) => {
-    console.log(
-      "configValue",
-      configValue,
-      "dataValue",
-      dataValue,
-      "isMin",
-      isMin,
-    );
-
     if (configValue === null || configValue === undefined) {
       return undefined;
     }
