@@ -136,12 +136,6 @@ export default defineComponent({
 
       const echartsGL = await import('echarts-gl');
 
-
-      // Destroy the existing chart instance if any
-      if (chart) {
-        chart.dispose();
-      }
-
       // Initialize chart
       chart = echarts.init(chartRef.value, undefined, {
         renderer: "canvas",
@@ -151,13 +145,6 @@ export default defineComponent({
       const convertedData = convertStringToFunction(props.data);
       const safeChartOptions = deepSanitize(convertedData);
       chart.setOption(safeChartOptions);
-            // Now, set the option with the executed functions
-            chart.on("click", (params) => emit("click", params));
-      chart.on("mousemove", (params) => emit("mousemove", params));
-      chart.on("mouseout", () => emit("mouseout"));
-      chart.on("legendselectchanged", (params) =>
-        emit("legendChanged", params),
-      );
 
       if (convertedData.o2_events) {
         

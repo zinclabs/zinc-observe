@@ -341,6 +341,7 @@ import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import { useLoading } from "@/composables/useLoading";
 import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
+import { panelIdToBeRefreshed } from '@/utils/dashboard/convertCustomChartData';
 
 const DashboardSettings = defineAsyncComponent(() => {
   return import("./DashboardSettings.vue");
@@ -1005,6 +1006,9 @@ export default defineComponent({
     const currentTimeObjPerPanel = ref({});
 
     const refreshPanelRequest = (panelId) => {
+      // Set the panel ID to be refreshed
+      panelIdToBeRefreshed.value = panelId;
+
       // when the date changes from the picker, update the current time object for the dashboard
       if (selectedDate.value && dateTimePicker.value) {
         const date = dateTimePicker.value?.getConsumableDateTime();
