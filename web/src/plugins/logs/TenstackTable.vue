@@ -566,17 +566,22 @@ watch(
 );
 
 const updateTableWidth = async () => {
-  tableRowSize.value = tableBodyRef?.value?.children[0]?.scrollWidth;
+  await nextTick();
+  const initialWidth = tableBodyRef?.value?.children[0]?.scrollWidth || 800;
+  tableRowSize.value = initialWidth;
 
-  setTimeout(() => {
-    let max = 0;
+  setTimeout(async () => {
+    await nextTick();
+    let max = initialWidth;
     let width = max;
-    for (let i = 0; i < tableRows.value.length; i++) {
-      width = tableBodyRef?.value?.children[i]?.scrollWidth;
-      if (width > max) max = width;
+    if (tableBodyRef?.value?.children) {
+      for (let i = 0; i < Math.min(tableRows.value.length, tableBodyRef.value.children.length); i++) {
+        width = tableBodyRef.value.children[i]?.scrollWidth || 0;
+        if (width > max) max = width;
+      }
+      tableRowSize.value = max || initialWidth;
     }
-    tableRowSize.value = max;
-  }, 0);
+  }, 100);
 };
 
 const debouncedUpdate = debounce((newColSizes) => {
@@ -615,8 +620,12 @@ const rowVirtualizerOptions = computed(() => {
     overscan: 80,
     measureElement:
       typeof window !== "undefined" &&
-      navigator.userAgent.indexOf("Firefox") === -1
-        ? (element: any) => element?.getBoundingClientRect().height
+      !isFirefox.value
+        ? (element: any) => {
+            if (!element) return 20;
+            const rect = element.getBoundingClientRect();
+            return rect?.height || 20;
+          }
         : undefined,
   };
 });
