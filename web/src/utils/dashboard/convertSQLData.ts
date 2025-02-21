@@ -1087,8 +1087,6 @@ export const convertSQLData = async (
           ? panelSchema.queries[0]?.fields?.y[0]?.label
           : "",
       nameLocation: "middle",
-      // min: panelSchema.config.y_axis_min,
-      // max: panelSchema.config.y_axis_max,
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       nameGap:
