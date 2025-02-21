@@ -520,8 +520,8 @@ export const convertPromQLData = async (
         }
       }
       case "gauge": {
+        // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
-        // Matrix result type handling
         const series = it?.result?.map((metric: any) => {
           const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
           gaugeIndex++;
@@ -535,7 +535,9 @@ export const convertPromQLData = async (
             ...getPropsByChartTypeForSeries(panelSchema.type),
             min: panelSchema?.queries[index]?.config?.min || 0,
             max: panelSchema?.queries[index]?.config?.max || 100,
+            //which grid will be used
             gridIndex: gaugeIndex - 1,
+            // radius, progress and axisline width will be calculated based on grid width and height
             radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
             progress: {
               show: true,
@@ -559,6 +561,7 @@ export const convertPromQLData = async (
             data: [
               {
                 name: seriesName,
+                // taking first value for gauge
                 value: values[0][1],
                 detail: {
                   formatter: function (value: any) {
