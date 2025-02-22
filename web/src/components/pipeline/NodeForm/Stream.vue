@@ -193,7 +193,7 @@ const streams: any = ref({});
 const usedStreams: any = ref([]);
 const streamTypes = ["logs", "metrics", "traces"];
 //for testing purpose but remove metrics and traces as discuessedf
-const outputStreamTypes = ["logs", "metrics", "traces"];
+const outputStreamTypes = ["logs", "metrics", "traces","enrichment_tables"];
 const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 const dynamic_stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 
