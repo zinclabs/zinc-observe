@@ -89,8 +89,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :rules="[(val: any) => !!val || 'Field is required!']"
             :option-disable="(option : any)  => option.isDisable"
             @input-value="handleDynamicStreamName"
-           
             />
+
+
+            <q-toggle
+            v-if="stream_type == 'enrichment_tables' && selectedNodeType == 'output'"
+              class="col-12 q-py-md text-grey-8 text-bold"
+              v-model="appendData"
+              :label="t('function.appendData')"
+            />
+
+
 
 
 
@@ -196,6 +205,8 @@ const streamTypes = ["logs", "metrics", "traces"];
 const outputStreamTypes = ["logs", "metrics", "traces","enrichment_tables"];
 const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 const dynamic_stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
+
+const appendData = ref(pipelineObj.currentSelectedNodeData?.data.hasOwnProperty("append_data") ? pipelineObj.currentSelectedNodeData.data.append_data : false);
 
 const stream_type = ref((pipelineObj.currentSelectedNodeData?.data as { stream_type?: string })?.stream_type || "logs");
 const selectedNodeType = ref((pipelineObj.currentSelectedNodeData as { io_type?: string })?.io_type || "");
@@ -342,12 +353,15 @@ const deleteNode = () => {
 };
 
 const saveStream = () => {
-  const streamNodeData = {
+  const streamNodeData: any = {
     stream_type: stream_type,
     stream_name: stream_name,
     org_id: store.state.selectedOrganization.identifier,
     node_type: "stream",
   };
+  if(stream_type.value == 'enrichment_tables'){
+    streamNodeData.append_data = appendData.value;
+  }
   if( typeof stream_name.value === 'object' && stream_name.value !== null && stream_name.value.hasOwnProperty('value') && stream_name.value.value === ""){
     $q.notify({
       message: "Please select Stream from the list",
