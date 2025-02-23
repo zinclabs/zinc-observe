@@ -121,9 +121,7 @@ pub async fn lookup_by_name(org_id: web::Path<String>, req: HttpRequest) -> impl
                             _stream_list_from_rbac = stream_list;
                         }
                         Err(e) => {
-                            return Ok(crate::common::meta::http::HttpResponse::forbidden(
-                                e.to_string(),
-                            ));
+                            return MetaHttpResponse::forbidden(e.to_string());
                         }
                     }
                 }
