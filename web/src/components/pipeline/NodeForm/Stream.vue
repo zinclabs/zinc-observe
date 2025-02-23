@@ -209,7 +209,7 @@ const outputStreamTypes = ["logs", "metrics", "traces","enrichment_tables"];
 const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 const dynamic_stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 
-const appendData = ref(pipelineObj.currentSelectedNodeData?.data.hasOwnProperty("append_data") ? pipelineObj.currentSelectedNodeData.data.append_data : false);
+const appendData = ref((pipelineObj.currentSelectedNodeData?.data as { meta?: { append_data?: boolean } })?.meta?.append_data || false);
 
 const stream_type = ref((pipelineObj.currentSelectedNodeData?.data as { stream_type?: string })?.stream_type || "logs");
 const selectedNodeType = ref((pipelineObj.currentSelectedNodeData as { io_type?: string })?.io_type || "");
@@ -361,16 +361,22 @@ const deleteNode = () => {
   emit("cancel:hideform");
 };
 
+
+
 const saveStream = () => {
+  // Validate pipeline configuration
+
   const streamNodeData: any = {
     stream_type: stream_type,
     stream_name: stream_name,
     org_id: store.state.selectedOrganization.identifier,
     node_type: "stream",
   };
+
   if(stream_type.value == 'enrichment_tables'){
-    streamNodeData.append_data = appendData.value;
+    streamNodeData.meta = { append_data: appendData.value };
   }
+
   if( typeof stream_name.value === 'object' && stream_name.value !== null && stream_name.value.hasOwnProperty('value') && stream_name.value.value === ""){
     $q.notify({
       message: "Please select Stream from the list",
