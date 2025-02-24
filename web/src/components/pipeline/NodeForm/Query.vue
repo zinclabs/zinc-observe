@@ -41,15 +41,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disableQueryTypeSelection="true"
             v-model:trigger="streamRoute.trigger_condition"
             v-model:sql="streamRoute.query_condition.sql"
+            v-model:promql="streamRoute.query_condition.promql"
             v-model:query_type="streamRoute.query_condition.type"
             v-model:aggregation="streamRoute.query_condition.aggregation"
             v-model:stream_type="streamRoute.stream_type"
             v-model:isAggregationEnabled="isAggregationEnabled"
+            v-model:streamType="streamRoute.stream_type"
             @validate-sql="validateSqlQuery"
             @submit:form="saveQueryData"
             @cancel:form="openCancelDialog"
             @delete:node="openDeleteDialog"
             @update:fullscreen="updateFullscreenMode"
+            @update:stream_type="updateStreamType"
+
             
             class="q-mt-sm"
           />
@@ -105,6 +109,7 @@ interface StreamRoute {
   conditions: RouteCondition[];
   query_condition: {
     sql: string;
+    promql: string | null;
     type: string;
     aggregation: {
       group_by: string[];
@@ -360,7 +365,7 @@ const saveQueryData = async () => {
       type: formData.query_condition.type,
       conditions: null,
       sql: formData.query_condition.sql,
-      promql: null,
+      promql: formData.query_condition.promql || null,
       promql_condition: null,
       aggregation: formData.query_condition.aggregation,
       vrl_function: null,
@@ -426,10 +431,15 @@ const removeVariable = (variable: any) => {
 };
 
 const validateSqlQuery = () => {
+  if(streamRoute.value.query_condition.type == 'promql'){
+    isValidSqlQuery.value = true;
+    return;
+  }
   const query = buildQueryPayload({
     sqlMode: true,
     streamName: streamRoute.value.name as string,
   });
+
 
   delete query.aggs;
 
@@ -463,6 +473,15 @@ const validateSqlQuery = () => {
         resolve("");
       });
   });
+};
+const updateStreamType = (val: string) => {
+  streamRoute.value.stream_type = val;
+};
+const updateQueryType = (val: string) => {
+  streamRoute.value.query_condition.type = val;
+  if(val == 'promql'){
+    streamRoute.value.query_condition.sql = '';
+  }
 };
 </script>
 
