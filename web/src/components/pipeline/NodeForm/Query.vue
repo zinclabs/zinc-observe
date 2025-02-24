@@ -384,8 +384,12 @@ const saveQueryData = async () => {
     },
   };
   if(formData.query_condition.type == 'promql'){
-    delete queryPayload.query_condition.search_event_type;
-    delete queryPayload.query_condition.sql;
+    if(queryPayload?.query_condition){
+     queryPayload.query_condition.search_event_type  = "";
+    }
+    if(queryPayload?.query_condition){
+       queryPayload.query_condition.sql = "";
+    }
     
   }
   addNode(queryPayload);
