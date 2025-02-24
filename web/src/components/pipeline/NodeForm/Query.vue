@@ -383,6 +383,11 @@ const saveQueryData = async () => {
       timezone: formData.trigger_condition.timezone,
     },
   };
+  if(formData.query_condition.type == 'promql'){
+    delete queryPayload.query_condition.search_event_type;
+    delete queryPayload.query_condition.sql;
+    
+  }
   addNode(queryPayload);
   emit("cancel:hideform");
 };
