@@ -402,7 +402,7 @@ async fn cache_files_inner(
 ) -> Result<file_data::CacheType, Error> {
     let cfg = get_config();
     let mut tasks = Vec::new();
-    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.query_thread_num));
+    let semaphore = std::sync::Arc::new(Semaphore::new(cfg.limit.s3_download_num));
     for file in files.iter() {
         let trace_id = trace_id.to_string();
         let file_name = file.to_string();
@@ -609,8 +609,6 @@ pub async fn filter_file_list_by_tantivy_index(
             let idx_optimize_rule_clone = idx_optimize_rule.clone();
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let task = tokio::task::spawn(async move {
-                log::info!("tantivy_search start : thread {i}");
-                let search_start = std::time::Instant::now();
                 let ret = search_tantivy_index(
                     &trace_id,
                     time_range,
@@ -619,10 +617,6 @@ pub async fn filter_file_list_by_tantivy_index(
                     &file,
                 )
                 .await;
-                log::info!(
-                    "tantivy_search end : thread {i} took {}",
-                    search_start.elapsed().as_millis()
-                );
                 drop(permit);
                 ret
             });
@@ -635,7 +629,6 @@ pub async fn filter_file_list_by_tantivy_index(
             .await
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?
         {
-            log::info!("tantivy_search : all results collected");
             let result: anyhow::Result<(String, Option<BitVec>, usize)> = result;
             // Each result corresponds to a file in the file list
             match result {
@@ -850,8 +843,6 @@ async fn search_tantivy_index(
     let file_in_range =
         parquet_file.meta.min_ts <= time_range.1 && parquet_file.meta.max_ts >= time_range.0;
     let idx_optimize_rule_clone = idx_optimize_rule.clone();
-    log::info!("search_thread start");
-    let search_start = std::time::Instant::now();
     let matched_docs = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule_clone) {
             (false, _) | (true, None) => tantivy_searcher
                 .search(&query, &tantivy::collector::DocSetCollector)
@@ -885,10 +876,6 @@ async fn search_tantivy_index(
         })
         // .instrument(tracing::info_span!("tantivy_search_thread"))
         .await??;
-    log::info!(
-        "search_thread end took {}",
-        search_start.elapsed().as_millis()
-    );
 
     // return early if no matches in tantivy
     let (matched_docs, total_hits) = matched_docs;

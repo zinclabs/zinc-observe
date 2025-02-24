@@ -79,13 +79,17 @@ impl PuffinBytesReader {
         }
 
         // check MAGIC
+        let magic_start = std::time::Instant::now();
         let magic =
             infra::cache::storage::get_range(&self.source.location, 0..MAGIC_SIZE as usize).await?;
         ensure!(magic.to_vec() == MAGIC, anyhow!("Header MAGIC mismatch"));
+        log::info!("magic_get_range took {}", magic_start.elapsed().as_millis());
 
+        let meta_start = std::time::Instant::now();
         let puffin_meta = PuffinFooterBytesReader::new(self.source.clone())
             .parse()
             .await?;
+        log::info!("puffin_metadata took {}", meta_start.elapsed().as_millis());
         self.metadata = Some(puffin_meta);
         Ok(())
     }
