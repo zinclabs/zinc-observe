@@ -105,7 +105,7 @@ pub enum DashboardError {
     /// Error that occurs when trying to get the list of dashboards that a user is permitted to
     /// get.
     #[error(transparent)]
-    ListPermittedDashboardsError(crate::handler::http::auth::validator::Error),
+    ListPermittedDashboardsError(actix_web::Error),
 }
 
 async fn add_distinct_field_entry(
@@ -368,8 +368,9 @@ pub async fn list_dashboards(
     user_id: &str,
     params: ListDashboardsParams,
 ) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
+    let org_id = params.org_id.clone();
     let dashboards = table::dashboards::list(params).await?;
-    let dashboards = filter_permitted_dashboards(&params.org_id, user_id, dashboards).await?;
+    let dashboards = filter_permitted_dashboards(&org_id, user_id, dashboards).await?;
     Ok(dashboards)
 }
 
@@ -545,7 +546,7 @@ async fn filter_permitted_dashboards(
 async fn filter_permitted_dashboards(
     org_id: &str,
     user_id: &str,
-    dashboards: Vec<Dashboard>,
+    dashboards: Vec<(Folder, Dashboard)>,
 ) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
     let permitted_objects = crate::handler::http::auth::validator::list_objects_for_user(
         org_id,
@@ -557,16 +558,20 @@ async fn filter_permitted_dashboards(
     .map_err(DashboardError::ListPermittedDashboardsError)?;
     let permitted_dashboards = dashboards
         .into_iter()
-        .filter(|d| {
+        .filter(|(_f, d)| {
+            let Some(dashboard_id) = d.dashboard_id() else {
+                return false;
+            };
+
             permitted_objects.is_none()
                 || permitted_objects
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("dashboards:{}", d.dashboard_id()))
+                    .contains(&format!("dashboards:{dashboard_id}"))
                 || permitted_objects
                     .as_ref()
                     .unwrap()
-                    .contains(&format!("dashboards:_all_{}", org_id))
+                    .contains(&format!("dashboards:_all_{org_id}"))
         })
         .collect();
     Ok(permitted_dashboards)
