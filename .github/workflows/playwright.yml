@@ -122,6 +122,7 @@ jobs:
             "changeOrg.spec.js",
             "serviceAccount.spec.js",
             "enrichment.spec.js",
+            "cipherKeys.spec.js",
             "sanity2.spec.js",
             "schemaload.spec.js",
             # "remotepipeline.spec.js",
