@@ -386,8 +386,8 @@ async fn cache_files(
     Ok((cache_type, download_percentage))
 
     // if cached file less than 50% of the total files, return None
-    // if scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files < files_num / 2
-    // {
+    // if scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files < files_num
+    // / 2 {
     //     Ok(file_data::CacheType::None)
     // } else {
     //     Ok(cache_type)
@@ -529,6 +529,8 @@ pub async fn filter_file_list_by_tantivy_index(
         cfg.limit.cpu_num
     };
 
+    log::info!("target_partitions : {target_partitions}");
+
     let search_start = std::time::Instant::now();
     let mut is_add_filter_back = file_list_map.len() != index_file_names.len();
     let time_range = query.time_range.unwrap_or((0, 0));
@@ -554,6 +556,13 @@ pub async fn filter_file_list_by_tantivy_index(
             )
         };
 
+    log::info!(
+        "index files splits : {:?}",
+        index_parquet_files
+            .iter()
+            .map(|v| v.len())
+            .collect::<Vec<_>>(),
+    );
     let mut no_more_files = false;
     let mut total_hits = 0;
     let group_num = index_parquet_files.len();
@@ -600,6 +609,8 @@ pub async fn filter_file_list_by_tantivy_index(
             let idx_optimize_rule_clone = idx_optimize_rule.clone();
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let task = tokio::task::spawn(async move {
+                log::info!("tantivy_search start : thread {i}");
+                let search_start = std::time::Instant::now();
                 let ret = search_tantivy_index(
                     &trace_id,
                     time_range,
@@ -608,10 +619,14 @@ pub async fn filter_file_list_by_tantivy_index(
                     &file,
                 )
                 .await;
+                log::info!(
+                    "tantivy_search end : thread {i} took {}",
+                    search_start.elapsed().as_millis()
+                );
                 drop(permit);
                 ret
-            })
-            .instrument(tracing::info_span!("tantivy_search"));
+            });
+            // .instrument(tracing::info_span!("tantivy_search"));
             tasks.push(task)
         }
 
@@ -620,6 +635,7 @@ pub async fn filter_file_list_by_tantivy_index(
             .await
             .map_err(|e| Error::ErrorCode(ErrorCodes::ServerInternalError(e.to_string())))?
         {
+            log::info!("tantivy_search : all results collected");
             let result: anyhow::Result<(String, Option<BitVec>, usize)> = result;
             // Each result corresponds to a file in the file list
             match result {
@@ -760,11 +776,21 @@ async fn search_tantivy_index(
                 }
                 Box::new(tantivy::directory::MmapDirectory::open(&puffin_dir_path)?)
             } else {
+                let directory_start = std::time::Instant::now();
                 let puffin_dir = Arc::new(
                     get_tantivy_directory(trace_id, &ttv_file_name, parquet_file.meta.index_size)
                         .await?,
                 );
+                log::info!(
+                    "get_tantivy_directory took {}",
+                    directory_start.elapsed().as_millis()
+                );
+                let footer_start = std::time::Instant::now();
                 let footer_cache = FooterCache::from_directory(puffin_dir.clone()).await?;
+                log::info!(
+                    "footer_cache_read took {}",
+                    footer_start.elapsed().as_millis()
+                );
                 let cache_dir =
                     CachingDirectory::new_with_cacher(puffin_dir, Arc::new(footer_cache));
                 Box::new(cache_dir)
@@ -815,15 +841,18 @@ async fn search_tantivy_index(
                 warm_terms.insert(field, HashMap::new());
             }
         }
+        let warm_start = std::time::Instant::now();
         warm_up_terms(&tantivy_searcher, &warm_terms).await?;
+        log::info!("warming up terms took {}", warm_start.elapsed().as_millis());
     }
 
     // search the index
     let file_in_range =
         parquet_file.meta.min_ts <= time_range.1 && parquet_file.meta.max_ts >= time_range.0;
     let idx_optimize_rule_clone = idx_optimize_rule.clone();
-    let matched_docs =
-        tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule_clone) {
+    log::info!("search_thread start");
+    let search_start = std::time::Instant::now();
+    let matched_docs = tokio::task::spawn_blocking(move || match (file_in_range, idx_optimize_rule_clone) {
             (false, _) | (true, None) => tantivy_searcher
                 .search(&query, &tantivy::collector::DocSetCollector)
                 .map(|ret| (ret, 0)),
@@ -854,8 +883,12 @@ async fn search_tantivy_index(
                 .search(&query, &tantivy::collector::Count)
                 .map(|ret| (HashSet::new(), ret)),
         })
-        .instrument(tracing::info_span!("tantivy_search_thread"))
+        // .instrument(tracing::info_span!("tantivy_search_thread"))
         .await??;
+    log::info!(
+        "search_thread end took {}",
+        search_start.elapsed().as_millis()
+    );
 
     // return early if no matches in tantivy
     let (matched_docs, total_hits) = matched_docs;
