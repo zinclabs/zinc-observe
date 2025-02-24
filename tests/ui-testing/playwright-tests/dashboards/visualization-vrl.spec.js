@@ -277,7 +277,7 @@ test.describe(" visualize UI testcases", () => {
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-x-data"]'
       )
-      ({ force: true });
+      .click({ force: true });
 
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
