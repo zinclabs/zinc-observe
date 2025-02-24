@@ -1278,6 +1278,7 @@ watch(()=> selectedStreamType.value, (val)=>{
   }
   selectedStreamName.value = "";
   streamFields.value = [];
+  query.value = "";
   emits("update:stream_type", val);
 })
 
@@ -1488,12 +1489,7 @@ const isVrlFunctionEnabled = computed({
 
 const updateQuery = () => {
   if (tab.value === "promql") {
-    const condition = !props.promql_condition
-      ? getDefaultPromqlCondition()
-      : props.promql_condition;
-    promqlCondition.value = condition;
-    emits("update:promql_condition", condition);
-    promqlQuery.value = props.promql;
+    query.value = `${selectedStreamName.value}{}`
   }
 
   if (tab.value === "sql") query.value = props.sql;
@@ -1716,6 +1712,9 @@ const getStreamFields = () => {
       .finally(() => {
         if(tab.value === 'sql'){
           query.value = `SELECT * FROM "${selectedStreamName.value}"`;
+        }
+        else if (tab.value === 'promql'){
+          query.value = `${selectedStreamName.value}{}`;
         }
         expandState.value.query = true;
         expandState.value.output = false;
