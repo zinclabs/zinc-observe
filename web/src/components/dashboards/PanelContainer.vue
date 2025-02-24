@@ -133,6 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           padding="2px"
           data-test="dashboard-panel-limit-number-of-series-warning"
+          class="warning"
         >
           <q-tooltip anchor="bottom right" self="top right">
             <div style="white-space: pre-wrap">
