@@ -227,7 +227,7 @@ test.describe(" visualize UI testcases", () => {
     page,
   }) => {
     await page.locator('[data-test="date-time-btn"]').click();
-    await page.locator('[data-test="date-time-relative-6-w-btn"]').click();
+    await page.locator('[data-test="date-time-relative-3-h-btn"]').click();
 
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
 
@@ -277,7 +277,7 @@ test.describe(" visualize UI testcases", () => {
       .locator(
         '[data-test="field-list-item-logs-e2e_automate-vrl"] [data-test="dashboard-add-x-data"]'
       )
-      .click();
+      .click({ force: true });
 
     await page
       .locator('[data-test="logs-search-bar-visualize-refresh-btn"]')
