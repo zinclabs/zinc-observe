@@ -1193,7 +1193,7 @@ const store = useStore();
 const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
-const  pipelineEditorRef = ref(null);
+const  pipelineEditorRef : any = ref(null);
 const splitterModel = ref(30);
 const step = ref(1);
 const dateTime  = ref({
@@ -1202,8 +1202,8 @@ const dateTime  = ref({
   relativeTimePeriod: null,
   valueType: "absolute",
 });
-const streamFields = ref([]);
-const previewPromqlQueryRef = ref(null);
+const streamFields: any = ref([]);
+const previewPromqlQueryRef : any = ref(null);
 
 const selectedStreamType = ref(props.streamType || "logs");
 
@@ -1758,10 +1758,9 @@ async function getStreamList() {
 }
 
 const handleSidebarEvent = (event: string, value: any) => {
-  console.log(event, value, 'event and value');
   
   if (pipelineEditorRef.value) {
-    const cursorPosition = pipelineEditorRef.value.getCursorIndex();
+    const cursorPosition = pipelineEditorRef.value?.getCursorIndex();
     
     // Split the value by '=' and take the first part
     const insertValue = value.split('=')[0].trim();
@@ -1770,7 +1769,7 @@ const handleSidebarEvent = (event: string, value: any) => {
     const valueToInsert = ` ${insertValue} `;
     
     // Get current query value
-    const currentQuery = pipelineEditorRef.value.getValue();
+    const currentQuery : any = pipelineEditorRef.value.getValue();
     
     // Insert at cursor position
     const newQuery = 
