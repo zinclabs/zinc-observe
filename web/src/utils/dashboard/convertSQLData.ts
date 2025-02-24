@@ -247,7 +247,9 @@ export const convertSQLData = async (
       ([, a]: any, [, b]: any) => b - a,
     );
 
-    if (allKeys.length > 100) {
+    // if allKeys.length > 100 and top_results is not set or if set and is greater than 100,
+    // add a warning message
+    if (allKeys.length > 100 && (!top_results || top_results > 100)) {
       extras.limitNumberOfSeriesWarningMessage =
         "Response contains over 100 unique breakdown values. Only the top 100 will be displayed.";
     }
