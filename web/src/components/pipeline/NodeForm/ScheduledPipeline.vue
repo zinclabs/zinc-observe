@@ -935,6 +935,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :columns="getColumns"
                     :rows="rows"
                   />
+                  <div v-if="loading" style="height: calc(100vh - 190px) !important;" class="flex justify-center items-center" >
+                    <q-spinner-hourglass color="primary" size="lg" />
+
+                  </div>
 
                   <div v-else-if="rows.length == 0 && expandState.output && tab == 'sql'" style="height: calc(100vh - 190px) !important;" >
                     <h6
@@ -1205,6 +1209,8 @@ const dateTime  = ref({
 const streamFields: any = ref([]);
 const previewPromqlQueryRef : any = ref(null);
 
+const loading = ref(false);
+
 const selectedStreamType = ref(props.streamType || "logs");
 
 
@@ -1279,6 +1285,8 @@ watch(()=> selectedStreamType.value, (val)=>{
   selectedStreamName.value = "";
   streamFields.value = [];
   query.value = "";
+  expandState.value.query = true;
+  expandState.value.output = false;
   emits("update:stream_type", val);
 })
 
@@ -1796,6 +1804,7 @@ const updateDateChange = (date: any) => {
 const runQuery = async () => {
 
   if(tab.value == 'sql'){
+    loading.value = true;
 
   const queryReq = {
     sql: query.value,
@@ -1819,6 +1828,8 @@ const runQuery = async () => {
 
   }).catch((err: any) => {
     console.log(err, 'err');
+  }).finally(() => {
+    loading.value = false;
   })
 }
 else if(tab.value == 'promql'){
