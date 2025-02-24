@@ -536,8 +536,8 @@ pub(crate) async fn get_folder_and_dashboard(
 async fn filter_permitted_dashboards(
     _org_id: &str,
     _user_id: &str,
-    dashboards: Vec<Dashboard>,
-) -> Result<Vec<Dashboard>, DashboardError> {
+    dashboards: Vec<(Folder, Dashboard)>,
+) -> Result<Vec<(Folder, Dashboard)>, DashboardError> {
     Ok(dashboards)
 }
 
