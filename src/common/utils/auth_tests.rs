@@ -3400,6 +3400,9 @@ mod tests {
                 algorithm: String::default(),
                 master_key: String::default(),
             },
+            ratelimit: config::RateLimit {
+                rules_refresh_interval: 0,
+            },
         }
     }
 }
