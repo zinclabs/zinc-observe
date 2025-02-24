@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-height full-width">
+  <div class="full-height full-width scheduled-pipeline-container">
     <div class="flex items-center justify-between q-pb-sm">
         <div class="flex items-center">
           <q-btn icon="close" size="12px" class="q-pt-sm" flat dense   @click="$emit('cancel:form')"/>
@@ -900,6 +900,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     expandState.output = false;
                   }"
                 />
+                {{ promqlQuery }}
                 <query-editor
                 v-show="expandState.query"
                 data-test="scheduled-pipeline-sql-editor"
@@ -928,16 +929,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }"
                 />
                   <TenstackTable
-                  v-if="rows.length > 0"
+                  v-if="rows.length > 0 && tab == 'sql'"
                     style="height: calc(100vh - 190px) !important;"
                     v-show="expandState.output"
                     ref="searchTableRef"
                     :columns="getColumns"
                     :rows="rows"
-                   
                   />
 
-                  <div v-else-if="rows.length == 0 && expandState.output" style="height: calc(100vh - 190px) !important;" >
+                  <div v-else-if="rows.length == 0 && expandState.output && tab == 'sql'" style="height: calc(100vh - 190px) !important;" >
                     <h6
                     v-if="selectedStreamName == ''"
                     data-test="logs-search-no-stream-selected-text"
@@ -957,6 +957,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("search.applySearch") }}
                     
                   </h6>
+                  </div>
+
+                  <div v-else-if="tab == 'promql'">
+                    <PreviewPromqlQuery
+                    ref="previewPromqlQueryRef"
+                    :query="query"
+                    :stream_name="selectedStreamName"
+                    :stream_type="selectedStreamType"
+                    :dateTime="dateTime"
+                    />
                   </div>
   
               </div>
@@ -1060,6 +1070,7 @@ import FieldList from "@/components/common/sidebar/FieldList.vue";
 import useStreams from "@/composables/useStreams";
 
 import TenstackTable from "@/plugins/logs/TenstackTable.vue";
+import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
 
 const QueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue"),
@@ -1106,6 +1117,7 @@ const emits = defineEmits([
   "cancel:form",
   "delete:node",
   "update:fullscreen",
+  "update:stream_type",
 ]);
 const {  pipelineObj } = useDragAndDrop();
 
@@ -1192,8 +1204,9 @@ const dateTime  = ref({
   valueType: "absolute",
 });
 const streamFields = ref([]);
+const previewPromqlQueryRef = ref(null);
 
-const selectedStreamType = ref("logs");
+const selectedStreamType = ref(props.streamType || "logs");
 
 
 const filteredStreams = ref<any[]>([]);
@@ -1266,6 +1279,7 @@ watch(()=> selectedStreamType.value, (val)=>{
   }
   selectedStreamName.value = "";
   streamFields.value = [];
+  emits("update:stream_type", val);
 })
 
 const metricFunctions = ["p50", "p75", "p90", "p95", "p99"];
@@ -1701,6 +1715,12 @@ const getStreamFields = () => {
         });
       })
       .finally(() => {
+        if(tab.value === 'sql'){
+          query.value = `SELECT * FROM "${selectedStreamName.value}"`;
+        }
+        expandState.value.query = true;
+        expandState.value.output = false;
+
         resolve(true);
       });
   });
@@ -1778,12 +1798,14 @@ const updateDateChange = (date: any) => {
 
 const runQuery = async () => {
 
+  if(tab.value == 'sql'){
+
   const queryReq = {
     sql: query.value,
     start_time: dateTime.value.startTime,
     end_time: dateTime.value.endTime,
     from: 0,
-    size: 50,
+    size: 10,
   }
   searchService.search({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -1801,6 +1823,20 @@ const runQuery = async () => {
   }).catch((err: any) => {
     console.log(err, 'err');
   })
+}
+else if(tab.value == 'promql'){
+  previewPromqlQueryRef.value.refreshData();
+  // searchService.metrics_query_range({
+  //   org_identifier: store.state.selectedOrganization.identifier,
+  //   query: query.value,
+  //   start_time: dateTime.value.startTime,
+  //   end_time: dateTime.value.endTime,
+  // }).then((res: any) => {
+  //   console.log(res, 'res')
+  // }).catch((err: any) => {
+  //   console.log(err, 'err')
+  // })
+}
 }
 
 const handleBuildQuery = () => {
@@ -1860,6 +1896,7 @@ defineExpose({
   sideBarSplitterModel,
   handleBuildQuery,
   handleSetVariables,
+  previewPromqlQueryRef,
 });
 
 </script>
@@ -1879,32 +1916,9 @@ defineExpose({
 
 </style>
 <style lang="scss">
-.search-button-pipeline {
-  height: 32px !important;
-    min-width: 77px;
-    line-height: 29px;
-    font-weight: bold;
-    text-transform: initial;
-    font-size: 11px;
-    color: white;
 
-    .q-btn__content {
-      background: $secondary;
-      border-radius: 3px 3px 3px 3px;
-      padding: 0px 5px;
-
-      .q-icon {
-        font-size: 15px;
-        color: #ffffff;
-      }
-    }
-  }
-.stepper-header{
-  .q-stepper--vertical .q-stepper__step-inner{
-  padding: 0 24px 2px 40px !important
-}
-}
-.q-splitter__before {
+.scheduled-pipeline-container{
+  .q-splitter__before {
     overflow: hidden;
   }
   .q-splitter__after {
@@ -1960,4 +1974,27 @@ defineExpose({
   font-size: 20px;
   padding-top: 12px;
 }
+}
+
+.search-button-pipeline {
+  height: 32px !important;
+    min-width: 77px;
+    line-height: 29px;
+    font-weight: bold;
+    text-transform: initial;
+    font-size: 11px;
+    color: white;
+
+    .q-btn__content {
+      background: $secondary;
+      border-radius: 3px 3px 3px 3px;
+      padding: 0px 5px;
+
+      .q-icon {
+        font-size: 15px;
+        color: #ffffff;
+      }
+    }
+  }
+
 </style>
