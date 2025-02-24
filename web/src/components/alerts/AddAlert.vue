@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :formData="formData"
             :query="previewQuery"
             :selectedTab="scheduledAlertRef?.tab || 'custom'"
-            :aggregationEnabled="isAggregationEnabled"
+            :isAggregationEnabled="isAggregationEnabled"
           />
         </div>
       </div>

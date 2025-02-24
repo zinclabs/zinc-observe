@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -90,8 +90,12 @@ impl FlightService for FlightServiceImpl {
             req.query_identifier.trace_id, req.query_identifier.job_id
         );
         let is_super_cluster = req.super_cluster_info.is_super_cluster;
-
-        log::info!("[trace_id {}] flight->search: do_get", trace_id);
+        let timeout = req.search_info.timeout as u64;
+        log::info!(
+            "[trace_id {}] flight->search: do_get, timeout: {}s",
+            trace_id,
+            timeout
+        );
 
         #[cfg(feature = "enterprise")]
         if is_super_cluster && !SEARCH_SERVER.contain_key(&trace_id).await {
@@ -165,6 +169,7 @@ impl FlightService for FlightServiceImpl {
                 })?,
                 defer,
                 start,
+                timeout,
             ))
             .map_err(|err| Status::from_error(Box::new(err)));
 
@@ -242,6 +247,7 @@ struct FlightSenderStream {
     stream: SendableRecordBatchStream,
     defer: Option<AsyncDefer>,
     start: std::time::Instant,
+    timeout: u64,
 }
 
 impl FlightSenderStream {
@@ -250,12 +256,14 @@ impl FlightSenderStream {
         stream: SendableRecordBatchStream,
         defer: Option<AsyncDefer>,
         start: std::time::Instant,
+        timeout: u64,
     ) -> Self {
         Self {
             trace_id,
             stream,
             defer,
             start,
+            timeout,
         }
     }
 }
@@ -265,9 +273,12 @@ impl Stream for FlightSenderStream {
 
     fn poll_next(
         mut self: std::pin::Pin<&mut Self>,
-        cx: &mut Context<'_>,
+        ctx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        match self.stream.poll_next_unpin(cx) {
+        if self.start.elapsed().as_secs() > self.timeout {
+            return Poll::Ready(None);
+        }
+        match self.stream.poll_next_unpin(ctx) {
             Poll::Ready(Some(Ok(batch))) => Poll::Ready(Some(Ok(batch))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,

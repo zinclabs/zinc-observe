@@ -1067,6 +1067,9 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_QUERY_TIMEOUT", default = 600)]
     pub query_timeout: u64,
+    #[env_config(name = "ZO_QUERY_INGESTER_TIMEOUT", default = 0)]
+    // default equal to query_timeout
+    pub query_ingester_timeout: u64,
     #[env_config(name = "ZO_QUERY_DEFAULT_LIMIT", default = 1000)]
     pub query_default_limit: i64,
     #[env_config(name = "ZO_QUERY_PARTITION_BY_SECS", default = 1)] // seconds
@@ -1675,7 +1678,7 @@ pub struct HealthCheck {
     pub timeout: u64,
     #[env_config(
         name = "ZO_HEALTH_CHECK_FAILED_TIMES",
-        default = 5,
+        default = 3,
         help = "The node will be removed from consistent hash if health check failed exceed this times"
     )]
     pub failed_times: usize,

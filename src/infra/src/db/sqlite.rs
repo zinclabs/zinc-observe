@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -56,7 +56,7 @@ fn connect_rw() -> Pool<Sqlite> {
         _ = std::fs::remove_file(format!("{url}-wal"));
     }
 
-    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 30);
+    let acquire_timeout = zero_or(cfg.limit.sql_db_connections_acquire_timeout, 30);
     let idle_timeout = zero_or(cfg.limit.sql_db_connections_idle_timeout, 600);
     let max_lifetime = zero_or(cfg.limit.sql_db_connections_max_lifetime, 1800);
 

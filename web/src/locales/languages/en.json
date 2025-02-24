@@ -913,7 +913,8 @@
     "createdAt":"Created At",
     "lastRunAt":"Last Run At",
     "lastSuccessfulAt":"Last Successfull At",
-    "status":"Status"
+    "status":"Status",
+    "numOfEvents": "Number of Events"
   },
   "alert_templates": {
     "header": "Templates",

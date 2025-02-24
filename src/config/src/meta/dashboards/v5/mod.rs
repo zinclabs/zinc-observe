@@ -230,6 +230,8 @@ pub struct PanelConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     line_thickness: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    step_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     top_results: Option<OrdF64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     top_results_others: Option<bool>,

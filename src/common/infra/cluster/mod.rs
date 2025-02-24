@@ -186,9 +186,13 @@ pub async fn register_and_keep_alive() -> Result<()> {
             .build()
             .unwrap();
         let ttl_keep_alive = min(10, (cfg.limit.node_heartbeat_ttl / 2) as u64);
+        let is_nats = matches!(
+            cfg.common.cluster_coordinator.as_str().into(),
+            MetaStore::Nats
+        );
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
-            if let Err(e) = check_nodes_status(&client).await {
+            if let Err(e) = check_nodes_status(&client, is_nats).await {
                 log::error!("[CLUSTER] check_nodes_status failed: {}", e);
             }
         }
@@ -412,7 +416,7 @@ async fn watch_node_list() -> Result<()> {
     Ok(())
 }
 
-async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
+async fn check_nodes_status(client: &reqwest::Client, is_nats: bool) -> Result<()> {
     let cfg = get_config();
     if !cfg.health_check.enabled {
         return Ok(());
@@ -437,7 +441,7 @@ async fn check_nodes_status(client: &reqwest::Client) -> Result<()> {
             let mut w = NODES_HEALTH_CHECK.write().await;
             let entry = w.entry(node.uuid.clone()).or_insert(0);
             *entry += 1;
-            if *entry >= cfg.health_check.failed_times {
+            if is_nats && *entry >= cfg.health_check.failed_times {
                 log::error!(
                     "[CLUSTER] node {}[{}] health check failed {} times, remove it",
                     node.name,

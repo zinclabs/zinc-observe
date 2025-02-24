@@ -49,6 +49,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="space"></div>
 
+    <q-input
+      v-if="promqlMode"
+      v-model="dashboardPanelData.data.config.step_value"
+      :value="0"
+      :min="0"
+      color="input-border"
+      bg-color="input-bg"
+      class="q-py-sm showLabelOnTop"
+      stack-label
+      outlined
+      filled
+      dense
+      label-slot
+      placeholder="Default: 0"
+      data-test="dashboard-config-step-value"
+    >
+      <template v-slot:label>
+        <div class="row items-center all-pointer-events">
+          Step Value
+          <div>
+            <q-icon
+              class="q-ml-xs"
+              size="20px"
+              name="info"
+              data-test="dashboard-config-top_results-info"
+            />
+            <q-tooltip
+              class="bg-grey-8"
+              anchor="top middle"
+              self="bottom middle"
+              max-width="250px"
+            >
+              <b>Step - </b>
+              The interval between datapoints, which must be returned from the
+              range query.
+              <br />
+              Eg: 10s, 1h
+            </q-tooltip>
+          </div>
+        </div>
+      </template>
+    </q-input>
+
+    <div class="space"></div>
+
     <div v-if="showTrellisConfig" class="q-mb-sm">
       <q-select
         :label="t('dashboard.trellisLayout')"
@@ -1490,6 +1535,11 @@ export default defineComponent({
       // Initialize map_type configuration
       if (!dashboardPanelData.data.config.map_type) {
         dashboardPanelData.data.config.map_type = { type: "world" };
+      }
+
+      // If no step value is set, set it to 0
+      if (!dashboardPanelData.data.config.step_value) {
+        dashboardPanelData.data.config.step_value = "0";
       }
     });
 

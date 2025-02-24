@@ -109,13 +109,15 @@ const search = {
     query,
     start_time,
     end_time,
+    step,
   }: {
     org_identifier: string;
     query: string;
     start_time: number;
     end_time: number;
+    step: string;
   }) => {
-    const url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&step=0&query=${encodeURIComponent(
+    const url = `/api/${org_identifier}/prometheus/api/v1/query_range?start=${start_time}&end=${end_time}&step=${step}&query=${encodeURIComponent(
       query,
     )}`;
     return http().get(url);

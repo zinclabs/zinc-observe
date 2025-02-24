@@ -340,13 +340,20 @@ fn generate_select_star_schema(
         let defined_schema_fields = get_stream_setting_defined_schema_fields(&stream_settings);
         let has_original_column = *has_original_column.get(&name).unwrap_or(&false);
         // check if it is user defined schema
-        if defined_schema_fields.is_empty() {
+        if defined_schema_fields.is_empty() || defined_schema_fields.len() > quick_mode_num_fields {
             let quick_mode = quick_mode && schema.schema().fields().len() > quick_mode_num_fields;
             let skip_original_column =
                 !has_original_column && schema.contains_field(ORIGINAL_DATA_COL_NAME);
             if quick_mode || skip_original_column {
                 let fields = if quick_mode {
-                    let columns = columns.get(&name);
+                    let mut columns = columns.get(&name).cloned();
+                    // filter columns by defined schema fields
+                    if !defined_schema_fields.is_empty() {
+                        let uds_columns = defined_schema_fields.iter().collect::<HashSet<_>>();
+                        if let Some(columns) = columns.as_mut() {
+                            columns.retain(|column| uds_columns.contains(column));
+                        }
+                    }
                     let fts_fields = get_stream_setting_fts_fields(&stream_settings);
                     generate_quick_mode_fields(
                         schema.schema(),
@@ -404,7 +411,7 @@ fn generate_user_defined_schema(
 
 fn generate_quick_mode_fields(
     schema: &Schema,
-    columns: Option<&HashSet<String>>,
+    columns: Option<HashSet<String>>,
     fts_fields: &[String],
     skip_original_column: bool,
 ) -> Vec<Arc<arrow_schema::Field>> {
@@ -453,8 +460,8 @@ fn generate_quick_mode_fields(
     // add the selected columns
     if let Some(columns) = columns {
         for column in columns {
-            if !fields_name.contains(column) {
-                if let Ok(field) = schema.field_with_name(column) {
+            if !fields_name.contains(&column) {
+                if let Ok(field) = schema.field_with_name(&column) {
                     fields.push(Arc::new(field.clone()));
                     fields_name.insert(column.to_string());
                 }
