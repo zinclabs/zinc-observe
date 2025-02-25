@@ -1834,6 +1834,9 @@ const handleSidebarEvent = (event: string, value: any) => {
     if(cursorIndex != -1 ){
       cursorPosition.value = cursorIndex;
     }
+    else if (cursorIndex == - 1 && cursorPosition.value == - 1){
+      cursorPosition.value = currentQuery.length;
+    }
 
     // Insert at cursor position
     const newQuery = 
