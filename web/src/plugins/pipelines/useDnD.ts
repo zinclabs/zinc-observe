@@ -348,7 +348,8 @@ export default function useDragAndDrop() {
     return true; // Allow connection for 'both' nodes
   }
 
-  function addNode(newNode:any) {    
+  function addNode(newNode:any) {  
+    
 
     if(pipelineObj.isEditNode){
       if(pipelineObj.userSelectedNode == null){
@@ -505,6 +506,11 @@ export default function useDragAndDrop() {
         ...pipelineObj.currentSelectedPipeline.edges,
         newEdge,
       ];
+    }
+        if(newNode.hasOwnProperty('meta') && newNode.meta.hasOwnProperty('append_data')){
+          pipelineObj.currentSelectedNodeData.meta = newNode.meta;
+          delete newNode.meta;
+          delete pipelineObj.currentSelectedNodeData.data.meta;
     }
   }
 
