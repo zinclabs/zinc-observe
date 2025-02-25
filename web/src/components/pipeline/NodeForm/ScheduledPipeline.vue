@@ -1453,13 +1453,7 @@ const updateTab = () => {
   emits("input:update", "query_type", tab.value);
 };
 
-const getDefaultPromqlCondition = () => {
-  return {
-    column: "value",
-    operator: ">=",
-    value: 0,
-  };
-};
+
 
 const onFunctionSelect = (_function: any) => {
   selectedFunction.value = _function.name;

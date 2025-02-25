@@ -331,6 +331,14 @@ const openCancelDialog = () => {
   dialog.value.okCallback = closeDialog;
 };
 
+const getDefaultPromqlCondition = () => {
+  return {
+    column: "value",
+    operator: ">=",
+    value: 0,
+  };
+};
+
 // TODO OK : Add check for duplicate routing name
 const saveQueryData = async () => {
   if (!scheduledPipelineRef.value.validateInputs()) {
@@ -386,12 +394,14 @@ const saveQueryData = async () => {
     },
   };
   if(formData.query_condition.type == 'promql'){
+
     if(queryPayload?.query_condition){
      queryPayload.query_condition.search_event_type  = "";
     }
     if(queryPayload?.query_condition){
        queryPayload.query_condition.sql = "";
     }
+    queryPayload.query_condition.promql_condition = getDefaultPromqlCondition();
     
   }
   addNode(queryPayload);
