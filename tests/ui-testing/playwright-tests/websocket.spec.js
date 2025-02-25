@@ -169,4 +169,42 @@ test.describe("Websocket for logs", () => {
         await logsPage.addRemoveInteresting();
     });
 
+    test("Websocket enabled histogram is disabled and run query, results appear and then user switches on Historgram, getting error", async ({ page }) => {
+
+        await logsPage.navigateToLogs();
+        await logsPage.selectIndexStreamDefault();
+        await logsPage.selectRunQuery();
+        await logsPage.toggleHistogram();
+        await logsPage.selectRunQuery();
+    
+        await logsPage.toggleHistogram();
+
+        await expect(page.getByRole('heading', { name: 'Error while fetching' })).toBeVisible();
+        await page.getByRole('heading', { name: 'Error while fetching' }).click();
+  
+        const errorDetails = await logsPage.getErrorDetails();
+        await expect(errorDetails).toContainText('warning Error while fetching histogram data. Click for error details');
+  
+        await page.locator('[data-test="logs-page-histogram-error-details-btn"]').click();
+  
+        await expect(errorDetails).toContainText('Cannot read properties of undefined (reading \'partitions\')');
+        await expect(errorDetails).toContainText('warning Error while fetching histogram data. Click for error detailsCannot read properties of undefined (reading \'partitions\')');
+        
+        // Check that the error message is not visible
+        const errorHeading = page.getByRole('heading', { name: 'Error while fetching' });
+        await expect(errorHeading).not.toBeVisible();
+
+        // Optionally, check that the error details are not present
+       
+        await expect(errorDetails).not.toContainText('warning Error while fetching histogram data. Click for error details');
+
+        // Ensure that the error details button is also not visible or disabled
+        const errorDetailsButton = page.locator('[data-test="logs-page-histogram-error-details-btn"]');
+        await expect(errorDetailsButton).not.toBeVisible();
+
+        // Optionally, verify that there are no errors related to partitions
+        await expect(errorDetails).not.toContainText('Cannot read properties of undefined (reading \'partitions\')');
+
+    });
+
 });

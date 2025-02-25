@@ -446,4 +446,25 @@ export class LogsPage {
     await this.page.waitForTimeout(2000);
     await this.page.locator(`[data-test="log-search-index-list-stream-toggle-${stream}"] div`).first().click();
 }
+
+async toggleHistogram() {
+  await this.page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"] div').nth(2).click();
+}
+
+async checkErrorVisible() {
+  return this.page.getByRole('heading', { name: 'Error while fetching' }).isVisible();
+}
+
+async getErrorDetails() {
+  return this.page.locator('[data-test="logs-search-search-result"]').getByRole('heading');
+}
+
+async selectIndexStreamDefault() {
+  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.waitForTimeout(3000);
+  await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
+
+}
+
+
 }
