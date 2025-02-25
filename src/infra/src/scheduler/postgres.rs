@@ -486,7 +486,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
         let now = chrono::Utc::now().timestamp_micros();
-        sqlx::query(
+        let res = sqlx::query(
             r#"UPDATE scheduled_jobs
 SET status = $1, retries = retries + 1
 WHERE status = $2 AND end_time <= $3;
@@ -497,6 +497,10 @@ WHERE status = $2 AND end_time <= $3;
         .bind(now)
         .execute(&pool)
         .await?;
+        log::debug!(
+            "[SCHEDULER] watch_timeout for scheduler updated {} rows",
+            res.rows_affected()
+        );
         Ok(())
     }
 

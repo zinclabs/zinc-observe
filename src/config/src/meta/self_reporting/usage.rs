@@ -71,6 +71,7 @@ pub struct TriggerData {
     pub is_partial: Option<bool>,
     pub delay_in_secs: Option<i64>,
     pub evaluation_took_in_secs: Option<f64>,
+    pub source_node: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

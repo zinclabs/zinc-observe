@@ -26,11 +26,11 @@ pub async fn run() -> Result<(), anyhow::Error> {
     }
 
     let cfg = get_config();
-    log::info!(
-        "Spawning embedded report server {}",
-        cfg.report_server.enable_report_server
-    );
     if cfg.report_server.enable_report_server {
+        log::info!(
+            "Spawning embedded report server {}",
+            cfg.report_server.enable_report_server
+        );
         tokio::task::spawn(async move {
             if let Err(e) = report_server::spawn_server().await {
                 log::error!("report server failed to spawn {}", e);
