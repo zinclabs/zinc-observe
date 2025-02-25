@@ -366,7 +366,7 @@ const saveQueryData = async () => {
       formData.trigger_condition.period,
     );
   }
-  let queryPayload = {
+  let queryPayload: any = {
     node_type: "query", // required
     stream_type: formData.stream_type, // required
     org_id: store.state.selectedOrganization.identifier, // required
