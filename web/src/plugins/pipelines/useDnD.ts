@@ -506,6 +506,12 @@ export default function useDragAndDrop() {
         newEdge,
       ];
     }
+    if(newNode.hasOwnProperty('meta') && newNode.meta.hasOwnProperty('append_data')){
+      pipelineObj.currentSelectedNodeData.meta = newNode.meta;
+      delete newNode.meta;
+      delete pipelineObj.currentSelectedNodeData.data.meta;
+    }
+
   }
 
   function editNode(updatedNode:any) {
