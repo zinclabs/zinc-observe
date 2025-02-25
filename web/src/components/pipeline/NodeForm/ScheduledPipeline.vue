@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="filteredStreams"
                 option-label="label"
                 option-value="value"
-                :label="t('alerts.stream_name') + ' *'"
+                :label="t('alerts.stream_name') "
                 :popup-content-style="{ textTransform: 'lowercase' }"
                 color="input-border"
                 bg-color="input-bg"

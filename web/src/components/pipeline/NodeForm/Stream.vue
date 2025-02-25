@@ -210,7 +210,7 @@ const outputStreamTypes = ["logs", "metrics", "traces","enrichment_tables"];
 const stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 const dynamic_stream_name = ref((pipelineObj.currentSelectedNodeData?.data as { stream_name?: string })?.stream_name || {label: "", value: "", isDisable: false});
 
-const appendData = ref((pipelineObj.currentSelectedNodeData?.data as { meta?: { append_data?: boolean } })?.meta?.append_data || false);
+const appendData = ref((pipelineObj.currentSelectedNodeData?.meta as { append_data?: boolean })?.append_data || false);
 
 const stream_type = ref((pipelineObj.currentSelectedNodeData?.data as { stream_type?: string })?.stream_type || "logs");
 const selectedNodeType = ref((pipelineObj.currentSelectedNodeData as { io_type?: string })?.io_type || "");

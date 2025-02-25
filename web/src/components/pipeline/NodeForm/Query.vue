@@ -344,11 +344,13 @@ const saveQueryData = async () => {
     return false;
   }
 
-  queryFormRef.value.validate().then((valid: any) => {
-    if (!valid) {
-      return false;
-    }
-  });
+  //this is not needed as we are using validateInputs in scheduledPipeline.vue
+
+  // queryFormRef.value.validate().then((valid: any) => {
+  //   if (!valid) {
+  //     return false;
+  //   }
+  // });
 
   const formData = streamRoute.value;
   if (typeof formData.trigger_condition.period === "string") {
