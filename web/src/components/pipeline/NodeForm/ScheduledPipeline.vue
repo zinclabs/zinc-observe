@@ -1834,6 +1834,7 @@ const handleSidebarEvent = (event: string, value: any) => {
     if(cursorIndex != -1 ){
       cursorPosition.value = cursorIndex;
     }
+
     // Insert at cursor position
     const newQuery = 
       currentQuery.slice(0, cursorPosition.value+1) + 
@@ -1841,7 +1842,9 @@ const handleSidebarEvent = (event: string, value: any) => {
       currentQuery.slice(cursorPosition.value+1);
       if(cursorPosition.value != -1){
         cursorPosition.value += valueToInsert.length;
-      }    
+      } 
+      console.log("newQuery Cursor Position", newQuery, cursorPosition.value);
+
     // Set the new value
     pipelineEditorRef.value.setValue(newQuery);
   } else {
