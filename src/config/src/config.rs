@@ -1300,7 +1300,7 @@ pub struct Limit {
     )]
     pub db_text_data_type: String,
     #[env_config(
-        name = "ZO_MAX_DASHBORD_SERIES",
+        name = "ZO_MAX_DASHBOARD_SERIES",
         default = 100,
         help = "maximum series to display in charts"
     )]
