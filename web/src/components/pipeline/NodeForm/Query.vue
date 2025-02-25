@@ -48,7 +48,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model:isAggregationEnabled="isAggregationEnabled"
             v-model:streamType="streamRoute.stream_type"
             @validate-sql="validateSqlQuery"
-            @submit:form="saveQueryData"
             @cancel:form="openCancelDialog"
             @delete:node="openDeleteDialog"
             @update:fullscreen="updateFullscreenMode"
