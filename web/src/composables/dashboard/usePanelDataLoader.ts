@@ -1236,7 +1236,7 @@ export const usePanelDataLoader = (
                 );
               }
 
-              // saveCurrentStateToCache();
+              saveCurrentStateToCache();
             }
           }
 
