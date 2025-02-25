@@ -1208,6 +1208,9 @@ const selectedStreamType = ref(props.streamType || "logs");
 const filteredStreams = ref<any[]>([]);
 const streams = ref([]);
 
+// Add a loading state and track stream types that have been loaded
+const loadedStreamTypes = ref(new Set());
+
 watch(()=> collapseFields.value ,  (val)=>{
   if(val == true){
     splitterModel.value = 0;
@@ -1758,37 +1761,62 @@ const getStreamFields = () => {
 };
 const filterStreams = (val: string, update: any) => {
   update(() => {
-    // Only try to get stream list if we haven't already attempted
     if (!val || val === '') {
-      if (filteredStreams.value.length === 0 && !streamListFetched.value) {
+      // If value is empty, show all streams
+      filteredStreams.value = streams.value.map((stream: any) => ({
+        label: stream.name,
+        value: stream.name
+      }));
+      // Only fetch if we haven't loaded this stream type yet
+      if (!loadedStreamTypes.value.has(selectedStreamType.value) && !loading.value) {
         getStreamList();
       }
     } else {
       // Filter existing streams based on the search value
-      filteredStreams.value = filteredStreams.value.filter((stream: any) => {
+      filteredStreams.value = streams.value.map((stream: any) => ({
+        label: stream.name,
+        value: stream.name
+      })).filter((stream: any) => {
         return stream.label.toLowerCase().indexOf(val.toLowerCase()) > -1;
       });
     }
   });
 };
 
-// Add a ref to track if we've attempted to fetch streams
-const streamListFetched = ref(false);
-
+// Modify getStreamList to store the full list
 async function getStreamList() {
+  if (loading.value) return;
+  loading.value = true;
+  
   try {
-    streamListFetched.value = true; // Mark that we've attempted to fetch
     const res: any = await getStreams(selectedStreamType.value, false);
-    filteredStreams.value = res.list?.map((stream: any) => ({
+    streams.value = res.list || [];
+    // Set filtered streams to show all streams initially
+    filteredStreams.value = streams.value.map((stream: any) => ({
       label: stream.name,
       value: stream.name
-    })) || [];
+    }));
+    // Mark this stream type as loaded
+    loadedStreamTypes.value.add(selectedStreamType.value);
   } 
   catch(err) {
     console.log(err);
+    streams.value = [];
     filteredStreams.value = [];
   }
+  finally {
+    loading.value = false;
+  }
 }
+
+// Clear loaded streams when stream type changes
+watch(() => selectedStreamType.value, () => {
+  streams.value = [];
+  filteredStreams.value = [];
+  if (!loadedStreamTypes.value.has(selectedStreamType.value)) {
+    getStreamList();
+  }
+});
 
 const handleSidebarEvent = (event: string, value: any) => {
   
