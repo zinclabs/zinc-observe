@@ -105,6 +105,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('ingestion.customLabel')"
         content-class="tab_content"
       />
+      <q-route-tab
+        name="database"
+        :to="{
+          name: 'databases',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.databaseLabel')"
+        content-class="tab_content"
+      />
     </q-tabs>
     <q-separator class="separator" />
     <router-view
@@ -229,6 +240,10 @@ export default defineComponent({
       {
         label: t("ingestion.customLabel"),
         value: "custom",
+      },
+      {
+        label: t("ingestion.databaseLabel"),
+        value: "database",
       },
     ];
 

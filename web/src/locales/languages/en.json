@@ -531,7 +531,8 @@
     "internal": "This Cluster",
     "external": "Default",
     "internalLabel": "Note: Use this option if the collector is installed in the same cluster as O2",
-    "redirectionIngestionMsg": "Note: In order to access pages other than IAM, data ingestion must be initiated within the current organization."
+    "redirectionIngestionMsg": "Note: In order to access pages other than IAM, data ingestion must be initiated within the current organization.",
+    "databaseLabel": "Databases"
   },
   "syslog": {
     "stream": "Stream",
