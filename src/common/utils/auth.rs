@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::fmt::Debug;
+#[cfg(feature = "enterprise")]
+use std::fmt::Display;
 
+#[cfg(feature = "enterprise")]
+use actix_http::Method;
 use actix_web::{dev::Payload, Error, FromRequest, HttpRequest};
 use argon2::{password_hash::SaltString, Algorithm, Argon2, Params, PasswordHasher, Version};
 use base64::Engine;
@@ -26,6 +30,8 @@ use o2_openfga::config::get_config as get_openfga_config;
 use o2_openfga::meta::mapping::OFGA_MODELS;
 use once_cell::sync::Lazy;
 use regex::Regex;
+#[cfg(feature = "enterprise")]
+use route_recognizer::{Params as RouteParams, Router};
 
 #[cfg(feature = "enterprise")]
 use crate::common::infra::config::USER_SESSIONS;
@@ -183,6 +189,71 @@ impl FromRequest for UserEmail {
     }
 }
 
+/// OpenFGA relation that defines the ability of a user to access a resource.
+#[cfg(feature = "enterprise")]
+pub enum AccessMethod {
+    /// Indicates that a user can create a resource.
+    Post,
+
+    /// Indicates that a user can get an individual resource.
+    Get,
+
+    /// Indicates that a user can update a resource.
+    Put,
+
+    /// Indicates that a user can delete a resource.
+    Delete,
+
+    /// Indicates that a user can list instances of a resource.
+    List,
+}
+
+#[cfg(feature = "enterprise")]
+impl Display for AccessMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AccessMethod::Post => write!(f, "POST"),
+            AccessMethod::Get => write!(f, "GET"),
+            AccessMethod::Put => write!(f, "PUT"),
+            AccessMethod::Delete => write!(f, "DELETE"),
+            AccessMethod::List => write!(f, "LIST"),
+        }
+    }
+}
+
+/// OpenFGA type for a specific type of resource that can be accessed by users.
+#[cfg(feature = "enterprise")]
+pub enum O2Type {
+    Alert,
+    AlertsFolder,
+    DashboardsFolder,
+    ReportsFolder,
+}
+
+#[cfg(feature = "enterprise")]
+impl O2Type {
+    fn from_folder_type_param(param: &str) -> Option<Self> {
+        match param {
+            "dashboards" => Some(Self::DashboardsFolder),
+            "alerts" => Some(Self::AlertsFolder),
+            "reports" => Some(Self::ReportsFolder),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+impl Display for O2Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            O2Type::Alert => write!(f, "alert"),
+            O2Type::AlertsFolder => write!(f, "afolder"),
+            O2Type::DashboardsFolder => write!(f, "dfolder"),
+            O2Type::ReportsFolder => write!(f, "rfolder"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct AuthExtractor {
     pub auth: String,
@@ -191,6 +262,266 @@ pub struct AuthExtractor {
     pub org_id: String,
     pub bypass_check: bool,
     pub parent_id: String,
+}
+
+#[cfg(feature = "enterprise")]
+impl AuthExtractor {
+    /// Returns a new [AuthExtractor].
+    fn new(auth: &str, method: AccessMethod, o2_type: O2Type, o2_id: &str, org_id: &str) -> Self {
+        AuthExtractor {
+            auth: auth.to_owned(),
+            method: format!("{method}"),
+            o2_type: format!("{o2_type}:{o2_id}"),
+            org_id: format!("{org_id}"),
+            bypass_check: false,
+            parent_id: format!("default"),
+        }
+    }
+
+    // /// Returns the [AuthExtractor] with `parent_id` set to the given value.
+    // fn parent(mut self, parent_id: &str) -> Self {
+    //     self.parent_id = format!("{parent_id}");
+    //     self
+    // }
+
+    /// Returns an [AuthExtractor] instance for the create_folder_v2 route.
+    fn create_folder_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let folder_type = Self::get_param(p, "folder_type")?;
+        let o2_type = O2Type::from_folder_type_param(&folder_type)?;
+        let e = AuthExtractor::new(auth, AccessMethod::Post, o2_type, &org_id, &org_id);
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the get_folder_v2 route.
+    fn get_folder_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let folder_type = Self::get_param(p, "folder_type")?;
+        let o2_type = O2Type::from_folder_type_param(&folder_type)?;
+        let folder_id = Self::get_param(p, "folder_id")?;
+        let e = AuthExtractor::new(auth, AccessMethod::Get, o2_type, &folder_id, &org_id);
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the get_folder_by_name_v2 route.
+    fn get_folder_by_name_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let folder_type = Self::get_param(p, "folder_type")?;
+        let o2_type = O2Type::from_folder_type_param(&folder_type)?;
+        let o2_id = format!("_all_{org_id}");
+        let e = AuthExtractor::new(auth, AccessMethod::Get, o2_type, &o2_id, &org_id);
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the update_folder_v2 route.
+    fn update_folder_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let folder_type = Self::get_param(p, "folder_type")?;
+        let o2_type = O2Type::from_folder_type_param(&folder_type)?;
+        let folder_id = Self::get_param(p, "folder_id")?;
+        let e = AuthExtractor::new(auth, AccessMethod::Put, o2_type, &folder_id, &org_id);
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the delete_folder_v2 route.
+    fn delete_folder_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let folder_type = Self::get_param(p, "folder_type")?;
+        let o2_type = O2Type::from_folder_type_param(&folder_type)?;
+        let folder_id = Self::get_param(p, "folder_id")?;
+        let e = AuthExtractor::new(auth, AccessMethod::Delete, o2_type, &folder_id, &org_id);
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the list_folders_v2 route.
+    fn list_folders_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let folder_type = Self::get_param(p, "folder_type")?;
+        let o2_type = O2Type::from_folder_type_param(&folder_type)?;
+        let e = AuthExtractor::new(auth, AccessMethod::List, o2_type, &org_id, &org_id);
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the create_alert_v2 route.
+    fn create_alert_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let e = AuthExtractor::new(auth, AccessMethod::Post, O2Type::Alert, &org_id, &org_id);
+        // todo: set parent
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the get_alert_v2 route.
+    fn get_alert_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let alert_id = Self::get_param(p, "alert_id")?;
+        let e = AuthExtractor::new(auth, AccessMethod::Get, O2Type::Alert, &alert_id, &org_id);
+        // todo: set parent
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the update_alert_v2 route.
+    fn update_alert_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let alert_id = Self::get_param(p, "alert_id")?;
+        let e = AuthExtractor::new(auth, AccessMethod::Put, O2Type::Alert, &alert_id, &org_id);
+        // todo: set parent
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the delete_alert_v2 route.
+    fn delete_alert_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let alert_id = Self::get_param(p, "alert_id")?;
+        let e = AuthExtractor::new(
+            auth,
+            AccessMethod::Delete,
+            O2Type::Alert,
+            &alert_id,
+            &org_id,
+        );
+        // todo: set parent
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the list_alerts_v2 route.
+    fn list_alerts_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let e = AuthExtractor::new(auth, AccessMethod::List, O2Type::Alert, &org_id, &org_id);
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the enable_alert_v2 route.
+    fn enable_alert_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let alert_id = Self::get_param(p, "alert_id")?;
+        let e = AuthExtractor::new(auth, AccessMethod::Put, O2Type::Alert, &alert_id, &org_id);
+        // todo: set parent
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the trigger_alert_v2 route.
+    fn trigger_alert_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let alert_id = Self::get_param(p, "alert_id")?;
+        let e = AuthExtractor::new(auth, AccessMethod::Put, O2Type::Alert, &alert_id, &org_id);
+        // todo: set parent
+        Some(e)
+    }
+
+    /// Returns an [AuthExtractor] instance for the move_alerts_v2 route.
+    fn move_alerts_v2(p: &RouteParams, auth: &str) -> Option<Self> {
+        let org_id = Self::get_org_id(p)?;
+        let alert_id = Self::get_param(p, "alert_id")?;
+        let e = AuthExtractor::new(auth, AccessMethod::Put, O2Type::Alert, &alert_id, &org_id);
+        // todo: set parent
+        Some(e)
+    }
+
+    /// Tries to get the value of `org_id` URL path parameter.
+    fn get_org_id(p: &RouteParams) -> Option<String> {
+        Self::get_param(p, "org_id")
+    }
+
+    /// Tries to get the value of the URL path parameter with the given key.
+    fn get_param(p: &RouteParams, key: &str) -> Option<String> {
+        p.find(key)
+            .filter(|val| !val.is_empty())
+            .map(|org_id| org_id.to_owned())
+    }
+
+    /// Tries to create an [AuthExtractor] instance for a request with the given
+    /// method and URL path.
+    fn from_request_route(method: &Method, path: &str, auth_str: &str) -> Option<Self> {
+        let mut get_routes: Router<Box<dyn Fn(&RouteParams) -> Option<AuthExtractor>>> =
+            route_recognizer::Router::new();
+        let mut post_routes: Router<Box<dyn Fn(&RouteParams) -> Option<AuthExtractor>>> =
+            route_recognizer::Router::new();
+        let mut put_routes: Router<Box<dyn Fn(&RouteParams) -> Option<AuthExtractor>>> =
+            route_recognizer::Router::new();
+        let mut delete_routes: Router<Box<dyn Fn(&RouteParams) -> Option<AuthExtractor>>> =
+            route_recognizer::Router::new();
+
+        // create_folder_v2
+        post_routes.add(
+            "api/v2/:org_id/folders/:folder_type",
+            Box::new(|p| Self::create_folder_v2(p, &auth_str)),
+        );
+        // get_folder_v2
+        get_routes.add(
+            "api/v2/:org_id/folders/:folder_type/:folder_id",
+            Box::new(|p| Self::get_folder_v2(p, &auth_str)),
+        );
+        // get_folder_by_name_v2
+        get_routes.add(
+            "api/v2/:org_id/folders/:folder_type/name/:folder_id",
+            Box::new(|p| Self::get_folder_by_name_v2(p, &auth_str)),
+        );
+        // update_folder_v2
+        put_routes.add(
+            "api/v2/:org_id/folders/:folder_type/:folder_id",
+            Box::new(|p| Self::update_folder_v2(p, &auth_str)),
+        );
+        // delete_folder_v2
+        delete_routes.add(
+            "api/v2/:org_id/folders/:folder_type/:folder_id",
+            Box::new(|p| Self::delete_folder_v2(p, &auth_str)),
+        );
+        // list_folders_v2
+        get_routes.add(
+            "api/v2/:org_id/folders/:folder_type",
+            Box::new(|p| Self::list_folders_v2(p, &auth_str)),
+        );
+        // create_alert_v2
+        post_routes.add(
+            "api/v2/:org_id/alerts",
+            Box::new(|p| Self::create_alert_v2(p, &auth_str)),
+        );
+        // get_alert_v2
+        get_routes.add(
+            "api/v2/:org_id/alerts/:alert_id",
+            Box::new(|p| Self::get_alert_v2(p, &auth_str)),
+        );
+        // update_alert_v2
+        put_routes.add(
+            "api/v2/:org_id/alerts/:alert_id",
+            Box::new(|p| Self::update_alert_v2(p, &auth_str)),
+        );
+        // delete_alert_v2
+        delete_routes.add(
+            "api/v2/:org_id/alerts/:alert_id",
+            Box::new(|p| Self::delete_alert_v2(p, &auth_str)),
+        );
+        // list_alerts_v2
+        get_routes.add(
+            "api/v2/:org_id/alerts",
+            Box::new(|p| Self::list_alerts_v2(p, &auth_str)),
+        );
+        // enable_alert_v2
+        put_routes.add(
+            "api/v2/:org_id/alerts/:alert_id/enable",
+            Box::new(|p| Self::enable_alert_v2(p, &auth_str)),
+        );
+        // trigger_alert_v2
+        put_routes.add(
+            "api/v2/:org_id/alerts/:alert_id/trigger",
+            Box::new(|p| Self::trigger_alert_v2(p, &auth_str)),
+        );
+        // move_alerts_v2
+        put_routes.add(
+            "api/v2/:org_id/alerts/move",
+            Box::new(|p| Self::move_alerts_v2(p, &auth_str)),
+        );
+
+        let routes = match method {
+            &Method::GET => Some(get_routes),
+            &Method::POST => Some(post_routes),
+            &Method::PUT => Some(put_routes),
+            &Method::DELETE => Some(delete_routes),
+            _ => None,
+        }?;
+        let mtch = routes.recognize(path).ok()?;
+        (mtch.handler())(mtch.params())
+    }
 }
 
 impl FromRequest for AuthExtractor {
@@ -208,6 +539,12 @@ impl FromRequest for AuthExtractor {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
         use crate::common::utils::http::{get_folder, get_stream_type_from_request};
+
+        if let Some(auth) =
+            Self::from_request_route(req.method(), req.path(), &extract_auth_str(req))
+        {
+            return ready(Ok(auth));
+        }
 
         let query = web::Query::<HashMap<String, String>>::from_query(req.query_string()).unwrap();
         let stream_type = get_stream_type_from_request(&query);
