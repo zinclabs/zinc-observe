@@ -223,6 +223,15 @@ export const convertSQLData = async (
     }
 
     const { top_results, top_results_others } = panelSchema.config;
+
+    // get the limit series from the config
+    // if top_results is enabled then use the top_results value
+    // otherwise use the max_dashboard_series value
+    const limitSeries = top_results
+      ? (Math.min(top_results, store.state?.zoConfig?.max_dashboard_series) ??
+        100)
+      : (store.state?.zoConfig?.max_dashboard_series ?? 100);
+
     const innerDataArray = data[0];
     if (!breakDownKeys.length) {
       return innerDataArray;
@@ -247,14 +256,19 @@ export const convertSQLData = async (
       ([, a]: any, [, b]: any) => b - a,
     );
 
-    // if allKeys.length > 100 and top_results is not set or if set and is greater than 100,
-    // add a warning message
-    if (allKeys.length > 100 && (!top_results || top_results > 100)) {
-      extras.limitNumberOfSeriesWarningMessage =
-        "Response contains over 100 unique breakdown values. Only the top 100 will be displayed.";
+    // if top_results is enabled and the number of unique breakdown values is greater than the limit, add a warning message
+    // if top_results is not enabled and the number of unique breakdown values is greater than the max_dashboard_series, add a warning message
+    if (
+      (top_results &&
+        top_results > store.state?.zoConfig?.max_dashboard_series &&
+        allKeys.length > top_results) ||
+      (!top_results &&
+        allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
+    ) {
+      extras.limitNumberOfSeriesWarningMessage = `Response contains over ${store.state?.zoConfig?.max_dashboard_series ?? 100} unique breakdown values. Only the top ${store.state?.zoConfig?.max_dashboard_series ?? 100} will be displayed.`;
     }
 
-    const topKeys = allKeys.slice(0, top_results ?? 100).map(([key]) => key);
+    const topKeys = allKeys.slice(0, limitSeries).map(([key]) => key);
 
     // Step 3: Initialize result array and others object for aggregation
     const resultArray: any[] = [];
