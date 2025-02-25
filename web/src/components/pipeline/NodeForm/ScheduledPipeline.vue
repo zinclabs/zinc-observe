@@ -115,7 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model:is-expanded="expandState.buildQuery"
                   label="Build Query"
                   class="tw-mt-1"
-                  @click="handleBuildQuery"
                 />
               <div class="q-pt-sm" v-show="expandState.buildQuery"  >
                 
@@ -125,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="streamTypes"
                 option-label="label"
                 option-value="value"
-                :label="t('alerts.stream_name') + ' *'"
+                :label="t('alerts.streamType') + ' *'"
                 :popup-content-style="{ textTransform: 'lowercase' }"
                 color="input-border"
                 bg-color="input-bg"
@@ -188,7 +187,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model:is-expanded="expandState.setVariables"
                   label="Set Variables"
                   class="tw-mt-1"
-                  @click="handleSetVariables"
                 />
               <div v-show="expandState.setVariables"  class="flex justify-between q-pl-sm full-height" style="overflow-y: auto !important;">
               <div>
@@ -895,10 +893,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model:is-expanded="expandState.query"
                   :label="tab === 'sql' ? 'Sql Query' : 'PromQL Query'"
                   class="tw-mt-1"
-                  @click="{
-                    expandState.query = !expandState.query;
-                    expandState.output = false;
-                  }"
                 />
                 <query-editor
                 v-show="expandState.query"
@@ -922,10 +916,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model:is-expanded="expandState.output"
                   label="Output"
                   class="tw-mt-1"
-                  @click="{
-                    expandState.output = !expandState.output;
-                    expandState.query = false;
-                  }"
                 />
                   <TenstackTable
                   v-if="rows.length > 0 && tab == 'sql'"
@@ -1198,6 +1188,7 @@ const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
 const  pipelineEditorRef : any = ref(null);
+const cursorPosition = ref(-1);
 const splitterModel = ref(30);
 const step = ref(1);
 const dateTime  = ref({
@@ -1230,6 +1221,8 @@ watch(()=> splitterModel.value ,  (val)=>{
    splitterModel.value = 0;
   }
 })
+
+
 
 
 onMounted(async ()=>{
@@ -1277,7 +1270,45 @@ watch(()=> sideBarSplitterModel.value ,  (val)=>{
     sideBarSplitterModel.value = 95;
   }
 })
-
+watch(()=> expandState.value.output, (val)=>{
+  if(val == true){
+    expandState.value.query = false;
+  }
+})
+watch(()=> expandState.value.query, (val)=>{
+  if(val == true){
+    expandState.value.output = false;
+  }
+})
+watch(()=> expandState.value.buildQuery, (val)=>{
+  if(val == false && expandState.value.setVariables == true){
+    sideBarSplitterModel.value = 0;
+  }
+  else if (val == false && expandState.value.setVariables == false){
+    sideBarSplitterModel.value = 0;
+  }
+  else if (val == true && expandState.value.setVariables == false){
+    sideBarSplitterModel.value = 99;
+  }
+  else{
+    sideBarSplitterModel.value = 60;
+  }
+})
+watch(()=> expandState.value.setVariables, (val)=>{
+  if(val == false && expandState.value.buildQuery == true){
+    sideBarSplitterModel.value = 99;
+  }
+  else if (val == false && expandState.value.buildQuery == false){
+    sideBarSplitterModel.value = 0;
+  }
+  else if (val == true && expandState.value.buildQuery == false){
+    sideBarSplitterModel.value = 0;
+  }
+  else{
+    sideBarSplitterModel.value = 60;
+  }
+})
+  
 watch(()=> selectedStreamType.value, (val)=>{
   if(val != "metrics"){
     tab.value = "sql";
@@ -1762,23 +1793,27 @@ async function getStreamList() {
 const handleSidebarEvent = (event: string, value: any) => {
   
   if (pipelineEditorRef.value) {
-    const cursorPosition = pipelineEditorRef.value?.getCursorIndex();
+    let cursorIndex = pipelineEditorRef.value?.getCursorIndex();
+
     
     // Split the value by '=' and take the first part
     const insertValue = value.split('=')[0].trim();
     
     // Add spaces before and after the value
     const valueToInsert = ` ${insertValue} `;
-    
     // Get current query value
     const currentQuery : any = pipelineEditorRef.value.getValue();
-    
+    if(cursorIndex != -1 ){
+      cursorPosition.value = cursorIndex;
+    }
     // Insert at cursor position
     const newQuery = 
-      currentQuery.slice(0, cursorPosition+1) + 
+      currentQuery.slice(0, cursorPosition.value+1) + 
       valueToInsert + 
-      currentQuery.slice(cursorPosition+1);
-    
+      currentQuery.slice(cursorPosition.value+1);
+      if(cursorPosition.value != -1){
+        cursorPosition.value += valueToInsert.length;
+      }    
     // Set the new value
     pipelineEditorRef.value.setValue(newQuery);
   } else {
@@ -1841,24 +1876,9 @@ else if(tab.value == 'promql'){
 }
 }
 
-const handleBuildQuery = () => {
-  expandState.value.buildQuery = !expandState.value.buildQuery;
-  if(expandState.value.buildQuery == false){
-    sideBarSplitterModel.value = 0;
-  }
-  else{
-    sideBarSplitterModel.value = 60;
-  }
-}
-const handleSetVariables = () => {
-  expandState.value.setVariables = !expandState.value.setVariables;
-  if(expandState.value.setVariables == false){
-    sideBarSplitterModel.value = 99;
-  }
-  else{
-    sideBarSplitterModel.value = 60;
-  }
-}
+
+
+
 
 const isFullscreen = ref(false);
 
@@ -1896,9 +1916,8 @@ defineExpose({
   getColumns,
   rows,
   sideBarSplitterModel,
-  handleBuildQuery,
-  handleSetVariables,
   previewPromqlQueryRef,
+  cursorPosition,
 });
 
 </script>
