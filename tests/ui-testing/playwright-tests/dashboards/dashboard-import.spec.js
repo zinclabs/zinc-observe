@@ -140,5 +140,12 @@ test.describe("dashboard UI testcases", () => {
 
     await page.waitForTimeout(2000);
   
-  });
+    await expect(page.getByRole('cell', { name: 'Cloudfront to OpenObserve' }).first()).toBeVisible();
+  await page.getByRole('row', { name: '01 Cloudfront to OpenObserve' }).locator('[data-test="dashboard-delete"]').click();
+  await page.locator('[data-test="confirm-button"]').click();
 });
+ 
+
+
+
+  });
