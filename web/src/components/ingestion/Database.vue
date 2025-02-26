@@ -144,6 +144,127 @@ export default defineComponent({
         label: "Postgres",
         contentClass: "tab_content",
       },
+      {
+        name: "mongodb",
+        to: {
+          name: "mongodb",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        label: "MongoDB",
+        contentClass: "tab_content",
+      },
+      {
+        name: "redis",
+        to: {
+          name: "redis",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        label: "Redis",
+        contentClass: "tab_content",
+      },
+      {
+        name: "couchdb",
+        to: {
+          name: "couchdb",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        label: "CouchDB",
+        contentClass: "tab_content",
+      },
+      {
+        name: "elasticsearch",
+        to: {
+          name: "elasticsearch",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        label: "Elasticsearch",
+        contentClass: "tab_content",
+      },
+      {
+        name: "mysql",
+        to: {
+          name: "mysql",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        label: "MySQL",
+        contentClass: "tab_content",
+      },
+      {
+        name: "saphana",
+        to: {
+          name: "saphana",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        label: "SAP HANA",
+        contentClass: "tab_content",
+      },
+      {
+        name: "snowflake",
+        to: {
+          name: "snowflake",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        label: "Snowflake",
+        contentClass: "tab_content",
+      },
+      {
+        name: "zookeeper",
+        to: {
+          name: "zookeeper",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        label: "Zookeeper",
+        contentClass: "tab_content",
+      },
+      {
+        name: "cassandra",
+        to: {
+          name: "cassandra",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        label: "Cassandra",
+        contentClass: "tab_content",
+      },
+      {
+        name: "aerospike",
+        to: {
+          name: "aerospike",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        label: "Aerospike",
+        contentClass: "tab_content",
+      },
+      {
+        name: "dynamodb",
+        to: {
+          name: "dynamodb",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        label: "DynamoDB",
+        contentClass: "tab_content",
+      }
     ];
 
     // create computed property to filter tabs
