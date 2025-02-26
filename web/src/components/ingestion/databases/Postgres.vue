@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="q-ma-md">
     <div class="tw-text-[16px]">
+      <CopyContent class="q-mt-sm" :content="content" />
       <div class="tw-font-bold tw-pt-6 tw-pb-2">
         Check further documentation at:
         <br />
@@ -32,6 +33,7 @@ import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getImageURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import useIngestion from "@/composables/useIngestion";
 
 export default defineComponent({
   name: "PostgresPage",
@@ -46,12 +48,16 @@ export default defineComponent({
   components: { CopyContent },
   setup(props) {
     const docURL = `https://short.openobserve.ai/database/postgres`;
+    const name = "postgres";
+    const { endpoint, databaseContent } = useIngestion();
+    const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
 
     
     return {
       config,
       docURL,
       getImageURL,
+      content,
     };
   },
 });
