@@ -46,6 +46,7 @@ import WindowsConfig from "@/components/ingestion/recommended/WindowsConfig.vue"
 
 import DatabaseConfig from "@/components/ingestion/Database.vue";
 import SqlServer from "@/components/ingestion/databases/SqlServer.vue";
+import Postgres from "@/components/ingestion/databases/Postgres.vue";
 
 const useIngestionRoutes = () => {
   const ingestionRoutes: any = [
@@ -287,6 +288,14 @@ const useIngestionRoutes = () => {
               path: "sqlserver",
               name: "sqlserver",
               component: SqlServer,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "postgres",
+              name: "postgres",
+              component: Postgres,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
