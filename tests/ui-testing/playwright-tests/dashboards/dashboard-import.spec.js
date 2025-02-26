@@ -128,15 +128,17 @@ test.describe("dashboard UI testcases", () => {
     await waitForDashboardPage(page);
     await page.locator('[data-test="dashboard-import"]').click();
 
-    const tempFilePath = path.join(__dirname, 'temp-dashboard.json');
-    fs.writeFileSync(tempFilePath, JSON.stringify(importdata, null, 2)); // Convert object to formatted JSON
-
-    await page.locator('[data-test="dashboard-import"]').click();
+    //file name to be used for import
+    const fileContentPath = "../test-data/dashboards-import.json";
 
     // Locate the file input field and set the JSON file
-    await page.locator('input[type="file"]').setInputFiles(tempFilePath);
+   const inputFile =  await page.locator('input[type="file"]')
+    //is used for setting the file to be imported
+    await inputFile.setInputFiles(fileContentPath);
 
     await page.getByRole('button', { name: 'Import' }).click();
+
+    await page.waitForTimeout(2000);
   
   });
 });
