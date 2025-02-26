@@ -2984,6 +2984,13 @@ mod tests {
                 tls_cert_path: String::default(),
                 tls_key_path: String::default(),
             },
+            websocket: config::WebSocket {
+                enabled: bool::default(),
+                session_idle_timeout_secs: i64::default(),
+                session_max_lifetime_secs: i64::default(),
+                session_gc_interval_secs: i64::default(),
+                ping_interval_secs: i64::default(),
+            },
             route: config::Route {
                 timeout: u64::default(),
                 max_connections: usize::default(),
@@ -3105,8 +3112,6 @@ mod tests {
                 swagger_enabled: bool::default(),
                 fake_es_version: String::default(),
                 min_auto_refresh_interval: u32::default(),
-                websocket_enabled: bool::default(),
-                websocket_close_frame_delay: u64::default(),
             },
             limit: config::Limit {
                 cpu_num: usize::default(),

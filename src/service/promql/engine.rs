@@ -678,7 +678,7 @@ impl Engine {
         }
 
         log::info!(
-            "[trace_id: {}] load data done for stream: {}, took: {}ms",
+            "[trace_id: {}] load data done for stream: {}, took: {} ms",
             self.trace_id,
             table_name,
             start_time.elapsed().as_millis()

@@ -124,6 +124,7 @@ struct ConfigResponse<'a> {
     websocket_enabled: bool,
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
+    max_dashboard_series: usize,
 }
 
 #[derive(Serialize)]
@@ -304,9 +305,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         all_fields_name: cfg.common.column_all.to_string(),
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
-        websocket_enabled: cfg.common.websocket_enabled,
+        websocket_enabled: cfg.websocket.enabled,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
+        max_dashboard_series: cfg.limit.max_dashboard_series,
     }))
 }
 
@@ -793,4 +795,10 @@ async fn flush_node() -> Result<HttpResponse, Error> {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
+}
+
+#[get("/list")]
+async fn list_node() -> Result<HttpResponse, Error> {
+    let nodes = cluster::get_cached_nodes(|_| true).await;
+    Ok(MetaHttpResponse::json(nodes))
 }

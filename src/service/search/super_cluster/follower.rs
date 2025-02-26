@@ -125,7 +125,7 @@ pub async fn search(
     let file_id_list_vec = file_id_list.iter().collect::<Vec<_>>();
     let file_id_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->follower_leader: get file_list time_range: {:?}, files: {}, took: {} ms",
         req.time_range,
         file_id_list_vec.len(),
         file_id_list_took,
@@ -324,7 +324,7 @@ async fn get_inverted_index_file_lists(
             .await?;
 
     log::info!(
-        "[trace_id {trace_id}] flight->follower_leader: get file_list from inverted index time_range: {:?}, num: {}, scan_size: {}, took: {} ms",
+        "[trace_id {trace_id}] flight->follower_leader: get file_list from inverted index time_range: {:?}, files: {}, scan_size: {} mb, took: {} ms",
         req.time_range,
         idx_file_list.len(),
         idx_scan_size,

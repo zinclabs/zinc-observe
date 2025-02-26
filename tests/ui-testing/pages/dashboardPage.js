@@ -164,6 +164,37 @@ async notAvailableDashboard() {
   await expect(this.page.locator('[data-test="dashboard-table"]')).toContainText('No data available');
 }
 
+async addCustomChart(page, pictorialJSON) {
+  await this.page.waitForSelector('[data-test="menu-link-\/dashboards-item"]');
+  await this.page.locator('[data-test="menu-link-\/dashboards-item"]').click();
+
+  await this.page.waitForSelector('[data-test="dashboard-add"]');
+  await this.page.waitForTimeout(2000);
+  await this.page.locator('[data-test="dashboard-add"]').click();
+  await this.page.waitForTimeout(2000);
+  await this.page.locator('[data-test="add-dashboard-name"]').fill("Customcharts");
+  await this.page.locator('[data-test="dashboard-add-submit"]').click();
+
+  await this.page.waitForSelector('[data-test="dashboard-if-no-panel-add-panel-btn"]');
+  await this.page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
+  await this.page.waitForSelector('[data-test="selected-chart-custom_chart-item"]');
+  await this.page.locator('[data-test="selected-chart-custom_chart-item"]').click();
+
+  await this.page.waitForSelector(".view-lines");
+  await this.page.locator(".view-lines").first().click();
+
+  await this.page.keyboard.press("Control+A");
+  await this.page.keyboard.press("Backspace");
+  
+  console.log("Pictorial JSON", pictorialJSON);
+  
+  // First clear any existing content
+  await this.page.waitForSelector('[data-test="dashboard-markdown-editor-query-editor"]');
+  await this.page.locator('[data-test="dashboard-markdown-editor-query-editor"]').click();
+  await this.page.keyboard.press('Control+A');
+  await this.page.keyboard.press('Delete');
+}
+
 
 }
 

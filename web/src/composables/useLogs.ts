@@ -725,8 +725,11 @@ const useLogs = () => {
         );
 
         searchObj.data.stream.selectedStreamFields = streamData.schema;
-        
-        if(!searchObj.data.stream.selectedStreamFields || searchObj.data.stream.selectedStreamFields.length == 0) {
+
+        if (
+          !searchObj.data.stream.selectedStreamFields ||
+          searchObj.data.stream.selectedStreamFields.length == 0
+        ) {
           searchObj.data.stream.selectedStreamFields = [];
           searchObj.loading = false;
           return false;
@@ -1489,9 +1492,10 @@ const useLogs = () => {
 
   const getQueryData = async (isPagination = false) => {
     try {
-
       // Reset cancel query on new search request initation
       searchObj.data.isOperationCancelled = false;
+      searchObj.data.searchRequestTraceIds = [];
+      searchObj.data.searchWebSocketRequestIdsAndTraceIds = [];
 
       // get websocket enable config from store
       // window will have more priority
@@ -2571,7 +2575,6 @@ const useLogs = () => {
           })
           .catch((err) => {
             searchObj.loadingHistogram = false;
-
 
             // Reset cancel query on search error
             searchObj.data.isOperationCancelled = false;
@@ -4011,35 +4014,29 @@ const useLogs = () => {
   const onStreamChange = async (queryStr: string) => {
     try {
       searchObj.loadingStream = true;
-      
+
       // Reset query results
       searchObj.data.queryResults = { hits: [] };
-      
+
       // Build UNION query once
       const streams = searchObj.data.stream.selectedStream;
       const unionquery = streams
-        .map((stream: string) => 
-          `SELECT [FIELD_LIST] FROM "${stream}"`
-        )
+        .map((stream: string) => `SELECT [FIELD_LIST] FROM "${stream}"`)
         .join(" UNION ");
 
-      const query = searchObj.meta.sqlMode ? (queryStr || unionquery) : "";
+      const query = searchObj.meta.sqlMode ? queryStr || unionquery : "";
 
       // Fetch all stream data in parallel
-      const streamDataPromises = streams.map((stream: string) => 
-        getStream(
-          stream,
-          searchObj.data.stream.streamType || "logs",
-          true
-        )
+      const streamDataPromises = streams.map((stream: string) =>
+        getStream(stream, searchObj.data.stream.streamType || "logs", true),
       );
 
       const streamDataResults = await Promise.all(streamDataPromises);
-      
+
       // Collect all schema fields
       const allStreamFields = streamDataResults
-        .filter(data => data?.schema)
-        .flatMap(data => data.schema);
+        .filter((data) => data?.schema)
+        .flatMap((data) => data.schema);
 
       // Update selectedStreamFields once
       searchObj.data.stream.selectedStreamFields = allStreamFields;
@@ -4050,21 +4047,29 @@ const useLogs = () => {
       }
 
       // Update selected fields if needed
-      const streamFieldNames = new Set(allStreamFields.map(item => item.name));
+      const streamFieldNames = new Set(
+        allStreamFields.map((item) => item.name),
+      );
       if (searchObj.data.stream.selectedFields.length > 0) {
-        searchObj.data.stream.selectedFields = searchObj.data.stream.selectedFields
-          .filter(fieldName => streamFieldNames.has(fieldName));
+        searchObj.data.stream.selectedFields =
+          searchObj.data.stream.selectedFields.filter((fieldName) =>
+            streamFieldNames.has(fieldName),
+          );
       }
 
       // Update interesting fields list
-      searchObj.data.stream.interestingFieldList = searchObj.data.stream.interestingFieldList
-        .filter(fieldName => streamFieldNames.has(fieldName));
+      searchObj.data.stream.interestingFieldList =
+        searchObj.data.stream.interestingFieldList.filter((fieldName) =>
+          streamFieldNames.has(fieldName),
+        );
 
       // Replace field list in query
-      const fieldList = searchObj.meta.quickMode && searchObj.data.stream.interestingFieldList.length > 0
-        ? searchObj.data.stream.interestingFieldList.join(",")
-        : "*";
-      
+      const fieldList =
+        searchObj.meta.quickMode &&
+        searchObj.data.stream.interestingFieldList.length > 0
+          ? searchObj.data.stream.interestingFieldList.join(",")
+          : "*";
+
       const finalQuery = query.replace(/\[FIELD_LIST\]/g, fieldList);
 
       // Update query related states
@@ -4174,6 +4179,12 @@ const useLogs = () => {
     }
 
     const tracesIds = [...searchObj.data.searchRequestTraceIds];
+
+    if (!searchObj.data.searchRequestTraceIds.length) {
+      searchObj.data.isOperationCancelled = false;
+      return;
+    }
+
     searchObj.data.isOperationCancelled = true;
 
     searchService
@@ -4670,6 +4681,7 @@ const useLogs = () => {
     queryReq: SearchRequestPayload,
     isPagination: boolean,
     type: "search" | "histogram" | "pageCount",
+    meta?: any,
   ) => {
     const { traceId } = generateTraceContext();
     addTraceId(traceId);
@@ -4680,12 +4692,14 @@ const useLogs = () => {
       isPagination: boolean;
       traceId: string;
       org_id: string;
+      meta?: any;
     } = {
       queryReq,
       type,
       isPagination,
       traceId,
       org_id: searchObj.organizationIdentifier,
+      meta,
     };
 
     return payload;
@@ -4768,7 +4782,12 @@ const useLogs = () => {
       }
 
       if (payload.type === "histogram") {
-        handleHistogramResponse(payload.queryReq, payload.traceId, response);
+        handleHistogramResponse(
+          payload.queryReq,
+          payload.traceId,
+          response,
+          payload.meta,
+        );
       }
 
       if (payload.type === "pageCount") {
@@ -4964,6 +4983,7 @@ const useLogs = () => {
     queryReq: SearchRequestPayload,
     traceId: string,
     response: any,
+    meta?: any,
   ) => {
     searchObjDebug["histogramProcessingStartTime"] = performance.now();
 
@@ -5039,7 +5059,7 @@ const useLogs = () => {
     (async () => {
       try {
         generateHistogramData();
-        refreshPagination(true);
+        if (!meta?.isHistogramOnly) refreshPagination(true);
       } catch (error) {
         console.error("Error processing histogram data:", error);
         searchObj.loadingHistogram = false;
@@ -5059,7 +5079,8 @@ const useLogs = () => {
     //   searchObj.data.queryResults.total = res.data.total;
     // }
 
-    searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    if (!meta?.isHistogramOnly)
+      searchObj.data.histogram.chartParams.title = getHistogramTitle();
 
     searchObjDebug["histogramProcessingEndTime"] = performance.now();
     searchObjDebug["histogramEndTime"] = performance.now();
@@ -5250,6 +5271,7 @@ const useLogs = () => {
     if (payload.type === "search") searchObj.loading = false;
     if (payload.type === "histogram" || payload.type === "pageCount")
       searchObj.loadingHistogram = false;
+
     searchObj.data.isOperationCancelled = false;
   };
 
@@ -5386,7 +5408,10 @@ const useLogs = () => {
 
   const sendCancelSearchMessage = (searchRequests: any[]) => {
     try {
-      if (!searchRequests.length) return;
+      if (!searchRequests.length) {
+        searchObj.data.isOperationCancelled = false;
+        return;
+      }
 
       searchObj.data.isOperationCancelled = true;
 
@@ -5507,6 +5532,9 @@ const useLogs = () => {
     initialQueryPayload,
     refreshPagination,
     enableRefreshInterval,
+    buildWebSocketPayload,
+    initializeWebSocketConnection,
+    addRequestId,
   };
 };
 

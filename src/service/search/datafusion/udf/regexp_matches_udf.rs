@@ -171,28 +171,54 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
         let value = values.value(i);
 
         let re = if is_scalar_pattern {
-            scalar_regex.clone().unwrap() // Use precompiled regex
+            scalar_regex.clone().unwrap()
         } else {
-            Regex::new(regex.value(i)) // Compile regex for this row
-                .map_err(|e| {
-                DataFusionError::Execution(format!("Invalid regex pattern: {}", e))
-            })?
+            Regex::new(regex.value(i))
+                .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {}", e)))?
         };
 
-        // Extract matches
         let mut has_match = false;
-        for mat in re.find_iter(value) {
-            list_builder.values().append_value(mat.as_str());
-            has_match = true;
+
+        for cap in re.captures_iter(value) {
+            // EXPLANATION OF REGEX CAPTURE GROUPS:
+            // In a regex pattern like: '"value":(("([^"]+)")|(\d+))'
+            // The groups are numbered from outside to inside:
+            // Group 0: Always the entire match (e.g., "value":"hello")
+            // Group 1: First explicit group (e.g., "hello")
+            // Group 2+: Nested groups (e.g., hello - without quotes)
+            //
+            // Example:
+            // Pattern: '"value":(("([^"]+)")|(\d+))'
+            // Input:   '{"value":"hello"}'
+            // Group 0: "value":"hello"    (full match)
+            // Group 1: "hello"            (outer capture)
+            // Group 2: "hello"            (middle capture)
+            // Group 3: hello              (innermost capture - what we want!)
+
+            // Try innermost capture group first, then work outwards
+            let matched_value = (2..=cap.len())  // Start from 2 because: Group 0 is full match, Group 1 is first explicit group
+                .rev()  // Reverse the range to start from last group (innermost) to first group
+                .find_map(|i| cap.get(i))  // Try to get each group, returns None if group didn't match
+                .or_else(|| cap.get(1))    // If no inner groups matched, try the first explicit group
+                .or_else(|| cap.get(0))    // If no groups matched at all, use the entire match
+                .map(|m| m.as_str()); // Convert the match to a string slice
+
+            if let Some(matched) = matched_value {
+                // Clean up the matched value:
+                // If the value is wrapped in quotes (like "hello"), remove them
+                // If it's not (like 123), keep as is
+                let cleaned = if matched.starts_with('"') && matched.ends_with('"') {
+                    // Remove the surrounding quotes
+                    &matched[1..matched.len() - 1]
+                } else {
+                    matched
+                };
+                list_builder.values().append_value(cleaned);
+                has_match = true;
+            }
         }
 
-        if has_match {
-            // If matches were found, finalize the list for this row
-            list_builder.append(true);
-        } else {
-            // If no matches were found, append NULL
-            list_builder.append(false);
-        }
+        list_builder.append(has_match);
     }
 
     Ok(Arc::new(list_builder.finish()))
@@ -306,6 +332,101 @@ mod tests {
             "| [ghi]      |", // Matches "ghi" for "789ghi123"
             "|            |", // NULL log should return NULL
             "|            |", // Empty string, no match
+            "+------------+",
+        ];
+
+        assert_batches_eq!(expected, &results);
+    }
+
+    #[tokio::test]
+    async fn test_re_matches_extract_json_values() {
+        // Use a named capture group and reference it in the SQL
+        let sql = "SELECT re_matches(json_data, '\"bt\":\"([^\"]+)\"') AS matches FROM t";
+
+        // Define schema
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "json_data",
+            DataType::Utf8,
+            false,
+        )]));
+
+        // Define test data
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![
+                r#"[{"bt":"login_benefit","cl":0},{"bt":"FDFS","cl":0},{"bt":"fdfsFirst","cl":0}]"#,
+                r#"{"bt":"single_value"}"#,
+                r#"{"other":"no_match"}"#,
+                r#"[{"bt":"value1"},{"bt":"value2"}]"#,
+            ]))],
+        )
+        .unwrap();
+
+        // Create a session context
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEX_MATCHES_UDF.clone());
+
+        // Register the table
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        // Execute SQL
+        let df = ctx.sql(sql).await.unwrap();
+        let results = df.collect().await.unwrap();
+
+        // Expected output
+        let expected = vec![
+            "+----------------------------------+",
+            "| matches                          |",
+            "+----------------------------------+",
+            "| [login_benefit, FDFS, fdfsFirst] |",
+            "| [single_value]                   |",
+            "|                                  |",
+            "| [value1, value2]                 |",
+            "+----------------------------------+",
+        ];
+
+        assert_batches_eq!(expected, &results);
+    }
+
+    #[tokio::test]
+    async fn test_re_matches_optional_capture_groups() {
+        let sql = "SELECT re_matches(text, '\"value\":(\"([^\"]+)\"|\\d+)') AS matches FROM t";
+
+        // Define schema
+        let schema = Arc::new(Schema::new(vec![Field::new("text", DataType::Utf8, false)]));
+
+        // Define test data with mixed formats
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![Arc::new(StringArray::from(vec![
+                r#"{"value":"quoted"}"#,          // Value in quotes
+                r#"{"value":123}"#,               // Numeric value without quotes
+                r#"{"value":"abc","value":456}"#, // Mixed in same string
+            ]))],
+        )
+        .unwrap();
+
+        // Create a session context
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEX_MATCHES_UDF.clone());
+
+        // Register the table
+        let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(provider)).unwrap();
+
+        // Execute SQL
+        let df = ctx.sql(sql).await.unwrap();
+        let results = df.collect().await.unwrap();
+
+        // Expected output
+        let expected = vec![
+            "+------------+",
+            "| matches    |",
+            "+------------+",
+            "| [quoted]   |", // Should capture the inner value
+            "| [123]      |", // Should capture the number
+            "| [abc, 456] |", // Should capture both values
             "+------------+",
         ];
 

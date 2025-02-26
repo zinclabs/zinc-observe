@@ -105,7 +105,12 @@ pub fn str_match_expr_impl(case_insensitive: bool) -> ScalarFunctionImplementati
             ));
         }
         // pre-compute the needle
-        let mem_finder = memchr::memmem::Finder::new(needle.as_ref().unwrap().as_bytes());
+        let needle = if case_insensitive {
+            needle.as_ref().unwrap().to_lowercase()
+        } else {
+            needle.as_ref().unwrap().to_string()
+        };
+        let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
 
         // 2. perform the computation
         let array = haystack
@@ -150,8 +155,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_str_match_udf() {
-        let sql =
-            "select * from t where str_match(log, 'es') and str_match_ignore_case(city, 'be')";
+        let sql = vec![
+            "select * from t where str_match(log, 'es') and str_match_ignore_case(city, 'be')",
+            "select * from t where str_match(log, 'es') and str_match_ignore_case(city, 'BE')",
+        ];
 
         // define a schema.
         let schema = Arc::new(Schema::new(vec![
@@ -187,9 +194,11 @@ mod tests {
         let provider = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
         ctx.register_table("t", Arc::new(provider)).unwrap();
 
-        let df = ctx.sql(sql).await.unwrap();
-        let result = df.collect().await.unwrap();
-        let count = result.iter().map(|batch| batch.num_rows()).sum::<usize>();
-        assert_eq!(count, 1);
+        for sql in sql {
+            let df = ctx.sql(sql).await.unwrap();
+            let result = df.collect().await.unwrap();
+            let count = result.iter().map(|batch| batch.num_rows()).sum::<usize>();
+            assert_eq!(count, 1);
+        }
     }
 }

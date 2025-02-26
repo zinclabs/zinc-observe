@@ -1878,7 +1878,8 @@ mod tests {
             data: "{}".to_string(),
         };
 
-        let res = handle_triggers(trigger).await;
+        let trace_id = "test_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
         // This alert has an invalid destination
         assert!(res.is_ok());
 
@@ -1914,7 +1915,8 @@ mod tests {
             data: "{}".to_string(),
         };
 
-        let res = handle_triggers(trigger).await;
+        let trace_id = "test_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
         // This alert has an invalid destination
         assert!(res.is_ok());
 
@@ -1982,7 +1984,8 @@ mod tests {
             data: "{}".to_string(),
         };
 
-        let res = handle_triggers(trigger).await;
+        let trace_id = "test_trace_id";
+        let res = handle_triggers(trace_id, trigger).await;
         // In case of alert evaluation errors, this error is returned
         assert!(res.is_err());
 

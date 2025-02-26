@@ -56,6 +56,7 @@ proto.workspace = true
 reqwest.workspace = true
 regex.workspace = true
 rand.workspace = true
+sea-orm = "1.1.3"
 serde.workspace = true
 serde_json.workspace = true
 segment.workspace = true
@@ -74,7 +75,6 @@ tracing-subscriber.workspace = true
 urlencoding.workspace = true
 utoipa.workspace = true
 vrl.workspace = true
-sea-orm = "1.1.3"
 
 [dev-dependencies]
 expect-test.workspace = true

@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-else-if="
                     (!searchObj.data.stream.selectedStreamFields ||
-                    searchObj.data.stream.selectedStreamFields.length == 0) &&
+                      searchObj.data.stream.selectedStreamFields.length == 0) &&
                     searchObj.loading == false
                   "
                   class="row q-mt-lg"
@@ -199,7 +199,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-no-stream-selected-text"
                     class="text-center col-10 q-mx-none"
                   >
-                    <q-icon name="info" color="primary" size="md" /> No field found in selected stream.
+                    <q-icon name="info" color="primary" size="md" /> No field
+                    found in selected stream.
                   </h6>
                 </div>
                 <div
@@ -386,6 +387,7 @@ import useNotifications from "@/composables/useNotifications";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
 import SearchHistory from "@/plugins/logs/SearchHistory.vue";
 import { type ActivationState, PageType } from "@/ts/interfaces/logs.ts";
+import { isWebSocketEnabled } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "PageSearch",
@@ -552,6 +554,9 @@ export default defineComponent({
       resetHistogramWithError,
       isLimitQuery,
       enableRefreshInterval,
+      buildWebSocketPayload,
+      initializeWebSocketConnection,
+      addRequestId,
     } = useLogs();
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -1503,6 +1508,10 @@ export default defineComponent({
       resetHistogramWithError,
       fnParsedSQL,
       isLimitQuery,
+      buildWebSocketPayload,
+      initializeWebSocketConnection,
+      addRequestId,
+      isWebSocketEnabled,
     };
   },
   computed: {
@@ -1589,10 +1598,33 @@ export default defineComponent({
           );
         } else if (this.searchObj.meta.histogramDirtyFlag == true) {
           this.searchObj.meta.histogramDirtyFlag = false;
+
           // this.handleRunQuery();
           this.searchObj.loadingHistogram = true;
 
+          const shouldUseWebSocket = this.isWebSocketEnabled();
+
+          // Generate histogram skeleton before making request
           await this.generateHistogramSkeleton();
+
+          if (shouldUseWebSocket) {
+            // Use WebSocket for histogram data
+            const payload = this.buildWebSocketPayload(
+              this.searchObj.data.histogramQuery,
+              false,
+              "histogram",
+              {
+                isHistogramOnly: this.searchObj.meta.histogramDirtyFlag,
+              },
+            );
+            const requestId = this.initializeWebSocketConnection(payload);
+
+            if (requestId) {
+              this.addRequestId(requestId, payload.traceId);
+            }
+
+            return;
+          }
 
           this.getHistogramQueryData(this.searchObj.data.histogramQuery)
             .then((res: any) => {

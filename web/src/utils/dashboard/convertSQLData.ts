@@ -120,6 +120,8 @@ export const convertSQLData = async (
   chartPanelStyle: any,
   annotations: any,
 ) => {
+  const extras: any = {};
+
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -221,8 +223,19 @@ export const convertSQLData = async (
     }
 
     const { top_results, top_results_others } = panelSchema.config;
+
+    // get the limit series from the config
+    // if top_results is enabled then use the top_results value
+    // otherwise use the max_dashboard_series value
+    const limitSeries = top_results
+      ? (Math.min(
+          top_results,
+          store.state?.zoConfig?.max_dashboard_series ?? 100,
+        ) ?? 100)
+      : (store.state?.zoConfig?.max_dashboard_series ?? 100);
+
     const innerDataArray = data[0];
-    if (!top_results || !breakDownKeys.length) {
+    if (!breakDownKeys.length) {
       return innerDataArray;
     }
 
@@ -241,10 +254,24 @@ export const convertSQLData = async (
     }, {});
 
     // Step 2: Sort and extract the top keys based on the configured number of top results
-    const topKeys = Object.entries(breakdown)
-      .sort(([, a]: any, [, b]: any) => b - a)
-      .slice(0, top_results)
-      .map(([key]) => key);
+    const allKeys = Object.entries(breakdown).sort(
+      ([, a]: any, [, b]: any) => b - a,
+    );
+
+    // if top_results is enabled and the number of unique breakdown values is greater than the limit, add a warning message
+    // if top_results is not enabled and the number of unique breakdown values is greater than the max_dashboard_series, add a warning message
+    if (
+      (top_results &&
+        top_results > (store.state?.zoConfig?.max_dashboard_series ?? 100) &&
+        allKeys.length > top_results) ||
+      (!top_results &&
+        allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
+    ) {
+      extras.limitNumberOfSeriesWarningMessage =
+        "Limiting the displayed series to ensure optimal performance";
+    }
+
+    const topKeys = allKeys.slice(0, limitSeries).map(([key]) => key);
 
     // Step 3: Initialize result array and others object for aggregation
     const resultArray: any[] = [];
@@ -844,6 +871,21 @@ export const convertSQLData = async (
     });
   };
 
+  const [min, max] = getSQLMinMaxValue(yAxisKeys, missingValueData);
+
+  const getFinalAxisValue = (
+    configValue: number | null | undefined,
+    dataValue: number,
+    isMin: boolean,
+  ) => {
+    if (configValue === null || configValue === undefined) {
+      return undefined;
+    }
+    return isMin
+      ? Math.min(configValue, dataValue)
+      : Math.max(configValue, dataValue);
+  };
+
   const options: any = {
     backgroundColor: "transparent",
     legend: legendConfig,
@@ -1072,6 +1114,8 @@ export const convertSQLData = async (
           ? panelSchema.queries[0]?.fields?.y[0]?.label
           : "",
       nameLocation: "middle",
+      min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
+      max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       nameGap:
         calculateWidthText(
           panelSchema.type == "h-bar" || panelSchema.type == "h-stacked"
@@ -2589,7 +2633,11 @@ export const convertSQLData = async (
 
   return {
     options,
-    extras: { panelId: panelSchema?.id, isTimeSeries: isTimeSeriesFlag },
+    extras: {
+      ...extras,
+      panelId: panelSchema?.id,
+      isTimeSeries: isTimeSeriesFlag,
+    },
   };
 };
 

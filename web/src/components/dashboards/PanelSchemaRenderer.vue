@@ -381,6 +381,7 @@ export default defineComponent({
     "update:initialVariableValues",
     "updated:vrlFunctionFieldList",
     "loading-state-change",
+    "limit-number-of-series-warning-message-update",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -394,6 +395,8 @@ export default defineComponent({
     const selectedAnnotationData: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
     const annotationPopupRef: any = ref(null);
+
+    const limitNumberOfSeriesWarningMessage: any = ref("");
 
     const chartPanelStyle = ref({
       height: "100%",
@@ -598,6 +601,9 @@ export default defineComponent({
               loading.value,
             );
 
+            limitNumberOfSeriesWarningMessage.value =
+              panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
+
             errorDetail.value = "";
           } catch (error: any) {
             console.error("error", error);
@@ -631,6 +637,18 @@ export default defineComponent({
       metadata,
       () => {
         emit("metadata-update", metadata.value);
+      },
+      { deep: true },
+    );
+
+    // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
+    watch(
+      limitNumberOfSeriesWarningMessage,
+      () => {
+        emit(
+          "limit-number-of-series-warning-message-update",
+          limitNumberOfSeriesWarningMessage.value,
+        );
       },
       { deep: true },
     );

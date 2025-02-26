@@ -377,7 +377,7 @@ export default defineComponent({
     const searchListContainer = ref(null);
     const noOfRecordsTitle = ref("");
     const scrollPosition = ref(0);
-    const rowsPerPageOptions = [10, 25, 50, 100, 250, 500];
+    const rowsPerPageOptions = [10, 25, 50, 100];
     const disableMoreErrorDetails = ref(false);
     const router = useRouter();
 

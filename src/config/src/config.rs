@@ -31,11 +31,10 @@ use lettre::{
     AsyncSmtpTransport, Tokio1Executor,
 };
 use once_cell::sync::Lazy;
-use sysinfo::{DiskExt, SystemExt};
 
 use crate::{
     meta::cluster,
-    utils::{cgroup, file::get_file_meta},
+    utils::{file::get_file_meta, sysinfo},
 };
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -355,6 +354,7 @@ pub static BLOCKED_STREAMS: Lazy<Vec<String>> = Lazy::new(|| {
 #[derive(EnvConfig)]
 pub struct Config {
     pub auth: Auth,
+    pub websocket: WebSocket,
     pub report_server: ReportServer,
     pub http: Http,
     pub grpc: Grpc,
@@ -379,6 +379,20 @@ pub struct Config {
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
     pub encryption: Encryption,
+}
+
+#[derive(EnvConfig)]
+pub struct WebSocket {
+    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
+    pub enabled: bool,
+    #[env_config(name = "ZO_WEBSOCKET_SESSION_IDLE_TIMEOUT_SECS", default = 300)]
+    pub session_idle_timeout_secs: i64,
+    #[env_config(name = "ZO_WEBSOCKET_SESSION_MAX_LIFETIME_SECS", default = 3600)]
+    pub session_max_lifetime_secs: i64,
+    #[env_config(name = "ZO_WEBSOCKET_SESSION_GC_INTERVAL_SECS", default = 60)]
+    pub session_gc_interval_secs: i64,
+    #[env_config(name = "ZO_WEBSOCKET_PING_INTERVAL_SECS", default = 15)]
+    pub ping_interval_secs: i64,
 }
 
 #[derive(EnvConfig)]
@@ -979,10 +993,6 @@ pub struct Common {
     pub swagger_enabled: bool,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
-    #[env_config(name = "ZO_WEBSOCKET_ENABLED", default = false)]
-    pub websocket_enabled: bool,
-    #[env_config(name = "ZO_WEBSOCKET_CLOSE_FRAME_DELAY", default = 0)]
-    pub websocket_close_frame_delay: u64, // in milliseconds
     #[env_config(
         name = "ZO_MIN_AUTO_REFRESH_INTERVAL",
         default = 5,
@@ -1302,6 +1312,12 @@ pub struct Limit {
         help = "Default data type for LongText compliant DB's"
     )]
     pub db_text_data_type: String,
+    #[env_config(
+        name = "ZO_MAX_DASHBOARD_SERIES",
+        default = 100,
+        help = "maximum series to display in charts"
+    )]
+    pub max_dashboard_series: usize,
 }
 
 #[derive(EnvConfig)]
@@ -1769,7 +1785,7 @@ pub fn init() -> Config {
 
 fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // set real cpu num
-    cfg.limit.real_cpu_num = max(1, cgroup::get_cpu_limit());
+    cfg.limit.real_cpu_num = max(1, sysinfo::get_cpu_limit());
     // set at least 2 threads
     let cpu_num = max(2, cfg.limit.real_cpu_num);
     cfg.limit.cpu_num = cpu_num;
@@ -1861,6 +1877,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.consistent_hash_vnodes = 100;
     }
 
+    // reset to default if given zero
+    if cfg.limit.max_dashboard_series == 0 {
+        cfg.limit.max_dashboard_series = 100;
+    }
+
     // check for uds
     #[allow(deprecated)]
     if cfg.limit.udschema_max_fields > 0 {
@@ -1909,7 +1930,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // HACK instance_name
     if cfg.common.instance_name.is_empty() {
-        cfg.common.instance_name = sysinfo::System::new().host_name().unwrap();
+        cfg.common.instance_name = sysinfo::os::get_hostname();
     }
     cfg.common.instance_name_short = cfg
         .common
@@ -2133,7 +2154,7 @@ fn check_etcd_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    let mem_total = cgroup::get_memory_limit();
+    let mem_total = sysinfo::get_memory_limit();
     cfg.limit.mem_total = mem_total;
     if cfg.memory_cache.max_size == 0 {
         if cfg.common.local_mode {
@@ -2218,29 +2239,15 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    let mut system = sysinfo::System::new();
-    system.refresh_disks_list();
-    let mut disks: Vec<(&str, u64, u64)> = system
-        .disks()
-        .iter()
-        .map(|d| {
-            (
-                d.mount_point().to_str().unwrap(),
-                d.total_space(),
-                d.available_space(),
-            )
-        })
-        .collect();
-    disks.sort_by(|a, b| b.0.cmp(a.0));
-
     std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
     let cache_dir = Path::new(&cfg.common.data_cache_dir)
         .canonicalize()
         .unwrap();
     let cache_dir = cache_dir.to_str().unwrap();
-    let disk = disks.iter().find(|d| cache_dir.starts_with(d.0));
+    let disks = sysinfo::disk::get_disk_usage();
+    let disk = disks.iter().find(|d| cache_dir.starts_with(&d.mount_point));
     let (disk_total, disk_free) = match disk {
-        Some(d) => (d.1, d.2),
+        Some(d) => (d.total_space, d.available_space),
         None => (0, 0),
     };
     cfg.limit.disk_total = disk_total as usize;

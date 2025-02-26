@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -84,7 +84,7 @@ impl DisplayAs for TantivyCountExec {
             .join(", ");
         write!(
             f,
-            "TantivyCountExec: file num: {}, file_list: [{file_keys}]",
+            "TantivyCountExec: files: {}, file_list: [{file_keys}]",
             self.file_list.len()
         )
     }

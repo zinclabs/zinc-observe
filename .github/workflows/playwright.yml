@@ -38,7 +38,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: ubicloud-standard-16
+      labels: ubicloud-standard-8
 
     steps:
       - name: Remove unused tools
@@ -88,7 +88,7 @@ jobs:
     name: playwright_ui_integration_tests
     needs: [build_binary]
     runs-on:
-      labels: ubicloud-standard-16
+      labels: ubicloud-standard-8
     container:
       image: mcr.microsoft.com/playwright:v1.50.0-jammy
       options: --user root
@@ -105,6 +105,7 @@ jobs:
             "logsquickmode.spec.js",
             "multiselect-stream.spec.js",
             "pipelines.spec.js",
+            "dashboards/custom-charts.spec.js",
             "dashboards/dashboardtype.spec.js",
             "dashboards/dashboard.spec.js",
             "dashboards/dashboard2.spec.js",
@@ -124,6 +125,7 @@ jobs:
             "enrichment.spec.js",
             "sanity2.spec.js",
             "schemaload.spec.js",
+            "websocket.spec.js",
             # "remotepipeline.spec.js",
 
           ]
@@ -198,7 +200,7 @@ jobs:
   generate_coverage_report:
     name: Generate Coverage Report
     needs: [build_binary, ui_integration_tests]
-    runs-on: ubicloud-standard-16
+    runs-on: ubicloud-standard-8
     if: always()
 
     steps:

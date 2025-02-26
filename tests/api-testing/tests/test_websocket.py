@@ -549,7 +549,7 @@ def test_sql(create_session, base_url, test_name_sql, sql_query, sql_size, total
         res_sql_cache.status_code == 200
     ), f"SQL cache {test_name_sql} mode added 200, but got {res_sql_cache.status_code} {res_sql_cache.content}"
 
-    print(f"Response Cache SQL {url} status code :", res_sql_cache.status_code) 
+    print(f"Response {test_name_sql} Cache SQL {url} status code :", res_sql_cache.status_code) 
 
     # Parse the JSON response
     
@@ -600,7 +600,7 @@ def test_websocket_histogram(test_name, hist_query, expected_total_hits_results_
     WS_URL_histogram = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{uuid_histogram}"
 
     # Example of using the WS_URL
-    print("WebSocket Histogram URL:", WS_URL_histogram)
+    print(f"WebSocket {test_name}  Histogram URL:", WS_URL_histogram)
 
     # Now we can use WS_URL in our WebSocket connection
     try:
@@ -678,7 +678,7 @@ def test_websocket_histogram(test_name, hist_query, expected_total_hits_results_
 
     ws_histogram_cache = websocket.create_connection(WS_URL_histogram_cache, header={"Cookie": cookie_header_histogram})
 
-    print(f"WebSocket Cache histogram {WS_ZO_BASE_URL} connection established", ws_histogram_cache)
+    print(f"WebSocket {test_name} Cache histogram {WS_ZO_BASE_URL} connection established", ws_histogram_cache)
 
     # Generate a dynamic trace_id
     trace_id_histogram_cache = str(uuid.uuid4())
@@ -763,7 +763,7 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
         print(f"An unexpected error occurred: {e}")
         assert False, f"An unexpected error occurred: {e}"
 
-    print(f"WebSocket SQL {WS_ZO_BASE_URL} connection established", ws_sql)
+    print(f"WebSocket {test_name_sql} SQL {WS_ZO_BASE_URL} connection established", ws_sql)
 
     # Generate a dynamic trace_id
     trace_id_sql = str(uuid.uuid4())
@@ -828,7 +828,7 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
 
     ws_sql_cache = websocket.create_connection(WS_URL_sql_cache, header={"Cookie": cookie_header_sql})
 
-    print(f"WebSocket Cache SQL {WS_ZO_BASE_URL} connection established", ws_sql_cache)
+    print(f"WebSocket {test_name_sql} Cache SQL {WS_ZO_BASE_URL} connection established", ws_sql_cache)
 
     # Generate a dynamic trace_id
     trace_id_sql_cache = str(uuid.uuid4())

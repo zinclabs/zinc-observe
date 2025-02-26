@@ -164,15 +164,17 @@ test.describe("Sanity testcases", () => {
     await page.waitForSelector('[data-test="logs-search-result-bar-chart"]');
   });
 
+
   test("should save search, favorite, click on saved search and then delete", async ({
     page,
   }) => {
+    const randomSavedViewName = `streamslog${Math.random().toString(36).substring(2, 10)}`;
     await page
       .locator("button")
       .filter({ hasText: "savesaved_search" })
       .click();
     await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill("sanitytest");
+    await page.locator('[data-test="add-alert-name-input"]').fill(randomSavedViewName);
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
     await page
       .locator('[data-test="logs-search-saved-views-btn"]')
@@ -183,8 +185,8 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("sanity");
-    await page.getByText("sanitytest").first().click();
+      .fill(randomSavedViewName);
+    await page.getByText(randomSavedViewName).first().click();
     await page
       .locator('[data-test="logs-search-saved-views-btn"]')
       .getByLabel("Expand")
@@ -194,7 +196,7 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("sanity");
+      .fill(randomSavedViewName);
     await page.getByText("favorite_border").first().click();
     await page.getByText("Favorite Views").click();
     await page.getByLabel('Clear').first().click();
@@ -215,9 +217,10 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("san");
-    await page.getByText("delete").click();
-    await page.locator('[data-test="confirm-button"]').click();
+      .fill(randomSavedViewName);
+    const deleteButtonSelector = `[data-test="logs-search-bar-delete-${randomSavedViewName}-saved-view-btn"]`;
+    await page.locator(deleteButtonSelector).click(); // Click delete
+    await page.locator('[data-test="confirm-button"]').click();;
   });
 
   test("should only display 5 result if limit 5 added", async ({ page }) => {

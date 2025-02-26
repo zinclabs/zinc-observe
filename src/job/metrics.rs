@@ -97,9 +97,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
         if let Err(e) = update_storage_metrics().await {
             log::error!("Error update storage metrics: {}", e);
         }
-        if let Err(e) = update_memory_usage().await {
-            log::error!("Error update memory_usage metrics: {}", e);
-        }
         interval.tick().await;
     }
 }
@@ -273,15 +270,6 @@ async fn update_storage_metrics() -> Result<(), anyhow::Error> {
         metrics::STORAGE_RECORDS
             .with_label_values(&[columns[0], columns[2], columns[1]])
             .set(stat.doc_num);
-    }
-    Ok(())
-}
-
-async fn update_memory_usage() -> Result<(), anyhow::Error> {
-    if let Some(cur_memory) = memory_stats::memory_stats() {
-        metrics::MEMORY_USAGE
-            .with_label_values(&[])
-            .set(cur_memory.physical_mem as i64);
     }
     Ok(())
 }

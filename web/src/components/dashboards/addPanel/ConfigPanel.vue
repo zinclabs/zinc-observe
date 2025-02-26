@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="dashboardPanelData.data.type == 'custom_chart'"
-    style="padding-bottom: 30px">
+    style="padding-bottom: 30px"
+  >
     <div class="" style="max-width: 300px">
       <div class="q-mb-sm" style="font-weight: 600">
         {{ t("dashboard.description") }}
@@ -874,7 +875,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="
           ['area', 'line', 'area-stacked', 'bar', 'stacked'].includes(
             dashboardPanelData.data.type,
-          )
+          ) && !promqlMode
         "
         v-model="dashboardPanelData.data.config.no_value_replacement"
         label="No Value Replacement"
@@ -1078,6 +1079,108 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-config-axis-border"
       />
 
+      <div class="space"></div>
+
+      <div
+        style="width: 100%; display: flex; gap: 16px"
+        v-if="
+          [
+            'area',
+            'area-stacked',
+            'bar',
+            'h-bar',
+            'line',
+            'scatter',
+            'stacked',
+            'h-stacked',
+          ].includes(dashboardPanelData.data.type)
+        "
+      >
+        <q-input
+          v-model.number="dashboardPanelData.data.config.y_axis_min"
+          color="input-border"
+          bg-color="input-bg"
+          style="width: 50%"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+          placeholder="Auto"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelData.data.config.y_axis_min =
+                value !== '' ? value : null)
+          "
+          data-test="dashboard-config-y_axis_min"
+          ><template v-slot:label>
+            <div class="row items-center all-pointer-events">
+              {{ t("common.yAxisMin") }}
+              <div>
+                <q-icon
+                  class="q-ml-xs"
+                  size="20px"
+                  name="info"
+                  data-test="dashboard-config-y_axis_min-info"
+                />
+                <q-tooltip
+                  class="bg-grey-8"
+                  anchor="top middle"
+                  self="bottom middle"
+                >
+                  Set the minimum value for the Y-axis.
+                  <br />
+                  This determines the lowest point displayed on the chart.
+                </q-tooltip>
+              </div>
+            </div>
+          </template>
+        </q-input>
+        <q-input
+          v-model.number="dashboardPanelData.data.config.y_axis_max"
+          color="input-border"
+          bg-color="input-bg"
+          style="width: 50%"
+          class="q-py-md showLabelOnTop"
+          stack-label
+          outlined
+          filled
+          dense
+          label-slot
+          :type="'number'"
+          placeholder="Auto"
+          @update:model-value="
+            (value: any) =>
+              (dashboardPanelData.data.config.y_axis_max =
+                value !== '' ? value : null)
+          "
+          data-test="dashboard-config-y_axis_max"
+          ><template v-slot:label>
+            <div class="row items-center all-pointer-events">
+              {{ t("common.yAxisMax") }}
+              <div>
+                <q-icon
+                  class="q-ml-xs"
+                  size="20px"
+                  name="info"
+                  data-test="dashboard-config-y_axis_max-info"
+                />
+                <q-tooltip
+                  class="bg-grey-8"
+                  anchor="top middle"
+                  self="bottom middle"
+                >
+                  Set the maximum value for the Y-axis.
+                  <br />
+                  This determines the highest point displayed on the chart.
+                </q-tooltip>
+              </div>
+            </div>
+          </template>
+        </q-input>
+      </div>
       <div class="space"></div>
 
       <q-select

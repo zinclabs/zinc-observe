@@ -46,9 +46,10 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
     } else {
         scan_stats.original_size
     };
-    if let Some(cur_memory) = memory_stats::memory_stats() {
+    let cur_memory = config::utils::sysinfo::get_memory_usage();
+    if cur_memory > 0 {
         // left memory < datafusion * breaker_ratio and scan_size >=  left memory
-        let left_mem = cfg.limit.mem_total - cur_memory.physical_mem;
+        let left_mem = cfg.limit.mem_total - cur_memory;
         if (left_mem
             < (cfg.memory_cache.datafusion_max_size * cfg.common.memory_circuit_breaker_ratio
                 / 100))
@@ -57,7 +58,7 @@ fn check_memory_circuit_breaker(trace_id: &str, scan_stats: &ScanStats) -> Resul
             let err = format!(
                 "fire memory_circuit_breaker, try to alloc {} bytes, now current memory usage is {} bytes, left memory {} bytes, left memory more than limit of [{} bytes] or scan_size more than left memory , please submit a new query with a short time range",
                 scan_size,
-                cur_memory.physical_mem,
+                cur_memory,
                 left_mem,
                 cfg.memory_cache.datafusion_max_size * cfg.common.memory_circuit_breaker_ratio
                     / 100

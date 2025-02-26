@@ -668,7 +668,7 @@ pub async fn search_partition(
 
     let file_list_took = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, num: {}, took: {} ms",
+        "[trace_id {trace_id}] search_partition: get file_list time_range: {:?}, files: {}, took: {} ms",
         (req.start_time, req.end_time),
         files.len(),
         file_list_took,

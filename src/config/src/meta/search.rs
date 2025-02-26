@@ -40,7 +40,7 @@ pub struct Session {
     pub target_partitions: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 #[schema(as = SearchRequest)]
 pub struct Request {
     #[schema(value_type = SearchQuery)]

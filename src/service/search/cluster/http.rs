@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -285,10 +285,10 @@ pub async fn search(
     }
 
     log::info!(
-        "[trace_id {trace_id}] search->result: total: {}, took: {} ms, scan_size: {}",
+        "[trace_id {trace_id}] search->result: total: {}, scan_size: {} mb, took: {} ms",
         result.total,
-        result.took,
         result.scan_size,
+        result.took,
     );
 
     Ok(result)

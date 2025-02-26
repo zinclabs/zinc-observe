@@ -364,12 +364,12 @@ fn get_empty_record_batch_stream(
     start: std::time::Instant,
 ) -> SendableRecordBatchStream {
     log::info!(
-        "[trace_id {}] flight->search: response node: {}, is_querier: {}, took: {} ms, err: {}",
+        "[trace_id {}] flight->search: response node: {}, is_querier: {}, err: {}, took: {} ms",
         trace_id,
         node_addr,
         is_querier,
+        e.to_string(),
         start.elapsed().as_millis(),
-        e.to_string()
     );
     process_partial_err(partial_err, e);
     let stream = futures::stream::empty::<Result<RecordBatch>>();
@@ -456,6 +456,14 @@ impl Stream for FlightStream {
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
             Poll::Ready(Some(Err(e))) => {
+                log::error!(
+                    "[trace_id {}] flight->search: response node: {}, is_querier: {}, err: {}, took: {} ms",
+                    self.trace_id,
+                    self.node_addr,
+                    self.is_querier,
+                    e.to_string(),
+                    self.start.elapsed().as_millis(),
+                );
                 process_partial_err(self.partial_err.clone(), e);
                 Poll::Ready(None)
             }
@@ -466,13 +474,13 @@ impl Stream for FlightStream {
 impl Drop for FlightStream {
     fn drop(&mut self) {
         log::info!(
-            "[trace_id {}] flight->search: response node: {}, is_querier: {}, took: {} ms, files: {}, scan_size: {}",
+            "[trace_id {}] flight->search: response node: {}, is_querier: {}, files: {}, scan_size: {} mb, took: {} ms",
             self.trace_id,
             self.node_addr,
             self.is_querier,
-            self.start.elapsed().as_millis(),
             self.files,
             self.scan_size / 1024 / 1024,
+            self.start.elapsed().as_millis(),
         );
     }
 }

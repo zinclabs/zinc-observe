@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -46,7 +46,7 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
             }
         }
         // after the node is online, keep alive
-        let ttl_keep_alive = min(10, (get_config().limit.node_heartbeat_ttl / 2) as u64);
+        let ttl_keep_alive = min(5, (get_config().limit.node_heartbeat_ttl / 2) as u64);
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
             loop {
@@ -153,6 +153,7 @@ async fn register() -> Result<()> {
         status: NodeStatus::Prepare,
         scheduled: true,
         broadcasted: false,
+        metrics: Default::default(),
     };
     let val = json::to_vec(&node).unwrap();
 
@@ -202,7 +203,7 @@ pub(crate) async fn set_offline() -> Result<()> {
 pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
     let cfg = get_config();
     // set node status to online
-    let node = match super::NODES.read().await.get(LOCAL_NODE.uuid.as_str()) {
+    let mut node = match super::NODES.read().await.get(LOCAL_NODE.uuid.as_str()) {
         Some(node) => {
             let mut val = node.clone();
             val.status = status.clone();
@@ -230,8 +231,13 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             status: status.clone(),
             scheduled: true,
             broadcasted: false,
+            metrics: Default::default(),
         },
     };
+
+    // update node status metrics
+    node.metrics = super::update_node_status_metrics();
+
     let val = json::to_string(&node).unwrap();
 
     LOCAL_NODE_STATUS.store(status as _, Ordering::Release);
