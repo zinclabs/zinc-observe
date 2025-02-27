@@ -335,8 +335,6 @@ export default {
 
     const showViewTraceBtn = ref(false);
 
-    const originalDataCache = ref(new Map());
-
     const getTracesStreams = async () => {
       isTracesStreamsLoading.value = true;
       try {
@@ -398,10 +396,10 @@ export default {
         return;
       }
 
-      // Check if data exists in cache
+      // Check if data exists in searchObj cache
       const cacheKey = `${props.value._o2_id}_${props.value._timestamp}`;
-      if (originalDataCache.value.has(cacheKey)) {
-        unflattendData.value = originalDataCache.value.get(cacheKey);
+      if (searchObj.data.originalDataCache?.has(cacheKey)) {
+        unflattendData.value = searchObj.data.originalDataCache.get(cacheKey);
         return;
       }
 
@@ -416,7 +414,7 @@ export default {
             query: {
               query: {
                 start_time: props.value._timestamp - 10 * 60 * 1000,
-                sql: `SELECT _original FROM "${props.streamName ?  props.streamName : searchObj.data.stream.selectedStream }" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
+                sql: `SELECT _original FROM "${props.streamName ? props.streamName : searchObj.data.stream.selectedStream}" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
                 end_time: props.value._timestamp + 10 * 60 * 1000,
                 sql_mode: "full",
                 size: 1,
@@ -433,8 +431,8 @@ export default {
         const formattedData = JSON.stringify(JSON.parse(res.data.hits[0]._original), null, 2);
         unflattendData.value = formattedData;
         
-        // Store in cache
-        originalDataCache.value.set(cacheKey, formattedData);
+
+        searchObj.data.originalDataCache.set(cacheKey, formattedData);
 
       } catch (err: any) {
         loading.value = false;
@@ -448,9 +446,6 @@ export default {
         loading.value = false;
       }
     };
-    onUnmounted(() => {
-      originalDataCache.value.clear();
-    });
 
     const filterStreamFn = (val: any = "") => {
       filteredTracesStreamOptions.value = tracesStreams.value.filter(
