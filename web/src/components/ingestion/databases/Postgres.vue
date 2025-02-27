@@ -47,11 +47,10 @@ export default defineComponent({
   },
   components: { CopyContent },
   setup(props) {
-    const docURL = `https://short.openobserve.ai/database/postgres`;
     const name = "postgres";
-    const { endpoint, databaseContent } = useIngestion();
+    const { endpoint, databaseContent, databaseDocURLs } = useIngestion();
     const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
-
+    const docURL = databaseDocURLs[name];
     
     return {
       config,

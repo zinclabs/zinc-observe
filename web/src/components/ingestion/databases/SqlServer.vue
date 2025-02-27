@@ -47,11 +47,10 @@ export default defineComponent({
   },
   components: { CopyContent },
   setup(props) {
-    const docURL = `https://short.openobserve.ai/database/sql-server`;
-    const name = "SQL Server";
-    const { endpoint, databaseContent } = useIngestion();
+    const name = "sqlServer";
+    const { endpoint, databaseContent, databaseDocURLs } = useIngestion();
     const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
-    
+    const docURL = databaseDocURLs[name];
     return {
       config,
       docURL,

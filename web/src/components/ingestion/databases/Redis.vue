@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
 import useIngestion from "@/composables/useIngestion";
-const docURL = "https://short.openobserve.ai/database/redis";
-const name = "Redis";
+const name = "redis";
 const store = useStore();
-const { endpoint, databaseContent } = useIngestion();
+const { endpoint, databaseContent, databaseDocURLs } = useIngestion();
 const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
+const docURL = databaseDocURLs[name];
 </script>
 
 <template>

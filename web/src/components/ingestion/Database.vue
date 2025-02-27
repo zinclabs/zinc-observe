@@ -98,7 +98,7 @@ export default defineComponent({
     const ingestTabType = ref("sqlserver");
 
     onBeforeMount(() => {
-      if (router.currentRoute.value.name === "database") {
+      if (router.currentRoute.value.name === "databases") {
         router.push({
           name: "sqlserver",
           query: {
@@ -110,7 +110,7 @@ export default defineComponent({
     });
 
     onUpdated(() => {
-      if (router.currentRoute.value.name === "database") {
+      if (router.currentRoute.value.name === "databases") {
         router.push({
           name: "sqlserver",
           query: {
