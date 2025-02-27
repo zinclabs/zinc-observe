@@ -1886,13 +1886,7 @@ const useLogs = () => {
         }
 
         // get function definition
-        if (
-          searchObj.data.tempFunctionContent != "" &&
-          searchObj.meta.toggleFunction
-        ) {
-          queryReq.query["query_fn"] =
-            b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
-        }
+        addTransformToQuery(queryReq);
 
         // in case of relative time, set start_time and end_time to query
         // it will be used in pagination request
