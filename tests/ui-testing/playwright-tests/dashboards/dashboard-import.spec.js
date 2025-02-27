@@ -146,6 +146,114 @@ test.describe("dashboard UI testcases", () => {
 });
  
 
+test("Should cancel the file upload action when clicking the Cancel button in the 'Drop your file' dialog", async ({ page }) => {
+  await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+  await waitForDashboardPage(page);
+  await page.locator('[data-test="dashboard-import"]').click();
+
+  //file name to be used for import
+  const fileContentPath = "../test-data/dashboards-import.json";
+
+  // Locate the file input field and set the JSON file
+ const inputFile =  await page.locator('input[type="file"]')
+  //is used for setting the file to be imported
+  await inputFile.setInputFiles(fileContentPath);
+
+  await page.getByText('close').click();
+  await expect(page.getByLabel('cloud_uploadDrop your file')).toBeVisible();
+  await page.getByRole('button', { name: 'Import' }).click();
+  await expect(page.getByText('Please Enter a JSON object')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
+});
+
+test("Side scrollsbdhser", async ({ page }) => {   ///////////////////////// NOt working 
+  await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+  await waitForDashboardPage(page);
+  await page.locator('[data-test="dashboard-import"]').click();
+
+  //file name to be used for import
+  const fileContentPath = "../test-data/dashboards-import.json";
+
+  // Locate the file input field and set the JSON file
+ const inputFile =  await page.locator('input[type="file"]')
+  //is used for setting the file to be imported
+  await inputFile.setInputFiles(fileContentPath);
+
+  await page.locator('.visible > .slider').click();
+  await page.keyboard.press('ArrowDown');  // Scrolls down
+});
+
+  test("Verify that the .json data is editable in the UI file editor.", async ({ page }) => {
+    await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+    await waitForDashboardPage(page);
+    await page.locator('[data-test="dashboard-import"]').click();
+
+    //file name to be used for import
+    const fileContentPath = "../test-data/dashboards-import.json";
+
+    // Locate the file input field and set the JSON file
+   const inputFile =  await page.locator('input[type="file"]')
+    //is used for setting the file to be imported
+    await inputFile.setInputFiles(fileContentPath);
+
+    await page.getByText('"Cloudfront Distribution to').click();
+    await page.getByLabel('Editor content;Press Alt+F1').fill('[\n  {\n    "version": 5,\n    "dashboardId": "7300465175298072125",\n    "title": "Cloudfront to OpenObserve",\n    "description": "Cloudfront Distribution test to Kinesis Streams to Amazon Data Firehose to OpenObserve",\n    "role": "",\n    "owner": "",\n    "created": "2025-02-26T10:45:04.098Z",\n');
+  
+    await page.getByRole('button', { name: 'Import' }).click();
+  
+    await expect(page.getByRole('cell', { name: 'Cloudfront to OpenObserve' }).first()).toBeVisible();
+  await page.getByRole('row', { name: '01 Cloudfront to OpenObserve' }).locator('[data-test="dashboard-delete"]').click();
+  await page.locator('[data-test="confirm-button"]').click();
+  
+
+});
+
+test("Should display an error validation message when clicking the Import button if the 'Title' field is missing in the .json data.", async ({ page }) => {
+  
+  await page.locator('[data-test="menu-link-\\/dashboards-item"]').click();
+  await waitForDashboardPage(page);
+  await page.locator('[data-test="dashboard-import"]').click();
+
+  //file name to be used for import
+  const fileContentPath = "../test-data/dashboards-import.json";
+
+  // Locate the file input field and set the JSON file
+ const inputFile =  await page.locator('input[type="file"]')
+  //is used for setting the file to be imported
+  await inputFile.setInputFiles(fileContentPath);
 
 
-  });
+  // await page.fill('"Cloudfront to OpenObserve"', '');
+
+  // await page.locator('span').filter({ hasText: '"title": "Cloudfront to' }).locator('span').nth(4).click();
+
+
+  await page.evaluate(() => {
+    document.body.innerHTML = document.body.innerHTML.replace(/Cloudfront to OpenObserve/g, "");
+});
+
+
+//   await page.evaluate(() => {
+//     let input = document.querySelector('input');
+//     input.value = input.value.replace("Cloudfront to OpenObserve", "").trim();
+// });
+
+// const backspaceLimit = 27; // Define the number of times to press Backspace
+
+// await page.locator('input').click(); // Focus on the input field
+// for (let i = 0; i < backspaceLimit; i++) {
+//     await page.locator('input').press('Backspace');
+// }
+
+
+
+
+  await page.getByRole('button', { name: 'Import' }).click();
+
+  await expect(page.getByRole('cell', { name: 'Cloudfront to OpenObserve' }).first()).toBeVisible();
+await page.getByRole('row', { name: '01 Cloudfront to OpenObserve' }).locator('[data-test="dashboard-delete"]').click();
+await page.locator('[data-test="confirm-button"]').click();
+
+});
+});
