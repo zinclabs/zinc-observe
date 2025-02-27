@@ -101,8 +101,9 @@
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
       <q-spinner v-if="loading" size="lg" color="primary" />
-
-      <query-editor
+      <div v-if="!loading"
+      >
+        <query-editor
         v-model:query="unflattendData"
         ref="queryEditorRef"
         :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
@@ -110,6 +111,8 @@
         :class="mode"
         language="json"
       />
+      </div>
+      
     </div>
     <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
       {
@@ -226,7 +229,7 @@
 </template>
 
 <script lang="ts">
-import { ref, onBeforeMount, computed, nextTick, onMounted, watch } from "vue";
+import { ref, onBeforeMount, computed, nextTick, onMounted, watch, onUnmounted } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
@@ -332,6 +335,8 @@ export default {
 
     const showViewTraceBtn = ref(false);
 
+    const originalDataCache = ref(new Map());
+
     const getTracesStreams = async () => {
       isTracesStreamsLoading.value = true;
       try {
@@ -382,59 +387,70 @@ export default {
 
     onMounted(async () => {});
 
-    watch(
-      () => props.value,
-      async () => {
-        setViewTraceBtn();
+    const getOriginalData = async () => {
+      setViewTraceBtn();
 
-        if (
-          !props.value._o2_id ||
-          searchAggData.hasAggregation ||
-          searchObj.data.stream.selectedStream.length > 1
-        ) {
-          return;
-        }
+      if (
+        !props.value._o2_id ||
+        searchAggData.hasAggregation ||
+        searchObj.data.stream.selectedStream.length > 1
+      ) {
+        return;
+      }
 
-        loading.value = true;
+      // Check if data exists in cache
+      const cacheKey = `${props.value._o2_id}_${props.value._timestamp}`;
+      if (originalDataCache.value.has(cacheKey)) {
+        unflattendData.value = originalDataCache.value.get(cacheKey);
+        return;
+      }
 
-        try {
-          const { traceparent, traceId } = generateTraceContext();
+      loading.value = true;
 
-          const res = await searchService.search(
-            {
-              org_identifier: searchObj.organizationIdentifier,
+      try {
+        const { traceparent, traceId } = generateTraceContext();
+
+        const res = await searchService.search(
+          {
+            org_identifier: searchObj.organizationIdentifier,
+            query: {
               query: {
-                query: {
-                  start_time: props.value._timestamp - 10 * 60 * 1000,
-                  sql: `SELECT _original FROM "${props.streamName ?  props.streamName : searchObj.data.stream.selectedStream }" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
-                  end_time: props.value._timestamp + 10 * 60 * 1000,
-                  sql_mode: "full",
-                  size: 1,
-                  from: 0,
-                  quick_mode: false,
-                },
+                start_time: props.value._timestamp - 10 * 60 * 1000,
+                sql: `SELECT _original FROM "${props.streamName ?  props.streamName : searchObj.data.stream.selectedStream }" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
+                end_time: props.value._timestamp + 10 * 60 * 1000,
+                sql_mode: "full",
+                size: 1,
+                from: 0,
+                quick_mode: false,
               },
-              page_type: searchObj.data.stream.streamType,
-              traceparent,
             },
-            "UI",
-          );
-          unflattendData.value = res.data.hits[0]._original;
-        } catch (err: any) {
-          loading.value = false;
-          $q.notify({
-            message:
-              err.response?.data?.message || "Failed to get the Original data",
-            color: "negative",
-            position: "bottom",
-            timeout: 1500,
-          });
-        } finally {
-          loading.value = false;
-        }
-      },
-      { immediate: true, deep: true },
-    );
+            page_type: searchObj.data.stream.streamType,
+            traceparent,
+          },
+          "UI",
+        );
+
+        const formattedData = JSON.stringify(JSON.parse(res.data.hits[0]._original), null, 2);
+        unflattendData.value = formattedData;
+        
+        // Store in cache
+        originalDataCache.value.set(cacheKey, formattedData);
+
+      } catch (err: any) {
+        loading.value = false;
+        $q.notify({
+          message: err.response?.data?.message || "Failed to get the Original data",
+          color: "negative",
+          position: "bottom",
+          timeout: 1500,
+        });
+      } finally {
+        loading.value = false;
+      }
+    };
+    onUnmounted(() => {
+      originalDataCache.value.clear();
+    });
 
     const filterStreamFn = (val: any = "") => {
       filteredTracesStreamOptions.value = tracesStreams.value.filter(
@@ -448,10 +464,19 @@ export default {
       emit("view-trace");
     };
 
+    watch(activeTab, async () => {
+      if (activeTab.value === "unflattened") {
+        unflattendData.value = "";
+        await getOriginalData();
+      }
+    });
+
     const handleTabChange = async () => {
       if (activeTab.value === "unflattened") {
         await nextTick();
-        queryEditorRef.value.formatDocument();
+        if(!loading.value) {
+          queryEditorRef.value.formatDocument();
+        }
       }
     };
 
@@ -494,6 +519,7 @@ export default {
       isTracesStreamsLoading,
       tracesStreams,
       setViewTraceBtn,
+      getOriginalData,
     };
   },
 };
