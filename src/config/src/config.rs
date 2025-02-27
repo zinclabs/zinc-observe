@@ -381,6 +381,7 @@ pub struct Config {
     pub pipeline: Pipeline,
     pub health_check: HealthCheck,
     pub encryption: Encryption,
+    pub ratelimit: RateLimit,
 }
 
 #[derive(EnvConfig)]
@@ -1703,6 +1704,21 @@ pub struct HealthCheck {
     pub failed_times: usize,
 }
 
+#[derive(EnvConfig)]
+pub struct RateLimit {
+    #[env_config(
+        name = "ZO_RATELIMIT_ENABLED",
+        default = false,
+        help = "ratelimit enabled"
+    )]
+    pub ratelimit_enabled: bool,
+    #[env_config(
+        name = "ZO_RULES_REFRESH_INTERVAL",
+        default = 10,
+        help = "unit: seconds, refresh interval for rate limit rules"
+    )]
+    pub rules_refresh_interval: usize,
+}
 pub fn init() -> Config {
     dotenv_override().ok();
     let mut cfg = Config::init().expect("config init error");
@@ -1781,6 +1797,11 @@ pub fn init() -> Config {
     // check pipeline config
     if let Err(e) = check_pipeline_config(&mut cfg) {
         panic!("pipeline config error: {e}");
+    }
+
+    // check ratelimit config
+    if let Err(e) = check_ratelimit_config(&mut cfg) {
+        panic!("ratelimit config error: {e}");
     }
 
     cfg
@@ -2479,6 +2500,15 @@ fn check_pipeline_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         }
     } else {
         cfg.pipeline.wal_size_limit *= 1024 * 1024;
+    }
+    Ok(())
+}
+
+fn check_ratelimit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.ratelimit.rules_refresh_interval < 2 {
+        return Err(anyhow::anyhow!(
+            "ratelimit rules refresh interval must gt 2"
+        ));
     }
     Ok(())
 }
