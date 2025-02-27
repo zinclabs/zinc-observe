@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2023 OpenObservice Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -673,7 +673,7 @@ const actionTypes = [
   },
   {
     label: "Service",
-    value: "Serve",
+    value: "service",
   },
 ];
 
@@ -1032,8 +1032,8 @@ const setupEditingActionScript = async (report: any) => {
 
   formData.value.type = "scheduled";
 
-  if (formData.value.execution_details === "Serve") {
-    formData.value.type = "Serve";
+  if (formData.value.execution_details === "service") {
+    formData.value.type = "service";
   }
 
   // set date, time and timezone in scheduling
