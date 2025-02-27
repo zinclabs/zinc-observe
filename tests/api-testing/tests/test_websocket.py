@@ -236,7 +236,7 @@ def test_histogram(create_session, base_url, test_name, hist_query, expected_tot
         res_histog_cache.status_code == 200
     ), f"histogram cache {test_name} mode added 200, but got {res_histog_cache.status_code} {res_histog_cache.content}"
 
-    print(f"Response {url} Cache Histog status code:", res_histog_cache.status_code) 
+    print(f"Response {url} Cache Histog {test_name} status code:", res_histog_cache.status_code) 
 
     # Parse the JSON response
     
@@ -587,6 +587,41 @@ def test_enable_websocket(create_session, base_url):
         resp_websocket.status_code == 200
     ), f"Websocket enable 200, but got {resp_websocket.status_code} {resp_websocket.content}"
 
+def handle_websocket_connection(base_url, cookie_header, message):
+    """Simple WebSocket handler - just get results and return"""
+    url = base_url
+    ws = None
+    try:
+        ws = websocket.create_connection(url, header={"Cookie": cookie_header})
+        
+        # Send query
+        ws.send(json.dumps(message))
+        
+        # Get results
+        response = ws.recv()
+        res_json = json.loads(response)
+        return res_json
+        
+    except websocket.WebSocketConnectionClosedException as e:
+        print(f"WebSocket connection closed by server: {e}")
+        raise
+    except websocket.WebSocketTimeoutException as e:
+        print(f"WebSocket timeout: {e}")
+        raise
+    except json.JSONDecodeError as e:
+        print(f"Failed to parse response as JSON: {e}")
+        raise
+    except Exception as e:
+        print(f"Unexpected WebSocket error: {e}")
+        raise
+    finally:
+        if ws:
+            try:
+                ws.close()
+            except:
+                pass  # Ignore errors during close
+
+
 @pytest.mark.parametrize("test_name, hist_query, expected_total_hits_results_histg, expected_zo_sql_num_histg", test_data_histog)
 def test_websocket_histogram(test_name, hist_query, expected_total_hits_results_histg, expected_zo_sql_num_histg):
     """Test WebSocket connection and histogram endpoint."""
@@ -602,20 +637,12 @@ def test_websocket_histogram(test_name, hist_query, expected_total_hits_results_
     # Example of using the WS_URL
     print(f"WebSocket {test_name}  Histogram URL:", WS_URL_histogram)
 
-    # Now we can use WS_URL in our WebSocket connection
-    try:
-        ws_histogram = websocket.create_connection(WS_URL_histogram, header={"Cookie": cookie_header_histogram})
-    except websocket.WebSocketBadStatusException as e:
-        print(f"Failed to connect: {e}")
-
-        print(f"WebSocket histogram connection {WS_ZO_BASE_URL} established", ws_histogram)
-
     # Generate a dynamic trace_id
     trace_id_histogram = str(uuid.uuid4())
 
     now = datetime.now(timezone.utc)
     end_time = int(now.timestamp() * 1000000)
-    # Prepare the message to send
+    # Prepare the message to send for running non-cached test
     message_histogram = {
         "type": "search",
         "content": {
@@ -636,17 +663,10 @@ def test_websocket_histogram(test_name, hist_query, expected_total_hits_results_
             "use_cache": False
         }
     }
-
-    # Send the message
-    ws_histogram.send(json.dumps(message_histogram))
-
-    # Receive the response
-    response_histogram = ws_histogram.recv()
-
-    # print("WebSocket response Histogram:", response_histogram) 
-
-    # Parse the JSON response
-    response_data_histogram = json.loads(response_histogram)
+    
+    response_data_histogram = handle_websocket_connection(WS_URL_histogram, cookie_header_histogram, message_histogram)
+    
+    print(f"WebSocket {test_name} response Histogram:", response_data_histogram) 
 
     # Validate the total in the response
     total_hits_histogram = response_data_histogram["content"]["results"]["total"]
@@ -662,24 +682,27 @@ def test_websocket_histogram(test_name, hist_query, expected_total_hits_results_
     else:
         pytest.fail("No hits found in the response.")
 
-    ws_histogram.close()
+    # Wait before next connection
+    time.sleep(0.5)
 
     # Generate a dynamic UUID for cache when websocket is enabled
-
     uuid_histogram_cache = str(uuid.uuid4())  # Generates a new UUID
 
     # Construct the WebSocket URL
     WS_URL_histogram_cache = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{uuid_histogram_cache}"
-
-    # Example of using the WS_URL
-    # print("WebSocket Histogram URL Cache:", WS_URL_histogram_cache)
 
     # Now we can use WS_URL in our WebSocket connection for cache
 
     ws_histogram_cache = websocket.create_connection(WS_URL_histogram_cache, header={"Cookie": cookie_header_histogram})
 
     print(f"WebSocket {test_name} Cache histogram {WS_ZO_BASE_URL} connection established", ws_histogram_cache)
+    
+    # Now we can use WS_URL in our WebSocket connection for cache
 
+    ws_histogram_cache = websocket.create_connection(WS_URL_histogram_cache, header={"Cookie": cookie_header_histogram})
+
+    print(f"WebSocket {test_name} Cache histogram {WS_ZO_BASE_URL} connection established", ws_histogram_cache)
+    
     # Generate a dynamic trace_id
     trace_id_histogram_cache = str(uuid.uuid4())
 
@@ -706,17 +729,10 @@ def test_websocket_histogram(test_name, hist_query, expected_total_hits_results_
             "use_cache": True
         }
     }
-
-    # Send the message
-    ws_histogram_cache.send(json.dumps(message_histogram_cashe))
-
-    # Receive the response
-    response_histogram_cache = ws_histogram_cache.recv()
-
-    # print("WebSocket cache response Histogram:", response_histogram_cache) 
-
-    # Parse the JSON response
-    response_data_histogram_cache = json.loads(response_histogram_cache)
+   
+    response_data_histogram_cache = handle_websocket_connection(WS_URL_histogram_cache, cookie_header_histogram, message_histogram_cashe)
+ 
+    print(f"WebSocket {test_name} response Histogram Cache:", response_data_histogram_cache) 
 
     # Validate the total in the response
     total_hits_histogram_cache = response_data_histogram_cache["content"]["results"]["total"]
@@ -732,8 +748,6 @@ def test_websocket_histogram(test_name, hist_query, expected_total_hits_results_
     else:
         pytest.fail("No hits found in the response.")
 
-    ws_histogram_cache.close()
-
 
 @pytest.mark.parametrize("test_name_sql, sql_query, sql_size, total_exp", test_data_sql)
 def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
@@ -747,24 +761,6 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
 
     # Construct the WebSocket URL
     WS_URL_sql = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{uuid_sql}"
-
-    # Now we can use WS_URL in our WebSocket connection
-
-    
-    try:
-        ws_sql = websocket.create_connection(WS_URL_sql, header={"Cookie": cookie_header_sql})
-        # Proceed with your WebSocket logic here
-    except websocket.WebSocketBadStatusException as e:
-        print(f"WebSocket connection failed: {e}")
-        # Use the exception's message directly
-        status_code = e.args[0].split()[2] if e.args else "Unknown"
-        assert False, f"WebSocket connection failed with status: {status_code} and message: {e.args[0]}"
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        assert False, f"An unexpected error occurred: {e}"
-
-    print(f"WebSocket {test_name_sql} SQL {WS_ZO_BASE_URL} connection established", ws_sql)
-
     # Generate a dynamic trace_id
     trace_id_sql = str(uuid.uuid4())
 
@@ -794,16 +790,9 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
         }
     }
 
-    # Send the specific message
-    ws_sql.send(json.dumps(message_sql))
+    response_data_sql = handle_websocket_connection(WS_URL_sql, cookie_header_sql, message_sql)
 
-    # Receive the response
-    response_sql = ws_sql.recv()
-
-    # print("WebSocket response for SQL:", response_sql)
-
-    # Parse the JSON response
-    response_data_sql = json.loads(response_sql)
+    print(f"WebSocket {test_name_sql} response SQL:", response_data_sql)
 
     # Validate the total in the response
     total_hits_sql = response_data_sql["content"]["results"]["total"]
@@ -812,7 +801,6 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
     expected_hits_sql = total_exp  # That's what we're expecting
     assert total_hits_sql == expected_hits_sql, f"Expected {test_name_sql} total to be {expected_hits_sql}, but got {total_hits_sql}"
     
-    ws_sql.close()
 
     # Generate a dynamic UUID for cache when websocket is enabled
 
@@ -821,14 +809,6 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
     # Construct the WebSocket URL
     WS_URL_sql_cache = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{uuid_sql_cache}"
 
-    # Example of using the WS_URL
-    # print("WebSocket SQL URL Cache:", WS_URL_sql_cache)
-
-    # Now we can use WS_URL in our WebSocket connection for cache
-
-    ws_sql_cache = websocket.create_connection(WS_URL_sql_cache, header={"Cookie": cookie_header_sql})
-
-    print(f"WebSocket {test_name_sql} Cache SQL {WS_ZO_BASE_URL} connection established", ws_sql_cache)
 
     # Generate a dynamic trace_id
     trace_id_sql_cache = str(uuid.uuid4())
@@ -859,18 +839,11 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
         }
     }
 
-    # Send the specific message
-    ws_sql_cache.send(json.dumps(message_sql_cache))
+    response_data_sql_cache = handle_websocket_connection(WS_URL_sql_cache, cookie_header_sql, message_sql_cache)   
 
 
-    # Receive the response
-    response_sql_cache = ws_sql_cache.recv()
+    print(f"WebSocket {test_name_sql} response SQL Cache:", response_data_sql_cache)
 
-    # print("WebSocket cache response for SQL:", response_sql_cache)
-
-    # Parse the JSON response
-
-    response_data_sql_cache = json.loads(response_sql_cache)
 
     # Validate the total in the response
     total_hits_sql_cache = response_data_sql_cache["content"]["results"]["total"]
@@ -879,7 +852,34 @@ def test_websocket_sql(test_name_sql, sql_query, sql_size, total_exp):
     expected_hits_sql_cache = total_exp  # That's what we're expecting
     assert total_hits_sql_cache == expected_hits_sql_cache, f"Expected cache {test_name_sql} total to be {expected_hits_sql_cache}, but got {total_hits_sql_cache}"
 
-    ws_sql_cache.close()
+def test_websocket_cancel():
+    """Test WebSocket cancel ."""
+    # Prepare headers with cookies
+
+    cookie_header_cancel = f"auth_tokens={{\"access_token\":\"Basic {base64.b64encode((ZO_ROOT_USER_EMAIL + ':' + ZO_ROOT_USER_PASSWORD).encode()).decode()}\",\"refresh_token\":\"\"}}"
+    
+    # Generate a dynamic UUID
+    uuid_cancel = str(uuid.uuid4())  # Generates a new UUID
+
+    # Construct the WebSocket URL
+    WS_URL_cancel = f"{WS_ZO_BASE_URL}api/{org_id}/ws/{uuid_cancel}"
+    # Generate a dynamic trace_id
+    trace_id_cancel = str(uuid.uuid4())
+
+    
+    message_cancel = {
+        "type": "cancel",
+        "content": {
+            "trace_id": trace_id_cancel
+        }
+    }
+
+    response_data_cancel = handle_websocket_connection(WS_URL_cancel, cookie_header_cancel, message_cancel)
+
+    print("WebSocket cancel response:", response_data_cancel)
+
+    # Assert that is_success is True
+    assert response_data_cancel["content"]["is_success"] is True, "Expected is_success to be True"
 
 def test_delete_stream(create_session, base_url):
     """Running an E2E test for deleting the created stream."""
@@ -895,7 +895,7 @@ def test_delete_stream_join(create_session, base_url):
     """Running an E2E test for deleting the created join stream."""
     session = create_session
     url = base_url
-    # Proceed to delete the created Stream
+    # Proceed to delete the created join Stream
     resp_delete_stream_join= session.delete(f"{url}api/{org_id}/streams/{stream_join}?type=logs")
     print(f"Deleted Stream Response: {resp_delete_stream_join.text}")
     assert resp_delete_stream_join.status_code == 200, f"Failed to delete stream {stream_join}"
