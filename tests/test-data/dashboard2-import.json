@@ -1,0 +1,105 @@
+{
+    "version": 5,
+    "dashboardId": "7269443761157972781",
+    "title": "",
+    "description": "Cloudfront Distribution to Kinesis Streams to Amazon Data Firehose to OpenObserve",
+    "role": "",
+    "owner": "",
+    "created": "2024-12-02T20:32:14.542Z",
+    "tabs": [
+      {
+        "tabId": "default",
+        "name": "Overview",
+        "panels": [
+          {
+            "id": "Panel_ID1938110",
+            "type": "bar",
+            "title": "Requests Over Time",
+            "description": "",
+            "config": {
+              "show_legends": false,
+              "legends_position": null,
+              "decimals": 2,
+              "top_results_others": false,
+              "axis_border_show": false,
+              "base_map": {
+                "type": "osm"
+              },
+              "map_view": {
+                "zoom": 1,
+                "lat": 0,
+                "lng": 0
+              },
+              "map_symbol_style": {
+                "size": "by Value",
+                "size_by_value": {
+                  "min": 1,
+                  "max": 100
+                },
+                "size_fixed": 2
+              },
+              "drilldown": [],
+              "mark_line": [],
+              "connect_nulls": false,
+              "no_value_replacement": "",
+              "wrap_table_cells": false
+            },
+            "queryType": "sql",
+            "queries": [
+              {
+                "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\" FROM \"cloudfront_access_logs\" GROUP BY x_axis_1",
+                "vrlFunctionQuery": "",
+                "customQuery": false,
+                "fields": {
+                  "stream": "cloudfront_access_logs",
+                  "stream_type": "",
+                  "x": [
+                    {
+                      "label": "Timestamp",
+                      "alias": "x_axis_1",
+                      "column": "_timestamp",
+                      "color": null,
+                      "aggregationFunction": "histogram"
+                    }
+                  ],
+                  "y": [
+                    {
+                      "label": "Requests",
+                      "alias": "y_axis_1",
+                      "column": "_timestamp",
+                      "color": "#f273db",
+                      "aggregationFunction": "count"
+                    }
+                  ],
+                  "z": [],
+                  "breakdown": [],
+                  "filter": {
+                    "filterType": "group",
+                    "logicalOperator": "AND",
+                    "conditions": []
+                  }
+                },
+                "config": {
+                  "layer_type": "scatter",
+                  "weight_fixed": 1,
+                  "limit": 0,
+                  "min": 0,
+                  "max": 100
+                }
+              }
+            ],
+            "layout": {
+              "x": 13,
+              "y": 0,
+              "w": 19,
+              "h": 18,
+              "i": "1"
+            },
+            "htmlContent": "",
+            "markdownContent": ""
+          }
+        ]
+      }
+    ]
+  }
+  
