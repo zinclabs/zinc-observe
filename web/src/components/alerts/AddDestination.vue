@@ -262,19 +262,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="col-6 q-py-xs action-select">
             <q-select
               data-test="add-destination-action-select"
-              v-model="formData.action"
+              v-model="formData.action_id"
               :label="t('alert_destinations.action') + ' *'"
               :options="filteredActions"
               color="input-border"
               bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
+              class="showLabelOnTop no-case"
+              map-options
               emit-value
+              stack-label
               outlined
-              :popup-content-style="{ textTransform: 'uppercase' }"
               filled
-              :loading="isLoadingActions"
               dense
+              use-input
+              :loading="isLoadingActions"
               :rules="[(val: any) => !!val || 'Field is required!']"
               tabindex="0"
               @filter="filterActions"
@@ -361,7 +362,7 @@ const formData: Ref<DestinationData> = ref({
   headers: {},
   emails: "",
   type: "http",
-  action: "",
+  action_id: "",
 });
 const isUpdatingDestination = ref(false);
 
@@ -369,9 +370,9 @@ const isLoadingActions = ref(false);
 
 const router = useRouter();
 
-const actionOptions = ref<string[]>([]);
+const actionOptions = ref<any[]>([]);
 
-const filteredActions = ref<string[]>([]);
+const filteredActions = ref<any[]>([]);
 
 // TODO OK: Use UUID package instead of this and move this method in utils
 const getUUID = () => {
@@ -439,9 +440,9 @@ const setupDestinationData = () => {
     formData.value.headers = props.destination.headers;
     formData.value.emails = (props.destination.emails || []).join(", ");
     formData.value.type = props.destination.type || "http";
-    formData.value.action = props.destination.action || "http";
+    formData.value.action_id = props.destination.action_id || "";
 
-    if (Object.keys(formData.value.headers).length) {
+    if (Object.keys(formData.value?.headers || {}).length) {
       apiHeaders.value = [];
       Object.entries(formData.value.headers).forEach(([key, value]) => {
         addApiHeader(key, value);
@@ -467,6 +468,7 @@ const isValidDestination = computed(
       formData.value.method &&
       formData.value.type === "http") ||
       (formData.value.type === "email" && formData.value.emails.length) ||
+      (formData.value.type === "action" && formData.value.action_id.length) ||
       (!props.isAlerts && formData.value.url && formData.value.method)) &&
     (props.isAlerts ? formData.value.template : true),
 );
@@ -477,11 +479,14 @@ const getActionOptions = async () => {
     const actions = await actionService.list(
       store.state.selectedOrganization.identifier,
     );
-    actionOptions.value = actions.data.map((action: any) => ({
-      value: action.id,
-      label: action.name,
-      type: action.execution_details_type,
-    }));
+    actions.data.forEach((action: any) => {
+      if (action.execution_details_type === "service")
+        actionOptions.value.push({
+          value: action.id,
+          label: action.name,
+          type: action.execution_details_type,
+        });
+    });
   } catch (err) {
     console.error(err);
   } finally {
@@ -526,7 +531,7 @@ const saveDestination = () => {
 
   if (formData.value.type === "action") {
     payload["type"] = "action";
-    payload["action"] = formData.value.action;
+    payload["action_id"] = formData.value.action_id;
   }
 
   // if (!props.isAlerts) {
@@ -619,15 +624,20 @@ const filterColumns = (options: any[], val: String, update: Function) => {
     return filteredOptions;
   }
   update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
+    const value = val?.toLowerCase();
+    filteredOptions = options.filter((column: any) => {
+      if (typeof column === "string")
+        return column?.toLowerCase().indexOf(value) > -1;
+      else {
+        return column?.label?.toLowerCase().indexOf(value) > -1;
+      }
+    });
   });
   return filteredOptions;
 };
 
 const filterActions = (val: string, update: any) => {
+  console.log(val, "val");
   filteredActions.value = filterColumns(actionOptions.value, val, update);
 };
 </script>
