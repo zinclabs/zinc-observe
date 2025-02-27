@@ -100,7 +100,7 @@
       </div>
     </div>
     <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner v-if="loading" size="lg" color="primary" />
+      <q-spinner-hourglass v-if="loading" color="primary" size="lg"  />
       <div v-if="!loading"
       >
         <query-editor
