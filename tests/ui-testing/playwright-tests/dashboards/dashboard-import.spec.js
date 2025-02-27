@@ -3,7 +3,6 @@ import logData from "../../cypress/fixtures/log.json";
 import logsdata from "../../../test-data/logs_data.json";
 import importdata from "../../../test-data/dashboards-import.json";
 import importdata1 from "../../../test-data/dashboard1-import.json";
-import importdata1 from "../../../test-data/dashboard2-import.json";
 
 
 const randomDashboardName =
@@ -293,10 +292,6 @@ test.describe("dashboard UI testcases", () => {
     await page.getByRole("button", { name: "Import" }).click();
     
   //  delete the dashboard
-
-    await expect(
-      page.getByRole("cell", { name: "Cloudfront to OpenObserve" }).first()
-    ).toBeVisible();
     await page
       .getByRole("row", { name: "01 Cloudfront to OpenObserve" })
       .locator('[data-test="dashboard-delete"]')
