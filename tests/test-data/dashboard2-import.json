@@ -1,7 +1,7 @@
 {
     "version": 5,
     "dashboardId": "7269443761157972781",
-    "title": "",
+    "title": "Cloudfront to OpenObserve",
     "description": "Cloudfront Distribution to Kinesis Streams to Amazon Data Firehose to OpenObserve",
     "role": "",
     "owner": "",
