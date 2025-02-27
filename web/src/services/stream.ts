@@ -81,12 +81,14 @@ const stream = {
     regions,
     clusters,
     no_count,
+    action_id,
   }: any) => {
     const fieldsString = fields.join(",");
     let url = `/api/${org_identifier}/${stream_name}/_values?fields=${fieldsString}&size=${size}&start_time=${start_time}&end_time=${end_time}`;
     if (query_context) url = url + `&sql=${query_context}`;
     if (no_count) url = url + `&no_count=${no_count}`;
     if (query_fn?.trim()) url = url + `&query_fn=${query_fn}`;
+    if (action_id?.trim()) url = url + `&action_id=${action_id}`;
     if (type) url += "&type=" + type;
     if (regions) url += "&regions=" + regions;
     if (clusters) url += "&clusters=" + clusters;

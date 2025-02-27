@@ -36,6 +36,7 @@ export interface QueryPayload {
   size: number;
   query_fn?: string;
   track_total_hits?: boolean;
+  action_id?: string;
 }
 export interface HistogramQueryPayload {
   histogram: string;

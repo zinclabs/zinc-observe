@@ -495,8 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </q-input>
           <q-tr v-if="searchObj.loadingStream == true">
-            <q-td colspan="100%"
-class="text-bold" style="opacity: 0.7">
+            <q-td colspan="100%" class="text-bold" style="opacity: 0.7">
               <div class="text-subtitle2 text-weight-bold">
                 <q-spinner-hourglass size="20px" />
                 {{ t("confirmDialog.loading") }}
@@ -920,10 +919,19 @@ export default defineComponent({
         let query_fn = "";
         if (
           searchObj.data.tempFunctionContent != "" &&
-          searchObj.meta.toggleFunction
+          searchObj.data.transformType === "function"
         ) {
           query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
         }
+
+        let action_id = "";
+        if (
+          searchObj.data.transformType === "action" &&
+          searchObj.data.selectedTransform?.id
+        ) {
+          action_id = searchObj.data.selectedTransform.id;
+        }
+
         fieldValues.value[name] = {
           isLoading: true,
           values: [],
@@ -970,6 +978,7 @@ export default defineComponent({
                     query_context.replace("[INDEX_NAME]", selectedStream),
                   ) || "",
                 query_fn: query_fn,
+                action_id,
                 type: searchObj.data.stream.streamType,
                 regions:
                   Object.hasOwn(searchObj.meta, "regions") &&
@@ -1262,7 +1271,7 @@ export default defineComponent({
       }),
       formatLargeNumber,
       sortedStreamFields,
-      placeHolderText
+      placeHolderText,
     };
   },
 });

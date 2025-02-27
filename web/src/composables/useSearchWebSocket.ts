@@ -48,6 +48,7 @@ const useSearchWebSocket = () => {
         requestId,
         handlers.error.bind(null, requestId, data),
       );
+      
       return requestId;
     } catch (error: any) {
       console.error(
