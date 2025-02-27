@@ -75,6 +75,7 @@ import searchService from "@/services/search";
 import savedviewsService from "@/services/saved_views";
 import config from "@/aws-exports";
 import useSearchWebSocket from "./useSearchWebSocket";
+import useActions from "./useActions";
 
 const defaultObject = {
   organizationIdentifier: "",
@@ -124,7 +125,7 @@ const defaultObject = {
     showQuery: true,
     showHistogram: true,
     showDetailTab: false,
-    toggleFunction: true,
+    showTransformEditor: true,
     searchApplied: false,
     toggleSourceWrap: useLocalWrapContent()
       ? JSON.parse(useLocalWrapContent())
@@ -196,6 +197,9 @@ const defaultObject = {
     },
     histogramInterval: <any>0,
     transforms: <any>[],
+    transformType: <string>"function",
+    actions: <any>[],
+    selectedTransform: <any>null,
     queryResults: <any>[],
     sortedQueryResults: <any>[],
     streamResults: <any>[],
@@ -239,6 +243,7 @@ const defaultObject = {
     >[],
     isOperationCancelled: false,
     searchRetriesCount: <{ [key: string]: number }>{},
+    actionId: null,
   },
 };
 
@@ -307,6 +312,8 @@ const useLogs = () => {
   const { t } = useI18n();
   const $q = useQuasar();
   const { getAllFunctions } = useFunctions();
+  const { getAllActions } = useActions();
+
   const { showErrorNotification } = useNotifications();
   const { getStreams, getStream, getMultiStreams } = useStreams();
   const router = useRouter();
@@ -406,6 +413,24 @@ const useLogs = () => {
         if (!data.stream_name) {
           searchObj.data.stream.functions.push(itemObj);
         }
+      });
+      return;
+    } catch (e) {
+      showErrorNotification("Error while fetching functions");
+    }
+  };
+
+  const getActions = async () => {
+    try {
+      if (store.state.organizationData.actions.length == 0) {
+        await getAllActions();
+      }
+
+      store.state.organizationData.actions.map((data: any) => {
+        searchObj.data.actions.push({
+          name: data.name,
+          id: data.id,
+        });
       });
       return;
     } catch (e) {
@@ -578,7 +603,7 @@ const useLogs = () => {
     }
 
     if (
-      searchObj.meta.toggleFunction &&
+      searchObj.data.transformType === "function" &&
       searchObj.data.tempFunctionContent != ""
     ) {
       query["functionContent"] = b64EncodeUnicode(
@@ -1573,10 +1598,15 @@ const useLogs = () => {
         // get function definition
         if (
           searchObj.data.tempFunctionContent != "" &&
-          searchObj.meta.toggleFunction
+          searchObj.data.transformType === "function"
         ) {
           queryReq.query["query_fn"] =
             b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+        }
+
+        // Add action ID if it exists
+        if (searchObj.data.actionId) {
+          queryReq.query["action_id"] = searchObj.data.actionId;
         }
 
         // in case of relative time, set start_time and end_time to query
@@ -3714,7 +3744,7 @@ const useLogs = () => {
       let query_fn: any = "";
       if (
         searchObj.data.tempFunctionContent != "" &&
-        searchObj.meta.toggleFunction
+        searchObj.data.transformType === "function"
       ) {
         query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
       }
@@ -3896,6 +3926,7 @@ const useLogs = () => {
       await getStreamList();
       // await getSavedViews();
       await getFunctions();
+      await getActions();
       await extractFields();
       if (searchObj.meta.jobId == ""){
         await getQueryData();
@@ -4063,7 +4094,7 @@ const useLogs = () => {
       searchObj.data.tempFunctionContent =
         b64DecodeUnicode(queryParams.functionContent) || "";
       searchObj.meta.functionEditorPlaceholderFlag = false;
-      searchObj.meta.toggleFunction = true;
+      searchObj.data.transformType = "function";
     }
 
     if (queryParams.stream_type) {
@@ -4757,10 +4788,15 @@ const useLogs = () => {
       // get function definition
       if (
         searchObj.data.tempFunctionContent != "" &&
-        searchObj.meta.toggleFunction
+        searchObj.data.transformType === "function"
       ) {
         queryReq.query["query_fn"] =
           b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+      }
+
+      // Add action ID if it exists
+      if (searchObj.data.actionId && searchObj.data.transformType === "function") {
+        queryReq.query["action_id"] = searchObj.data.actionId;
       }
 
       if (searchObj.data.datetime.type === "relative") {

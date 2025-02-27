@@ -1342,7 +1342,7 @@ export default defineComponent({
       () => {
         if (
           searchObj.meta.logsVisualizeToggle == "visualize" &&
-          searchObj.meta.toggleFunction &&
+          searchObj.data.transformType === "function" &&
           searchObj.data.tempFunctionContent
         ) {
           dashboardPanelData.data.queries[

@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               bg-color="input-bg"
               class="showLabelOnTop no-case tw-w-[400px]"
               stack-label
+              emit-value
               outlined
               filled
               dense
@@ -672,7 +673,7 @@ const actionTypes = [
   },
   {
     label: "Service",
-    value: "service",
+    value: "Serve",
   },
 ];
 
@@ -1031,8 +1032,8 @@ const setupEditingActionScript = async (report: any) => {
 
   formData.value.type = "scheduled";
 
-  if (formData.value.execution_details === "service") {
-    formData.value.type = "service";
+  if (formData.value.execution_details === "Serve") {
+    formData.value.type = "Serve";
   }
 
   // set date, time and timezone in scheduling

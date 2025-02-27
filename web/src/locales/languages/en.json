@@ -114,6 +114,11 @@
     "saveFunctionLabel": "Save Function",
     "saveFunctionName": "Function Name",
     "savedFunctionNotFound": "Function not found.",
+    "actionsNotFound": "Actions not found.",
+    "selectTransformType": "Select Function or Action to \n see available options",
+    "actionPlaceholder": "Saved Actions",
+    "functions": "Functions",
+    "actions": "Actions",
     "exportLogs": "Export logs",
     "runQuery": "Run query",
     "syntaxGuideLabel": "Syntax Guide",
@@ -138,7 +143,7 @@
     "functionErrorBtnLabel": "Click for error details",
     "applySearch": "Adjust filter parameters and click 'Run query'.",
     "searchSavedView": "Search saved views",
-    "searchSavedFunction": "Search saved function",
+    "searchSavedFunction": "Search",
     "streamNotExist": "The following [STREAM_NAME] stream(s) were not found. Please verify if the streams exist.",
     "noFieldFound": "No fields found for the selected stream",
     "regionTitle": "Select a Region",
@@ -153,7 +158,10 @@
     "unflattened": "Unflattened",
     "original": "Original",
     "resetFilters": "Reset filters",
-    "redirect_to_logs_page": "Go back to Logs page"
+    "redirect_to_logs_page": "Go back to Logs page",
+    "visualize": "Visualize",
+    "disableVisualizeForMultiStream": "Visualization is disabled for multi stream",
+    "transformType": "Transform Type"
   },
   "menu": {
     "home": "Home",
