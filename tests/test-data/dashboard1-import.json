@@ -1,0 +1,2073 @@
+{
+  "version": 5,
+  "dashboardId": "7300379507544817710",
+  "title": "",
+  "description": "Cloudfront Distribution to Kinesis Streams to Amazon Data Firehose to OpenObserve",
+  "role": "",
+  "owner": "",
+  "created": "2025-02-26T06:25:47.963Z",
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "Panel_ID1938110",
+          "type": "bar",
+          "title": "Requests Over Time",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "decimals": 2,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\"  FROM \"cloudfront_access_logs\"  GROUP BY x_axis_1",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Timestamp",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Requests",
+                    "alias": "y_axis_1",
+                    "column": "_timestamp",
+                    "color": "#f273db",
+                    "aggregationFunction": "count"
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 13,
+            "y": 0,
+            "w": 19,
+            "h": 18,
+            "i": 1,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID6499410",
+          "type": "gauge",
+          "title": "Bandwidth Usage",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "unit": "bps",
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp, '5 minutes') as \"x_axis_1\", count(distinct(_timestamp)) as \"y_axis_1\"  FROM \"cloudfront_access_logs\"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Timestamp",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": "5 minutes"
+                      }
+                    ]
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Bytes",
+                    "alias": "y_axis_1",
+                    "column": "_timestamp",
+                    "color": "#f273db",
+                    "aggregationFunction": "count-distinct"
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 32,
+            "y": 0,
+            "w": 15,
+            "h": 18,
+            "i": 2,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID9864410",
+          "type": "metric",
+          "title": "Total Requests",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(_timestamp) as \"y_axis_1\"  FROM \"cloudfront_access_logs\" ",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Requests",
+                    "alias": "y_axis_1",
+                    "column": "_timestamp",
+                    "color": "#098b23",
+                    "aggregationFunction": "count"
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 13,
+            "h": 6,
+            "i": 3,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID4195810",
+          "type": "donut",
+          "title": "Cache Status Distribution",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 2,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp, '5 minutes') as \"x_axis_1\", count(_timestamp) as \"y_axis_1\"  FROM \"cloudfront_access_logs\"  GROUP BY x_axis_1",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Timestamp",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "args": [
+                      {
+                        "value": "5 minutes"
+                      }
+                    ]
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Timestamp",
+                    "alias": "y_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "count"
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 6,
+            "w": 13,
+            "h": 12,
+            "i": 4,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID5879810",
+          "type": "geomap",
+          "title": "Unique Client IPs by Region",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 2,
+            "line_thickness": 1.5,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last"
+            }
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT geo_city_latitude as latitude, geo_city_longitude as longitude, count(distinct(client_ip)) as weight FROM \"cloudfront_access_logs\" GROUP BY latitude, longitude",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "latitude": {
+                  "label": "Geo City Latitude",
+                  "alias": "latitude",
+                  "column": "geo_city_latitude",
+                  "color": "#5960b2",
+                  "isDerived": false
+                },
+                "longitude": {
+                  "label": "Geo City Longitude",
+                  "alias": "longitude",
+                  "column": "geo_city_longitude",
+                  "color": "#5960b2",
+                  "isDerived": false
+                },
+                "weight": {
+                  "label": "Client Ip",
+                  "alias": "weight",
+                  "column": "client_ip",
+                  "color": "#5960b2",
+                  "aggregationFunction": "count-distinct",
+                  "isDerived": false
+                },
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 23,
+            "y": 34,
+            "w": 24,
+            "h": 19,
+            "i": 6,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID9674210",
+          "type": "maps",
+          "title": "Total Visitors by Region",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 2,
+            "line_thickness": 1.5,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last"
+            }
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT geo_city_region_code as \"name\", count(client_ip) as \"value_for_maps\" FROM \"cloudfront_access_logs\" GROUP BY name",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "name": {
+                  "label": "Geo City Region Code",
+                  "alias": "name",
+                  "column": "geo_city_region_code",
+                  "color": "#5960b2"
+                },
+                "value_for_maps": {
+                  "label": "Client Ip",
+                  "alias": "value_for_maps",
+                  "column": "client_ip",
+                  "color": "#5960b2",
+                  "aggregationFunction": "count"
+                },
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 18,
+            "w": 47,
+            "h": 16,
+            "i": 7,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID8381710",
+          "type": "table",
+          "title": "Unique Visitors by City & Country",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "line_thickness": 1.5,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "label_option": {
+              "rotate": 0
+            },
+            "show_symbol": false,
+            "line_interpolation": "smooth",
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_type": {
+              "type": "world"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "override_config": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false,
+            "table_transpose": false,
+            "table_dynamic_columns": false,
+            "mappings": [],
+            "color": {
+              "mode": "palette-classic-by-series",
+              "fixedColor": [
+                "#53ca53"
+              ],
+              "seriesBy": "last"
+            }
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT geo_city_city_name as \"x_axis_1\", geo_city_country_name as \"x_axis_2\", count(distinct(client_ip)) as \"y_axis_1\"  FROM \"cloudfront_access_logs\"  GROUP BY x_axis_1, x_axis_2",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Geo City City Name",
+                    "alias": "x_axis_1",
+                    "column": "geo_city_city_name",
+                    "color": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Geo City Country Name",
+                    "alias": "x_axis_2",
+                    "column": "geo_city_country_name",
+                    "color": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Number of Unique IP Addresses",
+                    "alias": "y_axis_1",
+                    "column": "client_ip",
+                    "color": "#5960b2",
+                    "aggregationFunction": "count-distinct",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100,
+                "time_shift": []
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 34,
+            "w": 23,
+            "h": 19,
+            "i": 8,
+            "moved": false
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "77665",
+      "name": "Performance",
+      "panels": [
+        {
+          "id": "Panel_ID131510",
+          "type": "table",
+          "title": "Response Distribution by Edge Location",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": true
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT edge_location as \"x_axis_1\", count(bytes_received) as \"y_axis_1\", count(bytes_sent) as \"y_axis_2\", count(time_taken) as \"y_axis_3\", count(time_to_first_byte) as \"y_axis_4\"  FROM \"cloudfront_access_logs\"  GROUP BY x_axis_1",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Edge Location",
+                    "alias": "x_axis_1",
+                    "column": "edge_location",
+                    "color": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Bytes Received",
+                    "alias": "y_axis_1",
+                    "column": "bytes_received",
+                    "color": "#5960b2",
+                    "aggregationFunction": "count",
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Bytes Sent",
+                    "alias": "y_axis_2",
+                    "column": "bytes_sent",
+                    "color": "#c23531",
+                    "aggregationFunction": "count",
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Time Taken",
+                    "alias": "y_axis_3",
+                    "column": "time_taken",
+                    "color": "#2f4554",
+                    "aggregationFunction": "count",
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Time To First Byte",
+                    "alias": "y_axis_4",
+                    "column": "time_to_first_byte",
+                    "color": "#61a0a8",
+                    "aggregationFunction": "count",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 48,
+            "h": 25,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID5105510",
+          "type": "bar",
+          "title": "Cache Performance",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": true
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(cmcd_startup) as \"y_axis_1\"  FROM \"cloudfront_access_logs\"  GROUP BY x_axis_1 ORDER BY x_axis_1 ASC, y_axis_1 DESC",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Timestamp",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ],
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Requests",
+                    "alias": "y_axis_1",
+                    "column": "cmcd_startup",
+                    "color": "#9b037a",
+                    "aggregationFunction": "count",
+                    "sortBy": "DESC",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 48,
+            "h": 16,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "87135",
+      "name": "Errors",
+      "panels": [
+        {
+          "id": "Panel_ID4989810",
+          "type": "h-bar",
+          "title": "Error Distribution by Status Code Type",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT status_code as \"x_axis_1\", count(distinct(client_ip)) as \"y_axis_1\"  FROM \"cloudfront_access_logs\"  WHERE status_code >= '400'  GROUP BY x_axis_1 ORDER BY x_axis_1 DESC, y_axis_1 DESC",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Status Code",
+                    "alias": "x_axis_1",
+                    "column": "status_code",
+                    "color": null,
+                    "sortBy": "DESC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ],
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Number of Affected Clients",
+                    "alias": "y_axis_1",
+                    "column": "client_ip",
+                    "color": "#ff8585",
+                    "aggregationFunction": "count-distinct",
+                    "sortBy": "DESC",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": [
+                    {
+                      "type": "condition",
+                      "values": [],
+                      "column": "status_code",
+                      "operator": ">=",
+                      "value": "400",
+                      "logicalOperator": "AND",
+                      "filterType": "condition"
+                    }
+                  ]
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 19,
+            "y": 0,
+            "w": 28,
+            "h": 9,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID1802010",
+          "type": "table",
+          "title": "Detailed Error Analysis",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT edge_response_result_type as \"x_axis_1\", status_code as \"x_axis_2\", count(distinct(client_ip)) as \"y_axis_1\"  FROM \"cloudfront_access_logs\"  WHERE status_code >= '400'  GROUP BY x_axis_1, x_axis_2 ORDER BY y_axis_1 ASC",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Edge Response Result Type",
+                    "alias": "x_axis_1",
+                    "column": "edge_response_result_type",
+                    "color": null,
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Status Code",
+                    "alias": "x_axis_2",
+                    "column": "status_code",
+                    "color": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Number of Affected Clients",
+                    "alias": "y_axis_1",
+                    "column": "client_ip",
+                    "color": "#5960b2",
+                    "aggregationFunction": "count-distinct",
+                    "sortBy": "ASC",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": [
+                    {
+                      "type": "condition",
+                      "values": [],
+                      "column": "status_code",
+                      "operator": ">=",
+                      "value": "400",
+                      "logicalOperator": "AND",
+                      "filterType": "condition"
+                    }
+                  ]
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 28,
+            "y": 9,
+            "w": 19,
+            "h": 12,
+            "i": 3
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID4624510",
+          "type": "metric",
+          "title": "Number of Errors",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(distinct(status_code)) as \"y_axis_1\"  FROM \"cloudfront_access_logs\"  WHERE status_code >= '400' ",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Status Code",
+                    "alias": "y_axis_1",
+                    "column": "status_code",
+                    "color": "#5960b2",
+                    "aggregationFunction": "count-distinct",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": [
+                    {
+                      "type": "condition",
+                      "values": [],
+                      "column": "status_code",
+                      "operator": ">=",
+                      "value": "400",
+                      "logicalOperator": "AND",
+                      "filterType": "condition"
+                    }
+                  ]
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 19,
+            "h": 9,
+            "i": 4
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID5505210",
+          "type": "bar",
+          "title": "Errors Over Time",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(status_code) as \"y_axis_1\"  FROM \"cloudfront_access_logs\"  WHERE status_code >= '400'  GROUP BY x_axis_1 ORDER BY x_axis_1 DESC",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Timestamp",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "DESC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ],
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Total Number of Errors",
+                    "alias": "y_axis_1",
+                    "column": "status_code",
+                    "color": "#cca000",
+                    "aggregationFunction": "count",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": [
+                    {
+                      "type": "condition",
+                      "values": [],
+                      "column": "status_code",
+                      "operator": ">=",
+                      "value": "400",
+                      "logicalOperator": "AND",
+                      "filterType": "condition"
+                    }
+                  ]
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 9,
+            "w": 28,
+            "h": 12,
+            "i": 5
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "48277",
+      "name": "Content",
+      "panels": [
+        {
+          "id": "Panel_ID3620910",
+          "type": "table",
+          "title": "Top URIs by Traffic",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": true
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT edge_result_type as \"x_axis_1\", count(distinct(client_ip)) as \"y_axis_1\", avg(time_taken) as \"y_axis_2\", sum(bytes_sent) as \"y_axis_3\"  FROM \"cloudfront_access_logs\"  GROUP BY x_axis_1 ORDER BY y_axis_1 DESC",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "URI",
+                    "alias": "x_axis_1",
+                    "column": "edge_result_type",
+                    "color": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Unique Clients",
+                    "alias": "y_axis_1",
+                    "column": "client_ip",
+                    "color": "#c23531",
+                    "aggregationFunction": "count-distinct",
+                    "sortBy": "DESC",
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Average Response Time",
+                    "alias": "y_axis_2",
+                    "column": "time_taken",
+                    "color": "#2f4554",
+                    "aggregationFunction": "avg",
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Bytes Transferred",
+                    "alias": "y_axis_3",
+                    "column": "bytes_sent",
+                    "color": "#5960b2",
+                    "aggregationFunction": "sum",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 14,
+            "w": 48,
+            "h": 16,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID4165810",
+          "type": "donut",
+          "title": "Content Type Distribution",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": true
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(content_type, '30 minutes') as \"x_axis_1\", count(bytes_sent) as \"y_axis_1\"  FROM \"cloudfront_access_logs\"  GROUP BY x_axis_1",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Content Type",
+                    "alias": "x_axis_1",
+                    "column": "content_type",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "args": [
+                      {
+                        "value": "30 minutes"
+                      }
+                    ],
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Bytes Transferred",
+                    "alias": "y_axis_1",
+                    "column": "bytes_sent",
+                    "color": "#5960b2",
+                    "aggregationFunction": "count",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 48,
+            "h": 14,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "27988",
+      "name": "Security and Protocol",
+      "panels": [
+        {
+          "id": "Panel_ID6920710",
+          "type": "bar",
+          "title": "SSL/TLS Protocol Usage",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": true
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(ssl_protocol) as \"x_axis_1\", count(ssl_cipher) as \"y_axis_1\"  FROM \"cloudfront_access_logs\"  WHERE ssl_protocol IN ('*')  GROUP BY x_axis_1",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Protocol",
+                    "alias": "x_axis_1",
+                    "column": "ssl_protocol",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ],
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Connections",
+                    "alias": "y_axis_1",
+                    "column": "ssl_cipher",
+                    "color": "#0bdac2",
+                    "aggregationFunction": "count",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": [
+                    {
+                      "type": "list",
+                      "values": [
+                        "*"
+                      ],
+                      "column": "ssl_protocol",
+                      "operator": null,
+                      "value": null,
+                      "logicalOperator": "AND",
+                      "filterType": "condition"
+                    }
+                  ]
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 48,
+            "h": 10,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID6385910",
+          "type": "table",
+          "title": "Top Client IPs",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": true
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT client_ip as \"x_axis_1\", count(distinct(edge_result_type)) as \"y_axis_1\", count(bytes_sent) as \"y_axis_2\", count(distinct(status_code)) as \"y_axis_3\", count(_timestamp) as \"y_axis_4\"  FROM \"cloudfront_access_logs\"  GROUP BY x_axis_1 ORDER BY y_axis_4 DESC",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Client Ip",
+                    "alias": "x_axis_1",
+                    "column": "client_ip",
+                    "color": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Unique URIs",
+                    "alias": "y_axis_1",
+                    "column": "edge_result_type",
+                    "color": "#2f4554",
+                    "aggregationFunction": "count-distinct",
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Bytes Transferred",
+                    "alias": "y_axis_2",
+                    "column": "bytes_sent",
+                    "color": "#61a0a8",
+                    "aggregationFunction": "count",
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Error Count",
+                    "alias": "y_axis_3",
+                    "column": "status_code",
+                    "color": "#c23531",
+                    "aggregationFunction": "count-distinct",
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Request Count",
+                    "alias": "y_axis_4",
+                    "column": "_timestamp",
+                    "color": "#5960b2",
+                    "aggregationFunction": "count",
+                    "sortBy": "DESC",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 48,
+            "h": 12,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    },
+    {
+      "tabId": "77277",
+      "name": "Referrer Analysis",
+      "panels": [
+        {
+          "id": "Panel_ID2121710",
+          "type": "table",
+          "title": "Top Referrers",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT referer as \"x_axis_1\", count(_timestamp) as \"y_axis_1\", count(distinct(client_ip)) as \"y_axis_2\", count(bytes_sent) as \"y_axis_3\", count(time_taken) as \"y_axis_4\"  FROM \"cloudfront_access_logs\"  GROUP BY x_axis_1 ORDER BY y_axis_1 ASC",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Referer",
+                    "alias": "x_axis_1",
+                    "column": "referer",
+                    "color": null,
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Request Count",
+                    "alias": "y_axis_1",
+                    "column": "_timestamp",
+                    "color": "#5960b2",
+                    "aggregationFunction": "count",
+                    "sortBy": "ASC",
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Unique Clients",
+                    "alias": "y_axis_2",
+                    "column": "client_ip",
+                    "color": "#c23531",
+                    "aggregationFunction": "count-distinct",
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Bytes Transferred",
+                    "alias": "y_axis_3",
+                    "column": "bytes_sent",
+                    "color": "#2f4554",
+                    "aggregationFunction": "count",
+                    "isDerived": false
+                  },
+                  {
+                    "label": "Avg Response Time",
+                    "alias": "y_axis_4",
+                    "column": "time_taken",
+                    "color": "#61a0a8",
+                    "aggregationFunction": "count",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 11,
+            "w": 48,
+            "h": 15,
+            "i": 1
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        },
+        {
+          "id": "Panel_ID3177910",
+          "type": "stacked",
+          "title": "Referrer Traffic Over Time",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "decimals": 0,
+            "top_results_others": false,
+            "axis_border_show": false,
+            "legend_width": {
+              "unit": "px"
+            },
+            "base_map": {
+              "type": "osm"
+            },
+            "map_view": {
+              "zoom": 1,
+              "lat": 0,
+              "lng": 0
+            },
+            "map_symbol_style": {
+              "size": "by Value",
+              "size_by_value": {
+                "min": 1,
+                "max": 100
+              },
+              "size_fixed": 2
+            },
+            "drilldown": [],
+            "mark_line": [],
+            "connect_nulls": false,
+            "no_value_replacement": "",
+            "wrap_table_cells": false
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as \"x_axis_1\", count(_timestamp) as \"y_axis_1\", referer as \"breakdown_1\"  FROM \"cloudfront_access_logs\"  GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "cloudfront_access_logs",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Time",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp",
+                    "color": null,
+                    "aggregationFunction": "histogram",
+                    "sortBy": "ASC",
+                    "args": [
+                      {
+                        "value": null
+                      }
+                    ],
+                    "isDerived": false
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Requests",
+                    "alias": "y_axis_1",
+                    "column": "_timestamp",
+                    "color": "#5960b2",
+                    "aggregationFunction": "count",
+                    "isDerived": false
+                  }
+                ],
+                "z": [],
+                "breakdown": [
+                  {
+                    "label": "Referer",
+                    "alias": "breakdown_1",
+                    "column": "referer",
+                    "color": null,
+                    "isDerived": false
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "",
+                "layer_type": "scatter",
+                "weight_fixed": 1,
+                "limit": 0,
+                "min": 0,
+                "max": 100
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 48,
+            "h": 11,
+            "i": 2
+          },
+          "htmlContent": "",
+          "markdownContent": ""
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "list": [],
+    "showDynamicFilters": true
+  },
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "6h",
+    "startTime": 1732551084322000,
+    "endTime": 1732572684322000
+  }
+}
