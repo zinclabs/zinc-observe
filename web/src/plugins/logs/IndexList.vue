@@ -923,6 +923,15 @@ export default defineComponent({
         ) {
           query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
         }
+
+        let action_id = "";
+        if (
+          searchObj.data.transformType === "action" &&
+          searchObj.data.selectedTransform?.id
+        ) {
+          action_id = searchObj.data.selectedTransform.id;
+        }
+
         fieldValues.value[name] = {
           isLoading: true,
           values: [],
@@ -969,6 +978,7 @@ export default defineComponent({
                     query_context.replace("[INDEX_NAME]", selectedStream),
                   ) || "",
                 query_fn: query_fn,
+                action_id,
                 type: searchObj.data.stream.streamType,
                 regions:
                   Object.hasOwn(searchObj.meta, "regions") &&

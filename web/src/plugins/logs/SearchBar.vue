@@ -362,6 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="float-left tw-cursor-pointer"
           size="32px"
           :disable="!searchObj.data.transformType"
+          @update:model-value="updateTransformEditor()"
         >
           <q-tooltip class="tw-text-[12px]" :offset="[0, 2]">
             {{ searchObj.meta.showTransformEditor ? "Hide" : "Show" }}
@@ -411,8 +412,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     filled
                     dense
                     clearable
-                    v-bind:readonly="beingUpdated"
-                    v-bind:disable="beingUpdated"
                     @update:model-value="updateTransforms()"
                   />
                 </div>
@@ -438,7 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="tw-border-b saved-view-item"
                     clickable
                     v-for="(item, i) in filteredTransformOptions"
-                    :key="'saved-view-' + i"
+                    :key="'transform-' + item?.name"
                     v-close-popup
                   >
                     <q-item-section
@@ -470,7 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-btn-dropdown>
           </div>
           <q-btn
-            data-test="logs-search-bar-share-link-btn"
+            data-test="logs-search-bar-save-transform-btn"
             class="q-mr-xs save-transform-btn q-px-sm"
             size="sm"
             icon="save"
@@ -759,7 +758,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="logs-vrl-function-editor"
-              v-show="searchObj.meta.showTransformEditor"
+              v-show="searchObj.data.transformType"
               style="width: 100%; height: 100%"
             >
               <template v-if="searchObj.data.transformType === 'function'">
@@ -781,14 +780,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
                 />
               </template>
-              <template v-else>
+              <template v-else-if="searchObj.data.transformType === 'action'">
                 <query-editor
                   data-test="logs-vrl-function-editor"
                   ref="fnEditorRef"
                   editor-id="fnEditor"
                   class="monaco-editor"
-                  query="Actions Editor is disabled"
+                  :query="actionEditorQuery"
                   read-only
+                  language="markdown"
                 />
               </template>
             </div>
@@ -1418,8 +1418,6 @@ export default defineComponent({
     const formData: any = ref(defaultValue());
     const functionOptions = ref(searchObj.data.transforms);
 
-    const actionOptions = ref(searchObj.data.actions);
-
     const transformsExpandState = ref({
       actions: false,
       functions: false,
@@ -1496,8 +1494,8 @@ export default defineComponent({
 
     const filteredActionOptions = computed(() => {
       if (searchObj.data.transformType !== "action") return [];
-      if (!searchTerm.value) return actionOptions.value;
-      return actionOptions.value.filter((item) =>
+      if (!searchTerm.value) return searchObj.data.actions;
+      return searchObj.data.actions.filter((item) =>
         item.name.toLowerCase().includes(searchTerm.value.toLowerCase()),
       );
     });
@@ -1599,11 +1597,6 @@ export default defineComponent({
     };
 
     const transformsLabel = computed(() => {
-      console.log(
-        "searchObj.data.selectedTransform",
-        searchObj.data.selectedTransform,
-        searchObj.data.transformType,
-      );
       if (searchObj.data.selectedTransform && searchObj.data.transformType) {
         return searchObj.data.selectedTransform.name;
       }
@@ -1613,6 +1606,17 @@ export default defineComponent({
         : searchObj.data.transformType === "function"
           ? "Function"
           : "Transform";
+    });
+
+    const actionEditorQuery = computed(() => {
+      if (
+        searchObj.data.transformType === "action" &&
+        searchObj.data.selectedTransform?.name
+      ) {
+        return `${searchObj.data.selectedTransform?.name} action applied successfully. Run Query to see results.`;
+      }
+
+      return "Select an action to apply";
     });
 
     const updateAutoComplete = (value) => {
@@ -1930,18 +1934,22 @@ export default defineComponent({
     };
 
     onMounted(async () => {
+      searchObj.data.transformType =
+        router.currentRoute.value.query.transformType;
+
       if (
-        router.currentRoute.value.query.functionContent ||
-        searchObj.data.tempFunctionContent
+        router.currentRoute.value.query.transformType === "function" &&
+        (router.currentRoute.value.query.functionContent ||
+          searchObj.data.tempFunctionContent)
       ) {
-        searchObj.data.transformType = "function";
         const fnContent = router.currentRoute.value.query.functionContent
           ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
           : searchObj.data.tempFunctionContent;
         fnEditorRef?.value?.setValue(fnContent);
-        fnEditorRef?.value?.resetEditorLayout();
-        searchObj.config.fnSplitterModel = 60;
       }
+
+      updateEditorWidth();
+
       window.addEventListener("keydown", handleEscKey);
     });
 
@@ -1955,9 +1963,12 @@ export default defineComponent({
     onActivated(() => {
       updateQuery();
 
+      updateEditorWidth();
+
       if (
-        router.currentRoute.value.query.functionContent ||
-        searchObj.data.tempFunctionContent
+        (router.currentRoute.value.query.functionContent ||
+          searchObj.data.tempFunctionContent) &&
+        searchObj.data.transformType === "function"
       ) {
         searchObj.data.transformType = "function";
         const fnContent = router.currentRoute.value.query.functionContent
@@ -1965,11 +1976,11 @@ export default defineComponent({
           : searchObj.data.tempFunctionContent;
         fnEditorRef?.value?.setValue(fnContent);
         fnEditorRef?.value?.resetEditorLayout();
-        searchObj.config.fnSplitterModel = 60;
         window.removeEventListener("click", () => {
           fnEditorRef?.value?.resetEditorLayout();
         });
       }
+
       fnEditorRef?.value?.resetEditorLayout();
     });
 
@@ -3243,16 +3254,45 @@ export default defineComponent({
     };
 
     const updateTransforms = () => {
-      searchObj.data.selectedTransform = null;
+      updateEditorWidth();
     };
 
     const selectTransform = (item: any, isSelected: boolean) => {
+      console.log("item", item);
       if (searchObj.data.transformType === "function") {
         populateFunctionImplementation(item, isSelected);
       }
 
+      // If action is selected notify the user
+      if (searchObj.data.transformType === "action") {
+        updateActionSelection(item);
+      }
+
       if (typeof item === "object")
-        searchObj.data.selectedTransform = { ...item };
+        searchObj.data.selectedTransform = {
+          ...item,
+          type: "function",
+        };
+    };
+
+    const updateActionSelection = (item: any) => {
+      $q.notify({
+        message: `${item?.name} action applied successfully`,
+        timeout: 3000,
+        color: "secondary",
+      });
+    };
+
+    const updateEditorWidth = () => {
+      if (searchObj.data.transformType) {
+        if (searchObj.meta.showTransformEditor) {
+          searchObj.config.fnSplitterModel = 60;
+        } else {
+          searchObj.config.fnSplitterModel = 99.5;
+        }
+      } else {
+        searchObj.config.fnSplitterModel = 99.5;
+      }
     };
 
     // [END] cancel running queries
@@ -3367,6 +3407,7 @@ export default defineComponent({
       filteredTransformOptions,
       updateTransforms,
       selectTransform,
+      actionEditorQuery,
     };
   },
   computed: {

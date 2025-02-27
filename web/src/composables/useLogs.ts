@@ -422,15 +422,19 @@ const useLogs = () => {
 
   const getActions = async () => {
     try {
+      searchObj.data.actions = [];
+
       if (store.state.organizationData.actions.length == 0) {
         await getAllActions();
       }
-
-      store.state.organizationData.actions.map((data: any) => {
-        searchObj.data.actions.push({
-          name: data.name,
-          id: data.id,
-        });
+      
+      store.state.organizationData.actions.forEach((data: any) => {
+        if (data.execution_details_type === "service") {
+          searchObj.data.actions.push({
+            name: data.name,
+            id: data.id,
+          });
+        }
       });
       return;
     } catch (e) {
@@ -1595,19 +1599,8 @@ const useLogs = () => {
           searchObj.meta.refreshHistogram = true;
         }
 
-        // get function definition
-        if (
-          searchObj.data.tempFunctionContent != "" &&
-          searchObj.data.transformType === "function"
-        ) {
-          queryReq.query["query_fn"] =
-            b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
-        }
-
-        // Add action ID if it exists
-        if (searchObj.data.actionId) {
-          queryReq.query["action_id"] = searchObj.data.actionId;
-        }
+        // update query with function or action
+        addTransformToQuery(queryReq);
 
         // in case of relative time, set start_time and end_time to query
         // it will be used in pagination request
@@ -1962,6 +1955,21 @@ const useLogs = () => {
       // notificationMsg.value = "";
     }
   };
+
+  function addTransformToQuery(queryReq: any) {
+    if (
+      searchObj.data.tempFunctionContent != "" &&
+      searchObj.data.transformType === "function"
+    ) {
+      queryReq.query["query_fn"] =
+        b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+    }
+
+    // Add action ID if it exists
+    if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
+      queryReq.query["action_id"] = searchObj.data.selectedTransform.id;
+    }
+  }
 
   function resetHistogramWithError(errorMsg: string, errorCode: number = 0) {
 
@@ -3749,6 +3757,12 @@ const useLogs = () => {
         query_fn = b64EncodeUnicode(searchObj.data.tempFunctionContent);
       }
 
+      let action_id: any = "";
+
+      if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
+        action_id = searchObj.data.selectedTransform.id;
+      }
+
       let streamName: string = "";
       if (searchObj.data.stream.selectedStream.length > 1) {
         streamName =
@@ -3776,6 +3790,7 @@ const useLogs = () => {
           clusters: searchObj.meta.hasOwnProperty("clusters")
             ? searchObj.meta.clusters.join(",")
             : "",
+          action_id,
           is_multistream:
             searchObj.data.stream.selectedStream.length > 1 ? true : false,
           traceparent,
@@ -4786,13 +4801,7 @@ const useLogs = () => {
       }
 
       // get function definition
-      if (
-        searchObj.data.tempFunctionContent != "" &&
-        searchObj.data.transformType === "function"
-      ) {
-        queryReq.query["query_fn"] =
-          b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
-      }
+      addTransformToQuery(queryReq);
 
       // Add action ID if it exists
       if (searchObj.data.actionId && searchObj.data.transformType === "function") {
