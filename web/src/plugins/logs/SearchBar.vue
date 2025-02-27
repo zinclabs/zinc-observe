@@ -1597,7 +1597,11 @@ export default defineComponent({
     };
 
     const transformsLabel = computed(() => {
-      if (searchObj.data.selectedTransform && searchObj.data.transformType) {
+      if (
+        searchObj.data.selectedTransform?.type ===
+          searchObj.data.transformType &&
+        searchObj.data.transformType
+      ) {
         return searchObj.data.selectedTransform.name;
       }
 
@@ -1611,6 +1615,7 @@ export default defineComponent({
     const actionEditorQuery = computed(() => {
       if (
         searchObj.data.transformType === "action" &&
+        searchObj.data.selectedTransform?.type === "action" &&
         searchObj.data.selectedTransform?.name
       ) {
         return `${searchObj.data.selectedTransform?.name} action applied successfully. Run Query to see results.`;
@@ -3271,7 +3276,7 @@ export default defineComponent({
       if (typeof item === "object")
         searchObj.data.selectedTransform = {
           ...item,
-          type: "function",
+          type: searchObj.data.transformType,
         };
     };
 
