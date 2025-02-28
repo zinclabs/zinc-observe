@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
-            :icon="tab.icon"
             :label="tab.label"
             content-class="tab_content"
           />
