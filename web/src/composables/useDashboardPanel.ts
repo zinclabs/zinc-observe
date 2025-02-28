@@ -323,43 +323,20 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     return dashboardPanelData.meta.stream.selectedStreamFields ?? [];
   });
 
-  const streamCache: any = {};
-
   async function loadStreamFields(streamName: string) {
     try {
       if (!streamName) return;
-      console.log(streamName, JSON.parse(JSON.stringify(streamCache)));
-
-      // If the stream data is already cached, return it immediately
-      if (streamCache[streamName]) {
-        console.log("Stream data already cached", streamCache[streamName]);
-        return streamCache[streamName]; // Return cached result
-      }
 
       // Create a new request and store it in the cache
-      const requestPromise = getStream(
+      return await getStream(
         streamName,
         dashboardPanelData.data.queries[
           dashboardPanelData.layout.currentQueryIndex
         ].fields.stream_type ?? "logs",
         true,
-      )
-        .then((res: any) => {
-          console.log("then", res);
-          return res;
-        })
-        .catch((error) => {
-          throw error;
-        })
-        .finally(() => {
-          streamCache[streamName] = null; // Remove from cache on error
-        });
-
-      console.log("Stream data loaded", streamName, JSON.parse(JSON.stringify(requestPromise)));
-      streamCache[streamName] = requestPromise; // Store the promise in cache
-      return requestPromise;
+      );
     } catch (e: any) {
-      console.log("Error while loading stream fields", e);
+      console.error("Error while loading stream fields", e);
     }
   }
 
@@ -389,7 +366,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       }),
     );
 
-      dashboardPanelData.meta.streamFields.groupedFields = groupedFields;
+    dashboardPanelData.meta.streamFields.groupedFields = groupedFields;
   };
 
   const flattenGroupedFields = computed(() => {
@@ -2955,77 +2932,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
       ].query = query;
+      return query;
     }
   };
-
-  // Generate the query when the fields are updated
-  watch(
-    () => [
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.stream,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.x,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.y,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.breakdown,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.z,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.filter,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].customQuery,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.latitude,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.longitude,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.weight,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.source,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.target,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.value,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.name,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.value_for_maps,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].config.limit,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].joins,
-    ],
-    () => {
-      // only continue if current mode is auto query generation
-      if (
-        !dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
-      ) {
-        // makeAutoSQLQuery is async function
-        makeAutoSQLQuery();
-      }
-    },
-    { deep: true },
-  );
 
   // so, it is not above common state
   // expect 2nd arg for x, y and breakdown field validation
@@ -3512,6 +3421,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     cleanupDraggingFields,
     getDefaultQueries,
     validatePanel,
+    makeAutoSQLQuery,
     currentXLabel,
     currentYLabel,
     generateLabelFromName,

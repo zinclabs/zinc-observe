@@ -78,17 +78,15 @@ const migrateV5FieldsToV6 = (
     fieldItem.type = "custom";
   } else {
     fieldItem.type = "build";
-    if (fieldItem.aggregationFunction) {
-      // prepend column in args
-      fieldItem.args.unshift({
-        type: "field",
-        value: {
-          field: fieldItem.column,
-          streamAlias: stream,
-        },
-      });
-      delete fieldItem.column;
-    }
+    // prepend column in args
+    fieldItem.args.unshift({
+      type: "field",
+      value: {
+        field: fieldItem.column,
+        streamAlias: stream,
+      },
+    });
+    delete fieldItem.column;
   }
 
   // rename aggregationFunction to functionName
