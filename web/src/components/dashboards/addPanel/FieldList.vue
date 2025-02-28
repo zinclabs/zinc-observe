@@ -737,7 +737,6 @@ export default defineComponent({
       addTarget,
       addValue,
       cleanupDraggingFields,
-      flattenGroupedFields,
       updateGroupedFields,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { getStreams, getStream } = useStreams();
@@ -931,108 +930,76 @@ export default defineComponent({
       },
     );
 
-    // const groupedFields: any = ref([]);
+    const flattenGroupedFields = computed(() => {
+      const flattenedFields: any[] = [];
+      dashboardPanelData.meta.streamFields.groupedFields.forEach(
+        (group: any) => {
+          // Add a group header row
+          flattenedFields.push({
+            isGroup: true,
+            groupName: group.name,
+          });
 
-    // watch(
-    //   () => [
-    //     dashboardPanelData.data.queries[
-    //       dashboardPanelData.layout.currentQueryIndex
-    //     ].fields.stream,
-    //     dashboardPanelData.data.queries[
-    //       dashboardPanelData.layout.currentQueryIndex
-    //     ].fields.stream_type,
-    //     dashboardPanelData.data.queries[
-    //       dashboardPanelData.layout.currentQueryIndex
-    //     ].joins,
-    //   ],
-    //   async () => {
-    //     const joins =
-    //       dashboardPanelData.data.queries[
-    //         dashboardPanelData.layout.currentQueryIndex
-    //       ].joins ?? [];
+          if (
+            group.settings.hasOwnProperty("defined_schema_fields") &&
+            group.settings.defined_schema_fields.length > 0
+          ) {
+            // add the user defined fields
+            // _timestamp field + user defined fields + all_fields_name
 
-    //     // joins streams
-    //     // main stream + all join streams
-    //     // wiil be object with stream and streamAlias
-    //     const joinsStreams = [
-    //       {
-    //         stream:
-    //           dashboardPanelData.data.queries[
-    //             dashboardPanelData.layout.currentQueryIndex
-    //           ].fields.stream,
-    //       },
-    //       ...joins.filter((stream: any) => stream?.stream),
-    //     ];
+            // add _timestamp field
+            flattenedFields.push({
+              name: store.state.zoConfig?.timestamp_column,
+              type: "Int64",
+              stream: group.name,
+              streamAlias: group.stream_alias,
+              isGroup: false,
+            });
 
-    //     // loop on all the streams
-    //     // get fields for each stream
-    //     // create grouped object with stream name and fields
-    //     groupedFields.value = await Promise.all(
-    //       joinsStreams.map(async (stream: any) => {
-    //         return {
-    //           ...(await loadStreamFields(stream?.stream)),
-    //           stream_alias: stream?.streamAlias,
-    //         };
-    //       }),
-    //     );
-    //   },
-    //   {
-    //     deep: true,
-    //   },
-    // );
+            // add user defined fields
+            for (const field of group.schema) {
+              if (
+                store.state.zoConfig.user_defined_schemas_enabled &&
+                group.settings.hasOwnProperty("defined_schema_fields") &&
+                group.settings.defined_schema_fields.length > 0
+              ) {
+                if (group.settings.defined_schema_fields.includes(field.name)) {
+                  // push as a user defined schema
+                  flattenedFields.push({
+                    ...field,
+                    stream: group.name,
+                    streamAlias: group.stream_alias,
+                    isGroup: false,
+                  });
+                }
+              }
+            }
 
-    // const flattenGroupedFields = computed(() => {
-    //   const flattenedFields: any[] = [];
-    //   groupedFields.value.forEach((group: any) => {
-    //     // // Add a group header row
-    //     flattenedFields.push({
-    //       isGroup: true,
-    //       groupName: group.name,
-    //     });
-    //     // // Add the fields in the group, including the group name
-    //     group.schema.forEach((field: any) => {
-    //       flattenedFields.push({
-    //         ...field,
-    //         stream: group.name,
-    //         streamAlias: group.stream_alias,
-    //         isGroup: false,
-    //       });
-    //     });
-    //   });
-    //   console.log("flattenedFields", flattenedFields);
+            // add all_fields_name
+            flattenedFields.push({
+              name: store.state.zoConfig?.all_fields_name,
+              type: "Utf8",
+              stream: group.name,
+              streamAlias: group.stream_alias,
+              isGroup: false,
+            });
+          } else {
+            // use schema of the group
+            // Add the fields in the group, including the group name
+            group.schema.forEach((field: any) => {
+              flattenedFields.push({
+                ...field,
+                stream: group.name,
+                streamAlias: group.stream_alias,
+                isGroup: false,
+              });
+            });
+          }
+        },
+      );
 
-    //   return flattenedFields;
-    // });
-
-    // computed(() => {
-
-    //   const { user_defined_schemas_enabled } = store.state.zoConfig;
-    //   const {
-    //     selectedStreamFields,
-    //     customQueryFields,
-    //     userDefinedSchema,
-    //     useUserDefinedSchemas,
-    //     vrlFunctionFieldList,
-    //   } = dashboardPanelData.meta.stream;
-
-    //   if (
-    //     user_defined_schemas_enabled &&
-    //     userDefinedSchema.length > 0 &&
-    //     useUserDefinedSchemas === "user_defined_schema"
-    //   ) {
-    //     return [
-    //       ...customQueryFields,
-    //       ...vrlFunctionFieldList,
-    //       ...userDefinedSchema,
-    //     ];
-    //   } else {
-    //     return [
-    //       ...customQueryFields,
-    //       ...vrlFunctionFieldList,
-    //       ...selectedStreamFields,
-    //     ];
-    //   }
-    // });
+      return flattenedFields;
+    });
 
     watch(
       () => ({

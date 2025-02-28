@@ -369,75 +369,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     dashboardPanelData.meta.streamFields.groupedFields = groupedFields;
   };
 
-  const flattenGroupedFields = computed(() => {
-    const flattenedFields: any[] = [];
-    dashboardPanelData.meta.streamFields.groupedFields.forEach((group: any) => {
-      // Add a group header row
-      flattenedFields.push({
-        isGroup: true,
-        groupName: group.name,
-      });
-
-      if (
-        group.settings.hasOwnProperty("defined_schema_fields") &&
-        group.settings.defined_schema_fields.length > 0
-      ) {
-        // add the user defined fields
-        // _timestamp field + user defined fields + all_fields_name
-
-        // add _timestamp field
-        flattenedFields.push({
-          name: store.state.zoConfig?.timestamp_column,
-          type: "Int64",
-          stream: group.name,
-          streamAlias: group.stream_alias,
-          isGroup: false,
-        });
-
-        // add user defined fields
-        for (const field of group.schema) {
-          if (
-            store.state.zoConfig.user_defined_schemas_enabled &&
-            group.settings.hasOwnProperty("defined_schema_fields") &&
-            group.settings.defined_schema_fields.length > 0
-          ) {
-            if (group.settings.defined_schema_fields.includes(field.name)) {
-              // push as a user defined schema
-              flattenedFields.push({
-                ...field,
-                stream: group.name,
-                streamAlias: group.stream_alias,
-                isGroup: false,
-              });
-            }
-          }
-        }
-
-        // add all_fields_name
-        flattenedFields.push({
-          name: store.state.zoConfig?.all_fields_name,
-          type: "Utf8",
-          stream: group.name,
-          streamAlias: group.stream_alias,
-          isGroup: false,
-        });
-      } else {
-        // use schema of the group
-        // Add the fields in the group, including the group name
-        group.schema.forEach((field: any) => {
-          flattenedFields.push({
-            ...field,
-            stream: group.name,
-            streamAlias: group.stream_alias,
-            isGroup: false,
-          });
-        });
-      }
-    });
-
-    return flattenedFields;
-  });
-
   const isAddXAxisNotAllowed = computed((e: any) => {
     switch (dashboardPanelData.data.type) {
       case "pie":
@@ -2973,9 +2904,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         errors.push("Please enter your markdown code");
       }
     }
-    if (dashboardPanelData.data.type == 'custom_chart'){
-      if(dashboardPanelData.data.queries[0].query.trim() == ""){
-         errors.push("Please enter query for custom chart")
+    if (dashboardPanelData.data.type == "custom_chart") {
+      if (dashboardPanelData.data.queries[0].query.trim() == "") {
+        errors.push("Please enter query for custom chart");
       }
     }
 
@@ -3426,7 +3357,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     currentYLabel,
     generateLabelFromName,
     selectedStreamFieldsBasedOnUserDefinedSchema,
-    flattenGroupedFields,
     updateGroupedFields,
   };
 };
