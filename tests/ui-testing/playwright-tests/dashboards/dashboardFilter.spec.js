@@ -40,7 +40,8 @@ test.describe("dashboard filter testcases", () => {
       .fill(randomDashboardName);
 
     await page.locator('[data-test="dashboard-add-submit"]').click();
-
+    await page.waitForTimeout(3000);
+    
     const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
 await expect(settingsButton).toBeVisible();
 await settingsButton.click();
@@ -67,7 +68,7 @@ await settingsButton.click();
       .click(); 
 
       await page.locator('[data-test="dashboard-variable-field-select"]').click();
-    await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
+    await page.locator('[data-test="dashboard-variable-field-select"]').fill('kubernetes_container_name');
     await page.getByText('kubernetes_container_name').click();
 
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
@@ -175,6 +176,7 @@ await settingsButton.click();
       .fill(randomDashboardName);
 
     await page.locator('[data-test="dashboard-add-submit"]').click();
+    await page.waitForTimeout(3000);
 
     const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
 await expect(settingsButton).toBeVisible();
@@ -202,7 +204,7 @@ await settingsButton.click();
       .click(); 
 
       await page.locator('[data-test="dashboard-variable-field-select"]').click();
-    await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
+    await page.locator('[data-test="dashboard-variable-field-select"]').fill('kubernetes_container_name');
     await page.getByText('kubernetes_container_name').click();
 
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
@@ -380,7 +382,8 @@ await settingsButton.click();
 
     await page.locator('[data-test="dashboard-add-submit"]').click();
 
-    // await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
+
 
     const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
     await expect(settingsButton).toBeVisible();
@@ -408,7 +411,7 @@ await settingsButton.click();
       .click();
 
       await page.locator('[data-test="dashboard-variable-field-select"]').click();
-    await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
+    await page.locator('[data-test="dashboard-variable-field-select"]').fill('kubernetes_container_name');
     await page.getByText('kubernetes_container_name').click();
 
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
@@ -531,10 +534,14 @@ await settingsButton.click();
 
     await page.locator('[data-test="dashboard-add-submit"]').click();
 
+    await page.waitForTimeout(3000);
+
+
     const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
     await expect(settingsButton).toBeVisible();
     await settingsButton.click();
     
+
     await page.locator('[data-test="dashboard-settings-variable-tab"]').click();
     await page.locator('[data-test="dashboard-variable-add-btn"]').click();
 
@@ -557,7 +564,7 @@ await settingsButton.click();
       .click();
 
       await page.locator('[data-test="dashboard-variable-field-select"]').click();
-    await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
+    await page.locator('[data-test="dashboard-variable-field-select"]').fill('kubernetes_container_name');
     await page.getByText('kubernetes_container_name').click();
 
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
@@ -676,6 +683,9 @@ await settingsButton.click();
 
     await page.locator('[data-test="dashboard-add-submit"]').click();
 
+    await page.waitForTimeout(3000);
+
+
     const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
 await expect(settingsButton).toBeVisible();
 await settingsButton.click();
@@ -702,7 +712,7 @@ await settingsButton.click();
       .click();
 
       await page.locator('[data-test="dashboard-variable-field-select"]').click();
-    await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
+    await page.locator('[data-test="dashboard-variable-field-select"]').fill('kubernetes_container_name');
     await page.getByText('kubernetes_container_name').click();
 
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
@@ -767,6 +777,9 @@ await settingsButton.click();
 
     await page.locator('[data-test="dashboard-add-submit"]').click();
 
+    await page.waitForTimeout(3000);
+
+
     const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
     await expect(settingsButton).toBeVisible();
     await settingsButton.click();
@@ -793,7 +806,7 @@ await settingsButton.click();
       .click();
 
       await page.locator('[data-test="dashboard-variable-field-select"]').click();
-    await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
+    await page.locator('[data-test="dashboard-variable-field-select"]').fill('kubernetes_container_name');
     await page.getByText('kubernetes_container_name').click();
 
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
@@ -891,6 +904,9 @@ await settingsButton.click();
 
     await page.locator('[data-test="dashboard-add-submit"]').click();
 
+    await page.waitForTimeout(3000);
+
+
 const settingsButton = page.locator('[data-test="dashboard-setting-btn"]');
 await expect(settingsButton).toBeVisible();
 await settingsButton.click();
@@ -917,7 +933,7 @@ await settingsButton.click();
       .click();
 
       await page.locator('[data-test="dashboard-variable-field-select"]').click();
-    await page.locator('[data-test="dashboard-variable-field-select"]').fill('names');
+    await page.locator('[data-test="dashboard-variable-field-select"]').fill('kubernetes_container_name');
     await page.getByText('kubernetes_container_name').click();
 
     await page.locator('[data-test="dashboard-variable-save-btn"]').click();
