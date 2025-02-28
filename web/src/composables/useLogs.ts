@@ -2820,14 +2820,20 @@ const useLogs = () => {
   };
 
   async function extractFields() {
+    searchObjDebug["extractFieldsStartTime"] = performance.now();
+    let worker: Worker | null = null;
+    
     try {
-      searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
       searchObj.data.errorMsg = "";
       searchObj.data.errorDetail = "";
       searchObj.data.countErrorMsg = "";
       searchObj.data.stream.selectedStreamFields = [];
       searchObj.data.stream.interestingFieldList = [];
+      
+      // Create worker instance
+      worker = new Worker(new URL('./extractFieldsWorker.ts', import.meta.url), { type: 'module' });
+      const processedFields: any[] = [];
       const schemaFields: any = [];
       const commonSchemaFields: any = [];
       if (searchObj.data.streamResults.list.length > 0) {
@@ -2873,8 +2879,29 @@ const useLogs = () => {
 
         searchObj.data.datetime.queryRangeRestrictionMsg = "";
         searchObj.data.datetime.queryRangeRestrictionInHour = -1;
+        // Process streams sequentially but handle fields in worker
         for (const stream of searchObj.data.streamResults.list) {
           if (searchObj.data.stream.selectedStream.includes(stream.name)) {
+            // Setup worker message handler
+            const workerPromise = new Promise((resolve, reject) => {
+              worker.onmessage = (e) => {
+                switch (e.data.type) {
+                  case 'batch':
+                    processedFields.push(...e.data.data);
+                    break;
+                  case 'complete':
+                    resolve(true);
+                    break;
+                  case 'error':
+                    reject(new Error(e.data.error));
+                    break;
+                }
+              };
+
+              worker.onerror = (error) => {
+                reject(error);
+              };
+            });
             if (searchObj.data.stream.selectedStream.length > 1) {
               schemaMaps.push({
                 name: convertToCamelCase(stream.name),
@@ -2903,12 +2930,33 @@ const useLogs = () => {
               if (streamSchema == undefined) {
                 searchObj.loadingStream = false;
                 searchObj.data.errorMsg = t("search.noFieldFound");
+                worker.terminate();
                 throw new Error(searchObj.data.errorMsg);
-                return;
               }
               stream.settings = streamData.settings;
               stream.schema = streamSchema;
             }
+
+            // Extract only serializable data for worker
+            const workerData = {
+              streamName: stream.name,
+              schema: stream.schema.map((obj: any) => ({ name: obj.name })),
+              settings: {
+                defined_schema_fields: stream.settings?.defined_schema_fields?.slice() || [],
+                full_text_search_keys: stream.settings?.full_text_search_keys?.slice() || []
+              },
+              timestampField: store.state.zoConfig.timestamp_column,
+              allField: store.state.zoConfig?.all_fields_name,
+              selectedStream: searchObj.data.stream.selectedStream.slice(),
+              interestingFieldList: searchObj.data.stream.interestingFieldList.slice(),
+              useUserDefinedSchemas: searchObj.meta.useUserDefinedSchemas
+            };
+
+            // Send serializable data to worker
+            worker.postMessage(workerData);
+
+            // Wait for worker to complete processing this stream
+            await workerPromise;
 
             if (
               stream.settings.max_query_range > 0 &&
@@ -2933,13 +2981,9 @@ const useLogs = () => {
               );
             }
 
-            let environmentInterestingFields = [];
-            if (
-              store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")
-            ) {
-              environmentInterestingFields =
-                store.state?.zoConfig?.default_quick_mode_fields;
-            }
+            // Initialize environment interesting fields
+            const environmentInterestingFields = 
+              store.state.zoConfig?.default_quick_mode_fields?.slice() || [];
 
             if (
               stream.settings.hasOwnProperty("defined_schema_fields") &&
@@ -3237,11 +3281,16 @@ const useLogs = () => {
         )
           updateFieldKeywords(searchObj.data.stream.selectedStreamFields);
       }
-      searchObjDebug["extractFieldsEndTime"] = performance.now();
     } catch (e: any) {
       searchObj.loadingStream = false;
       console.log("Error while extracting fields.", e);
       notificationMsg.value = "Error while extracting stream fields.";
+      throw e;
+    } finally {
+      if (worker) {
+        worker.terminate();
+      }
+      searchObjDebug["extractFieldsEndTime"] = performance.now();
     }
   }
 
