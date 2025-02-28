@@ -82,7 +82,7 @@ pub async fn init() -> errors::Result<()> {
 }
 
 async fn run() -> errors::Result<()> {
-    // start persidt worker
+    // start persist worker
     let cfg = config::get_config();
     let (tx, rx) = mpsc::channel::<PathBuf>(cfg.limit.mem_dump_thread_num);
     let rx = Arc::new(Mutex::new(rx));

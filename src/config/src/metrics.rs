@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -621,16 +621,6 @@ pub static META_NUM_DASHBOARDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-pub static MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new("memory_usage", "Process memory usage")
-            .namespace(NAMESPACE)
-            .const_labels(create_const_labels()),
-        &[],
-    )
-    .expect("Metric created")
-});
-
 // metrics for query manager
 pub static QUERY_RUNNING_NUMS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -712,6 +702,53 @@ pub static FILE_LIST_CACHE_HIT_COUNT: Lazy<IntGaugeVec> = Lazy::new(|| {
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
         &[],
+    )
+    .expect("Metric created")
+});
+
+// Node status metrics
+pub static NODE_CPU_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_cpu_total", "Total CPU usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_CPU_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_cpu_usage", "CPU usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_MEMORY_TOTAL: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_memory_total", "Total memory usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_memory_usage", "Memory usage")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+pub static NODE_TCP_CONNECTIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new("node_tcp_connections", "TCP connections")
+            .namespace(NAMESPACE)
+            .const_labels(create_const_labels()),
+        &["state"],
     )
     .expect("Metric created")
 });
@@ -887,9 +924,6 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(META_NUM_DASHBOARDS.clone()))
         .expect("Metric registered");
-    registry
-        .register(Box::new(MEMORY_USAGE.clone()))
-        .expect("Metric registered");
 
     // db stats
     registry
@@ -905,6 +939,23 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(FILE_LIST_CACHE_HIT_COUNT.clone()))
+        .expect("Metric registered");
+
+    // node status metrics
+    registry
+        .register(Box::new(NODE_CPU_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_CPU_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_MEMORY_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(NODE_TCP_CONNECTIONS.clone()))
         .expect("Metric registered");
 }
 

@@ -625,7 +625,7 @@ export default defineComponent({
     const addVariableForm: Ref<any> = ref(null);
     const data: any = reactive({
       schemaResponse: [],
-      streamType: ["logs", "metrics", "traces", "enrichment_tables"],
+      streamType: ["logs", "metrics", "traces", "enrichment_tables", "metadata"],
       streams: [],
       currentFieldsList: [],
 

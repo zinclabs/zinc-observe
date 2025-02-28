@@ -881,8 +881,6 @@ pub struct SearchQuery {
     pub start_time: i64,
     #[prost(int64, tag = "7")]
     pub end_time: i64,
-    #[prost(string, tag = "8")]
-    pub sort_by: ::prost::alloc::string::String,
     #[prost(bool, tag = "9")]
     pub track_total_hits: bool,
     #[prost(string, tag = "10")]
@@ -893,6 +891,8 @@ pub struct SearchQuery {
     pub query_fn: ::prost::alloc::string::String,
     #[prost(bool, tag = "14")]
     pub skip_wal: bool,
+    #[prost(string, tag = "15")]
+    pub action_id: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -1720,6 +1720,17 @@ pub struct IngestionRequest {
     pub data: ::core::option::Option<IngestionData>,
     #[prost(enumeration = "IngestionType", optional, tag = "5")]
     pub ingestion_type: ::core::option::Option<i32>,
+    #[prost(message, optional, tag = "6")]
+    pub metadata: ::core::option::Option<IngestRequestMetadata>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct IngestRequestMetadata {
+    #[prost(map = "string, string", tag = "1")]
+    pub data: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

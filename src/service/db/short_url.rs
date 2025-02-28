@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -201,7 +201,6 @@ mod cluster {
 /// Helper fuunctions for sending events to the super cluster queue.
 #[cfg(feature = "enterprise")]
 mod super_cluster {
-    use config::utils::json;
     use o2_enterprise::enterprise::common::infra::config::get_config as get_o2_config;
 
     use super::{short_urls, SHORT_URL_KEY};
@@ -212,11 +211,10 @@ mod super_cluster {
         entry: short_urls::ShortUrlRecord,
     ) -> Result<(), infra::errors::Error> {
         let key = short_url_key(short_id);
-        let value = json::to_vec(&entry.original_url)?.into();
         if get_o2_config().super_cluster.enabled {
             o2_enterprise::enterprise::super_cluster::queue::short_url_put(
                 &key,
-                value,
+                entry.original_url.into(),
                 infra::db::NEED_WATCH,
                 None,
             )

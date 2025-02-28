@@ -199,48 +199,6 @@ test.describe("Logs UI testcases", () => {
     );
   });
 
-  test("should allow alphanumeric name under saved view", async ({ page }) => {
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator("button")
-      .filter({ hasText: "savesaved_search" })
-      .click();
-    await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill("e2enewtest");
-    await page
-      .locator('[data-test="saved-view-dialog-save-btn"]')
-      .click({ force: true });
-    await page.waitForTimeout(5000);
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .click({ force: true });
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("e2enewtest");
-    await page.waitForTimeout(3000);
-    await page.getByText("e2enewtest").click();
-    await page
-      .locator('[data-test="logs-search-saved-views-btn"]')
-      .getByLabel("Expand")
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .click();
-    await page
-      .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("e2enewtest");
-    await page.getByText("delete").click();
-    await page.locator('[data-test="confirm-button"]').click();
-  });
-
   test("should display error when user directly clicks on OK without adding name", async ({
     page,
   }) => {

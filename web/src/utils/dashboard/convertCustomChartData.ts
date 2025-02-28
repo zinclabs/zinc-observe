@@ -16,7 +16,10 @@
 import router from "src/router";
 import * as acorn from "acorn";
 import * as walk from "acorn-walk";
+import { ref } from 'vue';
 
+// Add at the top of the file
+export const panelIdToBeRefreshed = ref<string | null>(null);
 
 /**
  * Converts SQL data into a format suitable for rendering a chart.
@@ -30,6 +33,11 @@ import * as walk from "acorn-walk";
 
 export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
   return new Promise((resolve, reject) => {
+    // Skip if this panel is not the one to be refreshed
+    if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
+      return;
+    }
+
     const iframe = document.createElement("iframe");
     iframe.style.display = "none";
     iframe.setAttribute("sandbox", "allow-scripts");
@@ -152,13 +160,24 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     window.addEventListener("message", function handler(event) {
       if (event.source !== iframe.contentWindow) return;
 
+      // Double check if this is still the panel to be refreshed
+      if (panelIdToBeRefreshed.value && panelIdToBeRefreshed.value !== panelSchema.id) {
+        window.removeEventListener("message", handler);
+        document.body.removeChild(iframe);
+        return;
+      }
+
       window.removeEventListener("message", handler);
       setTimeout(() => {
         document.body.removeChild(iframe);
-      }, 1000);
+      }, 2000);
 
       if (event.data.type === "success") {
         resolve(JSON.parse(event.data.result));
+        // Clear the panelIdToBeRefreshed after success
+        if (panelIdToBeRefreshed.value === panelSchema.id) {
+          panelIdToBeRefreshed.value = null;
+        }
       } else if (event.data.type === "error") {
         console.error("Error executing code", event.data.message);
         reject(new Error(event.data.message));

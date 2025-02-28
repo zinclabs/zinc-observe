@@ -87,7 +87,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     if job.partition_num.is_none() {
         let res = handle_search_partition(&job).await;
         if let Err(e) = res {
-            set_job_error_message(&job.id, &e.to_string()).await?;
+            set_job_error_message(&job.id, &job.trace_id, &e.to_string()).await?;
             log::error!(
                 "[SEARCH JOB {id}] job_id: {}, handle_search_partition error: {e}",
                 job.id
@@ -116,7 +116,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
             let total = match res {
                 Ok(total) => total,
                 Err(e) => {
-                    set_job_error_message(&job.id, &e.to_string()).await?;
+                    set_job_error_message(&job.id, &job.trace_id, &e.to_string()).await?;
                     log::error!(
                         "[SEARCH JOB {id}] job_id: {}, run_partition_job error: {e}",
                         job.id
@@ -145,7 +145,7 @@ pub async fn run(id: i64) -> Result<(), anyhow::Error> {
     storage::put(&path, buf.into()).await?;
 
     // 6. update `search_jobs` table
-    set_job_finish(&job.id, &path).await?;
+    set_job_finish(&job.id, &job.trace_id, &path).await?;
 
     log::info!(
         "[SEARCH JOB {id}] finish running, job_id: {}, time_elapsed: {}ms",
@@ -349,7 +349,7 @@ async fn check_status(id: i64, job_id: &str, org_id: &str) -> Result<(), anyhow:
             "[SEARCH JOB {id}] job_id: {}, status is not running when running search job, current status: {}",
             job.id, job.status
         );
-        set_job_error_message(&job.id, message.as_str()).await?;
+        set_job_error_message(&job.id, &job.trace_id, message.as_str()).await?;
         log::error!("{}", message);
         return Err(anyhow::anyhow!(message));
     }

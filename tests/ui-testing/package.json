@@ -13,7 +13,7 @@
     "cypress-file-upload": "^5.0.8",
     "cypress-multi-reporters": "^1.6.2",
     "cypress-xpath": "^2.0.1",
-    "mocha": "^10.2.0",
+    "mocha": "^10.8.2",
     "mochawesome": "^7.1.3",
     "nyc": "^17.1.0"
   },

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use ::datafusion::arrow::datatypes::Schema;
-use config::{get_config, utils::json};
+use config::{utils::json, TIMESTAMP_COL_NAME};
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use {
@@ -165,25 +165,24 @@ pub fn handle_metrics_response(sources: Vec<json::Value>) -> Vec<json::Value> {
     // handle metrics response
     let mut results_metrics: HashMap<String, json::Value> = HashMap::with_capacity(16);
     let mut results_values: HashMap<String, Vec<[json::Value; 2]>> = HashMap::with_capacity(16);
-    let cfg = get_config();
     for source in sources {
         let fields = source.as_object().unwrap();
         let mut key = Vec::with_capacity(fields.len());
         fields.iter().for_each(|(k, v)| {
-            if *k != cfg.common.column_timestamp && k != "value" {
+            if *k != TIMESTAMP_COL_NAME && k != "value" {
                 key.push(format!("{k}_{v}"));
             }
         });
         let key = key.join("_");
         if !results_metrics.contains_key(&key) {
             let mut fields = fields.clone();
-            fields.remove(&cfg.common.column_timestamp);
+            fields.remove(TIMESTAMP_COL_NAME);
             fields.remove("value");
             results_metrics.insert(key.clone(), json::Value::Object(fields));
         }
         let entry = results_values.entry(key).or_default();
         let value = [
-            fields.get(&cfg.common.column_timestamp).unwrap().to_owned(),
+            fields.get(TIMESTAMP_COL_NAME).unwrap().to_owned(),
             json::Value::String(fields.get("value").unwrap().to_string()),
         ];
         entry.push(value);

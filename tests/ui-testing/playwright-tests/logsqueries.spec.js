@@ -298,4 +298,47 @@ test.describe("Logs Queries testcases", () => {
 
   });
 
+  test("should display results if stringmatch ignorecase lowercase added in log query search", async ({ page }) => {
+    // Type the value of a variable into an input field
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+
+    // Ensure the query editor is visible and clickable before typing
+    const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+    await expect(queryEditor).toBeVisible();
+    await queryEditor.click();
+    await page.keyboard.type("str_match_ignore_case(kubernetes_container_name, 'ziox')");
+    await page.waitForTimeout(4000);
+
+    // Ensure the refresh button is visible and clickable before clicking
+    const refreshButton = page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content');
+    await expect(refreshButton).toBeVisible();
+    await refreshButton.click({ force: true });
+
+    // Verify that the expected log table column is visible
+    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+  });
+
+
+  test("should display results if stringmatch ignorecase uppercase added in log query search", async ({ page }) => {
+    // Type the value of a variable into an input field
+    await page.locator('[data-test="date-time-btn"]').click({ force: true });
+    await page.locator('[data-test="date-time-relative-15-m-btn"] > .q-btn__content > .block').click({ force: true });
+
+    // Ensure the query editor is visible and clickable before typing
+    const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+    await expect(queryEditor).toBeVisible();
+    await queryEditor.click();
+    await page.keyboard.type("str_match_ignore_case(kubernetes_container_name, 'Ziox')");
+    await page.waitForTimeout(4000);
+
+    // Ensure the refresh button is visible and clickable before clicking
+    const refreshButton = page.locator('[data-cy="search-bar-refresh-button"] > .q-btn__content');
+    await expect(refreshButton).toBeVisible();
+    await refreshButton.click({ force: true });
+
+    // Verify that the expected log table column is visible
+    await expect(page.locator('[data-test="log-table-column-0-source"]')).toBeVisible();
+  });
+
 })

@@ -192,9 +192,13 @@ pub async fn list(org_id: &str, limit: Option<i64>) -> Result<Vec<Action>, error
     Ok(records)
 }
 
-pub async fn contains(id: &str) -> Result<bool, errors::Error> {
+pub async fn contains(id: &str, org_id: &str) -> Result<bool, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let record = Entity::find().filter(Column::Id.eq(id)).one(client).await?;
+    let record = Entity::find()
+        .filter(Column::Id.eq(id))
+        .filter(Column::OrgId.eq(org_id))
+        .one(client)
+        .await?;
 
     Ok(record.is_some())
 }

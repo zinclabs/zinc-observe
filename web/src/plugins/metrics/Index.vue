@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
         <syntax-guide-metrics class="q-mr-sm" />
+        <MetricLegends class="q-mr-sm" />
       </div>
       <div class="text-right col flex justify-end">
         <DateTimePickerDashboard
@@ -505,6 +506,7 @@ import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
 import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
 import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
+import MetricLegends from "./MetricLegends.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
@@ -563,6 +565,7 @@ export default defineComponent({
     CustomHTMLEditor,
     CustomMarkdownEditor,
     SyntaxGuideMetrics,
+    MetricLegends,
     AddToDashboard,
     AutoRefreshInterval,
     CustomChartEditor,

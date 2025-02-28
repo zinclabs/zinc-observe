@@ -43,6 +43,7 @@ use openobserve::{
         utils::zo_logger,
     },
     handler::{
+        self,
         grpc::{
             auth::check_auth,
             flight::FlightServiceImpl,
@@ -296,6 +297,15 @@ async fn main() -> Result<(), anyhow::Error> {
                 panic!("meter provider init failed");
             };
 
+            // init websocket gc
+            if cfg.websocket.enabled {
+                log::info!("Initializing WebSocket session garbage collector");
+                if let Err(e) = handler::http::request::websocket::init().await {
+                    job_init_tx.send(false).ok();
+                    panic!("websocket gc init failed: {}", e);
+                }
+            }
+
             job_init_tx.send(true).ok();
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
@@ -479,7 +489,9 @@ async fn init_common_grpc_server(
     let gaddr: SocketAddr = format!("{}:{}", ip, cfg.grpc.port).parse()?;
     let event_svc = EventServer::new(Eventer)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let search_svc = SearchServer::new(SEARCH_SERVER.clone())
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -492,10 +504,14 @@ async fn init_common_grpc_server(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let metrics_ingest_svc = MetricsServiceServer::new(MetricsIngester)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let logs_svc = LogsServiceServer::new(LogsServer)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let trace_svc = TraceServiceServer::new(TraceServer)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -503,10 +519,14 @@ async fn init_common_grpc_server(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let query_cache_svc = QueryCacheServer::new(QueryCacheServerImpl)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let ingest_svc = IngestServer::new(Ingester)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let streams_svc = StreamsServer::new(StreamServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
@@ -514,7 +534,9 @@ async fn init_common_grpc_server(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     let flight_svc = FlightServiceServer::new(FlightServiceImpl)
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip);
+        .accept_compressed(CompressionEncoding::Gzip)
+        .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+        .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
     log::info!(
         "starting gRPC server {} at {}",
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
@@ -1006,7 +1028,7 @@ async fn init_script_server() -> Result<(), anyhow::Error> {
 
     // following command will setup the namespace
     #[cfg(feature = "enterprise")]
-    o2_enterprise::enterprise::actions::app_deployer::init().await?;
+    o2_enterprise::enterprise::actions::action_deployer::init().await?;
 
     let server = HttpServer::new(move || {
         let cfg = get_config();
@@ -1096,7 +1118,8 @@ pub fn get_script_server_routes(cfg: &mut web::ServiceConfig) {
             .service(script_server::create_job)
             .service(script_server::delete_job)
             .service(script_server::get_app_details)
-            .service(script_server::list_deployed_apps),
+            .service(script_server::list_deployed_apps)
+            .service(script_server::patch_action),
     );
 }
 
@@ -1118,7 +1141,6 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         openobserve::super_cluster_queue::init().await?;
     }
 
-    openobserve::service::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
-
+    o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
     Ok(())
 }

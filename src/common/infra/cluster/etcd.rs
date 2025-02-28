@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::atomic::Ordering;
+use std::{cmp::min, sync::atomic::Ordering};
 
 use config::{
     cluster::*,
@@ -45,39 +45,24 @@ pub(crate) async fn register_and_keep_alive() -> Result<()> {
             }
         }
         // after the node is online, keep alive
-        let mut need_online_again = false;
-        let ttl = get_config().limit.node_heartbeat_ttl;
+        let ttl_keep_alive = min(5, (get_config().limit.node_heartbeat_ttl / 2) as u64);
         loop {
-            if is_offline() {
-                break;
-            }
-
-            if need_online_again {
-                if let Err(e) = set_online(true).await {
-                    log::error!("[CLUSTER] keep alive failed: {}", e);
-                    continue;
+            tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;
+            loop {
+                if is_offline() {
+                    break;
+                }
+                match set_online(true).await {
+                    Ok(_) => {
+                        break;
+                    }
+                    Err(e) => {
+                        log::error!("[CLUSTER] keep alive failed: {}", e);
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        continue;
+                    }
                 }
             }
-
-            let lease_id = unsafe { LOCAL_NODE_KEY_LEASE_ID };
-            let ret = etcd::keep_alive_lease_id(lease_id, ttl, is_offline).await;
-            if ret.is_ok() {
-                break;
-            }
-            let e = ret.unwrap_err();
-            let estr = e.to_string();
-            if is_offline()
-                || estr
-                    != Error::from(etcd_client::Error::LeaseKeepAliveError(
-                        "lease expired or revoked".to_string(),
-                    ))
-                    .to_string()
-            {
-                break;
-            }
-            log::error!("[CLUSTER] keep alive lease id expired or revoked, set node online again.");
-            // set node online again
-            need_online_again = true;
         }
     });
 
@@ -167,6 +152,7 @@ async fn register() -> Result<()> {
         status: NodeStatus::Prepare,
         scheduled: true,
         broadcasted: false,
+        metrics: Default::default(),
     };
     let val = json::to_string(&node).unwrap();
 
@@ -229,7 +215,7 @@ pub(crate) async fn set_offline(new_lease_id: bool) -> Result<()> {
 pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result<()> {
     let cfg = get_config();
     // set node status to online
-    let node = match super::NODES.read().await.get(LOCAL_NODE.uuid.as_str()) {
+    let mut node = match super::NODES.read().await.get(LOCAL_NODE.uuid.as_str()) {
         Some(node) => {
             let mut val = node.clone();
             val.status = status.clone();
@@ -257,8 +243,13 @@ pub(crate) async fn set_status(status: NodeStatus, new_lease_id: bool) -> Result
             status: status.clone(),
             scheduled: true,
             broadcasted: false,
+            metrics: Default::default(),
         },
     };
+
+    // update node status metrics
+    node.metrics = super::update_node_status_metrics();
+
     let val = json::to_string(&node).unwrap();
 
     LOCAL_NODE_STATUS.store(status as _, Ordering::Release);

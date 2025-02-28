@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,14 +21,14 @@ use config::{
     get_config,
     meta::{
         function::VRLResultResolver,
-        search,
-        search::PARTIAL_ERROR_RESPONSE_MESSAGE,
+        search::{self, PARTIAL_ERROR_RESPONSE_MESSAGE},
         self_reporting::usage::{RequestStats, UsageType},
         sql::resolve_stream_names,
         stream::StreamType,
     },
     metrics,
     utils::{base64, json},
+    TIMESTAMP_COL_NAME,
 };
 use infra::errors;
 use tracing::{Instrument, Span};
@@ -47,10 +47,7 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    service::{
-        search::{self as SearchService, RESULT_ARRAY},
-        self_reporting::report_request_usage_stats,
-    },
+    service::{search as SearchService, self_reporting::report_request_usage_stats},
 };
 
 /// SearchStreamData
@@ -138,12 +135,7 @@ pub async fn search_multi(
     let trace_id = get_or_create_trace_id(in_req.headers(), &http_span);
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let search_type = match get_search_type_from_request(&query) {
         Ok(v) => v,
@@ -502,9 +494,11 @@ pub async fn search_multi(
         // compile vrl function & apply the same before returning the response
         let mut input_fn = query_fn.unwrap().trim().to_string();
 
-        let apply_over_hits = RESULT_ARRAY.is_match(&input_fn);
+        let apply_over_hits = SearchService::RESULT_ARRAY.is_match(&input_fn);
         if apply_over_hits {
-            input_fn = RESULT_ARRAY.replace(&input_fn, "").to_string();
+            input_fn = SearchService::RESULT_ARRAY
+                .replace(&input_fn, "")
+                .to_string();
         }
         let mut runtime = crate::common::utils::functions::init_vrl_runtime();
         let program = match crate::service::ingestion::compile_vrl_function(&input_fn, &org_id) {
@@ -593,7 +587,7 @@ pub async fn search_multi(
         };
     }
 
-    let column_timestamp = get_config().common.column_timestamp.to_string();
+    let column_timestamp = TIMESTAMP_COL_NAME.to_string();
     multi_res.cached_ratio /= queries_len;
     multi_res.hits.sort_by(|a, b| {
         if a.get(&column_timestamp).is_none() || b.get(&column_timestamp).is_none() {
@@ -710,12 +704,7 @@ pub async fn _search_partition_multi(
         .unwrap_or("")
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let req: search::MultiSearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
@@ -857,12 +846,7 @@ pub async fn around_multi(
     let stream_names = base64::decode_url(&stream_names)?;
     let mut uses_fn = false;
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let around_key = match query.get("key") {
         Some(v) => v.parse::<i64>().unwrap_or(0),
@@ -971,19 +955,21 @@ pub async fn around_multi(
             .dec();
 
         // search forward
+        let fw_sql = SearchService::sql::check_or_add_order_by_timestamp(around_sql, false)
+            .unwrap_or(around_sql.to_string());
         let req = config::meta::search::Request {
             query: config::meta::search::Query {
-                sql: around_sql.clone(),
+                sql: fw_sql,
                 from: 0,
                 size: around_size / 2,
                 start_time: around_start_time,
                 end_time: around_key,
-                sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
+                action_id: None,
                 skip_wal: false,
                 streaming_output: false,
                 streaming_id: None,
@@ -1047,19 +1033,21 @@ pub async fn around_multi(
         };
 
         // search backward
+        let bw_sql = SearchService::sql::check_or_add_order_by_timestamp(around_sql, true)
+            .unwrap_or(around_sql.to_string());
         let req = config::meta::search::Request {
             query: config::meta::search::Query {
-                sql: around_sql.clone(),
+                sql: bw_sql,
                 from: 0,
                 size: around_size / 2,
                 start_time: around_key,
                 end_time: around_end_time,
-                sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
                 quick_mode: false,
                 query_type: "".to_string(),
                 track_total_hits: false,
                 uses_zo_fn: uses_fn,
                 query_fn: query_fn.clone(),
+                action_id: None,
                 skip_wal: false,
                 streaming_output: false,
                 streaming_id: None,

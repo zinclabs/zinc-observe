@@ -216,7 +216,9 @@ pub fn get_basic_routes(svc: &mut web::ServiceConfig) {
             .wrap(cors.clone())
             .service(status::cache_status)
             .service(status::enable_node)
-            .service(status::flush_node),
+            .service(status::flush_node)
+            .service(status::list_node)
+            .service(status::node_metrics),
     );
 
     if get_config().common.swagger_enabled {
@@ -527,7 +529,8 @@ pub fn get_service_routes(svc: &mut web::ServiceConfig) {
         .service(actions::action::upload_zipped_action)
         .service(actions::action::update_action_details)
         .service(actions::action::serve_action_zip)
-        .service(actions::action::delete_action);
+        .service(actions::action::delete_action)
+        .service(actions::operations::test_action);
 
     svc.service(service);
 }

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::{collections::HashMap, io::Error};
 
 use actix_web::{get, http, post, web, HttpRequest, HttpResponse};
-use config::{get_config, meta::stream::StreamType, metrics, utils::json};
+use config::{get_config, meta::stream::StreamType, metrics, utils::json, TIMESTAMP_COL_NAME};
 use infra::errors;
 use serde::Serialize;
 use tracing::{Instrument, Span};
@@ -266,7 +266,7 @@ pub async fn get_latest_traces(
     // search
     let query_sql = format!(
         "SELECT trace_id, min({}) as zo_sql_timestamp, min(start_time) as trace_start_time, max(end_time) as trace_end_time FROM {stream_name}",
-        cfg.common.column_timestamp
+        TIMESTAMP_COL_NAME
     );
     let query_sql = if filter.is_empty() {
         format!("{query_sql} GROUP BY trace_id ORDER BY zo_sql_timestamp DESC")
@@ -280,12 +280,12 @@ pub async fn get_latest_traces(
             size,
             start_time,
             end_time,
-            sort_by: None,
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
+            action_id: None,
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
@@ -387,7 +387,7 @@ pub async fn get_latest_traces(
         .join("','");
     let query_sql = format!(
         "SELECT {}, trace_id, start_time, end_time, duration, service_name, operation_name, span_status FROM {stream_name} WHERE trace_id IN ('{}') ORDER BY {} ASC",
-        cfg.common.column_timestamp, trace_ids, cfg.common.column_timestamp,
+        TIMESTAMP_COL_NAME, trace_ids, TIMESTAMP_COL_NAME,
     );
     req.query.from = 0;
     req.query.size = 9999;

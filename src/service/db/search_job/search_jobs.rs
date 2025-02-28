@@ -123,14 +123,22 @@ pub async fn cancel_job_by_job_id(job_id: &str) -> Result<i64, errors::Error> {
     Ok(res)
 }
 
-pub async fn set_job_error_message(job_id: &str, error_message: &str) -> Result<(), errors::Error> {
+pub async fn set_job_error_message(
+    job_id: &str,
+    trace_id: &str,
+    error_message: &str,
+) -> Result<(), errors::Error> {
     let updated_at = chrono::Utc::now().timestamp_micros();
     let operator = SetOperator {
-        filter: vec![Filter::new(
-            MetaColumn::Id,
-            OperatorType::Equal,
-            Value::string(job_id),
-        )],
+        filter: vec![
+            Filter::new(MetaColumn::Id, OperatorType::Equal, Value::string(job_id)),
+            Filter::new(MetaColumn::Status, OperatorType::Equal, Value::i64(1)),
+            Filter::new(
+                MetaColumn::TraceId,
+                OperatorType::Equal,
+                Value::string(trace_id),
+            ),
+        ],
         update: vec![
             (MetaColumn::ErrorMessage, Value::string(error_message)),
             (MetaColumn::EndedAt, Value::i64(updated_at)),
@@ -152,12 +160,17 @@ pub async fn set_job_error_message(job_id: &str, error_message: &str) -> Result<
     Ok(())
 }
 
-pub async fn set_job_finish(job_id: &str, path: &str) -> Result<(), errors::Error> {
+pub async fn set_job_finish(job_id: &str, trace_id: &str, path: &str) -> Result<(), errors::Error> {
     let updated_at = chrono::Utc::now().timestamp_micros();
     let operator = SetOperator {
         filter: vec![
             Filter::new(MetaColumn::Id, OperatorType::Equal, Value::string(job_id)),
             Filter::new(MetaColumn::Status, OperatorType::Equal, Value::i64(1)),
+            Filter::new(
+                MetaColumn::TraceId,
+                OperatorType::Equal,
+                Value::string(trace_id),
+            ),
         ],
         update: vec![
             (MetaColumn::Status, Value::i64(2)),

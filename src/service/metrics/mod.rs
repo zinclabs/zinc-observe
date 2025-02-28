@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -68,7 +68,7 @@ pub fn signature_without_labels(
 fn get_exclude_labels() -> Vec<&'static str> {
     let vec: Vec<&str> = EXCLUDE_LABELS.to_vec();
     // TODO: fixed _timestamp
-    // let column_timestamp = config::get_config().common.column_timestamp.as_str();
+    // let column_timestamp = config::TIMESTAMP_COL_NAME.as_str();
     // vec.push(column_timestamp);
     vec
 }

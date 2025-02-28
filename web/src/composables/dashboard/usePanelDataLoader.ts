@@ -82,6 +82,7 @@ export const usePanelDataLoader = (
 
   // Add cleanup function
   const cleanupSearchRetries = (traceId: string) => {
+    removeTraceId(traceId);
     if (searchRetriesCount.value[traceId]) {
       delete searchRetriesCount.value[traceId];
     }
@@ -769,6 +770,7 @@ export const usePanelDataLoader = (
   ) => {
     try {
       const { traceId } = generateTraceContext();
+      addTraceId(traceId);
 
       const payload: {
         queryReq: any;
@@ -792,7 +794,6 @@ export const usePanelDataLoader = (
         org_id: store?.state?.selectedOrganization?.identifier,
         pageType,
       };
-
       const requestId = fetchQueryDataWithWebSocket(payload, {
         open: sendSearchMessage,
         close: handleSearchClose,
@@ -927,6 +928,7 @@ export const usePanelDataLoader = (
                     query: query,
                     start_time: startISOTimestamp,
                     end_time: endISOTimestamp,
+                    step: panelSchema.value.config.step_value ?? "0",
                   }),
                 abortController.signal,
               );
@@ -971,6 +973,7 @@ export const usePanelDataLoader = (
           };
           state.resultMetaData = [];
           state.annotations = [];
+          state.isOperationCancelled = false;
 
           // Call search API
 

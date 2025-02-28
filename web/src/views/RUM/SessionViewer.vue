@@ -395,13 +395,13 @@ const getDefaultEvent = (event: any) => {
 
 const handleErrorEvent = (event: any) => {
   const _event = getDefaultEvent(event);
-  _event.name = event.error_message;
+  _event.name = event?.error_message || "--";
   return _event;
 };
 
 const handleActionEvent = (event: any) => {
   const _event = getDefaultEvent(event);
-  _event.name = event.action_type + ' on "' + event.action_target_name + '"';
+  _event.name = event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
   // if (event.event.custom.error) {
   //   _event.name = event.event.custom.error.message;
   // }
@@ -416,7 +416,7 @@ const handleViewEvent = (event: any) => {
   //     " error " +
   //     event.event.custom.error.stack;
   // }
-  _event.name = event.view_loading_type + " : " + event.view_url;
+  _event.name = event?.view_loading_type + " : " + event?.view_url || "--";
   return _event;
 };
 

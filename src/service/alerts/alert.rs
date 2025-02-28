@@ -39,7 +39,7 @@ use config::{
         base64,
         json::{Map, Value},
     },
-    SMTP_CLIENT,
+    SMTP_CLIENT, TIMESTAMP_COL_NAME,
 };
 use cron::Schedule;
 use infra::{schema::unwrap_stream_settings, table};
@@ -221,8 +221,8 @@ async fn prepare_alert(
             if create {
                 return Err(AlertError::CreateAlreadyExists);
             }
-            alert.last_triggered_at = old_alert.last_triggered_at;
-            alert.last_satisfied_at = old_alert.last_satisfied_at;
+            alert.set_last_triggered_at(old_alert.get_last_triggered_at_from_table());
+            alert.set_last_satisfied_at(old_alert.get_last_satisfied_at_from_table());
             alert.owner = old_alert.owner;
         }
         Ok(None) => {
@@ -984,7 +984,7 @@ fn process_row_template(tpl: &String, alert: &Alert, rows: &[Map<String, Value>]
             process_variable_replace(&mut resp, key, &VarValue::Str(&value), false);
 
             // calculate start and end time
-            if key == &get_config().common.column_timestamp {
+            if key == TIMESTAMP_COL_NAME {
                 let val = value.parse::<i64>().unwrap_or_default();
                 if alert_start_time == 0 || val < alert_start_time {
                     alert_start_time = val;
@@ -1178,7 +1178,7 @@ async fn process_dest_template(
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
-            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}{}&type={}",
+            "{}{}/web/metrics?stream_type={}&stream={}&stream_value={}&from={}&to={}&query={}&org_identifier={}{}&type={}&show_histogram=false",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -1217,7 +1217,7 @@ async fn process_dest_template(
         };
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
-            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}&type={}",
+            "{}{}/web/logs?stream_type={}&stream={}&stream_value={}&from={}&to={}&sql_mode=true&query={}&org_identifier={}{}&type={}&show_histogram=false",
             cfg.common.web_url,
             cfg.common.base_uri,
             alert.stream_type,
@@ -1349,12 +1349,10 @@ pub fn get_alert_start_end_time(
         return (start_time, rows_end_time);
     }
 
-    let cfg = get_config();
-
     // calculate start and end time
     let mut alert_start_time = 0;
     let mut alert_end_time = 0;
-    if let Some(values) = vars.get(&cfg.common.column_timestamp) {
+    if let Some(values) = vars.get(TIMESTAMP_COL_NAME) {
         for val in values {
             let val = val.parse::<i64>().unwrap_or_default();
             if alert_start_time == 0 || val < alert_start_time {
@@ -1498,10 +1496,8 @@ mod tests {
         let org_id = "default";
         let stream_name = "default";
         let alert_name = "abc/alert";
-        let alert = Alert {
-            name: alert_name.to_string(),
-            ..Default::default()
-        };
+        let mut alert: Alert = Default::default();
+        alert.name = alert_name.to_string();
         let ret = save(org_id, stream_name, alert_name, alert, true).await;
         // alert name should not contain /
         assert!(ret.is_err());

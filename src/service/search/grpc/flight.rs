@@ -212,7 +212,7 @@ pub async fn search(
         )
         .await?;
         log::info!(
-            "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, num: {}, took: {} ms",
+            "[trace_id {trace_id}] flight->search in: part_id: {}, get file_list by ids, files: {}, took: {} ms",
             req.query_identifier.partition,
             file_list.len(),
             file_list_took,

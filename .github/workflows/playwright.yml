@@ -19,6 +19,7 @@ env:
   ZO_BASE_URL: http://localhost:5080
   WS_ZO_BASE_URL: ws://localhost:5080
   ZO_BASE_URL_SC: http://localhost:5080
+  ZO_BASE_URL_SC_UI: http://localhost:5080
   INGESTION_URL: http://localhost:5080
   ORGNAME: default
   ZO_QUICK_MODE_NUM_FIELDS: 100
@@ -37,7 +38,7 @@ jobs:
   build_binary:
     name: build_binary
     runs-on:
-      labels: ubicloud-standard-8
+      labels: ubicloud-standard-16
 
     steps:
       - name: Remove unused tools
@@ -75,7 +76,7 @@ jobs:
 
       - name: Build and run binary
         run: cargo build --release --target x86_64-unknown-linux-gnu
-        
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -94,8 +95,7 @@ jobs:
     strategy:
       matrix:
         browser: [chrome]
-        testfilename:
-          [
+        testfilename: [
             "sanity.spec.js",
             "alerts.spec.js",
             "schema.spec.js",
@@ -104,8 +104,10 @@ jobs:
             "logsquickmode.spec.js",
             "multiselect-stream.spec.js",
             "pipelines.spec.js",
+            "dashboards/custom-charts.spec.js",
             "dashboards/dashboardtype.spec.js",
             "dashboards/dashboard.spec.js",
+            "dashboards/dashboard2.spec.js",
             "dashboards/visualize.spec.js",
             "unflattened.spec.js",
             "secondsPrecisionAdded.spec.js",
@@ -122,6 +124,7 @@ jobs:
             "enrichment.spec.js",
             "sanity2.spec.js",
             "schemaload.spec.js",
+            "websocket.spec.js",
             # "remotepipeline.spec.js",
 
           ]
@@ -156,6 +159,7 @@ jobs:
           echo "ZO_BASE_URL=${ZO_BASE_URL}" >> .env
           echo "WS_ZO_BASE_URL=${WS_ZO_BASE_URL}" >> .env
           echo "ZO_BASE_URL_SC=${ZO_BASE_URL_SC}" >> .env
+          echo "ZO_BASE_URL_SC_UI=${ZO_BASE_URL_SC_UI}" >> .env
           echo "INGESTION_URL=${INGESTION_URL}" >> .env
           echo "ORGNAME=${ORGNAME}" >> .env
           mv .env tests/ui-testing
@@ -166,7 +170,7 @@ jobs:
       #   run: cat o2.log
 
       - name: Sanitize Test Filename
-        shell: bash 
+        shell: bash
         run: |
           # Assign the matrix variable to a Bash variable
           SANITIZED_FILENAME="${{ matrix.testfilename }}"
@@ -205,9 +209,9 @@ jobs:
       - name: Download Playwright Coverage Data
         uses: actions/download-artifact@v4
         with:
-          pattern: playwright-coverage-*  # Match all artifacts with this prefix
+          pattern: playwright-coverage-* # Match all artifacts with this prefix
           path: merged-coverage
-          merge-multiple: true 
+          merge-multiple: true
 
       - name: Verify Downloaded Files
         run: ls -R merged-coverage # Check the structure and contents

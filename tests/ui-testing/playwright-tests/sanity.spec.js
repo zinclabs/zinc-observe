@@ -138,9 +138,9 @@ test.describe("Sanity testcases", () => {
   });
 
   test("should display result text and pagination", async ({ page }) => {
-    await page.getByText("Showing 1 to 100").click();
+    await page.getByText("Showing 1 to 50").click();
     await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward50arrow_drop_down")
       .click();
   });
 
@@ -164,15 +164,17 @@ test.describe("Sanity testcases", () => {
     await page.waitForSelector('[data-test="logs-search-result-bar-chart"]');
   });
 
+
   test("should save search, favorite, click on saved search and then delete", async ({
     page,
   }) => {
+    const randomSavedViewName = `streamslog${Math.random().toString(36).substring(2, 10)}`;
     await page
       .locator("button")
       .filter({ hasText: "savesaved_search" })
       .click();
     await page.locator('[data-test="add-alert-name-input"]').click();
-    await page.locator('[data-test="add-alert-name-input"]').fill("sanitytest");
+    await page.locator('[data-test="add-alert-name-input"]').fill(randomSavedViewName);
     await page.locator('[data-test="saved-view-dialog-save-btn"]').click();
     await page
       .locator('[data-test="logs-search-saved-views-btn"]')
@@ -183,8 +185,8 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("sanity");
-    await page.getByText("sanitytest").first().click();
+      .fill(randomSavedViewName);
+    await page.getByText(randomSavedViewName).first().click();
     await page
       .locator('[data-test="logs-search-saved-views-btn"]')
       .getByLabel("Expand")
@@ -194,7 +196,7 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("sanity");
+      .fill(randomSavedViewName);
     await page.getByText("favorite_border").first().click();
     await page.getByText("Favorite Views").click();
     await page.getByLabel('Clear').first().click();
@@ -215,9 +217,10 @@ test.describe("Sanity testcases", () => {
       .click();
     await page
       .locator('[data-test="log-search-saved-view-field-search-input"]')
-      .fill("san");
-    await page.getByText("delete").click();
-    await page.locator('[data-test="confirm-button"]').click();
+      .fill(randomSavedViewName);
+    const deleteButtonSelector = `[data-test="logs-search-bar-delete-${randomSavedViewName}-saved-view-btn"]`;
+    await page.locator(deleteButtonSelector).click(); // Click delete
+    await page.locator('[data-test="confirm-button"]').click();;
   });
 
   test("should only display 5 result if limit 5 added", async ({ page }) => {
@@ -246,7 +249,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.waitForTimeout(2000);
     await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward50arrow_drop_down")
       .click();
   });
 
@@ -512,7 +515,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward50arrow_drop_down")
       .click();
   });
 
@@ -536,7 +539,7 @@ test.describe("Sanity testcases", () => {
 
   // test("should display pagination for schema", async ({ page }) => {
   //   await page
-  //     .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+  //     .getByText("fast_rewind12345fast_forward50arrow_drop_down")
   //     .click();
   //   await page.getByText("fast_rewind1/2fast_forward").click();
   //   await page
@@ -559,7 +562,7 @@ test.describe("Sanity testcases", () => {
   //   await page.locator('[data-test="log-table-column-0-source"]').click();
   //   await page.locator('[data-test="close-dialog"]').click();
   //   await page
-  //     .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+  //     .getByText("fast_rewind12345fast_forward50arrow_drop_down")
   //     .click();
   // });
 
@@ -575,7 +578,7 @@ test.describe("Sanity testcases", () => {
   //   await page.locator('[data-test="log-table-column-1-_timestamp"]').click();
   //   await page.locator('[data-test="close-dialog"]').click();
   //   await page
-  //     .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+  //     .getByText("fast_rewind12345fast_forward50arrow_drop_down")
   //     .click();
   // });
 

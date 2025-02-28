@@ -127,6 +127,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </q-tooltip>
         </q-btn>
         <q-btn
+          v-if="limitNumberOfSeriesWarningMessage"
+          :icon="symOutlinedDataInfoAlert"
+          flat
+          size="xs"
+          padding="2px"
+          data-test="dashboard-panel-limit-number-of-series-warning"
+          class="warning"
+        >
+          <q-tooltip anchor="bottom right" self="top right">
+            <div style="white-space: pre-wrap">
+              {{ limitNumberOfSeriesWarningMessage }}
+            </div>
+          </q-tooltip>
+        </q-btn>
+        <q-btn
           v-if="isCachedDataDifferWithCurrentTimeRange"
           :icon="outlinedRunningWithErrors"
           flat
@@ -158,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           title="Refresh Panel"
           data-test="dashboard-panel-refresh-panel-btn"
           :color="variablesDataUpdated ? 'warning' : ''"
+          :disable="isPanelLoading"
         >
           <q-tooltip>
             {{
@@ -238,6 +254,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </q-item>
             <q-item
               clickable
+              v-if="metaData && metaData.queries?.length > 0"
+              :disable="props.data.queryType != 'sql'"
+              v-close-popup="true"
+              @click="onLogPanel"
+            >
+              <q-item-section>
+                <q-item-label
+                  data-test="dashboard-move-to-logs-module"
+                  class="q-pa-sm"
+                  >Move To Logs</q-item-label
+                >
+              </q-item-section>
+            </q-item>
+            <q-item
+              clickable
               v-close-popup="true"
               @click="onPanelModifyClick('MovePanel')"
             >
@@ -264,7 +295,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboard-id="props.dashboardId"
       :folder-id="props.folderId"
       :report-id="props.reportId"
+      @loading-state-change="handleLoadingStateChange"
       @metadata-update="metaDataValue"
+      @limit-number-of-series-warning-message-update="
+        handleLimitNumberOfSeriesWarningMessageUpdate
+      "
       @result-metadata-update="handleResultMetadataUpdate"
       @last-triggered-at-update="handleLastTriggeredAtUpdate"
       @is-cached-data-differ-with-current-time-range-update="
@@ -309,6 +344,7 @@ import {
   computed,
   defineAsyncComponent,
   watch,
+  onBeforeMount,
 } from "vue";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
@@ -320,11 +356,13 @@ import {
   outlinedWarning,
   outlinedRunningWithErrors,
 } from "@quasar/extras/material-icons-outlined";
+import { symOutlinedDataInfoAlert } from "@quasar/extras/material-symbols-outlined";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import { isEqual } from "lodash-es";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -384,6 +422,8 @@ export default defineComponent({
 
     const maxQueryRange: any = ref([]);
 
+    const limitNumberOfSeriesWarningMessage = ref("");
+
     const handleResultMetadataUpdate = (metadata: any) => {
       const combinedWarnings: any[] = [];
       metadata.forEach((query: any) => {
@@ -421,6 +461,10 @@ export default defineComponent({
       isDiffer: boolean,
     ) => {
       isCachedDataDifferWithCurrentTimeRange.value = isDiffer;
+    };
+
+    const handleLimitNumberOfSeriesWarningMessageUpdate = (message: string) => {
+      limitNumberOfSeriesWarningMessage.value = message;
     };
 
     const showText = ref(false);
@@ -463,6 +507,109 @@ export default defineComponent({
         },
       });
     };
+    const getOriginalQueryAndStream = (queryDetails: any, metadata: any) => {
+      const originalQuery = metadata?.value?.queries[0]?.query;
+      const streamName = queryDetails?.queries[0]?.fields?.stream;
+
+      if (!originalQuery || !streamName) {
+        console.error("Missing query or stream name.");
+        return null;
+      }
+
+      return { originalQuery, streamName };
+    };
+    const constructLogsUrl = (
+      streamName: string,
+      encodedQuery: string,
+      queryDetails: any,
+      currentUrl: string,
+    ) => {
+      const logsUrl = new URL(currentUrl + "/logs");
+      logsUrl.searchParams.set(
+        "stream_type",
+        queryDetails.queries[0]?.fields?.stream_type,
+      );
+      logsUrl.searchParams.set("stream", streamName);
+      logsUrl.searchParams.set(
+        "from",
+        metaData.value.queries[0]?.startTime.toString(),
+      );
+      logsUrl.searchParams.set(
+        "to",
+        metaData.value.queries[0]?.endTime.toString(),
+      );
+      logsUrl.searchParams.set("sql_mode", "true");
+      logsUrl.searchParams.set("query", encodedQuery);
+      logsUrl.searchParams.set(
+        "org_identifier",
+        store.state.selectedOrganization.identifier,
+      );
+      logsUrl.searchParams.set("quick_mode", "false");
+      logsUrl.searchParams.set("show_histogram", "false");
+
+      return logsUrl;
+    };
+    let parser: any;
+    onBeforeMount(async () => {
+      await importSqlParser();
+    });
+
+    const importSqlParser = async () => {
+      const useSqlParser: any = await import("@/composables/useParser");
+      const { sqlParser }: any = useSqlParser.default();
+      parser = await sqlParser();
+    };
+    const parseQuery = async (originalQuery: string, parser: any) => {
+      try {
+        return parser.astify(originalQuery);
+      } catch (error) {
+        console.error("Failed to parse query:", error);
+        return null;
+      }
+    };
+
+    const onLogPanel = async () => {
+      const queryDetails = props.data;
+      if (!queryDetails) {
+        console.error("Data is undefined.");
+        return;
+      }
+
+      const { originalQuery, streamName } =
+        getOriginalQueryAndStream(queryDetails, metaData) || {};
+      if (!originalQuery || !streamName) return;
+
+      if (!parser) {
+        await importSqlParser();
+      }
+
+      const ast = await parseQuery(originalQuery, parser);
+      if (!ast) return;
+
+      let modifiedQuery = originalQuery;
+
+      modifiedQuery = modifiedQuery.replace(/`/g, '"');
+
+      const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
+
+      const pos = window.location.pathname.indexOf("/web/");
+      const currentUrl =
+        pos > -1
+          ? window.location.origin +
+            window.location.pathname.slice(0, pos) +
+            "/web"
+          : window.location.origin;
+
+      const logsUrl = constructLogsUrl(
+        streamName,
+        encodedQuery,
+        queryDetails,
+        currentUrl,
+      );
+
+      window.open(logsUrl.toString(), "_blank");
+    };
+
     //create a duplicate panel
     const onDuplicatePanel = async (data: any): Promise<void> => {
       // Show a loading spinner notification.
@@ -530,15 +677,27 @@ export default defineComponent({
       emit("onMovePanel", props.data.id, selectedTabId);
     };
 
-    const onRefreshPanel = () => {
-      emit("refreshPanelRequest", props.data.id);
+    const isPanelLoading = ref(false);
+
+    const handleLoadingStateChange = (isLoading: any) => {
+      isPanelLoading.value = isLoading;
     };
 
+    const onRefreshPanel = async () => {
+      if (isPanelLoading.value) return;
+
+      isPanelLoading.value = true;
+      try {
+        await emit("refreshPanelRequest", props.data.id);
+      } finally {
+        isPanelLoading.value = false;
+      }
+    };
     const createVariableRegex = (name: any) =>
       new RegExp(
         `.*\\$\\{?${name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
       );
-      
+
     const getDependentVariablesData = () =>
       props.variablesData?.values
         ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
@@ -591,15 +750,17 @@ export default defineComponent({
     const errorData = ref("");
     const onError = (error: any) => {
       errorData.value = typeof error === "string" ? error : error?.value;
-    }
+    };
 
     return {
       props,
       onEditPanel,
+      onLogPanel,
       onDuplicatePanel,
       deletePanelDialog,
       isCurrentlyHoveredPanel,
       outlinedWarning,
+      symOutlinedDataInfoAlert,
       outlinedRunningWithErrors,
       store,
       metaDataValue,
@@ -620,7 +781,11 @@ export default defineComponent({
       onRefreshPanel,
       variablesDataUpdated,
       onError,
-      errorData
+      errorData,
+      isPanelLoading,
+      handleLoadingStateChange,
+      limitNumberOfSeriesWarningMessage,
+      handleLimitNumberOfSeriesWarningMessageUpdate,
     };
   },
   methods: {

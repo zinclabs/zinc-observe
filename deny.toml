@@ -30,11 +30,10 @@ exceptions = [
     { name = "error-code", allow = ["BSL-1.0"] },
     { name = "base16", allow = ["CC0-1.0"] },
     { name = "tiny-keccak", allow = ["CC0-1.0"] },
-    { name = "enum-iterator-derive", allow = ["0BSD"] },
     { name = "quoted_printable", allow = ["0BSD"] },
     { name = "ring", allow = ["BSD-4-Clause", "OpenSSL"] },
-    { name = "unicode-ident", allow = ["Unicode-DFS-2016"] },
     { name = "adler32", allow = ["Zlib"] },
+    { name = "inferno", allow = ["CDDL-1.0"] },
 ]
 
 allow = [

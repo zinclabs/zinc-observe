@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,7 @@ use config::{
     get_config,
     meta::{search::Response, sql::OrderBy, stream::StreamType},
     utils::{file::scan_files, json},
+    TIMESTAMP_COL_NAME,
 };
 use infra::cache::{
     file_data::disk::{self, QUERY_RESULT_CACHE},
@@ -94,7 +95,6 @@ pub async fn check_cache(
     should_exec_query: &mut bool,
 ) -> MultiCachedQueryResponse {
     let start = std::time::Instant::now();
-    let cfg = get_config();
 
     let query: SearchQuery = req.query.clone().into();
     let sql = match Sql::new(&query, org_id, stream_type).await {
@@ -106,7 +106,7 @@ pub async fn check_cache(
     };
 
     // skip the queries with no timestamp column
-    let ts_result = get_ts_col_order_by(&sql, &cfg.common.column_timestamp, is_aggregate);
+    let ts_result = get_ts_col_order_by(&sql, TIMESTAMP_COL_NAME, is_aggregate);
     let mut result_ts_col = ts_result.map(|(ts_col, _)| ts_col);
     if result_ts_col.is_none() && (is_aggregate || !sql.group_by.is_empty()) {
         return MultiCachedQueryResponse::default();
@@ -116,7 +116,7 @@ pub async fn check_cache(
     let order_by = sql.order_by;
     if req.query.track_total_hits
         || (!order_by.is_empty()
-            && order_by.first().as_ref().unwrap().0 != cfg.common.column_timestamp
+            && order_by.first().as_ref().unwrap().0 != TIMESTAMP_COL_NAME
             && (result_ts_col.is_none()
                 || (result_ts_col.is_some()
                     && result_ts_col.as_ref().unwrap() != &order_by.first().as_ref().unwrap().0)))
@@ -129,18 +129,15 @@ pub async fn check_cache(
     {
         let caps = RE_SELECT_FROM.captures(origin_sql.as_str()).unwrap();
         let cap_str = caps.get(1).unwrap().as_str();
-        if !cap_str.contains(&cfg.common.column_timestamp) {
-            *origin_sql = origin_sql.replacen(
-                cap_str,
-                &format!("{}, {}", &cfg.common.column_timestamp, cap_str),
-                1,
-            );
+        if !cap_str.contains(TIMESTAMP_COL_NAME) {
+            *origin_sql =
+                origin_sql.replacen(cap_str, &format!("{}, {}", TIMESTAMP_COL_NAME, cap_str), 1);
         }
         req.query.sql = origin_sql.clone();
-        result_ts_col = Some(cfg.common.column_timestamp.clone());
+        result_ts_col = Some(TIMESTAMP_COL_NAME.to_string());
     }
     if !is_aggregate && origin_sql.contains('*') {
-        result_ts_col = Some(cfg.common.column_timestamp.clone());
+        result_ts_col = Some(TIMESTAMP_COL_NAME.to_string());
     }
 
     let result_ts_col = result_ts_col.unwrap();

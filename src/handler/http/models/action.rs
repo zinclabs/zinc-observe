@@ -107,3 +107,8 @@ where
         None => serializer.serialize_none(),
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TestActionRequest {
+    pub inputs: Vec<serde_json::Value>,
+}

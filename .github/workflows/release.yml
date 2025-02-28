@@ -67,20 +67,20 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ matrix.arch }}-build-cargo-${{ hashFiles('**/Cargo.lock') }}
-        
+
       - name: Install Node
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
-          cache: 'npm'
+          cache: "npm"
           cache-dependency-path: web/package-lock.json
       - name: Build UI
-        env: 
+        env:
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: |
-            cd web/
-            npm install
-            npm run build
+          cd web/
+          npm install
+          npm run build
 
       - name: Install Protoc for linux
         if: contains(matrix.arch, 'linux')
@@ -109,7 +109,7 @@ jobs:
         run: |
           sudo apt-get -y update
           sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
-      
+
       - name: Install dependencies for linux
         if: contains(matrix.arch, 'linux-musl')
         run: |

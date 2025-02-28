@@ -103,7 +103,7 @@ jobs:
         id-token: write
         contents: read
       if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false
-      runs-on: 'ubicloud-standard-8-arm'
+      runs-on: 'ubicloud-standard-16-arm'
       steps:
         - name: Remove unused tools
           run: |
@@ -183,7 +183,7 @@ jobs:
         
     build:
       needs: [build_pr_image, build_pr_image_arm]
-      runs-on: ubicloud-standard-2-arm
+      runs-on: ubicloud-standard-16-arm
       permissions:
         id-token: write
         contents: read

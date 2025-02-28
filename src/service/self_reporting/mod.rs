@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,7 @@
 
 use chrono::{DateTime, Datelike, Timelike};
 use config::{
+    cluster::LOCAL_NODE,
     get_config,
     meta::{
         self_reporting::{
@@ -132,6 +133,7 @@ pub async fn report_request_usage_stats(
             result_cache_ratio: None,
             is_partial: stats.is_partial,
             work_group: None,
+            node_name: stats.node_name.clone(),
         });
     };
 
@@ -171,6 +173,7 @@ pub async fn report_request_usage_stats(
         result_cache_ratio: stats.result_cache_ratio,
         is_partial: stats.is_partial,
         work_group: stats.work_group,
+        node_name: stats.node_name,
     });
     if !usage.is_empty() {
         publish_usage(usage).await;
@@ -243,7 +246,8 @@ pub async fn flush() {
     flush_audit().await;
 
     let cfg = get_config();
-    if !cfg.common.usage_enabled {
+    // only ingester and querier nodes report usage
+    if !cfg.common.usage_enabled || (!LOCAL_NODE.is_ingester() && !LOCAL_NODE.is_querier()) {
         return;
     }
 

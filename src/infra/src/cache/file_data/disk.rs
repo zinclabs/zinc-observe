@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,7 +24,7 @@ use std::{
 use async_recursion::async_recursion;
 use bytes::Bytes;
 use config::{
-    get_config, is_local_disk_storage,
+    get_config,
     meta::inverted_index::InvertedIndexTantivyMode,
     metrics,
     utils::{
@@ -458,12 +458,7 @@ pub async fn exist(file: &str) -> bool {
 
 #[inline]
 pub async fn set(trace_id: &str, file: &str, data: Bytes) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    if !cfg.disk_cache.enabled
-        || (is_local_disk_storage()
-            && !cfg.common.result_cache_enabled
-            && !cfg.common.metrics_cache_enabled)
-    {
+    if !get_config().disk_cache.enabled {
         return Ok(());
     }
     let idx = get_bucket_idx(file);
@@ -614,7 +609,7 @@ async fn load(root_dir: &PathBuf, scan_dir: &PathBuf) -> Result<(), anyhow::Erro
 
 async fn gc() -> Result<(), anyhow::Error> {
     let cfg = get_config();
-    if !cfg.disk_cache.enabled || is_local_disk_storage() {
+    if !cfg.disk_cache.enabled {
         return Ok(());
     }
     for file in FILES.iter() {

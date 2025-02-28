@@ -21,6 +21,7 @@ use config::{
     },
     utils::rand::generate_random_string,
 };
+use infra::table;
 
 use crate::{
     common::{
@@ -71,7 +72,7 @@ pub async fn get_summary(org_id: &str) -> OrgSummary {
     };
 
     let functions = db::functions::list(org_id).await.unwrap_or_default();
-    let dashboards = super::dashboards::list_dashboards(ListDashboardsParams::new(org_id))
+    let dashboards = table::dashboards::list(ListDashboardsParams::new(org_id))
         .await
         .unwrap_or_default();
 

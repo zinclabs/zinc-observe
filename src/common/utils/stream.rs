@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ use arrow::array::{Int64Array, RecordBatch};
 use config::{
     get_config,
     meta::stream::{FileMeta, StreamType},
-    FILE_EXT_JSON,
+    FILE_EXT_JSON, TIMESTAMP_COL_NAME,
 };
 
 use crate::{
@@ -77,9 +77,8 @@ pub async fn populate_file_meta(
     if batches.is_empty() {
         return Ok(());
     }
-    let cfg = get_config();
-    let min_field = min_field.unwrap_or_else(|| cfg.common.column_timestamp.as_str());
-    let max_field = max_field.unwrap_or_else(|| cfg.common.column_timestamp.as_str());
+    let min_field = min_field.unwrap_or(TIMESTAMP_COL_NAME);
+    let max_field = max_field.unwrap_or(TIMESTAMP_COL_NAME);
 
     let total = batches.iter().map(|batch| batch.num_rows()).sum::<usize>();
     let mut min_val = i64::MAX;

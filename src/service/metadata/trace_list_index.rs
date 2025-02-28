@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,6 +27,7 @@ use config::{
     get_config,
     meta::stream::{StreamPartition, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt},
+    TIMESTAMP_COL_NAME,
 };
 use infra::schema::unwrap_partition_time_level;
 use once_cell::sync::Lazy;
@@ -64,11 +65,7 @@ pub struct TraceListItem {
 impl Metadata for TraceListIndex {
     fn generate_schema(&self) -> Arc<Schema> {
         Arc::new(Schema::new(vec![
-            Field::new(
-                get_config().common.column_timestamp.as_str(),
-                DataType::Int64,
-                false,
-            ),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("stream_name", DataType::Utf8, false),
             Field::new("service_name", DataType::Utf8, false),
             Field::new("trace_id", DataType::Utf8, false),
@@ -272,7 +269,7 @@ mod tests {
         let mut data = json::to_value(item).unwrap();
         let data = data.as_object_mut().unwrap();
         data.insert(
-            config::get_config().common.column_timestamp.clone(),
+            config::TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
         let hour_key = ingestion::get_write_partition_key(

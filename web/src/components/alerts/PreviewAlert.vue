@@ -40,6 +40,7 @@ import { reactive } from "vue";
 import { onBeforeMount } from "vue";
 import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
+import { useI18n } from "vue-i18n";
 
 const getDefaultDashboardPanelData: any = () => ({
   data: {
@@ -158,6 +159,7 @@ onBeforeMount(() => {
 
 const chartPanelRef = ref(null);
 const chartData = ref({});
+const { t } = useI18n();
 
 const store = useStore();
 
@@ -194,7 +196,7 @@ const refreshData = () => {
       alias: "zo_sql_val",
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
-      label: "",
+      label: t("alerts.numOfEvents"),
     });
   } else {
     yAxis.push({
@@ -202,7 +204,7 @@ const refreshData = () => {
       alias: "zo_sql_val",
       color: null,
       column: store.state.zoConfig.timestamp_column || "_timestamp",
-      label: "",
+      label: t("alerts.numOfEvents"),
     });
   }
 

@@ -56,7 +56,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
@@ -101,7 +101,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
@@ -147,7 +147,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
@@ -192,7 +192,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
@@ -237,7 +237,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
@@ -282,7 +282,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();
@@ -327,7 +327,7 @@ test.describe("Report test cases Updated", () => {
         await reportsPage.navigateToReports();
         await reportsPage.pauseReport(TEST_REPORT_NAME);
         await reportsPage.updateReport(TEST_REPORT_NAME);
-        await page.goto(process.env["ZO_BASE_URL_SC"] + "/web/reports?org_identifier=default");
+        await page.goto(process.env["ZO_BASE_URL_SC_UI"] + "/web/reports?org_identifier=default");
         await expect(page).toHaveURL(/.*\/reports/);
         await reportsPage.deleteReport(TEST_REPORT_NAME);
         await dashboardPage.navigateToDashboards();

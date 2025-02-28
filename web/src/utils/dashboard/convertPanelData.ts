@@ -123,17 +123,16 @@ export const convertPanelData = async (
       };
     }
     case "custom_chart": {
-      if(data.length > 0 && data[0].length > 0){
+      if (data.length > 0 && data[0].length > 0) {
         const result = await runJavaScriptCode(panelSchema, data);
         const safeResult = result && typeof result === "object" ? result : {};
         return {
           chartType: panelSchema.type,
           ...safeResult,
         };
-      }
-      else{
-        if(!loading)
-          throw new Error("No data to render Please check the query.");
+      } else {
+        if (panelSchema?.queries?.[0]?.query?.trim() == "")
+          throw new Error("No data found");
       }
     }
     default: {

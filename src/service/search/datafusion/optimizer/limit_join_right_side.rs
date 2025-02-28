@@ -73,7 +73,7 @@ impl OptimizerRule for LimitJoinRightSide {
                 if right_column.is_empty() {
                     let plan = (*join.right)
                         .clone()
-                        .rewrite(&mut AddSortAndLimit::new(self.limit, 0, None))?
+                        .rewrite(&mut AddSortAndLimit::new(self.limit, 0))?
                         .data;
                     join.right = Arc::new(plan);
                     Ok(Transformed::yes(LogicalPlan::Join(join)))

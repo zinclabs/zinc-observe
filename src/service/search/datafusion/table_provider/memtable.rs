@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -139,7 +139,7 @@ impl TableProvider for NewMemTable {
 
 // create sort exec by _timestamp
 fn wrap_sort(exec: Arc<dyn ExecutionPlan>) -> Arc<dyn ExecutionPlan> {
-    let column_timestamp = config::get_config().common.column_timestamp.to_string();
+    let column_timestamp = config::TIMESTAMP_COL_NAME.to_string();
     let index = exec.schema().index_of(&column_timestamp);
     (match index {
         Ok(index) => {

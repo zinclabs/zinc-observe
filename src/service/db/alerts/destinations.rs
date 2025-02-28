@@ -58,6 +58,9 @@ pub enum DestinationError {
     UsedByAlert(String),
     #[error("Destination is currently used by pipeline: {0}")]
     UsedByPipeline(String),
+    #[cfg(feature = "enterprise")]
+    #[error("Invalid action id: {0}")]
+    InvalidActionId(anyhow::Error),
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Destination, DestinationError> {

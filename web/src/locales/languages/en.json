@@ -43,6 +43,8 @@
     "tags": "Tags",
     "process": "Process",
     "axisWidth": "Axis Width",
+    "yAxisMin": "Y-Axis Min",
+    "yAxisMax": "Y-Axis Max",
     "legendWidth": "Legend Width",
     "exceptions": "Exceptions",
     "nameRequired": "Name is required",
@@ -115,6 +117,7 @@
     "exportLogs": "Export logs",
     "runQuery": "Run query",
     "syntaxGuideLabel": "Syntax Guide",
+    "legendLabel":"Legends",
     "logs": "Logs",
     "enrichmentTables": "Enrichment Tables",
     "savedViewsLabel": "Save View",
@@ -913,7 +916,8 @@
     "createdAt":"Created At",
     "lastRunAt":"Last Run At",
     "lastSuccessfulAt":"Last Successfull At",
-    "status":"Status"
+    "status":"Status",
+    "numOfEvents": "Number of Events"
   },
   "alert_templates": {
     "header": "Templates",

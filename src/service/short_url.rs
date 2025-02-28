@@ -77,7 +77,7 @@ pub async fn shorten(org_id: &str, original_url: &str) -> Result<String, anyhow:
             if let Some(infra_error) = e.downcast_ref::<Error>() {
                 match infra_error {
                     Error::DbError(DbError::UniqueViolation) => {
-                        let timestamp = Utc::now().timestamp();
+                        let timestamp = Utc::now().timestamp_micros();
                         short_id = generate_short_id(original_url, Some(timestamp));
                         store_short_url(org_id, &short_id, original_url).await
                     }

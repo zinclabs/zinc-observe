@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{io::Error, str::FromStr};
+use std::{collections::HashMap, io::Error, str::FromStr};
 
 use actix_multipart::Multipart;
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse};
@@ -26,6 +26,9 @@ use o2_enterprise::enterprise::actions::action_manager::{
     delete_app_from_target_cluster, get_action_details, get_actions, register_app,
     serve_file_from_s3, update_app_on_target_cluster,
 };
+use once_cell::sync::Lazy;
+use regex::Regex;
+use serde_json;
 use svix_ksuid::Ksuid;
 
 use crate::{
@@ -39,6 +42,17 @@ use crate::{
 
 const MANDATORY_FIELDS_FOR_ACTION_CREATION: [&str; 5] =
     ["name", "owner", "file", "filename", "execution_details"];
+
+static ENV_VAR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[A-Z][A-Z0-9_]*$").unwrap());
+
+fn validate_environment_variables(env_vars: &HashMap<String, String>) -> Result<(), String> {
+    for key in env_vars.keys() {
+        if !ENV_VAR_REGEX.is_match(key) {
+            return Err("Environment variable keys must be uppercase and alphanumeric".to_string());
+        }
+    }
+    Ok(())
+}
 
 /// Delete Action
 #[utoipa::path(
@@ -127,7 +141,15 @@ pub async fn update_action_details(
     req: web::Json<UpdateActionDetailsRequest>,
 ) -> Result<HttpResponse, Error> {
     let (org_id, ksuid) = path.into_inner();
-    let req = req.into_inner();
+    let mut req = req.into_inner();
+
+    // Validate environment variables if they are being updated
+    if let Some(ref env_vars) = req.environment_variables {
+        if let Err(e) = validate_environment_variables(env_vars) {
+            return Ok(MetaHttpResponse::bad_request(e));
+        }
+    }
+
     let sa = match req.service_account.clone() {
         None => {
             if let Ok(action) = action_scripts::get(&ksuid.to_string(), &org_id).await {
@@ -143,6 +165,8 @@ pub async fn update_action_details(
     } else {
         return Ok(HttpResponse::BadRequest().body("Failed to fetch passcode"));
     };
+
+    req.service_account = Some(sa);
     match update_app_on_target_cluster(&org_id, ksuid, req, &passcode).await {
         Ok(uuid) => Ok(MetaHttpResponse::json(serde_json::json!({"uuid":uuid}))),
         Err(e) => Ok(MetaHttpResponse::bad_request(e)),
@@ -415,6 +439,10 @@ pub async fn upload_zipped_action(
                 }
                 if let Ok(env_vars) = String::from_utf8(env_vars) {
                     if let Ok(env_vars) = serde_json::from_str(&env_vars) {
+                        // Validate environment variables before assigning
+                        if let Err(e) = validate_environment_variables(&env_vars) {
+                            return Ok(MetaHttpResponse::bad_request(e));
+                        }
                         action.environment_variables = env_vars;
                     } else {
                         return Ok(HttpResponse::BadRequest()

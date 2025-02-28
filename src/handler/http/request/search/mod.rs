@@ -28,7 +28,7 @@ use config::{
     },
     metrics,
     utils::{base64, json},
-    DISTINCT_FIELDS,
+    DISTINCT_FIELDS, TIMESTAMP_COL_NAME,
 };
 use infra::{cache::stats, errors};
 use tracing::{Instrument, Span};
@@ -193,10 +193,7 @@ pub async fn search(
         .to_string();
 
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let use_cache = cfg.common.result_cache_enabled && get_use_cache_from_request(&query);
     // handle encoding for query and aggs
@@ -431,10 +428,7 @@ pub async fn around(
 
     let mut uses_fn = false;
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let around_key = match query.get("key") {
         Some(v) => v.parse::<i64>().unwrap_or(0),
@@ -526,19 +520,21 @@ pub async fn around(
             .unwrap();
 
     // search forward
+    let fw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, false)
+        .unwrap_or(around_sql.to_string());
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: around_sql.clone(),
+            sql: fw_sql,
             from: 0,
             size: around_size / 2,
             start_time: around_start_time,
             end_time: around_key,
-            sort_by: Some(format!("{} DESC", cfg.common.column_timestamp)),
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
+            action_id: None,
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
@@ -580,19 +576,21 @@ pub async fn around(
     };
 
     // search backward
+    let bw_sql = SearchService::sql::check_or_add_order_by_timestamp(&around_sql, true)
+        .unwrap_or(around_sql.to_string());
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
-            sql: around_sql.clone(),
+            sql: bw_sql,
             from: 0,
             size: around_size / 2,
             start_time: around_key,
             end_time: around_end_time,
-            sort_by: Some(format!("{} ASC", cfg.common.column_timestamp)),
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
             uses_zo_fn: uses_fn,
             query_fn: query_fn.clone(),
+            action_id: None,
             skip_wal: false,
             streaming_output: false,
             streaming_id: None,
@@ -738,10 +736,7 @@ pub async fn values(
     let (org_id, stream_name) = path.into_inner();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
 
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(meta::http::HttpResponse::bad_request(e)),
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let user_id = in_req
         .headers()
@@ -809,10 +804,7 @@ async fn values_v1(
         }
     }
 
-    let default_sql = format!(
-        "SELECT {} FROM \"{stream_name}\"",
-        cfg.common.column_timestamp
-    );
+    let default_sql = format!("SELECT {} FROM \"{stream_name}\"", TIMESTAMP_COL_NAME);
     let mut query_sql = match query.get("filter") {
         None => default_sql,
         Some(v) => {
@@ -1184,10 +1176,7 @@ pub async fn search_partition(
         .unwrap_or("")
         .to_string();
     let query = web::Query::<HashMap<String, String>>::from_query(in_req.query_string()).unwrap();
-    let stream_type = match get_stream_type_from_request(&query) {
-        Ok(v) => v.unwrap_or(StreamType::Logs),
-        Err(e) => return Ok(MetaHttpResponse::bad_request(e)),
-    };
+    let stream_type = get_stream_type_from_request(&query).unwrap_or_default();
 
     let mut req: config::meta::search::SearchPartitionRequest = match json::from_slice(&body) {
         Ok(v) => v,
@@ -1329,7 +1318,7 @@ pub async fn search_history(
 
     // Search
     let stream_name = USAGE_STREAM;
-    let search_query_req = match req.to_query_req(stream_name, &cfg.common.column_timestamp) {
+    let search_query_req = match req.to_query_req(stream_name) {
         Ok(r) => r,
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));

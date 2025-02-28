@@ -1,14 +1,14 @@
 name: Security audit
 on:
   push:
-    paths: 
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
+
 jobs:
   security_audit:
-    runs-on: ubicloud-standard-8
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/audit-check@v1
+      - uses: taiki-e/install-action@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          tool: cargo-audit
+      - name: run cargo audit
+        run: cargo audit

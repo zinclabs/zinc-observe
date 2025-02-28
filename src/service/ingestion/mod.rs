@@ -22,7 +22,6 @@ use anyhow::{anyhow, Result};
 use chrono::{Duration, TimeZone, Utc};
 use config::{
     cluster::{LOCAL_NODE, LOCAL_NODE_ID},
-    get_config,
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::alert::Alert,
@@ -34,7 +33,7 @@ use config::{
     },
     metrics,
     utils::{flatten, json::*, schema::format_partition_key},
-    SIZE_IN_MB,
+    SIZE_IN_MB, TIMESTAMP_COL_NAME,
 };
 use infra::schema::STREAM_RECORD_ID_GENERATOR;
 use proto::cluster_rpc::IngestionType;
@@ -242,6 +241,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             is_partial: None,
             delay_in_secs: None,
             evaluation_took_in_secs: None,
+            source_node: Some(LOCAL_NODE.name.clone()),
         };
         match alert.send_notification(val, now, None, now).await {
             Err(e) => {
@@ -498,7 +498,6 @@ pub async fn get_uds_and_original_data_streams(
     user_defined_schema_map: &mut HashMap<String, HashSet<String>>,
     streams_need_original: &mut HashSet<String>,
 ) {
-    let cfg = get_config();
     for stream in streams {
         if user_defined_schema_map.contains_key(stream.stream_name.as_str()) {
             continue;
@@ -513,8 +512,8 @@ pub async fn get_uds_and_original_data_streams(
         if let Some(fields) = &stream_settings.defined_schema_fields {
             if !fields.is_empty() {
                 let mut fields: HashSet<_> = fields.iter().cloned().collect();
-                if !fields.contains(&cfg.common.column_timestamp) {
-                    fields.insert(cfg.common.column_timestamp.to_string());
+                if !fields.contains(TIMESTAMP_COL_NAME) {
+                    fields.insert(TIMESTAMP_COL_NAME.to_string());
                 }
                 user_defined_schema_map.insert(stream.stream_name.to_string(), fields);
             }

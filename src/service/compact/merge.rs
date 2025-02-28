@@ -37,7 +37,7 @@ use config::{
         schema_ext::SchemaExt,
         time::{day_micros, hour_micros},
     },
-    FILE_EXT_PARQUET,
+    FILE_EXT_PARQUET, TIMESTAMP_COL_NAME,
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{
@@ -947,7 +947,7 @@ pub async fn merge_files(
             let id = ider::generate();
             let new_file_key = format!("{prefix}/{id}{}", FILE_EXT_PARQUET);
             log::info!(
-                "[COMPACT:{thread_id}] merge file successfully, {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
+                "[COMPACT:{thread_id}] merged {} files into a new file: {}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
                 new_file_key,
                 new_file_meta.original_size,
@@ -1014,7 +1014,7 @@ pub async fn merge_files(
                 new_file_metas.push(new_file_meta);
             }
             log::info!(
-                "[COMPACT:{thread_id}] merge file successfully, {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
+                "[COMPACT:{thread_id}] merged {} files into a new file: {:?}, original_size: {}, compressed_size: {}, took: {} ms",
                 retain_file_list.len(),
                 new_file_keys,
                 new_file_metas.iter().map(|m| m.original_size).sum::<i64>(),
@@ -1042,6 +1042,7 @@ async fn generate_inverted_index(
     let cfg = get_config();
 
     // generate parquet format inverted index
+    #[allow(deprecated)]
     let index_format = InvertedIndexFormat::from(&cfg.common.inverted_index_store_format);
     if matches!(
         index_format,
@@ -1218,8 +1219,8 @@ pub fn generate_inverted_idx_recordbatch(
         return Ok(None);
     }
     // add _timestamp column to columns_to_index
-    if !inverted_idx_columns.contains(&cfg.common.column_timestamp) {
-        inverted_idx_columns.push(cfg.common.column_timestamp.to_string());
+    if !inverted_idx_columns.contains(&TIMESTAMP_COL_NAME.to_string()) {
+        inverted_idx_columns.push(TIMESTAMP_COL_NAME.to_string());
     }
 
     let mut inverted_idx_batches = Vec::with_capacity(batches.len());
@@ -1258,7 +1259,7 @@ pub fn generate_inverted_idx_recordbatch(
 
         if matches!(
             new_batch.schema().fields().len(),
-            0 | 1 if new_batch.schema().field(0).name() == &cfg.common.column_timestamp
+            0 | 1 if new_batch.schema().field(0).name() == TIMESTAMP_COL_NAME
         ) {
             Ok(None)
         } else {

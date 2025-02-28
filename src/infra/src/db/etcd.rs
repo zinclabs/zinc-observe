@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -564,11 +564,12 @@ pub async fn keep_alive_connection() -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn keep_alive_lease_id<F>(id: i64, ttl: i64, stopper: F) -> Result<()>
 where
     F: Fn() -> bool,
 {
-    let mut ttl_keep_alive = min(10, (ttl / 2) as u64);
+    let mut ttl_keep_alive = min(5, (ttl / 2) as u64);
     loop {
         if stopper() {
             break;

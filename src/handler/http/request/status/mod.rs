@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,7 @@ use config::{
     get_config, get_instance_id,
     meta::{cluster::NodeStatus, function::ZoFunction},
     utils::{json, schema_ext::SchemaExt},
-    Config, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS,
+    Config, QUICK_MODEL_FIELDS, SQL_FULL_TEXT_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
 };
 use hashbrown::HashMap;
 use infra::{
@@ -124,6 +124,7 @@ struct ConfigResponse<'a> {
     websocket_enabled: bool,
     min_auto_refresh_interval: u32,
     query_default_limit: i64,
+    max_dashboard_series: usize,
 }
 
 #[derive(Serialize)]
@@ -268,7 +269,7 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         default_quick_mode_fields: QUICK_MODEL_FIELDS.to_vec(),
         default_functions: DEFAULT_FUNCTIONS.to_vec(),
         sql_base64_enabled: cfg.common.ui_sql_base64_enabled,
-        timestamp_column: cfg.common.column_timestamp.clone(),
+        timestamp_column: TIMESTAMP_COL_NAME.to_string(),
         syslog_enabled: *SYSLOG_ENABLED.read(),
         data_retention_days: cfg.compact.data_retention_days,
         extended_data_retention_days: cfg.compact.extended_data_retention_days,
@@ -304,9 +305,10 @@ pub async fn zo_config() -> Result<HttpResponse, Error> {
         all_fields_name: cfg.common.column_all.to_string(),
         usage_enabled: cfg.common.usage_enabled,
         usage_publish_interval: cfg.common.usage_publish_interval,
-        websocket_enabled: cfg.common.websocket_enabled,
+        websocket_enabled: cfg.websocket.enabled,
         min_auto_refresh_interval: cfg.common.min_auto_refresh_interval,
         query_default_limit: cfg.limit.query_default_limit,
+        max_dashboard_series: cfg.limit.max_dashboard_series,
     }))
 }
 
@@ -793,4 +795,16 @@ async fn flush_node() -> Result<HttpResponse, Error> {
         Ok(_) => Ok(MetaHttpResponse::json(true)),
         Err(e) => Ok(MetaHttpResponse::internal_error(e)),
     }
+}
+
+#[get("/list")]
+async fn list_node() -> Result<HttpResponse, Error> {
+    let nodes = cluster::get_cached_nodes(|_| true).await;
+    Ok(MetaHttpResponse::json(nodes))
+}
+
+#[get("/metrics")]
+async fn node_metrics() -> Result<HttpResponse, Error> {
+    let metrics = config::utils::sysinfo::get_node_metrics();
+    Ok(MetaHttpResponse::json(metrics))
 }

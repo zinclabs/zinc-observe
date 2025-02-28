@@ -1,4 +1,4 @@
-// Copyright 2024 Zinc Labs Inc.
+// Copyright 2025 Zinc Labs Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,6 +26,9 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             };
             if original_url.is_empty() {
                 return Err(Error::Message("Invalid message value".to_string()));
+            }
+            if infra::table::short_urls::contains(&short_id).await? {
+                return Ok(());
             }
             infra::table::short_urls::add(&short_id, &original_url).await?;
         }

@@ -30,7 +30,7 @@ class PipelinePage {
     this.pipelineNameInput = page.getByLabel("Enter Pipeline Name");
     this.sourceNodeRequiredMessage = page.getByText("Source node is required");
     this.streamNameInput = page.getByLabel("Stream Name *");
-    this.e2eAutomateOption = page.getByRole("option", { name: "e2e_automate" });
+    this.e2eAutomateOption = page.getByRole("option", { name: "e2e_automate" , exact: true});
     this.inputNodeStreamSaveButton = page.locator(
       '[data-test="input-node-stream-save-btn"]'
     );

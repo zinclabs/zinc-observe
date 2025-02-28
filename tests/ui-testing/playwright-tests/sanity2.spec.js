@@ -114,8 +114,9 @@ test.describe("Sanity testcases", () => {
   });
 
   test("should display pagination for schema", async ({ page }) => {
+    await page.waitForTimeout(2000);
     await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward50arrow_drop_down")
       .click();
     await page.getByText("fast_rewind1/2fast_forward").click();
     await page
@@ -138,7 +139,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="log-table-column-0-source"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward50arrow_drop_down")
       .click();
   });
 
@@ -154,7 +155,7 @@ test.describe("Sanity testcases", () => {
     await page.locator('[data-test="log-table-column-1-_timestamp"]').click();
     await page.locator('[data-test="close-dialog"]').click();
     await page
-      .getByText("fast_rewind12345fast_forward100arrow_drop_down")
+      .getByText("fast_rewind12345fast_forward50arrow_drop_down")
       .click();
   });
 
@@ -496,7 +497,7 @@ test.skip("should display error if timestamp past the ingestion time limit", asy
     await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
     await page.getByRole('button', { name: 'Search History' }).click();
     await page.locator('[data-test="add-alert-title"]').click();
-    await page.getByText('arrow_back_ios_new').click();
+    await page.getByText('arrow_back_ios_new').first().click()
     await page.waitForTimeout(1000);
 
     // Use a more specific locator for 'e2e_automate' by targeting its unique container or parent element

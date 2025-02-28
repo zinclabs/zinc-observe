@@ -26,7 +26,7 @@ use config::{
     get_config,
     meta::stream::StreamType,
     utils::{json, schema::infer_json_schema_from_map},
-    FxIndexMap,
+    FxIndexMap, TIMESTAMP_COL_NAME,
 };
 use infra::{
     errors::{Error, Result},
@@ -152,11 +152,7 @@ impl Metadata for DistinctValues {
         // distinct values will always have _timestamp and
         // count, rest will be dynamically determined
         Arc::new(Schema::new(vec![
-            Field::new(
-                get_config().common.column_timestamp.as_str(),
-                DataType::Int64,
-                false,
-            ),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("count", DataType::Int64, false),
         ]))
     }
@@ -264,7 +260,7 @@ impl Metadata for DistinctValues {
                 let data = data.as_object_mut().unwrap();
                 data.insert("count".to_string(), json::Value::Number(count.into()));
                 data.insert(
-                    cfg.common.column_timestamp.clone(),
+                    TIMESTAMP_COL_NAME.to_string(),
                     json::Value::Number(timestamp.into()),
                 );
                 let hour_key = ingestion::get_write_partition_key(

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,7 @@ pub(crate) mod arrjoin_udf;
 pub(crate) mod arrsort_udf;
 pub(crate) mod arrzip_udf;
 pub(crate) mod cast_to_arr_udf;
+pub(crate) mod cast_to_timestamp_udf;
 #[cfg(feature = "enterprise")]
 pub(crate) mod cipher_udf;
 pub(crate) mod date_format_udf;
@@ -50,7 +51,7 @@ pub(crate) const REGEX_NOT_MATCH_UDF_NAME: &str = "re_not_match";
 /// The name of the regex_matches UDF given to DataFusion.
 pub(crate) const REGEX_MATCHES_UDF_NAME: &str = "re_matches";
 
-pub(crate) const DEFAULT_FUNCTIONS: [ZoFunction; 10] = [
+pub(crate) const DEFAULT_FUNCTIONS: [ZoFunction; 11] = [
     ZoFunction {
         name: "match_all_raw",
         text: "match_all_raw('v')",
@@ -90,6 +91,10 @@ pub(crate) const DEFAULT_FUNCTIONS: [ZoFunction; 10] = [
     ZoFunction {
         name: REGEX_MATCHES_UDF_NAME,
         text: "re_matches(field, 'pattern')",
+    },
+    ZoFunction {
+        name: cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF_NAME,
+        text: "cast_to_timestamp('pattern')",
     },
 ];
 

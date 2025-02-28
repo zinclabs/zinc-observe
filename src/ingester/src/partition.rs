@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -142,104 +142,122 @@ impl Partition {
             if data.data.is_empty() {
                 continue;
             }
-            let mut file_meta = FileMeta::default();
-            data.data.iter().for_each(|r| {
-                file_meta.original_size += r.data_json_size as i64;
-                file_meta.records += r.data.num_rows() as i64;
-                if file_meta.min_ts == 0 || file_meta.min_ts > r.min_ts {
-                    file_meta.min_ts = r.min_ts;
-                }
-                if file_meta.max_ts < r.max_ts {
-                    file_meta.max_ts = r.max_ts;
-                }
-            });
-            let mut persist_stat = PersistStat {
-                json_size: file_meta.original_size,
-                arrow_size: 0,
-                file_num: 1,
-                batch_num: data.data.len(),
-            };
-            // write into parquet buf
-            let bloom_filter_fields =
-                if self.schema.fields().len() >= cfg.limit.file_move_fields_limit {
-                    let settings = infra::schema::unwrap_stream_settings(self.schema.as_ref());
-                    infra::schema::get_stream_setting_bloom_filter_fields(&settings)
+            let mut chunks = Vec::new();
+            let mut cur_batches = Vec::new();
+            let mut cur_num_rows = 0;
+            for data in data.data.iter() {
+                let num_rows = data.data.num_rows();
+                if cur_num_rows > 0 && cur_num_rows + num_rows > config::PARQUET_FILE_CHUNK_SIZE {
+                    chunks.push(std::mem::take(&mut cur_batches));
+                    cur_num_rows = 0;
                 } else {
-                    vec![]
+                    cur_num_rows += num_rows;
+                    cur_batches.push(data);
+                }
+            }
+            if !cur_batches.is_empty() {
+                chunks.push(std::mem::take(&mut cur_batches));
+            }
+            for data in chunks {
+                let mut file_meta = FileMeta::default();
+                data.iter().for_each(|r| {
+                    file_meta.original_size += r.data_json_size as i64;
+                    file_meta.records += r.data.num_rows() as i64;
+                    if file_meta.min_ts == 0 || file_meta.min_ts > r.min_ts {
+                        file_meta.min_ts = r.min_ts;
+                    }
+                    if file_meta.max_ts < r.max_ts {
+                        file_meta.max_ts = r.max_ts;
+                    }
+                });
+                let mut persist_stat = PersistStat {
+                    json_size: file_meta.original_size,
+                    arrow_size: 0,
+                    file_num: 1,
+                    batch_num: data.len(),
                 };
+                // write into parquet buf
+                let bloom_filter_fields =
+                    if self.schema.fields().len() >= cfg.limit.file_move_fields_limit {
+                        let settings = infra::schema::unwrap_stream_settings(self.schema.as_ref());
+                        infra::schema::get_stream_setting_bloom_filter_fields(&settings)
+                    } else {
+                        vec![]
+                    };
 
-            let batches = data
-                .data
-                .iter()
-                .map(|r| {
-                    persist_stat.arrow_size += r.data_arrow_size;
-                    r.data.clone()
-                })
-                .collect::<Vec<_>>();
-            let (schema, batches) =
-                merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), batches)
-                    .context(MergeRecordBatchSnafu)?;
+                let batches = data
+                    .iter()
+                    .map(|r| {
+                        persist_stat.arrow_size += r.data_arrow_size;
+                        r.data.clone()
+                    })
+                    .collect::<Vec<_>>();
+                let (schema, batches) =
+                    merge_record_batches("INGESTER:PERSIST", 0, self.schema.clone(), batches)
+                        .context(MergeRecordBatchSnafu)?;
 
-            let mut buf_parquet = Vec::new();
-            let mut writer = new_parquet_writer(
-                &mut buf_parquet,
-                &schema,
-                &bloom_filter_fields,
-                &file_meta,
-                true,
-            );
+                let mut buf_parquet = Vec::new();
+                let mut writer = new_parquet_writer(
+                    &mut buf_parquet,
+                    &schema,
+                    &bloom_filter_fields,
+                    &file_meta,
+                    true,
+                );
 
-            writer
-                .write(&batches)
-                .await
-                .context(WriteParquetRecordBatchSnafu)?;
-            writer.close().await.context(WriteParquetRecordBatchSnafu)?;
-            file_meta.compressed_size = buf_parquet.len() as i64;
+                writer
+                    .write(&batches)
+                    .await
+                    .context(WriteParquetRecordBatchSnafu)?;
+                writer.close().await.context(WriteParquetRecordBatchSnafu)?;
+                file_meta.compressed_size = buf_parquet.len() as i64;
 
-            // write into local file
-            let file_name = generate_filename_with_time_range(file_meta.min_ts, file_meta.max_ts);
-            let mut path = path.clone();
-            path.push(hour.to_string());
-            path.push(file_name);
-            path.set_extension("par");
-            create_dir_all(path.parent().unwrap())
-                .context(CreateFileSnafu { path: path.clone() })?;
-            let mut f = OpenOptions::new()
-                .create(true)
-                .write(true)
-                .truncate(true)
-                .open(&path)
-                .await
-                .context(CreateFileSnafu { path: path.clone() })?;
-            f.write_all(&buf_parquet)
-                .await
-                .context(WriteFileSnafu { path: path.clone() })?;
-            drop(f);
+                // write into local file
+                let file_name =
+                    generate_filename_with_time_range(file_meta.min_ts, file_meta.max_ts);
+                let mut path = path.clone();
+                path.push(hour.to_string());
+                path.push(file_name);
+                path.set_extension("par");
+                create_dir_all(path.parent().unwrap())
+                    .context(CreateFileSnafu { path: path.clone() })?;
+                let mut f = OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(true)
+                    .open(&path)
+                    .await
+                    .context(CreateFileSnafu { path: path.clone() })?;
+                f.write_all(&buf_parquet)
+                    .await
+                    .context(WriteFileSnafu { path: path.clone() })?;
+                drop(f);
 
-            // set parquet metadata cache
-            let mut file_key = path.clone();
-            file_key.set_extension("parquet");
-            let file_key = file_key
-                .strip_prefix(base_path.clone())
-                .unwrap()
-                .to_string_lossy()
-                .replace('\\', "/")
-                .trim_start_matches('/')
-                .to_string();
-            super::WAL_PARQUET_METADATA
-                .write()
-                .await
-                .insert(file_key, file_meta);
+                // set parquet metadata cache
+                let mut file_key = path.clone();
+                file_key.set_extension("parquet");
+                let file_key = file_key
+                    .strip_prefix(base_path.clone())
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/")
+                    .trim_start_matches('/')
+                    .to_string();
+                super::WAL_PARQUET_METADATA
+                    .write()
+                    .await
+                    .insert(file_key, file_meta);
 
-            // update metrics
-            metrics::INGEST_WAL_USED_BYTES
-                .with_label_values(&[org_id, stream_type])
-                .add(buf_parquet.len() as i64);
-            metrics::INGEST_WAL_WRITE_BYTES
-                .with_label_values(&[org_id, stream_type])
-                .inc_by(buf_parquet.len() as u64);
+                // update metrics
+                metrics::INGEST_WAL_USED_BYTES
+                    .with_label_values(&[org_id, stream_type])
+                    .add(buf_parquet.len() as i64);
+                metrics::INGEST_WAL_WRITE_BYTES
+                    .with_label_values(&[org_id, stream_type])
+                    .inc_by(buf_parquet.len() as u64);
 
-            paths.push((path, persist_stat));
+                paths.push((path, persist_stat));
+            }
         }
         Ok((self.schema.size(), paths))
     }

@@ -107,7 +107,6 @@ export const useAnnotationsData = (
   ];
   const processTabPanels = (dashboardData: any): any[] => {
     if (!dashboardData?.tabs || !Array.isArray(dashboardData.tabs)) {
-      console.warn("No tabs found in dashboard data");
       return [];
     }
 

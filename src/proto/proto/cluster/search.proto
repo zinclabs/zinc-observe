@@ -81,12 +81,12 @@ message SearchQuery {
     int32              size = 5;
     int64        start_time = 6;
     int64          end_time = 7;
-    string          sort_by = 8;
     bool   track_total_hits = 9;
     string      query_type = 10;
     bool        uses_zo_fn = 12;
     string        query_fn = 13;
     bool          skip_wal = 14;
+    string       action_id = 15;
 }
 
 

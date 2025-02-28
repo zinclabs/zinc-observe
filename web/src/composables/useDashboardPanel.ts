@@ -55,6 +55,9 @@ const getDefaultDashboardPanelData: any = () => ({
       unit_custom: null,
       decimals: 2,
       line_thickness: 1.5,
+      step_value: "0",
+      y_axis_min: null,
+      y_axis_max: null,
       top_results: null,
       top_results_others: false,
       axis_width: null,
@@ -2203,18 +2206,32 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ?.filter((it: any) => !it?.isDerived)
       ?.map((it: any) => it?.alias);
 
-    if (dashboardPanelData.data.type == "heatmap") {
-      query +=
-        xAxisAlias.length && yAxisAlias.length
-          ? " GROUP BY " + xAxisAlias.join(", ") + ", " + yAxisAlias.join(", ")
-          : "";
-    } else if (bAxisAlias?.length) {
-      query +=
-        xAxisAlias.length && bAxisAlias.length
-          ? " GROUP BY " + xAxisAlias.join(", ") + ", " + bAxisAlias.join(", ")
-          : "";
-    } else {
-      query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
+    const tableTypeWithXFieldOnly =
+      dashboardPanelData.data.type === "table" &&
+      xAxisAlias.length > 0 &&
+      yAxisAlias.length === 0 &&
+      !bAxisAlias?.length;
+
+    if (!tableTypeWithXFieldOnly) {
+      if (dashboardPanelData.data.type == "heatmap") {
+        query +=
+          xAxisAlias.length && yAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              yAxisAlias.join(", ")
+            : "";
+      } else if (bAxisAlias?.length) {
+        query +=
+          xAxisAlias.length && bAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              bAxisAlias.join(", ")
+            : "";
+      } else {
+        query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
+      }
     }
 
     // array of sorting fields with followed by asc or desc
@@ -2655,6 +2672,11 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         errors.push("Please enter your markdown code");
       }
     }
+    if (dashboardPanelData.data.type == 'custom_chart'){
+      if(dashboardPanelData.data.queries[0].query.trim() == ""){
+         errors.push("Please enter query for custom chart")
+      }
+    }
 
     if (promqlMode.value) {
       // 1. chart type: only line chart is supported
@@ -3005,11 +3027,13 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].query,
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].customQuery,
+      ].customQuery, // Only watch for custom query mode changes
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
     ],
-    () => {
-      
+    (newVal, oldVal) => {
+      // Check if customQuery mode has changed
+      const customQueryChanged = newVal[1] !== oldVal[1];
+
       // Only continue if the current mode is "show custom query"
       if (
         dashboardPanelData.data.queries[
@@ -3019,10 +3043,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ) {
         // Call the updateQueryValue function
         if (parser) updateQueryValue();
-      } else {
+      } else if (customQueryChanged) {
+        // Only clear lists when switching modes
         // auto query mode selected
         // remove the custom fields from the list
         dashboardPanelData.meta.stream.customQueryFields = [];
+        dashboardPanelData.meta.stream.vrlFunctionFieldList = []; // Clear VRL function field list
       }
       // if (dashboardPanelData.data.queryType == "promql") {
       //     updatePromQLQuery()

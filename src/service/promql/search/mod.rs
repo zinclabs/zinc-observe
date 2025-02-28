@@ -261,12 +261,12 @@ async fn search_in_cluster(
                 let scan_stats = response.scan_stats.as_ref().unwrap();
 
                 log::info!(
-                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, took: {} ms, files: {}, scan_size: {}",
+                    "[trace_id {trace_id}] promql->search->grpc: result node: {}, need_wal: {}, files: {}, scan_size: {} bytes, took: {} ms",
                     &node.get_grpc_addr(),
                     req_need_wal,
-                    response.took,
                     scan_stats.files,
                     scan_stats.original_size,
+                    response.took,
                 );
                 Ok(response)
             }
@@ -307,6 +307,12 @@ async fn search_in_cluster(
         series_data.push(series);
     });
 
+    // with cache maybe we only get the last point from original data, then the result_type will
+    // return as vector, but if the query is range query, the result_type should be matrix
+    if result_type == "vector" && original_start != end {
+        result_type = "matrix".to_string();
+    }
+
     // merge result
     let values = if result_type == "matrix" {
         merge_matrix_query(&series_data)
@@ -320,10 +326,10 @@ async fn search_in_cluster(
         return Err(server_internal_error("invalid result type"));
     };
     log::info!(
-        "[trace_id {trace_id}] promql->search->result: took: {} ms, file_count: {}, scan_size: {}",
-        op_start.elapsed().as_millis(),
+        "[trace_id {trace_id}] promql->search->result: files: {}, scan_size: {} bytes, took: {} ms",
         scan_stats.files,
         scan_stats.original_size,
+        op_start.elapsed().as_millis(),
     );
 
     let req_stats = RequestStats {

@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2025 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -161,7 +161,7 @@ fn pop_time_range(
 ) -> (i64, i64) {
     let mut min_ts = 0;
     let mut max_ts = 0;
-    let time_field = config::get_config().common.column_timestamp.to_string();
+    let time_field = config::TIMESTAMP_COL_NAME.to_string();
     let min_field = min_field.unwrap_or(time_field.as_str());
     let max_field = max_field.unwrap_or(time_field.as_str());
     if min_field == max_field {

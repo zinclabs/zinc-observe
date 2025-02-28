@@ -166,6 +166,7 @@ pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
 pub async fn put(
     org_id: &str,
     folder_id: &str,
+    new_folder_id: Option<&str>,
     mut dashboard: Dashboard,
     clone: bool,
 ) -> Result<Dashboard, errors::Error> {
@@ -201,59 +202,82 @@ pub async fn put(
         dashboard.set_updated_at();
     }
     let updated_at = dashboard.updated_at;
-
     let data = inner_data_as_json(dashboard)?;
 
-    let model = match get_model_from_folder(client, org_id, folder_id, &dashboard_id).await? {
-        None => {
-            // Destination folder does not exist so the dashboard can neither be
-            // created nor updated.
-            Err(errors::PutDashboardError::FolderDoesNotExist)
-        }
-        Some((folder_m, Some(dash_m))) => {
-            // Destination folder exists and dashboard already exists, so
-            // update the dashboard.
-            let mut dash_am = dash_m.into_active_model();
-            dash_am.folder_id = Set(folder_m.id);
-            dash_am.owner = Set(owner);
-            dash_am.role = Set(role);
-            dash_am.title = Set(title);
-            dash_am.description = Set(description);
-            dash_am.data = Set(data);
-            dash_am.version = Set(version);
-            dash_am.updated_at = Set(updated_at);
-            let model: dashboards::Model = dash_am.update(client).await?.try_into_model()?;
-            Ok(model)
-        }
-        Some((folder_m, None)) => {
-            // Destination folder exists but dashboard does not exist, so create
-            // a new dashboard.
-            // TODO: Use timestamp in microseconds like all other resources
-            let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
-                created_at_tz.timestamp()
-            } else {
-                chrono::Utc::now().timestamp()
-            };
+    // Try to get the new folder if the dashboard is being moved to a new folder.
+    let maybe_new_folder_model = if let Some(new_folder_id) = new_folder_id {
+        let new_folder_model = folders::Entity::find()
+            .filter(folders::Column::Org.eq(org_id))
+            .filter(folders::Column::Type.eq::<i16>(folder_type_into_i16(FolderType::Dashboards)))
+            .filter(folders::Column::FolderId.eq(new_folder_id))
+            .one(client)
+            .await?
+            .ok_or(errors::PutDashboardError::FolderDoesNotExist)?;
+        Some(new_folder_model)
+    } else {
+        None
+    };
 
-            let dash_am = dashboards::ActiveModel {
-                id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
-                dashboard_id: Set(dashboard_id.to_owned()),
-                folder_id: Set(folder_m.id),
-                owner: Set(owner),
-                role: Set(role),
-                title: Set(title),
-                description: Set(description),
-                data: Set(data),
-                version: Set(version),
-                created_at: Set(created_at_unix),
-                updated_at: Set(updated_at),
-            };
-            let model: dashboards::Model = dash_am.insert(client).await?.try_into_model()?;
-            Ok(model)
-        }
-    }?;
+    let dashboard_model =
+        match get_model_from_folder(client, org_id, folder_id, &dashboard_id).await? {
+            None => {
+                // Destination folder does not exist so the dashboard can neither be
+                // created nor updated.
+                Err(errors::PutDashboardError::FolderDoesNotExist)
+            }
+            Some((folder_m, Some(dash_m))) => {
+                // Destination folder exists and dashboard already exists, so
+                // update the dashboard.
 
-    let dash = model.try_into()?;
+                // If the dashboard is being to a new folder, then update the folder ID foreign key.
+                // Otherwise keep using the older folder ID foreign key.
+                let folder_id = if let Some(new_folder_model) = maybe_new_folder_model {
+                    new_folder_model.id
+                } else {
+                    folder_m.id
+                };
+
+                let mut dash_am = dash_m.into_active_model();
+                dash_am.folder_id = Set(folder_id);
+                dash_am.owner = Set(owner);
+                dash_am.role = Set(role);
+                dash_am.title = Set(title);
+                dash_am.description = Set(description);
+                dash_am.data = Set(data);
+                dash_am.version = Set(version);
+                dash_am.updated_at = Set(updated_at);
+                let model: dashboards::Model = dash_am.update(client).await?.try_into_model()?;
+                Ok(model)
+            }
+            Some((folder_m, None)) => {
+                // Destination folder exists but dashboard does not exist, so create
+                // a new dashboard.
+                // TODO: Use timestamp in microseconds like all other resources
+                let created_at_unix: i64 = if let Some(created_at_tz) = created_at_depricated {
+                    created_at_tz.timestamp()
+                } else {
+                    chrono::Utc::now().timestamp()
+                };
+
+                let dash_am = dashboards::ActiveModel {
+                    id: Set(svix_ksuid::Ksuid::new(None, None).to_string()),
+                    dashboard_id: Set(dashboard_id.to_owned()),
+                    folder_id: Set(folder_m.id),
+                    owner: Set(owner),
+                    role: Set(role),
+                    title: Set(title),
+                    description: Set(description),
+                    data: Set(data),
+                    version: Set(version),
+                    created_at: Set(created_at_unix),
+                    updated_at: Set(updated_at),
+                };
+                let model: dashboards::Model = dash_am.insert(client).await?.try_into_model()?;
+                Ok(model)
+            }
+        }?;
+
+    let dash = dashboard_model.try_into()?;
     Ok(dash)
 }
 
