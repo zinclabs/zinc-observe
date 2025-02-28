@@ -737,7 +737,8 @@ export default defineComponent({
       addTarget,
       addValue,
       cleanupDraggingFields,
-      flattenGroupedFields
+      flattenGroupedFields,
+      updateGroupedFields,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { getStreams, getStream } = useStreams();
     const { showErrorNotification } = useNotifications();
@@ -1032,6 +1033,27 @@ export default defineComponent({
     //     ];
     //   }
     // });
+
+    watch(
+      () => ({
+        stream:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream,
+        streamType:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].fields.stream_type,
+        joins:
+          dashboardPanelData.data.queries[
+            dashboardPanelData.layout.currentQueryIndex
+          ].joins,
+      }),
+      () => {
+        updateGroupedFields();
+      },
+      { deep: true },
+    );
 
     watch(
       () => dashboardPanelData.meta.stream.filterField,

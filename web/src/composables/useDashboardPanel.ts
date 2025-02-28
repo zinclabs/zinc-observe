@@ -363,62 +363,34 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     }
   }
 
-  let latestRequestId: any = null;
-
-  watch(
-    () => [
+  // Helper function to update grouped fields
+  const updateGroupedFields = async () => {
+    const currentStream =
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.stream,
-      dashboardPanelData.data.queries[
+      ].fields.stream;
+    if (!currentStream) return;
+
+    // Collect streams (main + joins)
+    const joinsStreams = [
+      { stream: currentStream },
+      ...(dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
-      ].fields.stream_type,
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].joins,
-    ],
-    async () => {
-      // Generate a unique request ID
-      const requestId = Symbol();
-      latestRequestId = requestId;
+      ].joins?.filter((stream: any) => stream?.stream) ?? []),
+    ];
 
-      const joins =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].joins ?? [];
+    // Fetch stream fields
+    const groupedFields = await Promise.all(
+      joinsStreams.map(async (stream: any) => {
+        return {
+          ...(await loadStreamFields(stream?.stream)),
+          stream_alias: stream?.streamAlias,
+        };
+      }),
+    );
 
-      // Collect streams (main + joins)
-      const joinsStreams = [
-        {
-          stream:
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.stream,
-        },
-        ...joins.filter((stream: any) => stream?.stream),
-      ];
-
-      console.log(joinsStreams, "joinsStreams");
-
-      // Fetch stream fields
-      const groupedFields = await Promise.all(
-        joinsStreams.map(async (stream: any) => {
-          return {
-            ...(await loadStreamFields(stream?.stream)),
-            stream_alias: stream?.streamAlias,
-          };
-        }),
-      );
-
-      // Only update if this is the latest request
-      if (latestRequestId === requestId) {
-        dashboardPanelData.meta.streamFields.groupedFields = groupedFields;
-      }
-    },
-    {
-      deep: true,
-    },
-  );
+      dashboardPanelData.meta.streamFields.groupedFields = groupedFields;
+  };
 
   const flattenGroupedFields = computed(() => {
     const flattenedFields: any[] = [];
@@ -3545,6 +3517,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
     generateLabelFromName,
     selectedStreamFieldsBasedOnUserDefinedSchema,
     flattenGroupedFields,
+    updateGroupedFields,
   };
 };
 export default useDashboardPanelData;
