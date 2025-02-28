@@ -44,6 +44,22 @@ import LinuxConfig from "@/components/ingestion/recommended/LinuxConfig.vue";
 import OtelConfig from "@/components/ingestion/recommended/OtelConfig.vue";
 import WindowsConfig from "@/components/ingestion/recommended/WindowsConfig.vue";
 
+import DatabaseConfig from "@/components/ingestion/Database.vue";
+import SqlServer from "@/components/ingestion/databases/SqlServer.vue";
+import Postgres from "@/components/ingestion/databases/Postgres.vue";
+import MongoDB from '@/components/ingestion/databases/MongoDB.vue'
+import Redis from '@/components/ingestion/databases/Redis.vue'
+import CouchDB from '@/components/ingestion/databases/CouchDB.vue'
+import Elasticsearch from '@/components/ingestion/databases/Elasticsearch.vue'
+import MySQL from '@/components/ingestion/databases/MySQL.vue'
+import SAPHana from '@/components/ingestion/databases/SAPHana.vue'
+import Snowflake from '@/components/ingestion/databases/Snowflake.vue'
+import Zookeeper from '@/components/ingestion/databases/Zookeeper.vue'
+import Cassandra from '@/components/ingestion/databases/Cassandra.vue'
+import Aerospike from '@/components/ingestion/databases/Aerospike.vue'
+import DynamoDB from '@/components/ingestion/databases/DynamoDB.vue'
+
+
 const useIngestionRoutes = () => {
   const ingestionRoutes: any = [
     {
@@ -271,6 +287,120 @@ const useIngestionRoutes = () => {
               },
             },
           ],
+        },
+        {
+          path: "databases",
+          name: "databases",
+          component: DatabaseConfig,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+          children: [
+            {
+              path: "sqlserver",
+              name: "sqlserver",
+              component: SqlServer,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "postgres",
+              name: "postgres",
+              component: Postgres,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "mongodb",
+              name: "mongodb",
+              component: MongoDB,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "redis",
+              name: "redis",
+              component: Redis,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "couchdb",
+              name: "couchdb",
+              component: CouchDB,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "elasticsearch",
+              name: "elasticsearch",
+              component: Elasticsearch,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "mysql",
+              name: "mysql",
+              component: MySQL,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "saphana",
+              name: "saphana",
+              component: SAPHana,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "snowflake",
+              name: "snowflake",
+              component: Snowflake,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "zookeeper",
+              name: "zookeeper",
+              component: Zookeeper,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "cassandra",
+              name: "cassandra",
+              component: Cassandra,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "aerospike",
+              name: "aerospike",
+              component: Aerospike,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "dynamodb",
+              name: "dynamodb",
+              component: DynamoDB,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+          ]
         },
       ],
     },

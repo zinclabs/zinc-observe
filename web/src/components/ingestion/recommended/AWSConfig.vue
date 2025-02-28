@@ -86,28 +86,60 @@ Access Key: [BASIC_PASSCODE]`;
 
     const awsServiceLinks = [
       {
-        name: "Cloudwatch Logs",
-        link: "https://docs.aws.amazon.com/firehose/latest/dev/writing-with-cloudwatch-logs.html",
+        name: "Application Load Balancer (ALB)",
+        link: "https://short.openobserve.ai/aws/alb",
       },
       {
-        name: "Cloudwatch Events",
-        link: "https://docs.aws.amazon.com/firehose/latest/dev/writing-with-cloudwatch-events.html",
+        name: "Cloudwatch Logs",
+        link: "https://short.openobserve.ai/aws/cloudwatch-logs",
+      },
+      {
+        name: "Eventbridge/Cloudwatch Events",
+        link: "https://short.openobserve.ai/aws/eventbridge",
       },
       {
         name: "Cloudwatch Metrics",
-        link: "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Metric-Streams.html",
+        link: "https://short.openobserve.ai/aws/cloudwatch-metrics",
       },
       {
         name: "VPC Flow Logs",
-        link: "https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs-firehose.html",
+        link: "https://short.openobserve.ai/aws/vpc-flow-logs",
+      },
+      {
+        name: "EC2 Instance Logs",
+        link: "https://short.openobserve.ai/aws/ec2",
+      },
+      {
+        name: "Congnito",
+        link: "https://short.openobserve.ai/aws/cognito",
       },
       {
         name: "AWS Network Firewall Logs",
-        link: "https://docs.aws.amazon.com/network-firewall/latest/developerguide/logging-kinesis.html",
+        link: "https://short.openobserve.ai/aws/network-firewall-logs",
       },
       {
         name: "AWS WAF Logs",
-        link: "https://docs.aws.amazon.com/waf/latest/developerguide/logging-kinesis.html",
+        link: "https://short.openobserve.ai/aws/waf",
+      },
+      {
+        name: "RDS Logs",
+        link: "https://short.openobserve.ai/aws/rds",
+      },
+      {
+        name: "DynamoDB Logs",
+        link: "https://short.openobserve.ai/aws/dynamodb",
+      },
+      {
+        name: "Route53 Logs",
+        link: "https://short.openobserve.ai/aws/route53",
+      },
+      {
+        name: "API Gateway Logs",
+        link: "https://short.openobserve.ai/aws/api-gateway",
+      },
+      {
+        name: "Cloudfront Logs",
+        link: "https://short.openobserve.ai/aws/cloudfront",
       },
       {
         name: "AWS IoT",
