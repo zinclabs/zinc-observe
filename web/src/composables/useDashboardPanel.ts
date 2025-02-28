@@ -3053,6 +3053,57 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
           //     ),
           //   );
           // }
+
+          // Add join schema validation
+            const currentQuery =
+              dashboardPanelData.data.queries[
+                dashboardPanelData.layout.currentQueryIndex
+              ];
+
+            // Validate joins if present
+            if (currentQuery.joins && currentQuery.joins.length > 0) {
+              currentQuery.joins.forEach((join: any, index: number) => {
+                // Validate required join fields
+                if (!join.stream) {
+                  errors.push(`Join #${index + 1}: Stream name is required`);
+                }
+                if (!join.joinType) {
+                  errors.push(`Join #${index + 1}: Join type is required`);
+                }
+
+                // Validate join conditions
+                if (!join.conditions || join.conditions.length === 0) {
+                  errors.push(
+                    `Join #${index + 1}: At least one join condition is required`,
+                  );
+                } else {
+                  join.conditions.forEach(
+                    (condition: any, condIndex: number) => {
+                      // Validate left field
+                      if (!condition.leftField?.field) {
+                        errors.push(
+                          `Join #${index + 1}, Condition #${condIndex + 1}: Left field is required`,
+                        );
+                      }
+
+                      // Validate right field
+                      if (!condition.rightField?.field) {
+                        errors.push(
+                          `Join #${index + 1}, Condition #${condIndex + 1}: Right field is required`,
+                        );
+                      }
+
+                      // Validate operation
+                      if (!condition.operation) {
+                        errors.push(
+                          `Join #${index + 1}, Condition #${condIndex + 1}: Operation is required`,
+                        );
+                      }
+                    },
+                  );
+                }
+              });
+            }
         }
       }
     }
