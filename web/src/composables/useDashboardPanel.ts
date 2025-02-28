@@ -2428,33 +2428,33 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ?.filter((it: any) => !it?.isDerived)
       ?.map((it: any) => it?.alias);
 
-    // const tableTypeWithXFieldOnly =
-    //   dashboardPanelData.data.type === "table" &&
-    //   xAxisAlias.length > 0 &&
-    //   yAxisAlias.length === 0 &&
-    //   !bAxisAlias?.length;
+    const tableTypeWithXFieldOnly =
+      dashboardPanelData.data.type === "table" &&
+      xAxisAlias.length > 0 &&
+      yAxisAlias.length === 0 &&
+      !bAxisAlias?.length;
 
-    // if (!tableTypeWithXFieldOnly) {
-    // if (dashboardPanelData.data.type == "heatmap") {
-    //   query +=
-    //     xAxisAlias.length && yAxisAlias.length
-    //       ? " GROUP BY " +
-    // xAxisAlias.join(", ") +
-    // ", " +
-    // yAxisAlias.join(", ")
-    //       : "";
-    // } else if (bAxisAlias?.length) {
-    //   query +=
-    //     xAxisAlias.length && bAxisAlias.length
-    //       ? " GROUP BY " +
-    // xAxisAlias.join(", ") +
-    // ", " +
-    // bAxisAlias.join(", ")
-    //       : "";
-    // } else {
-    //   query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
-    // }
-    // }
+    if (!tableTypeWithXFieldOnly) {
+      if (dashboardPanelData.data.type == "heatmap") {
+        query +=
+          xAxisAlias.length && yAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              yAxisAlias.join(", ")
+            : "";
+      } else if (bAxisAlias?.length) {
+        query +=
+          xAxisAlias.length && bAxisAlias.length
+            ? " GROUP BY " +
+              xAxisAlias.join(", ") +
+              ", " +
+              bAxisAlias.join(", ")
+            : "";
+      } else {
+        query += xAxisAlias.length ? " GROUP BY " + xAxisAlias.join(", ") : "";
+      }
+    }
 
     // 5. Order by
     // array of sorting fields with followed by asc or desc
